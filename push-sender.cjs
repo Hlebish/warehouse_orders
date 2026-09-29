@@ -22,6 +22,14 @@ async function main() {
       const tokens = await user.ref.collection('pushTokens').get();
       tokenDocs.push(...tokens.docs);
     }
+    if (tokenDocs.length === 0) {
+      await event.ref.update({ sentAt: admin.firestore.FieldValue.serverTimestamp(), deliveryStatus: 'no_devices' });
+      console.log(`Processed ${event.id}; devices=0; status=no_devices`);
+      continue;
+    }
+    let accepted = 0;
+    let failed = 0;
+    const failuresByCode = new Map();
     for (let i = 0; i < tokenDocs.length; i += 500) {
       const group = tokenDocs.slice(i, i + 500);
       if (!group.length) continue;
@@ -32,12 +40,31 @@ async function main() {
       });
       const removals = [];
       response.responses.forEach((result, index) => {
+        if (result.success) {
+          accepted++;
+          return;
+        }
+        failed++;
+        const code = result.error?.code || 'unknown';
+        failuresByCode.set(code, (failuresByCode.get(code) || 0) + 1);
         if (!result.success && ['messaging/registration-token-not-registered', 'messaging/invalid-registration-token'].includes(result.error?.code)) removals.push(group[index].ref.delete());
       });
       await Promise.all(removals);
     }
-    await event.ref.update({ sentAt: admin.firestore.FieldValue.serverTimestamp() });
-    console.log(`Processed ${event.id}; devices=${tokenDocs.length}`);
+    if (accepted === 0) {
+      const reasons = [...failuresByCode].map(([code, count]) => `${code}:${count}`).join(', ');
+      console.error(`Delivery failed for ${event.id}; accepted=0; failed=${failed}; errors=${reasons}; event remains queued for retry`);
+      throw new Error(`FCM rejected all ${failed} device deliveries for ${event.id}`);
+    }
+    await event.ref.update({
+      sentAt: admin.firestore.FieldValue.serverTimestamp(),
+      deliveryStatus: failed === 0 ? 'accepted' : 'partially_accepted',
+      acceptedCount: accepted,
+      failedCount: failed,
+      failureCodes: Object.fromEntries(failuresByCode)
+    });
+    const reasons = failuresByCode.size ? `; errors=${[...failuresByCode].map(([code, count]) => `${code}:${count}`).join(', ')}` : '';
+    console.log(`Processed ${event.id}; devices=${tokenDocs.length}; accepted=${accepted}; failed=${failed}${reasons}`);
   }
 }
 

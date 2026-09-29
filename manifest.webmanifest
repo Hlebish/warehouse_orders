@@ -1,11 +1,20 @@
 {
+  "id": "./",
   "name": "Заказы · Склад",
   "short_name": "Заказы",
   "description": "Заказы, дефекты и согласование отгрузки",
   "lang": "ru",
   "start_url": "./",
+  "scope": "./",
   "display": "standalone",
   "background_color": "#f5f6f8",
-  "theme_color": "#f5f6f8",
-  "icons": []
+  "theme_color": "#174b3c",
+  "icons": [
+    {
+      "src": "app-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
 }

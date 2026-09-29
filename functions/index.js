@@ -140,7 +140,6 @@ exports.sendWarehousePush = onDocumentCreated('pushQueue/{eventId}', async event
 
       const response = await messaging.sendEachForMulticast({
         tokens: group.map(item => item.token),
-       
         data: {
           title,
           body,

@@ -70,10 +70,16 @@ Cloud Functions и платный план Blaze для регистрации �
 
 ### Настроить фоновые push-уведомления
 
-1. Firebase Console → Project settings → Cloud Messaging → Web Push certificates → создайте/скопируйте ключ. В `firebase-config.js` замените `ADD_WEB_PUSH_CERTIFICATE_KEY_HERE` на этот публичный ключ.
-2. Firebase Console → Project settings → Service accounts → создайте закрытый ключ JSON для сервисного аккаунта.
-3. На GitHub откройте Settings → Secrets and variables → Actions → New repository secret. Название: `FIREBASE_SERVICE_ACCOUNT_JSON`; значение: всё содержимое JSON-файла. Не добавляйте этот файл в репозиторий.
-4. Опубликуйте новые Firestore Rules из `firestore.rules` в Firebase Console.
-5. Обновите сайт и на каждом телефоне/компьютере откройте центр уведомлений → «Разрешить на этом устройстве» и разрешите уведомления браузера.
+Система использует Firebase Cloud Messaging (FCM) и Cloud Functions 2nd gen. Клиент регистрирует FCM-токен каждого устройства в users/{UID}/pushTokens; любое изменение в очереди pushQueue запускает серверную функцию, которая отправляет push на все активные зарегистрированные устройства.
 
-Отправитель запускается GitHub Actions примерно раз в пять минут. Раннеры бесплатны для публичного репозитория. Уведомления о заказах и комментариях отправляются на устройства всех активных сотрудников, включая другие устройства автора события. Поэтому автор с компьютера получит уведомление на свой подключённый телефон. Доставка зависит от разрешений браузера, сети и поддержки Web Push устройством.
+1. Переведите проект sklad-18f38 на план Blaze.
+2. Установите Firebase CLI: npm install -g firebase-tools
+3. Выполните: firebase login
+4. В корне проекта выполните: firebase deploy --only functions
+5. На каждом компьютере/телефоне один раз разрешите уведомления через центр уведомлений приложения.
+
+Основной путь доставки: Изменение заказа → Firestore → Cloud Function → FCM → телефон/ПК.
+
+GitHub Actions больше не используется для отправки push, поэтому задержка до 5 минут не нужна.
+
+Для контроля расходов на Blaze настройте бюджетное уведомление и spend cap для Cloud Functions в Google Cloud/Firebase Console.

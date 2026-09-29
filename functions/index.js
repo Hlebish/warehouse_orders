@@ -139,25 +139,23 @@ exports.sendWarehousePush = onDocumentCreated('pushQueue/{eventId}', async event
       const group = tokenDocs.slice(i, i + 500);
 
       const response = await messaging.sendEachForMulticast({
-        tokens: group.map(item => item.token),
-        notification: {
-          title,
-          body
-        },
-        data: {
-          eventId,
-          link: siteUrl
-        },
-        webpush: {
-          headers: {
-            Urgency: 'high',
-            TTL: '86400'
-          },
-          fcmOptions: {
-            link: siteUrl
-          }
-        }
-      });
+  tokens: group.map(item => item.token),
+  data: {
+    title,
+    body,
+    eventId,
+    link: siteUrl
+  },
+  webpush: {
+    headers: {
+      Urgency: 'high',
+      TTL: '86400'
+    },
+    fcmOptions: {
+      link: siteUrl
+    }
+  }
+});
 
       const removals = [];
 

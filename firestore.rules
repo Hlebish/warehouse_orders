@@ -29,6 +29,25 @@ service cloud.firestore {
       allow delete: if isDirector();
     }
 
+    match /deletedOrders/{archiveId} {
+      allow read: if canManageUsers();
+      allow create: if canManageUsers()
+        && request.resource.data.deletedBy == request.auth.uid
+        && request.resource.data.complete == false;
+      allow update: if canManageUsers()
+        && resource.data.complete == false
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['complete'])
+        && request.resource.data.complete == true;
+      allow delete: if false;
+
+      match /entries/{entryId} {
+        allow read: if canManageUsers();
+        allow create, update: if canManageUsers()
+          && get(/databases/$(database)/documents/deletedOrders/$(archiveId)).data.complete == false;
+        allow delete: if false;
+      }
+    }
+
     match /pendingStaff/{email} {
       allow read: if canManageUsers();
       allow write: if false;
@@ -58,7 +77,7 @@ service cloud.firestore {
           && request.resource.data.diff(resource.data).affectedKeys()
             .hasOnly(['status', 'updatedAt', 'updatedBy', 'updatedByName'])
           && request.resource.data.status in ['Собран', 'Под вопросом']);
-      allow delete: if isDirector();
+      allow delete: if canManageUsers();
 
       match /entries/{entryId} {
         allow read: if activeUser();
@@ -81,7 +100,7 @@ service cloud.firestore {
             .hasOnly(['decision', 'decisionText', 'decidedBy', 'decidedByName', 'decidedAt'])
           && request.resource.data.decision in ['Подтверждён', 'Отменён']
           && request.resource.data.decisionText is string;
-        allow delete: if isDirector();
+        allow delete: if canManageUsers();
       }
     }
   }

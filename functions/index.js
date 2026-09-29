@@ -18,7 +18,7 @@ async function requireUserManager(uid) {
   return profile;
 }
 
-exports.provisionStaff = onCall({ region: 'europe-west1' }, async request => {
+exports.provisionStaff = onCall({ region: 'europe-west1', cors: ['https://hlebish.github.io'] }, async request => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in first.');
   await requireUserManager(request.auth.uid);
 
@@ -33,7 +33,7 @@ exports.provisionStaff = onCall({ region: 'europe-west1' }, async request => {
   return { email };
 });
 
-exports.claimStaffProfile = onCall({ region: 'europe-west1' }, async request => {
+exports.claimStaffProfile = onCall({ region: 'europe-west1', cors: ['https://hlebish.github.io'] }, async request => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in through Google first.');
   const email = normalizedEmail(request.auth.token.email);
   if (!email || request.auth.token.email_verified !== true) {
@@ -60,7 +60,7 @@ exports.claimStaffProfile = onCall({ region: 'europe-west1' }, async request => 
   return { claimed: true };
 });
 
-exports.deleteStaffAccount = onCall({ region: 'europe-west1' }, async request => {
+exports.deleteStaffAccount = onCall({ region: 'europe-west1', cors: ['https://hlebish.github.io'] }, async request => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in first.');
   await requireUserManager(request.auth.uid);
 

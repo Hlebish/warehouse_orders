@@ -76,3 +76,4 @@ td{border-top-color:#edf1eb}
 .auth-submit{justify-content:center;margin-top:4px}
 .auth-reset{border:0;background:none;color:#497d56;font:inherit;cursor:pointer;padding:8px}
 .auth-error{min-height:18px;color:#a43333;font-size:12px;text-align:center}
+.staff-actions{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:8px}.staff-actions select{max-width:100%;min-height:32px;padding:5px 8px;border:1px solid var(--line);border-radius:6px;background:#fff;color:#596574;font-size:11px}

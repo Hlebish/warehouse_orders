@@ -1,6 +1,12 @@
 const admin = require('firebase-admin');
 
-const credential = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
+let credential;
+try {
+  credential = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON || '');
+  if (credential.type !== 'service_account' || !credential.project_id || !credential.client_email || !credential.private_key) throw new Error();
+} catch {
+  throw new Error('FIREBASE_SERVICE_ACCOUNT_JSON must contain the Firebase service-account JSON key.');
+}
 admin.initializeApp({ credential: admin.credential.cert(credential), projectId: 'sklad-18f38' });
 const db = admin.firestore();
 const messaging = admin.messaging();

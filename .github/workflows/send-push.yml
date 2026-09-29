@@ -14,7 +14,7 @@ jobs:
     steps:
       - id: config
         run: |
-          if [ -n "$FIREBASE_SERVICE_ACCOUNT_JSON" ]; then echo "ready=true" >> "$GITHUB_OUTPUT"; else echo "ready=false" >> "$GITHUB_OUTPUT"; echo "Push sender awaits the repository secret."; fi
+          if python3 -c 'import json,os; d=json.loads(os.environ["FIREBASE_SERVICE_ACCOUNT_JSON"]); assert d.get("type")=="service_account" and d.get("project_id") and d.get("client_email") and d.get("private_key")'; then echo "ready=true" >> "$GITHUB_OUTPUT"; else echo "ready=false" >> "$GITHUB_OUTPUT"; echo "Push sender awaits a valid Firebase service-account JSON secret."; fi
         env:
           FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
       - uses: actions/checkout@v4

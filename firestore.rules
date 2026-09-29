@@ -10,12 +10,26 @@ service cloud.firestore {
     function isDirector() { return activeUser() && role() == 'director'; }
     function isWarehouse() { return activeUser() && role() == 'warehouse'; }
     function isManager() { return activeUser() && role() == 'manager'; }
+    function canManageUsers() { return activeUser() && (userDoc().data.admin == true || role() == 'director'); }
 
     match /users/{userId} {
-      // Staff can read their own profile to learn their role; only the director
-      // can read other staff profiles. Profiles are provisioned in the console.
-      allow read: if signedIn() && (request.auth.uid == userId || isDirector());
-      allow create, update, delete: if false;
+      allow read: if signedIn() && (request.auth.uid == userId || canManageUsers());
+      allow create: if canManageUsers()
+        && request.resource.data.keys().hasOnly(['displayName', 'email', 'role', 'active', 'admin'])
+        && request.resource.data.displayName is string
+        && request.resource.data.email is string
+        && request.resource.data.active == true
+        && request.resource.data.admin == false
+        && request.resource.data.role in (isDirector()
+          ? ['warehouse', 'manager', 'director']
+          : ['warehouse', 'manager']);
+      allow update: if isDirector()
+        || (activeUser() && userDoc().data.admin == true && request.auth.uid != userId
+          && resource.data.role != 'director'
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['displayName', 'role', 'active'])
+          && request.resource.data.role in ['warehouse', 'manager']);
+      allow delete: if isDirector();
     }
 
     match /orders/{orderId} {

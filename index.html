@@ -6,22 +6,20 @@
   <meta name="theme-color" content="#f5f6f8">
   <meta name="description" content="Заказы, дефекты и согласование отгрузки в одном месте">
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="stylesheet" href="styles.css?v=20260929-firebase-login1">
+  <link rel="stylesheet" href="styles.css?v=20260929-google-photo3">
   <title>Заказы · Склад</title>
 </head>
 <body>
   <section class="auth-gate" id="authGate" hidden>
-    <form class="auth-card" id="loginForm">
+    <div class="auth-card">
       <img src="amp-logo.png" alt="AMP" class="auth-logo">
       <div class="eyebrow">AMP · ЗАКАЗЫ И СКЛАД</div>
       <h1 id="authTitle">Вход в приложение</h1>
-      <p id="authMessage">Войдите с рабочей учётной записью.</p>
-      <label class="field"><span>Рабочая почта</span><input id="loginEmail" type="email" autocomplete="username" required></label>
-      <label class="field"><span>Пароль</span><input id="loginPassword" type="password" autocomplete="current-password" required></label>
-      <button class="primary-button auth-submit" type="submit">Войти</button>
-      <button class="auth-reset" id="resetPassword" type="button">Забыли пароль?</button>
+      <p id="authMessage">Войдите через Google, чтобы открыть список заказов.</p>
+      <button class="primary-button auth-submit google-login" id="googleLoginButton" type="button">Войти через Google</button>
+      <details class="legacy-auth"><summary>Есть старый аккаунт с паролем?</summary><form id="legacyLogin"><label class="field"><span>Почта</span><input id="legacyEmail" type="email" autocomplete="username" required></label><label class="field"><span>Старый пароль</span><input id="legacyPassword" type="password" autocomplete="current-password" required></label><button class="secondary-button" type="submit">Войти и связать Google</button></form></details>
       <div class="auth-error" id="authError" role="alert"></div>
-    </form>
+    </div>
   </section>
   <div class="app-shell">
   <div class="sidebar-backdrop" id="sidebarBackdrop" hidden></div>
@@ -69,7 +67,8 @@
   </div>
 
   <div class="modal-backdrop" id="modalBackdrop" hidden><section class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle"><div class="modal-head"><div><span class="eyebrow" id="modalEyebrow">НОВАЯ КАРТОЧКА</span><h2 id="modalTitle">Добавить заказ</h2></div><button class="close-button" id="closeModal" aria-label="Закрыть">×</button></div><div class="modal-body" id="modalBody"></div><div class="modal-foot" id="modalFoot"></div></section></div>
+  <div class="image-viewer" id="imageViewer" hidden role="dialog" aria-modal="true" aria-label="Просмотр фотографии"><button class="image-viewer-close" id="closeImageViewer" aria-label="Закрыть">×</button><img id="imageViewerImage" alt="Фото из комментария"></div>
   <div class="toast-stack" id="toastStack" aria-live="polite"></div>
-  <script type="module" src="app.js?v=20260929-staff-drawer2"></script>
+  <script type="module" src="app.js?v=20260929-google-photo3"></script>
 </body>
 </html>

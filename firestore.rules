@@ -29,6 +29,11 @@ service cloud.firestore {
       allow delete: if isDirector();
     }
 
+    match /pendingStaff/{email} {
+      allow read: if canManageUsers();
+      allow write: if false;
+    }
+
     match /orders/{orderId} {
       allow read: if activeUser();
       allow create: if (isWarehouse() || isDirector())

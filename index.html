@@ -10,6 +10,19 @@
   <title>Заказы · Склад</title>
 </head>
 <body>
+  <section class="auth-gate" id="authGate" hidden>
+    <form class="auth-card" id="loginForm">
+      <img src="amp-logo.png" alt="AMP" class="auth-logo">
+      <div class="eyebrow">AMP · ЗАКАЗЫ И СКЛАД</div>
+      <h1 id="authTitle">Вход в приложение</h1>
+      <p id="authMessage">Войдите с рабочей учётной записью.</p>
+      <label class="field"><span>Рабочая почта</span><input id="loginEmail" type="email" autocomplete="username" required></label>
+      <label class="field"><span>Пароль</span><input id="loginPassword" type="password" autocomplete="current-password" required></label>
+      <button class="primary-button auth-submit" type="submit">Войти</button>
+      <button class="auth-reset" id="resetPassword" type="button">Забыли пароль?</button>
+      <div class="auth-error" id="authError" role="alert"></div>
+    </form>
+  </section>
   <div class="app-shell">
   <aside class="sidebar" id="sidebar">
       <a class="brand" href="#"><img class="brand-mark brand-logo" src="amp-logo.png" alt="AMP Automobile Parts"><span>Склад<span class="brand-sub">Заказы и качество</span></span></a>
@@ -34,7 +47,7 @@
       </header>
 
       <section class="content">
-        <div class="demo-banner" id="demoBanner"><span>◈</span><div><b>Предварительный просмотр</b><small>Сейчас данные хранятся только в этом браузере. Подключите Firebase, чтобы включить общую историю, учётные записи и синхронизацию.</small></div><a href="README.md">Как подключить →</a></div>
+        <div class="demo-banner" id="demoBanner" hidden><span>◈</span><div><b>Облачная история заказов</b><small>Изменения синхронизируются между всеми сотрудниками.</small></div></div>
         <div class="page-heading"><div><div class="eyebrow">ОБРАБОТКА И СОГЛАСОВАНИЕ</div><h1>Заказы</h1><p>Сборка, комментарии и решения менеджеров в одной истории.</p></div><button class="primary-button" id="newOrderButton"><span>＋</span> Добавить заказ</button></div>
 
         <div class="stats-grid">

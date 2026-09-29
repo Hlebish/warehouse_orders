@@ -1,0 +1,21 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    function activeUser() {
+      return request.auth != null
+        && firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.active == true;
+    }
+    function isDirector() {
+      return activeUser()
+        && firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'director';
+    }
+
+    match /orders/{orderId}/{entryId}/{fileName} {
+      allow read: if activeUser();
+      allow create, update: if activeUser()
+        && request.resource.size < 8 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+      allow delete: if isDirector();
+    }
+  }
+}

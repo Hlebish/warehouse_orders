@@ -1,0 +1,72 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function userDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+    function activeUser() { return signedIn() && userDoc().data.active == true; }
+    function role() { return userDoc().data.role; }
+    function isDirector() { return activeUser() && role() == 'director'; }
+    function isWarehouse() { return activeUser() && role() == 'warehouse'; }
+    function isManager() { return activeUser() && role() == 'manager'; }
+
+    match /users/{userId} {
+      // Staff can read their own profile to learn their role; only the director
+      // can read other staff profiles. Profiles are provisioned in the console.
+      allow read: if signedIn() && (request.auth.uid == userId || isDirector());
+      allow create, update, delete: if false;
+    }
+
+    match /orders/{orderId} {
+      allow read: if activeUser();
+      allow create: if (isWarehouse() || isDirector())
+        && request.resource.data.keys().hasOnly([
+          'number', 'client', 'status', 'createdAt', 'createdBy',
+          'createdByName', 'updatedAt'
+        ])
+        && request.resource.data.number is string
+        && request.resource.data.number.size() > 0
+        && request.resource.data.client is string
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.status in ['Собран', 'Под вопросом'];
+      allow update: if isDirector()
+        || (isManager()
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['status', 'updatedAt', 'updatedBy', 'updatedByName'])
+          && request.resource.data.status in [
+            'Собран', 'Под вопросом', 'На согласовании',
+            'Одобрен на отгрузку клиенту', 'Отменён'
+          ])
+        || (isWarehouse()
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['status', 'updatedAt', 'updatedBy', 'updatedByName'])
+          && request.resource.data.status in ['Собран', 'Под вопросом']);
+      allow delete: if isDirector();
+
+      match /entries/{entryId} {
+        allow read: if activeUser();
+        allow create: if activeUser()
+          && request.resource.data.keys().hasOnly([
+            'kind', 'article', 'text', 'authorId', 'authorName', 'createdAt',
+            'photos', 'decision', 'decisionText', 'decidedBy',
+            'decidedByName', 'decidedAt'
+          ])
+          && request.resource.data.authorId == request.auth.uid
+          && request.resource.data.kind in [
+            'comment', 'question', 'defect', 'decision', 'viewed', 'system'
+          ]
+          && request.resource.data.text is string
+          && request.resource.data.photos is list
+          && request.resource.data.photos.size() <= 5;
+        allow update: if (isManager() || isDirector())
+          && resource.data.kind == 'defect'
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['decision', 'decisionText', 'decidedBy', 'decidedByName', 'decidedAt'])
+          && request.resource.data.decision in ['Подтверждён', 'Отменён']
+          && request.resource.data.decisionText is string;
+        allow delete: if isDirector();
+      }
+    }
+  }
+}

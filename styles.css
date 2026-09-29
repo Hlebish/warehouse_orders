@@ -61,3 +61,16 @@ td{border-top-color:#edf1eb}
 .timeline-type{color:#34734f;background:#eaf3eb}
 .notice-item{border-color:#e1e9e1}
 .page-footer{color:#839589}
+/* Firebase account gate */
+.auth-gate{position:fixed;inset:0;z-index:1000;display:grid;place-items:center;padding:20px;background:linear-gradient(145deg,#e8f3ec,#f5f7f4)}
+.auth-gate[hidden]{display:none}
+.auth-card{width:min(100%,420px);padding:34px;background:#fff;border:1px solid #dce8df;border-radius:22px;box-shadow:0 20px 60px #193e2a18;display:flex;flex-direction:column;gap:14px}
+.auth-logo{width:82px;height:82px;object-fit:contain;border-radius:50%;margin:0 auto 4px}
+.auth-card .eyebrow{text-align:center;color:#527d5e;font-size:11px;letter-spacing:.12em;font-weight:700}
+.auth-card h1{font-size:26px;text-align:center;margin:0;color:#1e3828}
+.auth-card p{text-align:center;color:#647469;font-size:14px;margin:0 0 8px}
+.auth-card .field{display:flex;flex-direction:column;gap:6px;color:#405348;font-size:13px;font-weight:600}
+.auth-card input{border:1px solid #d9e3dc;border-radius:10px;padding:12px;font:inherit;outline-color:#4b8b5c}
+.auth-submit{justify-content:center;margin-top:4px}
+.auth-reset{border:0;background:none;color:#497d56;font:inherit;cursor:pointer;padding:8px}
+.auth-error{min-height:18px;color:#a43333;font-size:12px;text-align:center}

@@ -15,11 +15,10 @@ const siteUrl = 'https://hlebish.github.io/warehouse_orders/';
 async function main() {
   const batch = await db.collection('pushQueue').where('sentAt', '==', null).limit(100).get();
   for (const event of batch.docs) {
-    const { title, body, authorId } = event.data();
+    const { title, body } = event.data();
     const users = await db.collection('users').where('active', '==', true).get();
     const tokenDocs = [];
     for (const user of users.docs) {
-      if (user.id === authorId) continue;
       const tokens = await user.ref.collection('pushTokens').get();
       tokenDocs.push(...tokens.docs);
     }

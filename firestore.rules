@@ -27,6 +27,20 @@ service cloud.firestore {
             .hasOnly(['displayName', 'role', 'active'])
           && request.resource.data.role in ['warehouse', 'manager', 'director']);
       allow delete: if isDirector();
+
+      match /pushTokens/{tokenId} {
+        allow read, create, update, delete: if activeUser() && request.auth.uid == userId;
+      }
+    }
+
+    match /pushQueue/{eventId} {
+      allow create: if activeUser()
+        && request.resource.data.keys().hasOnly(['title', 'body', 'authorId', 'createdAt', 'sentAt'])
+        && request.resource.data.authorId == request.auth.uid
+        && request.resource.data.title is string
+        && request.resource.data.body is string
+        && request.resource.data.sentAt == null;
+      allow read, update, delete: if false;
     }
 
     match /deletedOrders/{archiveId} {

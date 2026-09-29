@@ -41,7 +41,88 @@ async function save(){
  }catch(err){console.error(err);toast('Не удалось сохранить изменения. Проверьте доступ и соединение.');}
 }
 async function queuePush(title,body,authorId){try{await setDoc(doc(db,'pushQueue',crypto.randomUUID()),{title:String(title||'Заказы · Склад'),body:String(body||'Новое изменение в заказе.'),authorId,createdAt:isoNow(),sentAt:null})}catch(err){console.warn('Push event was not queued',err)}}
-async function enablePush(){if(!('Notification'in window)||!('serviceWorker'in navigator)){toast('Этот браузер не поддерживает push-уведомления.');return}if(!vapidKey||vapidKey.includes('ADD_WEB_PUSH')){toast('Push ещё не настроен: администратору нужно добавить VAPID-ключ Firebase.');return}try{const permission=await Notification.requestPermission();if(permission!=='granted'){toast('Разрешение на уведомления не предоставлено.');return}const registration=await navigator.serviceWorker.ready,token=await getToken(messaging,{vapidKey,serviceWorkerRegistration:registration});if(!token)throw new Error('FCM token unavailable');const storageKey='ampPushInstallationId';let installationId=localStorage.getItem(storageKey);if(!installationId){installationId=crypto.randomUUID();localStorage.setItem(storageKey,installationId)}const tokensRef=collection(db,'users',signedInUser.uid,'pushTokens');const existing=await getDocs(tokensRef);const batch=writeBatch(db);for(const tokenDoc of existing.docs){const data=tokenDoc.data()||{};if(data.userAgent===navigator.userAgent&&data.token!==token&&data.installationId!==installationId){batch.delete(tokenDoc.ref)}}const tokenRef=doc(tokensRef,encodeURIComponent(token));batch.set(tokenRef,{token,installationId,updatedAt:isoNow(),userAgent:navigator.userAgent},{merge:true});await batch.commit();toast('Push-уведомления включены на этом устройстве.')}catch(err){console.error('Не удалось включить push',err);toast('Не удалось включить push. Проверьте настройки Firebase и разрешения браузера.')}}
+async function syncPushToken(requestPermission=false){
+  if(!('Notification' in window)||!('serviceWorker' in navigator)){
+    if(requestPermission)toast('Этот браузер не поддерживает push-уведомления.');
+    return;
+  }
+
+  if(!vapidKey||vapidKey.includes('ADD_WEB_PUSH')){
+    if(requestPermission)toast('Push ещё не настроен: администратору нужно добавить VAPID-ключ Firebase.');
+    return;
+  }
+
+  try{
+    let permission=Notification.permission;
+
+    if(permission!=='granted'){
+      if(!requestPermission)return;
+      permission=await Notification.requestPermission();
+    }
+
+    if(permission!=='granted'){
+      if(requestPermission)toast('Разрешение на уведомления не предоставлено.');
+      return;
+    }
+
+    const registration=await navigator.serviceWorker.ready;
+    const token=await getToken(messaging,{
+      vapidKey,
+      serviceWorkerRegistration:registration
+    });
+
+    if(!token)throw new Error('FCM token unavailable');
+
+    const storageKey='ampPushInstallationId';
+    let installationId=localStorage.getItem(storageKey);
+
+    if(!installationId){
+      installationId=crypto.randomUUID();
+      localStorage.setItem(storageKey,installationId);
+    }
+
+    const tokensRef=collection(db,'users',signedInUser.uid,'pushTokens');
+    const existing=await getDocs(tokensRef);
+    const batch=writeBatch(db);
+
+    for(const tokenDoc of existing.docs){
+      const data=tokenDoc.data()||{};
+
+      if(
+        data.userAgent===navigator.userAgent &&
+        data.token!==token &&
+        data.installationId!==installationId
+      ){
+        batch.delete(tokenDoc.ref);
+      }
+    }
+
+    const tokenRef=doc(tokensRef,encodeURIComponent(token));
+
+    batch.set(tokenRef,{
+      token,
+      installationId,
+      updatedAt:isoNow(),
+      userAgent:navigator.userAgent
+    },{merge:true});
+
+    await batch.commit();
+
+    if(requestPermission){
+      toast('Push-уведомления включены на этом устройстве.');
+    }
+  }catch(err){
+    console.error('Не удалось синхронизировать push-токен',err);
+
+    if(requestPermission){
+      toast('Не удалось включить push. Проверьте настройки Firebase и разрешения браузера.');
+    }
+  }
+}
+
+async function enablePush(){
+  await syncPushToken(true);
+}
 onMessage(messaging,payload=>{const n=payload.notification||payload.data||{};if(n.title)toast(`${n.title}${n.body?`: ${n.body}`:''}`)});
 function stopCloud(){profileUnsubscribe?.();ordersUnsubscribe?.();profileUnsubscribe=ordersUnsubscribe=null;for(const stop of entryUnsubscribes.values())stop();entryUnsubscribes.clear();serverCache.clear();state.orders=[]}
 function watchOrders(){
@@ -64,7 +145,7 @@ onAuthStateChanged(auth,user=>{
  profileUnsubscribe=onSnapshot(doc(db,'users',user.uid),snap=>{
    if(!snap.exists()){showAuth('Учётная запись создана, но профиль не найден. Обратитесь к администратору.');$('authError').textContent=`UID: ${user.uid}`;return}
    const profile=snap.data();if(profile.active!==true||!roles[profile.role]){showAuth('Доступ отключён или роль не назначена. Обратитесь к администратору.');return}
-   state.role=profile.role;canManageUsers=profile.admin===true||profile.role==='director';profileName=profile.displayName||user.email||roles[profile.role];$('userName').textContent=profileName;$('userRole').textContent=canManageUsers?`Администратор · ${roles[profile.role]}`:roles[profile.role];hideAuth();watchOrders();render();
+   state.role=profile.role;canManageUsers=profile.admin===true||profile.role==='director';profileName=profile.displayName||user.email||roles[profile.role];$('userName').textContent=profileName;$('userRole').textContent=canManageUsers?`Администратор · ${roles[profile.role]}`:roles[profile.role];hideAuth();watchOrders();render();syncPushToken(false);
  },err=>{console.error(err);showAuth('Не удалось проверить профиль сотрудника. Проверьте правила доступа Firestore.')});
 });
  $('loginForm').addEventListener('submit',async e=>{e.preventDefault();$('authError').textContent='';try{await signInWithEmailAndPassword(auth,$('loginEmail').value.trim(),$('loginPassword').value)}catch(err){$('authError').textContent=err.code==='auth/invalid-credential'?'Неверная почта или пароль.':err.code==='auth/too-many-requests'?'Слишком много попыток. Попробуйте позже.':'Не удалось войти. Проверьте почту и пароль.'}});

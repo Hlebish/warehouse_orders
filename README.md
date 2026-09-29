@@ -38,4 +38,4 @@ python -m http.server 8080
 - `styles.css` — оформление и мобильная версия;
 - `app.js` — демо-логика;
 - `manifest.webmanifest`, `sw.js` — базовая оболочка PWA.
-
+- `amp-logo.png` — логотип AMP в интерфейсе.

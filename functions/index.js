@@ -59,10 +59,50 @@ async function collectTokens() {
     users.docs.map(user => user.ref.collection('pushTokens').get())
   );
 
-  return tokenGroups.flatMap(snapshot => snapshot.docs.map(tokenDoc => ({
-    ref: tokenDoc.ref,
-    token: tokenDoc.get('token')
-  })));
+  // Do not send the same push twice to one app installation.
+  const byInstallation = new Map();
+  const byToken = new Map();
+
+  for (let i = 0; i < tokenGroups.length; i++) {
+    const user = users.docs[i];
+
+    for (const tokenDoc of tokenGroups[i].docs) {
+      const data = tokenDoc.data() || {};
+      const token = String(data.token || '');
+      if (!token) continue;
+
+      const item = {
+        ref: tokenDoc.ref,
+        token,
+        installationId: String(data.installationId || ''),
+        updatedAt: String(data.updatedAt || ''),
+        userId: user.id
+      };
+
+      if (item.installationId) {
+        const key = user.id + ':' + item.installationId;
+        const previous = byInstallation.get(key);
+
+        if (!previous || item.updatedAt >= previous.updatedAt) {
+          byInstallation.set(key, item);
+        }
+      } else if (!byToken.has(token)) {
+        byToken.set(token, item);
+      }
+    }
+  }
+
+  const result = [...byInstallation.values()];
+  const usedTokens = new Set(result.map(item => item.token));
+
+  for (const item of byToken.values()) {
+    if (!usedTokens.has(item.token)) {
+      result.push(item);
+      usedTokens.add(item.token);
+    }
+  }
+
+  return result;
 }
 
 exports.sendWarehousePush = onDocumentCreated('pushQueue/{eventId}', async event => {
@@ -100,6 +140,10 @@ exports.sendWarehousePush = onDocumentCreated('pushQueue/{eventId}', async event
 
       const response = await messaging.sendEachForMulticast({
         tokens: group.map(item => item.token),
+        notification: {
+          title,
+          body
+        },
         data: {
           title,
           body,

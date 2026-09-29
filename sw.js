@@ -4,7 +4,7 @@ importScripts(
 );
 
 const SITE_URL = 'https://hlebish.github.io/warehouse_orders/';
-const CACHE = 'order-desk-fcm-v18';
+const CACHE = 'order-desk-fcm-v19';
 const ASSETS = [
   './',
   './index.html',
@@ -47,6 +47,28 @@ firebase.initializeApp({
 });
 
 const messaging = firebase.messaging();
+
+messaging.onBackgroundMessage(payload => {
+  const data = payload?.data || {};
+  const title = String(data.title || 'Заказы · Склад');
+  const body = String(data.body || 'Новое изменение в заказе.');
+  const eventId = String(data.eventId || '');
+  const link = data.link || SITE_URL;
+
+  self.registration.showNotification(title, {
+    body,
+    icon: './amp-logo.png',
+    badge: './amp-logo.png',
+    tag: eventId || 'warehouse-push',
+    renotify: true,
+    silent: false,
+    vibrate: [200, 100, 200],
+    data: {
+      link,
+      eventId
+    }
+  });
+});
 
 
 self.addEventListener('install', event =>

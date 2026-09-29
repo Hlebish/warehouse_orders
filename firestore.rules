@@ -20,15 +20,13 @@ service cloud.firestore {
         && request.resource.data.email is string
         && request.resource.data.active == true
         && request.resource.data.admin == false
-        && request.resource.data.role in (isDirector()
-          ? ['warehouse', 'manager', 'director']
-          : ['warehouse', 'manager']);
+        && request.resource.data.role in ['warehouse', 'manager', 'director'];
       allow update: if isDirector()
         || (activeUser() && userDoc().data.admin == true && request.auth.uid != userId
           && resource.data.role != 'director'
           && request.resource.data.diff(resource.data).affectedKeys()
             .hasOnly(['displayName', 'role', 'active'])
-          && request.resource.data.role in ['warehouse', 'manager']);
+          && request.resource.data.role in ['warehouse', 'manager', 'director']);
       allow delete: if isDirector();
     }
 

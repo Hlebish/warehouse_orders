@@ -46,7 +46,26 @@ firebase.initializeApp({
   appId: '1:329606730319:web:0235d13ef2f01c71f5503a'
 });
 
-firebase.messaging();
+const messaging = firebase.messaging();
+
+messaging.onBackgroundMessage(payload => {
+  const data = payload.data || {};
+  const title = data.title || 'Заказы · Склад';
+  const body = data.body || 'Новое изменение в заказе.';
+  const eventId = data.eventId || '';
+
+  self.registration.showNotification(title, {
+    body,
+    icon: './amp-logo.png',
+    badge: './amp-logo.png',
+    tag: eventId || 'warehouse-push',
+    renotify: false,
+    data: {
+      link: data.link || SITE_URL,
+      eventId
+    }
+  });
+});
 
 self.addEventListener('install', event =>
   event.waitUntil(

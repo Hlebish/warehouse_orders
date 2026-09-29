@@ -10,4 +10,4 @@ export const firebaseConfig = {
   measurementId: "G-J6MWFZZ0C2"
 };
 
-export const vapidKey = "ADD_WEB_PUSH_CERTIFICATE_KEY_HERE";
+export const vapidKey = "BG532LpLWRd7bJYUg9BCipJo8i9FPwMHxfADycRV4QbOKWVDjY4UaCQv-LqG9TfhfT2u6L_oc9jNZUCdv6_ZGm8";

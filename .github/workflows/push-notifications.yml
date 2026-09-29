@@ -2,7 +2,6 @@ name: Send push notifications
 
 on:
   schedule:
-    # Offset from common five-minute boundaries to reduce GitHub Actions queue contention.
     - cron: '2-59/5 * * * *'
   workflow_dispatch:
 

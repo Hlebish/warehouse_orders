@@ -48,26 +48,6 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
-messaging.onBackgroundMessage(payload => {
-  console.log('[FCM SW] BACKGROUND MESSAGE RECEIVED', payload);
-  const data = payload.data || {};
-  const title = data.title || 'Заказы · Склад';
-  const body = data.body || 'Новое изменение в заказе.';
-  const eventId = data.eventId || '';
-
-  console.log('[FCM SW] SHOW NOTIFICATION', { title, body, eventId });
-  self.registration.showNotification(title, {
-    body,
-    icon: './amp-logo.png',
-    badge: './amp-logo.png',
-    tag: eventId || 'warehouse-push',
-    renotify: false,
-    data: {
-      link: data.link || SITE_URL,
-      eventId
-    }
-  });
-});
 
 self.addEventListener('install', event =>
   event.waitUntil(

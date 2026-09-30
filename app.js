@@ -220,6 +220,22 @@ async function readPhotos(files){
 
   return out;
 }
+async function uploadPhotos(orderId,entryId,blobs){
+  const urls=[];
+
+  for(let i=0;i<blobs.length;i++){
+    const path=`orders/${orderId}/${entryId}/photo-${i+1}-${crypto.randomUUID()}.jpg`;
+    const fileRef=storageRef(storage,path);
+
+    await uploadBytes(fileRef,blobs[i],{
+      contentType:'image/jpeg'
+    });
+
+    urls.push(await getDownloadURL(fileRef));
+  }
+
+  return urls;
+}
 async function saveEntry(){const kind=$('entryKind').value,text=$('entryText').value.trim(),article=$('article')?.value.trim()||'';if(!text){toast('Напишите сообщение.');return}if(kind==='defect'&&!article){toast('Для дефекта укажите артикул детали.');return}try{const photos=await readPhotos($('entryPhotos').files);const o=state.orders.find(x=>x.id===selectedId);o.entries.push({id:crypto.randomUUID(),kind,article:kind==='defect'?article:'',text,author:profileName||roles[state.role],createdAt:isoNow(),photos});if(kind==='defect')o.status='Под вопросом';save();closeModal();render();toast('Запись добавлена в историю заказа.');notify(`${kind==='defect'?'Дефект':'Комментарий'} к заказу № ${o.number}`,o.id);openOrder(o.id)}catch(e){toast(e.message)}}
 function setStatus(status,text,kind='system'){const o=state.orders.find(x=>x.id===selectedId);if(!o)return;o.status=status;o.entries.push({id:crypto.randomUUID(),kind,text,author:roles[state.role],createdAt:isoNow(),photos:[]});save();render();toast(`Статус: ${status}`);notify(`Заказ № ${o.number}: ${status}`,o.id);openOrder(o.id)}
 function cancelOrder(){const o=state.orders.find(x=>x.id===selectedId);showModal('Отменить заказ',`<p style="font-size:12px;color:#697382;margin:0 0 14px">Укажите причину отмены заказа № ${esc(o.number)}. Причина сохранится в истории.</p><div class="field"><label for="cancelReason">Причина отмены *</label><textarea id="cancelReason" required placeholder="Почему заказ отменён?"></textarea></div>`,[button('Назад','back-detail'),button('Отменить заказ','confirm-cancel','small-button danger')],'РЕШЕНИЕ МЕНЕДЖЕРА')}

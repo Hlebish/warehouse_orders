@@ -191,3 +191,32 @@ thead{background:#f1f5f2}th{color:#60746a}td{color:#52665c;border-color:#e8eee9}
  .demo-banner{background:#edf5f0;color:#315344;box-shadow:0 5px 14px rgba(39,75,56,.05)}
  .demo-banner b{color:#315344}.demo-banner small{color:#6c8075}
 }
+
+/* Readability hotfix: sidebar bottom content must remain dark on light cards */
+.sidebar .online-card,
+.sidebar .online-card b,
+.sidebar .online-card small,
+.sidebar .profile-button,
+.sidebar .profile-button b,
+.sidebar .profile-button small,
+.sidebar .dots{
+  color:#29473a !important;
+}
+.sidebar .online-card{
+  background:#e8f4ed !important;
+}
+.sidebar .online-card small,
+.sidebar .profile-button small,
+.sidebar .dots{
+  color:#668074 !important;
+}
+.sidebar .pulse{background:#45bf7d !important}
+.sidebar .profile-button{
+  background:#fff !important;
+}
+.sidebar .avatar{
+  background:#dff2e7 !important;
+  color:#237450 !important;
+}
+.sidebar .brand,
+.sidebar .brand-sub{color:#203d31}

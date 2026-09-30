@@ -94,3 +94,13 @@ body{background:#f1f5f2;color:#182820}
 .search-box{border-color:#cad8ce;background:#fff}.search-box:focus-within{border-color:#388565;box-shadow:0 0 0 3px #38856520}.search-box input{color:#203c30}.search-box input::placeholder{color:#778b7e}
 .modal{box-shadow:0 24px 80px #0d2b1f44}.modal-backdrop{background:#10281fcc}.toast{background:#173e31;color:#f5fff8}
 @media(max-width:760px){.sidebar{box-shadow:8px 0 28px #081f1870}.topbar{background:#fff}.content{padding-top:20px}.stat-card,.orders-panel{box-shadow:0 2px 9px #183d2b0c}}
+.notification-icon {
+  width: 23px;
+  height: 23px;
+  display: block;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}

@@ -16,8 +16,21 @@ let activeFilter='all', selectedId=null, pendingDefectId=null;
 const $=id=>document.getElementById(id), modal=$('modalBackdrop');
 function showAuth(message='Войдите с рабочей учётной записью.'){ $('authGate').hidden=false;document.querySelector('.app-shell').hidden=true;$('authMessage').textContent=message }
 function hideAuth(){ $('authGate').hidden=true;document.querySelector('.app-shell').hidden=false }
-function entryToCloud(e){const out={kind:e.kind,article:e.article||'',text:e.text||'',authorId:e.authorId||auth.currentUser.uid,authorName:e.author||profileName,createdAt:e.createdAt,photos:Array.isArray(e.photos)?e.photos.filter(p=>typeof p==='string'):[]};
-function entryFromCloud(id,d){return{id,kind:d.kind,article:d.article||'',text:d.text||'',authorId:d.authorId,author:d.authorName||'Сотрудник',createdAt:d.createdAt,photos:d.photos||[],...Object.fromEntries(['decision','decisionText','decidedBy','decidedByName','decidedAt'].filter(k=>d[k]!==undefined).map(k=>[k,d[k]]))}}
+function entryToCloud(e){
+  const out={
+    kind:e.kind,
+    article:e.article||'',
+    text:e.text||'',
+    authorId:e.authorId||auth.currentUser.uid,
+    authorName:e.author||profileName,
+    createdAt:e.createdAt,
+    photos:Array.isArray(e.photos)?e.photos.filter(p=>typeof p==='string'):[]
+  };
+  for(const k of ['decision','decisionText','decidedBy','decidedByName','decidedAt']){
+    if(e[k]!==undefined)out[k]=e[k];
+  }
+  return out;
+}function entryFromCloud(id,d){return{id,kind:d.kind,article:d.article||'',text:d.text||'',authorId:d.authorId,author:d.authorName||'Сотрудник',createdAt:d.createdAt,photos:d.photos||[],...Object.fromEntries(['decision','decisionText','decidedBy','decidedByName','decidedAt'].filter(k=>d[k]!==undefined).map(k=>[k,d[k]]))}}
 function orderToCloud(o,isNew=false){return{number:o.number,client:o.client||'',status:o.status,createdAt:o.createdAt,createdBy:o.createdBy||auth.currentUser.uid,createdByName:o.author||profileName,updatedAt:o.updatedAt||o.createdAt,...(!isNew&&o.updatedBy?{updatedBy:o.updatedBy,updatedByName:o.updatedByName}:{})}}
 function equal(a,b){return JSON.stringify(a)===JSON.stringify(b)}
 async function save(){

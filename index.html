@@ -45,13 +45,15 @@
         <button class="mobile-menu" id="mobileMenu" aria-label="Открыть меню">☰</button>
         <div class="breadcrumbs">Рабочее пространство <span>/</span> <b>Заказы</b></div>
         <div class="top-actions">
-  <button class="icon-button" id="notificationButton" aria-label="Уведомления">
-    <span class="material-symbols-outlined">notifications</span>
-    <i id="notificationDot"></i>
-  </button>
-  <span class="top-divider"></span>
-  <span class="today" id="today"></span>
-</div>
+          <button class="icon-button" id="notificationButton" aria-label="Уведомления">
+            <svg class="notification-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/>
+            </svg>
+            <i id="notificationDot"></i>
+          </button>
+          <span class="top-divider"></span>
+          <span class="today" id="today"></span>
+        </div>
       </header>
 
       <section class="content">

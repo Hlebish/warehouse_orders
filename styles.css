@@ -431,3 +431,125 @@ td b,.client-name{color:#111}
   .page-heading h1{color:#111}
   .stat-card{box-shadow:0 3px 12px rgba(0,0,0,.06)}
 }
+
+/* === Final contrast / card refinement === */
+.sidebar .brand{
+  color:#ffffff !important;
+}
+.sidebar .brand-sub{
+  color:#9f9f9f !important;
+}
+.sidebar .online-card{
+  border:1px solid #3a3a3a !important;
+  border-radius:16px !important;
+  background:#141414 !important;
+}
+.sidebar .profile-button{
+  border:1px solid #2d2d2d !important;
+  border-radius:16px !important;
+  margin-top:4px;
+  padding:11px 10px !important;
+  background:#101010 !important;
+}
+.sidebar .profile-button b{
+  color:#ffffff !important;
+}
+.sidebar .profile-button small{
+  color:#a8a8a8 !important;
+}
+.sidebar .dots{
+  color:#8d8d8d !important;
+}
+
+/* Statistics cards: clear borders and strong number hierarchy */
+.stat-card{
+  border:1px solid #cfd6cf !important;
+  box-shadow:0 3px 10px rgba(0,0,0,.055) !important;
+  background:#ffffff !important;
+}
+.stat-card:nth-child(1){border-top:3px solid #669900 !important}
+.stat-card:nth-child(2){border-top:3px solid #9b7b1f !important}
+.stat-card:nth-child(3){border-top:3px solid #669900 !important}
+.stat-card:nth-child(4){border-top:3px solid #669900 !important}
+.stat-card strong{
+  color:#0b0b0b !important;
+  font-weight:800 !important;
+  font-size:29px !important;
+}
+.stat-top{
+  color:#333 !important;
+  font-weight:600;
+}
+.stat-card small{
+  color:#555 !important;
+}
+
+/* Main text: remove washed-out appearance */
+.page-heading p,.panel-heading p{
+  color:#4f4f4f !important;
+}
+.eyebrow{
+  color:#669900 !important;
+  font-weight:800;
+}
+th{
+  color:#333 !important;
+  font-weight:800 !important;
+}
+td{
+  color:#444 !important;
+}
+.client-sub{
+  color:#666 !important;
+}
+.table-footer,.page-footer{
+  color:#555 !important;
+}
+
+/* Search/filter controls */
+.search-box,.filter-button,.secondary-button{
+  color:#222 !important;
+  border-color:#bfc7c0 !important;
+}
+.search-box input{
+  color:#111 !important;
+}
+.search-box input::placeholder{
+  color:#666 !important;
+}
+
+/* Green accents should remain readable, not fluorescent */
+.primary-button{
+  background:#669900 !important;
+  color:#fff !important;
+}
+.order-number{
+  color:#527c00 !important;
+  font-weight:800;
+}
+
+/* Header / breadcrumbs */
+.topbar{
+  color:#222 !important;
+}
+.breadcrumbs{
+  color:#555 !important;
+}
+.breadcrumbs b{
+  color:#111 !important;
+}
+
+/* Slightly stronger page surface */
+.main-area{
+  background:#f4f4f4 !important;
+}
+
+/* On mobile keep the dark AMP header */
+@media(max-width:760px){
+  .topbar{
+    background:#080808 !important;
+  }
+  .breadcrumbs{
+    color:#fff !important;
+  }
+}

@@ -2,9 +2,8 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.19.0/fireba
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, createUserWithEmailAndPassword, updatePassword, EmailAuthProvider, reauthenticateWithCredential, GoogleAuthProvider, signInWithPopup, linkWithCredential } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js';
 import { getFirestore, collection, doc, onSnapshot, setDoc, deleteDoc, getDocs, getDoc, updateDoc, writeBatch } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
 import { getMessaging, getToken, deleteToken, onMessage } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-messaging.js';
-import { getStorage, ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-storage.js';
 import { firebaseConfig, vapidKey } from './firebase-config.js';
-const firebaseApp=initializeApp(firebaseConfig),auth=getAuth(firebaseApp),db=getFirestore(firebaseApp),messaging=getMessaging(firebaseApp),storage=getStorage(firebaseApp),staffAuth=getAuth(initializeApp(firebaseConfig,'amp-staff-provisioner'));
+const firebaseApp=initializeApp(firebaseConfig),auth=getAuth(firebaseApp),db=getFirestore(firebaseApp),messaging=getMessaging(firebaseApp),staffAuth=getAuth(initializeApp(firebaseConfig,'amp-staff-provisioner'));
 let signedInUser=null,profileName='',canManageUsers=false,profileUnsubscribe=null,ordersUnsubscribe=null,entryUnsubscribes=new Map(),serverCache=new Map(),pendingWrites=new Set(),initialCloudLoad=true;
 const roles={warehouse:'Кладовщик',manager:'Менеджер',director:'Директор'};
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -16,9 +15,7 @@ let activeFilter='all', selectedId=null, pendingDefectId=null;
 const $=id=>document.getElementById(id), modal=$('modalBackdrop');
 function showAuth(message='Войдите с рабочей учётной записью.'){ $('authGate').hidden=false;document.querySelector('.app-shell').hidden=true;$('authMessage').textContent=message }
 function hideAuth(){ $('authGate').hidden=true;document.querySelector('.app-shell').hidden=false }
-function entryToCloud(e){const out={kind:e.kind,article:e.article||'',text:e.text||'',authorId:e.authorId||auth.currentUser.uid,authorName:e.author||profileName,createdAt:e.createdAt,photos:Array.isArray(e.photos)
-  ? e.photos.filter(p=>typeof p==='string')
-  : []};for(const k of ['decision','decisionText','decidedBy','decidedByName','decidedAt'])if(e[k]!==undefined)out[k]=e[k];return out}
+function entryToCloud(e){const out={kind:e.kind,article:e.article||'',text:e.text||'',authorId:e.authorId||auth.currentUser.uid,authorName:e.author||profileName,createdAt:e.createdAt,photos:e.photos||[]};for(const k of ['decision','decisionText','decidedBy','decidedByName','decidedAt'])if(e[k]!==undefined)out[k]=e[k];return out}
 function entryFromCloud(id,d){return{id,kind:d.kind,article:d.article||'',text:d.text||'',authorId:d.authorId,author:d.authorName||'Сотрудник',createdAt:d.createdAt,photos:d.photos||[],...Object.fromEntries(['decision','decisionText','decidedBy','decidedByName','decidedAt'].filter(k=>d[k]!==undefined).map(k=>[k,d[k]]))}}
 function orderToCloud(o,isNew=false){return{number:o.number,client:o.client||'',status:o.status,createdAt:o.createdAt,createdBy:o.createdBy||auth.currentUser.uid,createdByName:o.author||profileName,updatedAt:o.updatedAt||o.createdAt,...(!isNew&&o.updatedBy?{updatedBy:o.updatedBy,updatedByName:o.updatedByName}:{})}}
 function equal(a,b){return JSON.stringify(a)===JSON.stringify(b)}
@@ -170,143 +167,10 @@ function openOrder(id){const o=state.orders.find(x=>x.id===id);if(!o)return;sele
  if(canManageUsers)actions+=button('Удалить карточку','delete-order','small-button danger');let entries=(o.entries||[]).map(e=>`<article class="timeline-item"><div class="timeline-top"><span><b>${esc(e.author)}</b> · ${fmtDateTime(e.createdAt)}</span><span style="display:flex;align-items:center;gap:7px"><span class="timeline-type">${esc(({defect:'ДЕФЕКТ',question:'ВОПРОС',decision:'РЕШЕНИЕ',comment:'КОММЕНТАРИЙ',viewed:'ПРОСМОТРЕНО',system:'СИСТЕМА'})[e.kind]||'ЗАПИСЬ')}</span>${isDirector?`<button class="row-menu" title="Удалить запись (директор)" data-action="delete-entry:${e.id}">×</button>`:''}</span></div>${e.article?`<div class="timeline-article">Артикул: ${esc(e.article)}</div>`:''}<div class="timeline-text">${esc(e.text)}</div>${e.photos?.length?`<div class="photo-grid">${e.photos.map(p=>`<img src="${p}" alt="Фото к записи" data-photo="${p}">`).join('')}</div>`:''}${e.kind==='defect'&&isManager?`<div class="decision-row"><span>Решение по дефекту: <b>${esc(e.decision||'ожидает ответа')}</b>${e.decisionText?`<br>${esc(e.decisionText)}`:''}</span><span class="decision-actions">${button('Подтвердить','defect-confirm:'+e.id,'small-button good')}${button('Отменить','defect-cancel:'+e.id,'small-button danger')}</span></div>`:''}${e.kind==='defect'&&e.decision&&!isManager?`<div class="decision-row"><span>Решение менеджера: <b>${esc(e.decision)}</b>${e.decisionText?`<br>${esc(e.decisionText)}`:''}</span></div>`:''}</article>`).join('');const reviewed=(o.entries||[]).some(e=>e.kind==='viewed');let badge=reviewed?'<span class="status-pill status-neutral">Просмотрен менеджером</span>':'';showModal(`Заказ № ${o.number}`,`<div class="order-detail-head"><div><div class="detail-number">${esc(o.client)}</div><div class="detail-client">Заказ № ${esc(o.number)}</div><div class="detail-meta">Создан ${fmtDateTime(o.createdAt)} · ${esc(o.author||'Кладовщик')}</div></div><div>${statusPill(o.status)}<div style="margin-top:6px">${badge}</div></div></div><div class="detail-actions">${actions}</div><div class="detail-section-title">История · ${entriesCount(o)} ${plural(entriesCount(o),'запись','записи','записей')}</div><div class="timeline">${entries||'<div class="danger-note">Записей пока нет. Добавьте комментарий или описание дефекта.</div>'}</div>`,[button('Закрыть','close')],'КАРТОЧКА ЗАКАЗА')}
 function addComment(){const isManager=state.role==='manager',typeOptions=isManager?'<option value="comment">Обычное сообщение</option>':'<option value="comment">Обычное сообщение</option><option value="defect">Дефект детали</option>';showModal('Добавить комментарий',`<form id="entryForm"><div class="field"><label for="entryKind">Тип записи</label><select id="entryKind">${typeOptions}</select></div><div class="field" id="articleField" hidden><label for="article">Артикул детали *</label><input id="article" placeholder="Артикул"></div><div class="field"><label for="entryText">Сообщение *</label><textarea id="entryText" required placeholder="Напишите комментарий"></textarea></div><div class="field"><label for="entryPhotos">Фото (необязательно)</label><div class="upload-box">Прикрепить фотографии<input id="entryPhotos" type="file" accept="image/*" multiple></div><span class="field-hint">Можно отправить обычный текст без артикула и фотографий.</span></div></form>`,[button('Назад','back-detail'),button('Отправить','save-entry','primary-button')],'КОММЕНТАРИЙ');$('entryKind').addEventListener('change',e=>{$('articleField').hidden=e.target.value!=='defect'})}
 function saveOrder(){const n=$('orderNumber').value.trim(),client=$('clientName').value.trim();if(!n||!client){toast('Укажите номер заказа и имя клиента.');return}if(state.orders.some(o=>o.number.toLowerCase()===n.toLowerCase())){toast('Карточка с таким номером уже есть.');return}const status=$('startStatus').value,comment=$('initialComment').value.trim();const o={id:crypto.randomUUID(),number:n,client,status,createdAt:isoNow(),author:profileName||roles[state.role],createdBy:signedInUser.uid,entries:[]};if(comment)o.entries.push({id:crypto.randomUUID(),kind:'comment',text:comment,author:profileName||roles[state.role],createdAt:isoNow(),photos:[]});state.orders.unshift(o);save();closeModal();render();toast('Карточка заказа создана.');notify(`Создан заказ № ${n}`,o.id)}
-async function readPhotos(files){
-  if(files.length>5)throw new Error('К одной записи можно прикрепить не более пяти фото.');
-
-  const out=[];
-  let total=0;
-
-  for(const file of [...files]){
-    if(!file.type.startsWith('image/'))
-      throw new Error('Можно прикреплять только изображения.');
-
-    const image=await new Promise((resolve,reject)=>{
-      const url=URL.createObjectURL(file);
-      const img=new Image();
-
-      img.onload=()=>{
-        URL.revokeObjectURL(url);
-        resolve(img);
-      };
-
-      img.onerror=()=>{
-        URL.revokeObjectURL(url);
-        reject(new Error('Не удалось открыть фото'));
-      };
-
-      img.src=url;
-    });
-
-    const scale=Math.min(1,1600/Math.max(image.width,image.height));
-    const canvas=document.createElement('canvas');
-
-    canvas.width=Math.round(image.width*scale);
-    canvas.height=Math.round(image.height*scale);
-
-    canvas.getContext('2d').drawImage(
-      image,
-      0,
-      0,
-      canvas.width,
-      canvas.height
-    );
-
-    let quality=.78;
-    let blob=await new Promise(resolve=>
-      canvas.toBlob(resolve,'image/jpeg',quality)
-    );
-
-    while(blob&&blob.size>360000&&quality>.5){
-      quality-=.1;
-
-      blob=await new Promise(resolve=>
-        canvas.toBlob(resolve,'image/jpeg',quality)
-      );
-    }
-
-    if(!blob)
-      throw new Error('Не удалось подготовить фото.');
-
-    total+=blob.size;
-
-    if(blob.size>360000||total>1200000)
-      throw new Error(
-        'Фото слишком большие вместе. Прикрепите меньше снимков или уменьшите их размер.'
-      );
-
-    out.push(blob);
-  }
-
-  return out;
-}
-
-async function saveEntry(){
-  const kind=$('entryKind').value;
-  const text=$('entryText').value.trim();
-  const article=$('article')?.value.trim()||'';
-
-  if(!text){
-    toast('Напишите сообщение.');
-    return;
-  }
-
-  if(kind==='defect'&&!article){
-    toast('Для дефекта укажите артикул детали.');
-    return;
-  }
-
-  try{
-    const blobs=await readPhotos($('entryPhotos').files);
-
-    const o=state.orders.find(x=>x.id===selectedId);
-
-    if(!o)
-      throw new Error('Заказ не найден.');
-
-    const entryId=crypto.randomUUID();
-
-    // Сначала загружаем фотографии в Firebase Storage
-    const photos=await uploadPhotos(
-      o.id,
-      entryId,
-      blobs
-    );
-
-    // В Firestore сохраняем только URL
-    o.entries.push({
-      id:entryId,
-      kind,
-      article:kind==='defect'?article:'',
-      text,
-      author:profileName||roles[state.role],
-      createdAt:isoNow(),
-      photos
-    });
-
-    if(kind==='defect')
-      o.status='Под вопросом';
-
-    await save();
-
-    closeModal();
-    render();
-
-    toast('Запись добавлена в историю заказа.');
-
-    notify(
-      `${kind==='defect'?'Дефект':'Комментарий'} к заказу № ${o.number}`,
-      o.id
-    );
-
-    openOrder(o.id);
-
-  }catch(e){
-    console.error('Ошибка сохранения записи:',e);
-    toast(e.message||'Не удалось сохранить запись.');
-  }
-}
-
-function cancelOrder(){const o=state.orders.find(x=>x.id===selectedId);
+async function readPhotos(files){if(files.length>5)throw new Error('К одной записи можно прикрепить не более пяти фото.');const out=[];let total=0;for(const file of [...files]){if(!file.type.startsWith('image/'))throw new Error('Можно прикреплять только изображения.');const image=await new Promise((resolve,reject)=>{const url=URL.createObjectURL(file),img=new Image();img.onload=()=>{URL.revokeObjectURL(url);resolve(img)};img.onerror=()=>{URL.revokeObjectURL(url);reject(new Error('Не удалось открыть фото'))};img.src=url});const scale=Math.min(1,1600/Math.max(image.width,image.height)),canvas=document.createElement('canvas');canvas.width=Math.round(image.width*scale);canvas.height=Math.round(image.height*scale);canvas.getContext('2d').drawImage(image,0,0,canvas.width,canvas.height);let data=canvas.toDataURL('image/jpeg',.78);while(data.length>280000)data=canvas.toDataURL('image/jpeg',.58);total+=data.length;if(data.length>280000||total>620000)throw new Error('Фото слишком большие вместе. Прикрепите меньше снимков или уменьшите их размер.');out.push(data)}return out}
+async function saveEntry(){const kind=$('entryKind').value,text=$('entryText').value.trim(),article=$('article')?.value.trim()||'';if(!text){toast('Напишите сообщение.');return}if(kind==='defect'&&!article){toast('Для дефекта укажите артикул детали.');return}try{const photos=await readPhotos($('entryPhotos').files);const o=state.orders.find(x=>x.id===selectedId);o.entries.push({id:crypto.randomUUID(),kind,article:kind==='defect'?article:'',text,author:profileName||roles[state.role],createdAt:isoNow(),photos});if(kind==='defect')o.status='Под вопросом';save();closeModal();render();toast('Запись добавлена в историю заказа.');notify(`${kind==='defect'?'Дефект':'Комментарий'} к заказу № ${o.number}`,o.id);openOrder(o.id)}catch(e){toast(e.message)}}
+function setStatus(status,text,kind='system'){const o=state.orders.find(x=>x.id===selectedId);if(!o)return;o.status=status;o.entries.push({id:crypto.randomUUID(),kind,text,author:roles[state.role],createdAt:isoNow(),photos:[]});save();render();toast(`Статус: ${status}`);notify(`Заказ № ${o.number}: ${status}`,o.id);openOrder(o.id)}
+function cancelOrder(){const o=state.orders.find(x=>x.id===selectedId);showModal('Отменить заказ',`<p style="font-size:12px;color:#697382;margin:0 0 14px">Укажите причину отмены заказа № ${esc(o.number)}. Причина сохранится в истории.</p><div class="field"><label for="cancelReason">Причина отмены *</label><textarea id="cancelReason" required placeholder="Почему заказ отменён?"></textarea></div>`,[button('Назад','back-detail'),button('Отменить заказ','confirm-cancel','small-button danger')],'РЕШЕНИЕ МЕНЕДЖЕРА')}
 function approveOrder(){showModal('Одобрить на отгрузку',`<p style="font-size:12px;color:#697382;margin:0 0 12px">Заказ № ${esc(state.orders.find(x=>x.id===selectedId)?.number||'')} будет отмечен как одобренный к отгрузке клиенту.</p><div class="field"><label for="approvalComment">Комментарий менеджера (необязательно)</label><textarea id="approvalComment" placeholder="Добавьте пояснение для кладовщика"></textarea></div>`,[button('Назад','back-detail'),button('Одобрить','confirm-approve','small-button good')],'РЕШЕНИЕ МЕНЕДЖЕРА')}
 function confirmApprove(){const note=$('approvalComment').value.trim()||'Согласовано к отгрузке клиенту.';setStatus('Одобрен на отгрузку клиенту',note,'decision')}
 function confirmCancel(){const reason=$('cancelReason').value.trim();if(!reason){toast('Напишите причину отмены.');return}setStatus('Отменён',reason,'decision')}

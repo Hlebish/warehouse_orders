@@ -765,3 +765,10 @@ body.dark-theme .auth-reset{color:#a7c85a !important}
   body.dark-theme .topbar{background:#050505 !important}
   body.dark-theme .topbar:after{background:#0b0b0b !important}
 }
+
+/* Dark theme: comment count badges */
+body.dark-theme .entry-count{
+  color:#fff !important;
+  border-color:#555 !important;
+  background:#1b1b1b !important;
+}

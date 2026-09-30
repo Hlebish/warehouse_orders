@@ -220,3 +220,214 @@ thead{background:#f1f5f2}th{color:#60746a}td{color:#52665c;border-color:#e8eee9}
 }
 .sidebar .brand,
 .sidebar .brand-sub{color:#203d31}
+
+/* === AMP logo palette: black / white / olive green === */
+:root{
+  --amp-green:#669900;
+  --amp-green-dark:#4f7800;
+  --amp-mint:#f3f6ee;
+  --amp-ink:#111111;
+  --amp-muted:#5f5f5f;
+  --amp-line:#dedede;
+}
+html{background:#f3f3f3}
+body{
+  background:#f4f4f4;
+  color:#111;
+}
+.sidebar{
+  background:#050505;
+  color:#fff;
+  border-right:1px solid #222;
+  box-shadow:4px 0 20px rgba(0,0,0,.14);
+}
+.brand,.brand-sub{color:#fff}
+.brand-sub{color:#aaa}
+.brand-mark{
+  background:#000;
+  border:1px solid #669900;
+  box-shadow:none;
+}
+.nav-item{color:#bdbdbd}
+.nav-item:hover{background:#191919;color:#fff}
+.nav-item.active{
+  background:#669900;
+  color:#fff;
+  box-shadow:0 5px 14px rgba(102,153,0,.22);
+}
+.nav-item.active .nav-count,.nav-count{color:inherit}
+.nav-icon{color:#aaa}
+.nav-item.active .nav-icon{color:#fff}
+.sidebar .amber{color:#d7b45a}
+.sidebar .blue{color:#b5c8dc}
+.sidebar .green{color:#a8cc45}
+.sidebar .red{color:#e28b87}
+.online-card{
+  background:#111 !important;
+  border:1px solid #2c2c2c;
+  color:#fff !important;
+}
+.online-card b{color:#fff !important}
+.online-card small{color:#aaa !important}
+.pulse{background:#669900 !important;box-shadow:0 0 0 4px rgba(102,153,0,.22)}
+.profile-button{
+  background:#050505 !important;
+  border-top:1px solid #2c2c2c;
+  color:#fff !important;
+}
+.profile-button b{color:#fff !important}
+.profile-button small,.dots{color:#aaa !important}
+.avatar{background:#669900 !important;color:#fff !important}
+.main-area{background:#f4f4f4}
+.topbar{
+  background:#fff;
+  border-bottom:1px solid #dedede;
+}
+.breadcrumbs{color:#777}
+.breadcrumbs b{color:#111}
+.top-actions,.icon-button{color:#333}
+.eyebrow{color:#669900}
+.page-heading h1{color:#111}
+.page-heading p,.panel-heading p{color:#666}
+.primary-button{
+  background:#669900;
+  color:#fff;
+  box-shadow:0 4px 10px rgba(102,153,0,.2);
+}
+.primary-button:hover{background:#4f7800}
+.demo-banner{
+  background:#f1f4eb;
+  border-color:#dce5cc;
+  color:#3d4d21;
+}
+.demo-banner b{color:#273300}
+.demo-banner small{color:#68735b}
+.stats-grid .stat-card{
+  background:#fff;
+  border:1px solid #e0e0e0;
+  box-shadow:0 4px 14px rgba(0,0,0,.045);
+}
+.stat-card:nth-child(1),
+.stat-card:nth-child(2),
+.stat-card:nth-child(3),
+.stat-card:nth-child(4){background:#fff}
+.stat-top{color:#555}
+.stat-card strong{color:#111}
+.stat-card small{color:#707070}
+.pale-blue,.pale-violet,.pale-green{
+  background:#eef2e7;
+  color:#669900;
+}
+.pale-amber{background:#f4f0df;color:#806b20}
+.orders-panel{
+  background:#fff;
+  border:1px solid #ddd;
+  box-shadow:0 5px 18px rgba(0,0,0,.05);
+}
+.panel-heading h2{color:#111}
+.search-box,.filter-button,.secondary-button{
+  background:#fff;
+  border-color:#d2d2d2;
+  color:#333;
+}
+.search-box input{color:#111}
+.search-box input::placeholder{color:#888}
+.search-box:focus-within{
+  border-color:#669900;
+  box-shadow:0 0 0 3px rgba(102,153,0,.12);
+}
+.filter-button:hover,.secondary-button:hover{
+  background:#f4f6f0;
+  border-color:#aab58e;
+  color:#4f7800;
+}
+thead{background:#f4f4f4}
+th{color:#555}
+td{color:#555;border-color:#e9e9e9}
+td b,.client-name{color:#111}
+.order-number{color:#669900}
+.order-number:hover{color:#4f7800}
+.client-sub{color:#777}
+.status-assembled{background:#f0f0f0;color:#444}
+.status-question{background:#f4f0df;color:#806b20}
+.status-approval{background:#edf1e7;color:#4f6f18}
+.status-ready{background:#e8f0d8;color:#4f7800}
+.status-cancel{background:#f5e9e9;color:#a33a34}
+.status-neutral{background:#eee;color:#555}
+.entry-count{border-color:#d0d0d0;color:#555}
+.time-cell{color:#666}
+.row-menu{color:#666}
+.row-menu:hover{color:#669900}
+.table-footer,.page-footer{color:#707070}
+.modal-backdrop{background:rgba(0,0,0,.62)}
+.modal{
+  background:#fff;
+  color:#111;
+  box-shadow:0 24px 70px rgba(0,0,0,.25);
+}
+.modal-head,.modal-foot{border-color:#e0e0e0}
+.modal-head h2{color:#111}
+.close-button{color:#555}
+.field label,.field-label{color:#333}
+.field input,.field textarea,.field select{
+  background:#fff;
+  color:#111;
+  border-color:#d1d1d1;
+}
+.field input:focus,.field textarea:focus,.field select:focus{
+  border-color:#669900;
+  box-shadow:0 0 0 3px rgba(102,153,0,.12);
+}
+.field-hint{color:#777}
+.small-button{
+  background:#fff;
+  color:#333;
+  border-color:#d0d0d0;
+}
+.small-button:hover{background:#f5f5f5}
+.small-button.primary-soft{
+  color:#4f7800;
+  background:#eef3e6;
+  border-color:#d5e0c2;
+}
+.small-button.good{
+  color:#4f7800;
+  background:#e8f0d8;
+  border-color:#cfdfad;
+}
+.timeline-item,.notice-item{
+  background:#fff;
+  border-color:#ddd;
+  color:#444;
+}
+.timeline-top{color:#777}
+.timeline-top b{color:#333}
+.timeline-type{color:#4f7800;background:#eef3e6}
+.timeline-text{color:#333}
+.toast{background:#111;color:#fff;border-left:4px solid #669900}
+.auth-gate{
+  background:linear-gradient(145deg,#f0f0f0,#fff);
+}
+.auth-card{background:#fff;border:1px solid #ddd}
+.auth-card h1{color:#111}
+.auth-card p{color:#666}
+.auth-card .field{color:#333}
+.auth-card input{color:#111;border-color:#ccc}
+.auth-card input:focus{border-color:#669900}
+.auth-submit{background:#669900}
+.auth-submit:hover{background:#4f7800}
+
+@media(max-width:760px){
+  body{background:#f4f4f4}
+  .topbar{
+    background:#050505;
+    color:#fff;
+    box-shadow:0 8px 20px rgba(0,0,0,.16);
+  }
+  .topbar:after{background:#f4f4f4}
+  .mobile-menu,.icon-button,.top-actions{color:#fff}
+  .breadcrumbs{color:#fff}
+  .demo-banner{background:#eef3e6;color:#3f4c2b}
+  .page-heading h1{color:#111}
+  .stat-card{box-shadow:0 3px 12px rgba(0,0,0,.06)}
+}

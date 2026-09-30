@@ -572,3 +572,25 @@ td{
   font-weight:800 !important;
   letter-spacing:.65px;
 }
+
+/* Final table treatment: framed panel + white outlined header text */
+.orders-panel{
+  border:2px solid #669900 !important;
+  border-radius:14px !important;
+  overflow:hidden;
+}
+.table-wrap{
+  border-top:1px solid #669900;
+}
+.table-wrap thead{
+  background:#669900 !important;
+}
+.table-wrap thead th{
+  color:#fff !important;
+  font-weight:800 !important;
+  text-shadow:
+    -1px -1px 0 #3f5f00,
+     1px -1px 0 #3f5f00,
+    -1px  1px 0 #3f5f00,
+     1px  1px 0 #3f5f00;
+}

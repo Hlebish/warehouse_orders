@@ -553,3 +553,22 @@ td{
     color:#fff !important;
   }
 }
+
+/* Final small contrast tweaks */
+.sidebar .online-card b,
+.sidebar .online-card small{
+  color:#fff !important;
+}
+.sidebar .online-card small{
+  color:#d0d0d0 !important;
+}
+
+/* Orders table header: stronger AMP-green strip with black text */
+.table-wrap thead{
+  background:#669900 !important;
+}
+.table-wrap thead th{
+  color:#0b0b0b !important;
+  font-weight:800 !important;
+  letter-spacing:.65px;
+}

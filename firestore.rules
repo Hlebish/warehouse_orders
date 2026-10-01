@@ -69,7 +69,7 @@ service cloud.firestore {
 
     match /orders/{orderId} {
       allow read: if activeUser();
-      allow create: if (isWarehouse() || isDirector())
+      allow create: if (isWarehouse() || canManageUsers())
         && request.resource.data.keys().hasOnly([
           'number', 'client', 'status', 'createdAt', 'createdBy',
           'createdByName', 'updatedAt'
@@ -80,6 +80,13 @@ service cloud.firestore {
         && request.resource.data.createdBy == request.auth.uid
         && request.resource.data.status in ['Собран', 'Под вопросом'];
       allow update: if isDirector()
+        || (canManageUsers()
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['status', 'updatedAt', 'updatedBy', 'updatedByName'])
+          && request.resource.data.status in [
+            'Собран', 'Под вопросом', 'На согласовании',
+            'Одобрен на отгрузку клиенту', 'Отменён'
+          ])
         || (isManager()
           && request.resource.data.diff(resource.data).affectedKeys()
             .hasOnly(['status', 'updatedAt', 'updatedBy', 'updatedByName'])
@@ -108,7 +115,7 @@ service cloud.firestore {
           && request.resource.data.text is string
           && request.resource.data.photos is list
           && request.resource.data.photos.size() <= 5;
-        allow update: if (isManager() || isDirector())
+        allow update: if (isManager() || canManageUsers() || isDirector())
           && resource.data.kind == 'defect'
           && request.resource.data.diff(resource.data).affectedKeys()
             .hasOnly(['decision', 'decisionText', 'decidedBy', 'decidedByName', 'decidedAt'])

@@ -782,3 +782,6 @@ body.dark-theme .entry-count{
   .list-controls{flex-wrap:wrap}
   .date-filter{width:150px}
 }
+
+/* Keep defect decision text readable on the white decision box. */
+.decision-row{color:#000 !important}

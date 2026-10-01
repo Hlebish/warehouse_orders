@@ -816,3 +816,6 @@ body.dark-theme .chat-sidebar-button:hover{background:#222;color:#8eb0ff}
 .sidebar-bottom > .chat-sidebar-button{flex-shrink:0}
 
 body.dark-theme .filter-menu{background:#181818;border-color:#3b3b3b}body.dark-theme .filter-menu button{color:#eee}body.dark-theme .filter-menu button:hover,body.dark-theme .filter-menu button.active{background:#292929}
+
+.notice-open{width:100%;font:inherit;text-align:left;cursor:pointer}.notice-open:hover{background:#f1f6f3}.toast-clickable{cursor:pointer}.toast-clickable:hover{transform:translateY(-1px)}
+body.dark-theme .notice-open:hover{background:#292929}

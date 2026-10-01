@@ -5,7 +5,7 @@ import { getStorage, ref as storageRef, uploadBytes, getDownloadURL, deleteObjec
 import { getMessaging, getToken, deleteToken, onMessage } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-messaging.js';
 import { firebaseConfig, vapidKey } from './firebase-config.js';
 const firebaseApp=initializeApp(firebaseConfig),auth=getAuth(firebaseApp),db=getFirestore(firebaseApp),messaging=getMessaging(firebaseApp),storage=getStorage(firebaseApp),staffAuth=getAuth(initializeApp(firebaseConfig,'amp-staff-provisioner'));
-let signedInUser=null,profileName='',canManageUsers=false,profileUnsubscribe=null,ordersUnsubscribe=null,entryUnsubscribes=new Map(),serverCache=new Map(),pendingWrites=new Set(),initialCloudLoad=true;
+let signedInUser=null,profileName='',canManageUsers=false,profileUnsubscribe=null,ordersUnsubscribe=null,chatUnsubscribe=null,serverCache=new Map(),entryUnsubscribes=new Map(),pendingWrites=new Set(),initialCloudLoad=true;
 const roles={warehouse:'Кладовщик',manager:'Менеджер',director:'Директор'};
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const isoNow=()=>new Date().toISOString();
@@ -147,7 +147,7 @@ async function enablePush(){
   await syncPushToken(true);
 }
 onMessage(messaging,payload=>{const n=payload.notification||payload.data||{};if(n.title)toast(`${n.title}${n.body?`: ${n.body}`:''}`)});
-function stopCloud(){profileUnsubscribe?.();ordersUnsubscribe?.();profileUnsubscribe=ordersUnsubscribe=null;for(const stop of entryUnsubscribes.values())stop();entryUnsubscribes.clear();serverCache.clear();state.orders=[]}
+function stopCloud(){profileUnsubscribe?.();ordersUnsubscribe?.();chatUnsubscribe?.();profileUnsubscribe=ordersUnsubscribe=chatUnsubscribe=null;for(const stop of entryUnsubscribes.values())stop();entryUnsubscribes.clear();serverCache.clear();state.orders=[]}
 function watchOrders(){
  ordersUnsubscribe?.();
  ordersUnsubscribe=onSnapshot(collection(db,'orders'),snap=>{
@@ -281,8 +281,63 @@ async function showDeletedOrder(id){if(!canManageUsers)return;try{const archiveS
 function paintNotices(){const unread=state.notices.some(n=>!n.read);$('notificationButton').classList.toggle('has-notice',unread)}
 async function disablePush(){try{if(!signedInUser)throw new Error('User is not signed in');const installationId=localStorage.getItem('ampPushInstallationId');const tokensRef=collection(db,'users',signedInUser.uid,'pushTokens');const snap=await getDocs(tokensRef);const batch=writeBatch(db);for(const tokenDoc of snap.docs){const data=tokenDoc.data()||{};if(installationId&&data.installationId===installationId)batch.delete(tokenDoc.ref)}await batch.commit();await deleteToken(messaging).catch(()=>{});toast('Push-уведомления выключены на этом устройстве.')}catch(err){console.error('Не удалось выключить push',err);toast('Не удалось выключить уведомления. Попробуйте ещё раз.')}}
 
+let chatMessages=[];
+
+function renderChatMessages(){
+  const box=$('chatMessages');
+  if(!box)return;
+  if(!chatMessages.length){
+    box.innerHTML='<div class="chat-empty">Пока никто ничего не написал. Будьте первым 🙂</div>';
+  }else{
+    box.innerHTML=chatMessages.map(m=>{
+      const mine=m.authorId===signedInUser?.uid;
+      return '<article class="chat-message '+(mine?'mine':'')+'"><div class="chat-message-head"><b>'+esc(m.authorName||'Сотрудник')+'</b><time>'+esc(fmtDateTime(m.createdAt))+'</time></div><div class="chat-message-text">'+esc(m.text)+'</div></article>';
+    }).join('');
+    box.scrollTop=box.scrollHeight;
+  }
+}
+
+function openChat(){
+  if(!signedInUser)return;
+  chatUnsubscribe?.();
+  chatMessages=[];
+  showModal('Общий чат','<div class="chat-shell"><div class="chat-messages" id="chatMessages"><div class="chat-empty">Загрузка сообщений…</div></div><form id="chatForm" class="chat-form"><textarea id="chatInput" maxlength="1000" rows="2" placeholder="Напишите сообщение…" autocomplete="off" required></textarea><button class="primary-button" type="submit">Отправить</button></form></div>',[button('Закрыть','close')],'ОБЩИЙ ЧАТ');
+  chatUnsubscribe=onSnapshot(collection(db,'chatMessages'),snap=>{
+    chatMessages=snap.docs.map(d=>({id:d.id,...d.data()})).filter(m=>m.text).sort((x,y)=>new Date(x.createdAt)-new Date(y.createdAt));
+    renderChatMessages();
+  },err=>{
+    console.error('Не удалось загрузить общий чат',err);
+    toast('Не удалось загрузить общий чат. Проверьте доступ к Firestore.');
+  });
+  $('chatForm').addEventListener('submit',async e=>{
+    e.preventDefault();
+    const input=$('chatInput');
+    const text=input.value.trim();
+    if(!text||!signedInUser)return;
+    input.disabled=true;
+    try{
+      const createdAt=isoNow();
+      await setDoc(doc(db,'chatMessages',crypto.randomUUID()),{
+        text:text.slice(0,1000),
+        authorId:signedInUser.uid,
+        authorName:profileName,
+        createdAt
+      });
+      await queuePush('Общий чат',`${profileName}: ${text.slice(0,160)}`,signedInUser.uid);
+      input.value='';
+      input.focus();
+    }catch(err){
+      console.error('Не удалось отправить сообщение в чат',err);
+      toast('Не удалось отправить сообщение.');
+    }finally{
+      input.disabled=false;
+    }
+  });
+  setTimeout(()=>$('chatInput')?.focus(),50);
+}
+
 function showNotifications(){state.notices.forEach(n=>n.read=true);paintNotices();showModal('Уведомления',state.notices.length?`<div class="notice-list">${state.notices.map(n=>`<div class="notice-item">${esc(n.message)}<small>${fmtDateTime(n.at)}</small></div>`).join('')}</div>`:'<div class="danger-note">Новых уведомлений пока нет.</div>',[button('🔔 Разрешить на этом устройстве','enable-notifications','small-button'),button('🔕 Выключить на этом устройстве','disable-notifications','small-button danger'),button('Готово','close')],'ЦЕНТР УВЕДОМЛЕНИЙ')}
-function profileMenu(){const themeAction=button(document.body.classList.contains('dark-theme')?'☀️ Светлая тема':'🌙 Тёмная тема','toggle-theme','small-button primary-soft'),adminAction=canManageUsers?button('Учётные записи сотрудников','open-staff','small-button primary-soft'):'',historyAction=canManageUsers?button('История удалённых заказов','deleted-orders','small-button'):'',hasPassword=signedInUser?.providerData.some(p=>p.providerId==='password');showModal('Учётная запись',`<p style="font-size:13px;color:#52635a;margin:0 0 6px"><b>${esc(profileName)}</b><br>${esc(signedInUser?.email||'')} · ${esc(roles[state.role])}${canManageUsers?' · администратор':''}</p>`,[themeAction,adminAction,historyAction,...(!hasPassword?[button('Задать пароль для входа','set-login-password','small-button')]:[button('Сменить пароль','change-password','small-button')]),button('Выйти','sign-out','small-button danger'),button('Закрыть','close')],'ПРОФИЛЬ СОТРУДНИКА')}
+function profileMenu(){const themeAction=button(document.body.classList.contains('dark-theme')?'☀️ Светлая тема':'🌙 Тёмная тема','toggle-theme','small-button primary-soft'),adminAction=canManageUsers?button('Учётные записи сотрудников','open-staff','small-button primary-soft'):'',historyAction=canManageUsers?button('История удалённых заказов','deleted-orders','small-button'):'',chatAction=button('💬 Общий чат','open-chat','small-button primary-soft'),hasPassword=signedInUser?.providerData.some(p=>p.providerId==='password');showModal('Учётная запись',`<p style="font-size:13px;color:#52635a;margin:0 0 6px"><b>${esc(profileName)}</b><br>${esc(signedInUser?.email||'')} · ${esc(roles[state.role])}${canManageUsers?' · администратор':''}</p>`,[chatAction,themeAction,adminAction,historyAction,...(!hasPassword?[button('Задать пароль для входа','set-login-password','small-button')]:[button('Сменить пароль','change-password','small-button')]),button('Выйти','sign-out','small-button danger'),button('Закрыть','close')],'ПРОФИЛЬ СОТРУДНИКА')}
 function setLoginPassword(){showModal('Задать пароль для входа',`<p class="field-hint">Это подключит вход по почте и паролю к этой учётной записи. Текущий вход Google продолжит работать.</p><div class="field"><label for="linkPassword">Новый пароль *</label><input id="linkPassword" type="password" minlength="6" autocomplete="new-password" required></div>`,[button('Назад','back-profile'),button('Задать пароль','save-login-password','primary-button')],'БЕЗОПАСНОСТЬ')}
 async function saveLoginPassword(){const password=$('linkPassword').value;if(password.length<6){toast('Пароль должен содержать минимум 6 символов.');return}try{await linkWithCredential(signedInUser,EmailAuthProvider.credential(signedInUser.email,password));toast('Вход по почте и паролю подключён.');profileMenu()}catch(err){console.error('Не удалось подключить пароль',err);toast(err.code==='auth/credential-already-in-use'?'Эта почта уже связана с другой учётной записью.':'Не удалось задать пароль. Выйдите и войдите через Google заново.') }}
 function changePassword(){showModal('Сменить пароль',`<form id="changePasswordForm"><div class="field"><label for="currentPassword">Текущий пароль *</label><input id="currentPassword" type="password" autocomplete="current-password" required></div><div class="field"><label for="newPassword">Новый пароль *</label><input id="newPassword" type="password" minlength="6" autocomplete="new-password" required><span class="field-hint">Не менее 6 символов.</span></div><div class="field"><label for="confirmPassword">Повторите новый пароль *</label><input id="confirmPassword" type="password" minlength="6" autocomplete="new-password" required></div></form>`,[button('Назад','back-profile'),button('Сохранить пароль','save-password','primary-button')],'БЕЗОПАСНОСТЬ')}
@@ -294,7 +349,7 @@ function backProfile(){closeModal();profileMenu()}
 async function toggleStaff(uid,active){if(!canManageUsers||uid===signedInUser.uid)return;try{await updateDoc(doc(db,'users',uid),{active});toast(active?'Доступ сотрудника включён.':'Доступ сотрудника отключён.');showStaff()}catch(err){console.error(err);toast('Не удалось изменить доступ сотрудника.')}}
 async function changeStaffRole(uid){if(!canManageUsers||uid===signedInUser.uid)return;const role=$(`staff-role-${uid}`)?.value;if(!roles[role])return;try{await updateDoc(doc(db,'users',uid),{role});toast(`Роль изменена: ${roles[role]}.`);showStaff()}catch(err){console.error(err);toast('Не удалось изменить роль. Проверьте права администратора и правила Firestore.')}}
 function backDetail(){closeModal();openOrder(selectedId)}
-document.addEventListener('click',e=>{const open=e.target.closest('[data-open]');if(open){e.preventDefault();openOrder(open.dataset.open);return}const nav=e.target.closest('.nav-item');if(nav){activeFilter=nav.dataset.filter;render();closeSidebar();return}if(e.target===$('sidebarBackdrop')){closeSidebar();return}if(e.target===$('imageViewer')||e.target===$('closeImageViewer')){$('imageViewer').hidden=true;$('imageViewerImage').removeAttribute('src');return}const act=e.target.closest('[data-action]')?.dataset.action;if(act){if(act==='close')closeModal();else if(act==='create-order')saveOrder();else if(act==='add-comment')addComment();else if(act==='back-detail')backDetail();else if(act==='save-entry')saveEntry();else if(act==='set-approval')setStatus('На согласовании','Начал согласование заказа с клиентом.');else if(act==='approve-order')approveOrder();else if(act==='confirm-approve')confirmApprove();else if(act==='cancel-order')cancelOrder();else if(act==='confirm-cancel')confirmCancel();else if(act==='mark-seen')markViewed();else if(act==='delete-order')deleteOrder();else if(act==='confirm-delete')confirmDelete();else if(act.startsWith('delete-entry:'))deleteEntry(act.split(':')[1]);else if(act.startsWith('confirm-delete-entry:'))confirmDeleteEntry(act.split(':')[1]);else if(act==='confirm-defect-cancel')confirmDefectCancel();else if(act==='sign-out'){closeModal();signOut(auth)}else if(act==='open-staff')showStaff();else if(act==='new-staff')newStaff();else if(act==='create-staff')createStaff();else if(act==='back-profile')backProfile();else if(act==='change-password')changePassword();else if(act==='save-password')savePassword();else if(act==='set-login-password')setLoginPassword();else if(act==='save-login-password')saveLoginPassword();else if(act==='deleted-orders')showDeletedOrders();else if(act==='toggle-theme'){applyTheme(document.body.classList.contains('dark-theme')?'light':'dark');profileMenu();}else if(act.startsWith('view-deleted-order:'))showDeletedOrder(act.slice('view-deleted-order:'.length));else if(act.startsWith('save-role:'))changeStaffRole(act.slice('save-role:'.length));else if(act.startsWith('toggle-user:')){const[,uid,mode]=act.split(':');toggleStaff(uid,mode==='on')}else if(act==='enable-notifications'){enablePush()}else if(act==='disable-notifications'){disablePush()}else if(act.startsWith('defect-confirm:'))decideDefect(act.split(':')[1],'Подтверждён');else if(act.startsWith('defect-cancel:')){pendingDefectId=act.split(':')[1];decideDefect(pendingDefectId,'Отменён')}return}if(e.target===modal)closeModal();const photo=e.target.closest('[data-photo]');if(photo){$('imageViewerImage').src=photo.dataset.photo;$('imageViewer').hidden=false}});
+document.addEventListener('click',e=>{const open=e.target.closest('[data-open]');if(open){e.preventDefault();openOrder(open.dataset.open);return}const nav=e.target.closest('.nav-item');if(nav){activeFilter=nav.dataset.filter;render();closeSidebar();return}if(e.target===$('sidebarBackdrop')){closeSidebar();return}if(e.target===$('imageViewer')||e.target===$('closeImageViewer')){$('imageViewer').hidden=true;$('imageViewerImage').removeAttribute('src');return}const act=e.target.closest('[data-action]')?.dataset.action;if(act){if(act==='close')closeModal();else if(act==='create-order')saveOrder();else if(act==='add-comment')addComment();else if(act==='back-detail')backDetail();else if(act==='save-entry')saveEntry();else if(act==='set-approval')setStatus('На согласовании','Начал согласование заказа с клиентом.');else if(act==='approve-order')approveOrder();else if(act==='confirm-approve')confirmApprove();else if(act==='cancel-order')cancelOrder();else if(act==='confirm-cancel')confirmCancel();else if(act==='mark-seen')markViewed();else if(act==='delete-order')deleteOrder();else if(act==='confirm-delete')confirmDelete();else if(act.startsWith('delete-entry:'))deleteEntry(act.split(':')[1]);else if(act.startsWith('confirm-delete-entry:'))confirmDeleteEntry(act.split(':')[1]);else if(act==='confirm-defect-cancel')confirmDefectCancel();else if(act==='sign-out'){closeModal();signOut(auth)}else if(act==='open-chat'){openChat();}else if(act==='open-staff')showStaff();else if(act==='new-staff')newStaff();else if(act==='create-staff')createStaff();else if(act==='back-profile')backProfile();else if(act==='change-password')changePassword();else if(act==='save-password')savePassword();else if(act==='set-login-password')setLoginPassword();else if(act==='save-login-password')saveLoginPassword();else if(act==='deleted-orders')showDeletedOrders();else if(act==='toggle-theme'){applyTheme(document.body.classList.contains('dark-theme')?'light':'dark');profileMenu();}else if(act.startsWith('view-deleted-order:'))showDeletedOrder(act.slice('view-deleted-order:'.length));else if(act.startsWith('save-role:'))changeStaffRole(act.slice('save-role:'.length));else if(act.startsWith('toggle-user:')){const[,uid,mode]=act.split(':');toggleStaff(uid,mode==='on')}else if(act==='enable-notifications'){enablePush()}else if(act==='disable-notifications'){disablePush()}else if(act.startsWith('defect-confirm:'))decideDefect(act.split(':')[1],'Подтверждён');else if(act.startsWith('defect-cancel:')){pendingDefectId=act.split(':')[1];decideDefect(pendingDefectId,'Отменён')}return}if(e.target===modal)closeModal();const photo=e.target.closest('[data-photo]');if(photo){$('imageViewerImage').src=photo.dataset.photo;$('imageViewer').hidden=false}});
 let sidebarHistoryEntry=false,handlingSidebarPop=false;function closeSidebar(fromPop=false){$('sidebar').classList.remove('open');$('sidebarBackdrop').hidden=true;if(sidebarHistoryEntry&&!fromPop){handlingSidebarPop=true;history.back()}sidebarHistoryEntry=false}
 function openSidebar(){if($('sidebar').classList.contains('open')){closeSidebar();return}$('sidebar').classList.add('open');$('sidebarBackdrop').hidden=false;history.pushState({mobileSidebar:true},'','#menu');sidebarHistoryEntry=true}
 window.addEventListener('popstate',()=>{if($('sidebar').classList.contains('open'))closeSidebar(true);else if(handlingSidebarPop)handlingSidebarPop=false});document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeSidebar();if(!$('imageViewer').hidden){$('imageViewer').hidden=true;$('imageViewerImage').removeAttribute('src')}}});$('closeImageViewer').addEventListener('click',()=>{$('imageViewer').hidden=true;$('imageViewerImage').removeAttribute('src')});

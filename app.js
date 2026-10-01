@@ -307,7 +307,9 @@ function openChat(){
     renderChatMessages();
   },err=>{
     console.error('Не удалось загрузить общий чат',err);
-    toast('Не удалось загрузить общий чат. Проверьте доступ к Firestore.');
+    const box=$('chatMessages');
+    if(box)box.innerHTML='<div class="danger-note">Не удалось загрузить сообщения.<br><small>Скорее всего, правила Firestore ещё не опубликованы.</small></div>';
+    toast('Чат не имеет доступа к Firestore. Опубликуйте firestore.rules.');
   });
   $('chatForm').addEventListener('submit',async e=>{
     e.preventDefault();
@@ -323,12 +325,12 @@ function openChat(){
         authorName:profileName,
         createdAt
       });
-      await queuePush('Общий чат',`${profileName}: ${text.slice(0,160)}`,signedInUser.uid);
+      await queuePush('Общий чат',profileName+': '+text.slice(0,160),signedInUser.uid);
       input.value='';
       input.focus();
     }catch(err){
       console.error('Не удалось отправить сообщение в чат',err);
-      toast('Не удалось отправить сообщение.');
+      toast(err?.code==='permission-denied'?'Нет доступа к chatMessages. Сначала опубликуйте firestore.rules.':'Не удалось отправить сообщение.');
     }finally{
       input.disabled=false;
     }

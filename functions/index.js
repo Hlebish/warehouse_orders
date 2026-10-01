@@ -117,6 +117,8 @@ exports.sendWarehousePush = onDocumentCreated('pushQueue/{eventId}', async event
   const body = String(data.body || 'Новое изменение в заказе.').slice(0, 500);
   const eventId = event.params.eventId;
   const siteUrl = 'https://hlebish.github.io/warehouse_orders/';
+  const orderId = String(data.orderId || '');
+  const link = orderId ? `${siteUrl}?order=${encodeURIComponent(orderId)}` : siteUrl;
 
   try {
     const tokenDocs = await collectTokens();
@@ -144,7 +146,8 @@ exports.sendWarehousePush = onDocumentCreated('pushQueue/{eventId}', async event
     title,
     body,
     eventId,
-    link: siteUrl
+    link,
+    orderId
   },
   webpush: {
     headers: {
@@ -152,7 +155,7 @@ exports.sendWarehousePush = onDocumentCreated('pushQueue/{eventId}', async event
       TTL: '86400'
     },
     fcmOptions: {
-      link: siteUrl
+      link
     }
   }
 });

@@ -10,6 +10,15 @@ service firebase.storage {
         && firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'director';
     }
 
+    match /chat/{userId}/{fileName} {
+      allow read: if activeUser();
+      allow create, update: if activeUser()
+        && request.auth.uid == userId
+        && request.resource.size < 8 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+      allow delete: if activeUser() && request.auth.uid == userId;
+    }
+
     match /orders/{orderId}/{entryId}/{fileName} {
       allow read: if activeUser();
       allow create, update: if activeUser()

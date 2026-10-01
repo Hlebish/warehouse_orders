@@ -335,6 +335,12 @@ function openChat(){
       input.disabled=false;
     }
   });
+  $('chatInput').addEventListener('keydown',e=>{
+    if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){
+      e.preventDefault();
+      $('chatForm')?.requestSubmit();
+    }
+  });
   setTimeout(()=>$('chatInput')?.focus(),50);
 }
 

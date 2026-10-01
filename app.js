@@ -308,7 +308,7 @@ function openChat(){
   chatMessages=[];
   showModal('Общий чат','<div class="chat-shell"><div class="chat-messages" id="chatMessages"><div class="chat-empty">Загрузка сообщений…</div></div><form id="chatForm" class="chat-form"><textarea id="chatInput" maxlength="1000" rows="2" placeholder="Напишите сообщение…" autocomplete="off" required></textarea><div class="chat-attach-row"><label class="chat-attach-button">📎 Фото<input id="chatPhotoInput" type="file" accept="image/*" multiple hidden></label><span id="chatPhotoHint">До 5 фото, по 8 МБ</span></div><div id="chatPhotoPreview" class="chat-photo-preview"></div><button class="primary-button" type="submit">Отправить</button></form></div>',[button('Закрыть','close')],'ОБЩИЙ ЧАТ');
   chatUnsubscribe=onSnapshot(collection(db,'chatMessages'),snap=>{
-    chatMessages=snap.docs.map(d=>({id:d.id,...d.data()})).filter(m=>m.text).sort((x,y)=>new Date(x.createdAt)-new Date(y.createdAt));
+    chatMessages=snap.docs.map(d=>({id:d.id,...d.data()})).filter(m=>m.text||Array.isArray(m.photos)&&m.photos.length).sort((x,y)=>new Date(x.createdAt)-new Date(y.createdAt));
     renderChatMessages();
   },err=>{
     console.error('Не удалось загрузить общий чат',err);
@@ -342,7 +342,7 @@ function openChat(){
         createdAt,
         photos
       });
-      await queuePush('Общий чат',profileName+': '+text.slice(0,160),signedInUser.uid,'','chat');
+      await queuePush('Общий чат',profileName+': '+(text?text.slice(0,160):'📷 Фото'),signedInUser.uid,'','chat');
       input.value='';
       if(photoInput){photoInput.value='';photoInput.disabled=false;}
       const preview=$('chatPhotoPreview');if(preview)preview.innerHTML='';

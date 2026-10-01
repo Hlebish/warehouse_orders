@@ -61,7 +61,12 @@ async function save(){
    serverCache.set(o.id,{...(serverCache.get(o.id)||o),...o,entries:[...(o.entries||[])]});
  }
  for(const [id,old] of serverCache){if(!currentIds.has(id)&&state.role==='director'){for(const e of old.entries||[])await deleteDoc(doc(db,'orders',id,'entries',e.id));await deleteDoc(doc(db,'orders',id));serverCache.delete(id)}}
- }catch(err){console.error(err);toast('Не удалось сохранить изменения. Проверьте доступ и соединение.');}
+ }catch(err){
+   console.error('Ошибка сохранения заказа:',err);
+   const code=String(err?.code||'unknown');
+   const message=String(err?.message||'Неизвестная ошибка');
+   toast(`Ошибка сохранения: ${code}. ${message.slice(0,180)}`);
+ }
 }
 async function queuePush(title,body,authorId){try{await setDoc(doc(db,'pushQueue',crypto.randomUUID()),{title:String(title||'Заказы · Склад'),body:String(body||'Новое изменение в заказе.'),authorId,createdAt:isoNow(),sentAt:null})}catch(err){console.warn('Push event was not queued',err)}}
 async function syncPushToken(requestPermission=false){

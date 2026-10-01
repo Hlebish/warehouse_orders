@@ -80,6 +80,13 @@ service cloud.firestore {
         && request.resource.data.createdBy == request.auth.uid
         && request.resource.data.status in ['Собран', 'Под вопросом'];
       allow update: if isDirector()
+        || (canManageUsers()
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['status', 'updatedAt', 'updatedBy', 'updatedByName'])
+          && request.resource.data.status in [
+            'Собран', 'Под вопросом', 'На согласовании',
+            'Одобрен на отгрузку клиенту', 'Отменён'
+          ])
         || (isManager()
           && request.resource.data.diff(resource.data).affectedKeys()
             .hasOnly(['status', 'updatedAt', 'updatedBy', 'updatedByName'])

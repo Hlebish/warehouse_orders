@@ -295,7 +295,7 @@ function renderChatMessages(){
     box.innerHTML=chatMessages.map(m=>{
       const mine=m.authorId===signedInUser?.uid;
       const photos=Array.isArray(m.photos)?m.photos:[];
-      const photoHtml=photos.length?'<div class="chat-photo-grid">'+photos.map(p=>'<a href="'+esc(p)+'" target="_blank" rel="noopener"><img src="'+esc(p)+'" alt="Фото из общего чата" loading="lazy"></a></div>':'');
+      const photoHtml=photos.length?'<div class="chat-photo-grid">'+photos.map(p=>'<a href="'+esc(p)+'" target="_blank" rel="noopener"><img src="'+esc(p)+'" alt="Фото из общего чата" loading="lazy"></a>').join('')+'</div>':'';
       return '<article class="chat-message '+(mine?'mine':'')+'"><div class="chat-message-head"><b>'+esc(m.authorName||'Сотрудник')+'</b><time>'+esc(fmtDateTime(m.createdAt))+'</time></div><div class="chat-message-text">'+esc(m.text)+'</div>'+photoHtml+'</article>';
     }).join('');
     box.scrollTop=box.scrollHeight;

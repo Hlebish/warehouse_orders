@@ -772,3 +772,13 @@ body.dark-theme .entry-count{
   border-color:#555 !important;
   background:#1b1b1b !important;
 }
+
+
+/* Date filter */
+.date-filter{width:145px}
+.date-filter input{font-size:11px}
+.clear-date-button{white-space:nowrap}
+@media(max-width:760px){
+  .list-controls{flex-wrap:wrap}
+  .date-filter{width:150px}
+}

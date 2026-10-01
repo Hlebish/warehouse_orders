@@ -738,6 +738,11 @@ body.dark-theme .small-button.primary-soft{
   color:#b8d86c !important;
   border-color:#4e661d !important;
 }
+body.dark-theme .small-button.danger{
+  background:#351919 !important;
+  color:#ff8178 !important;
+  border-color:#6b2d2a !important;
+}
 body.dark-theme .timeline-item,
 body.dark-theme .notice-item{
   background:#191919 !important;

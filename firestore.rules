@@ -36,13 +36,16 @@ service cloud.firestore {
     match /chatMessages/{messageId} {
       allow read: if activeUser();
       allow create: if activeUser()
-        && request.resource.data.keys().hasOnly(['text', 'authorId', 'authorName', 'createdAt'])
+        && request.resource.data.keys().hasOnly(['text', 'authorId', 'authorName', 'createdAt', 'photos'])
         && request.resource.data.authorId == request.auth.uid
         && request.resource.data.authorName is string
         && request.resource.data.text is string
         && request.resource.data.text.size() > 0
         && request.resource.data.text.size() <= 1000
-        && request.resource.data.createdAt is string;
+        && request.resource.data.createdAt is string
+        && request.resource.data.photos is list
+        && request.resource.data.photos.size() <= 5
+        && request.resource.data.photos.all(photo => photo is string);
       allow update, delete: if false;
     }
 

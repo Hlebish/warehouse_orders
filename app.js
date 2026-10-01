@@ -294,7 +294,9 @@ function renderChatMessages(){
   }else{
     box.innerHTML=chatMessages.map(m=>{
       const mine=m.authorId===signedInUser?.uid;
-      return '<article class="chat-message '+(mine?'mine':'')+'"><div class="chat-message-head"><b>'+esc(m.authorName||'Сотрудник')+'</b><time>'+esc(fmtDateTime(m.createdAt))+'</time></div><div class="chat-message-text">'+esc(m.text)+'</div></article>';
+      const photos=Array.isArray(m.photos)?m.photos:[];
+      const photoHtml=photos.length?'<div class="chat-photo-grid">'+photos.map(p=>'<a href="'+esc(p)+'" target="_blank" rel="noopener"><img src="'+esc(p)+'" alt="Фото из общего чата" loading="lazy"></a></div>':'');
+      return '<article class="chat-message '+(mine?'mine':'')+'"><div class="chat-message-head"><b>'+esc(m.authorName||'Сотрудник')+'</b><time>'+esc(fmtDateTime(m.createdAt))+'</time></div><div class="chat-message-text">'+esc(m.text)+'</div>'+photoHtml+'</article>';
     }).join('');
     box.scrollTop=box.scrollHeight;
   }
@@ -304,7 +306,7 @@ function openChat(){
   if(!signedInUser)return;
   chatUnsubscribe?.();
   chatMessages=[];
-  showModal('Общий чат','<div class="chat-shell"><div class="chat-messages" id="chatMessages"><div class="chat-empty">Загрузка сообщений…</div></div><form id="chatForm" class="chat-form"><textarea id="chatInput" maxlength="1000" rows="2" placeholder="Напишите сообщение…" autocomplete="off" required></textarea><button class="primary-button" type="submit">Отправить</button></form></div>',[button('Закрыть','close')],'ОБЩИЙ ЧАТ');
+  showModal('Общий чат','<div class="chat-shell"><div class="chat-messages" id="chatMessages"><div class="chat-empty">Загрузка сообщений…</div></div><form id="chatForm" class="chat-form"><textarea id="chatInput" maxlength="1000" rows="2" placeholder="Напишите сообщение…" autocomplete="off" required></textarea><div class="chat-attach-row"><label class="chat-attach-button">📎 Фото<input id="chatPhotoInput" type="file" accept="image/*" multiple hidden></label><span id="chatPhotoHint">До 5 фото, по 8 МБ</span></div><div id="chatPhotoPreview" class="chat-photo-preview"></div><button class="primary-button" type="submit">Отправить</button></form></div>',[button('Закрыть','close')],'ОБЩИЙ ЧАТ');
   chatUnsubscribe=onSnapshot(collection(db,'chatMessages'),snap=>{
     chatMessages=snap.docs.map(d=>({id:d.id,...d.data()})).filter(m=>m.text).sort((x,y)=>new Date(x.createdAt)-new Date(y.createdAt));
     renderChatMessages();
@@ -318,26 +320,42 @@ function openChat(){
     e.preventDefault();
     const input=$('chatInput');
     const text=input.value.trim();
-    if(!text||!signedInUser)return;
+    const photoInput=$('chatPhotoInput');
+    const files=Array.from(photoInput?.files||[]).slice(0,5);
+    if(!text&&!files.length||!signedInUser)return;
+    if(files.some(file=>!file.type.startsWith('image/')||file.size>8*1024*1024)){toast('Фото должны быть изображениями до 8 МБ каждое.');return}
     input.disabled=true;
+    if(photoInput)photoInput.disabled=true;
     try{
       const createdAt=isoNow();
+      const photos=[];
+      for(const file of files){
+        const path=`chat/${signedInUser.uid}/${Date.now()}-${crypto.randomUUID()}-${file.name.replace(/[^a-zA-Z0-9._-]/g,'_')}`;
+        const photoRef=storageRef(storage,path);
+        await uploadBytes(photoRef,file,{contentType:file.type});
+        photos.push(await getDownloadURL(photoRef));
+      }
       await setDoc(doc(db,'chatMessages',crypto.randomUUID()),{
         text:text.slice(0,1000),
         authorId:signedInUser.uid,
         authorName:profileName,
-        createdAt
+        createdAt,
+        photos
       });
       await queuePush('Общий чат',profileName+': '+text.slice(0,160),signedInUser.uid,'','chat');
       input.value='';
+      if(photoInput){photoInput.value='';photoInput.disabled=false;}
+      const preview=$('chatPhotoPreview');if(preview)preview.innerHTML='';
       input.focus();
     }catch(err){
       console.error('Не удалось отправить сообщение в чат',err);
       toast(err?.code==='permission-denied'?'Нет доступа к chatMessages. Сначала опубликуйте firestore.rules.':'Не удалось отправить сообщение.');
     }finally{
       input.disabled=false;
+      if(photoInput)photoInput.disabled=false;
     }
   });
+  $('chatPhotoInput').addEventListener('change',e=>{const files=Array.from(e.target.files||[]).slice(0,5);const preview=$('chatPhotoPreview');if(!preview)return;preview.innerHTML=files.map(file=>{const url=URL.createObjectURL(file);return `<span><img src="${url}" alt="Предпросмотр"><b>${esc(file.name)}</b></span>`}).join('');});
   $('chatInput').addEventListener('keydown',e=>{
     if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){
       e.preventDefault();

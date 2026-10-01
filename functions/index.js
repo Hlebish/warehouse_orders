@@ -118,7 +118,10 @@ exports.sendWarehousePush = onDocumentCreated('pushQueue/{eventId}', async event
   const eventId = event.params.eventId;
   const siteUrl = 'https://hlebish.github.io/warehouse_orders/';
   const orderId = String(data.orderId || '');
-  const link = orderId ? `${siteUrl}?order=${encodeURIComponent(orderId)}` : siteUrl;
+  const target = data.target === 'chat' ? 'chat' : 'site';
+  const link = target === 'chat'
+    ? `${siteUrl}?chat=1`
+    : (orderId ? `${siteUrl}?order=${encodeURIComponent(orderId)}` : siteUrl);
 
   try {
     const tokenDocs = await collectTokens();
@@ -147,7 +150,8 @@ exports.sendWarehousePush = onDocumentCreated('pushQueue/{eventId}', async event
     body,
     eventId,
     link,
-    orderId
+    orderId,
+    target
   },
   webpush: {
     headers: {

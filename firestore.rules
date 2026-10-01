@@ -101,14 +101,14 @@ service cloud.firestore {
             .hasOnly(['status', 'updatedAt', 'updatedBy', 'updatedByName'])
           && request.resource.data.status in [
             'Собран', 'Под вопросом', 'На согласовании',
-            'Одобрен на отгрузку клиенту', 'Самовывоз', 'Отменён'
+            'Одобрен на отгрузку клиенту', 'Ожидает самовывоза', 'Клиент забрал самовывозом', 'Отменён'
           ])
         || (isManager()
           && request.resource.data.diff(resource.data).affectedKeys()
             .hasOnly(['status', 'updatedAt', 'updatedBy', 'updatedByName'])
           && request.resource.data.status in [
             'Собран', 'Под вопросом', 'На согласовании',
-            'Одобрен на отгрузку клиенту', 'Самовывоз', 'Отменён'
+            'Одобрен на отгрузку клиенту', 'Ожидает самовывоза', 'Клиент забрал самовывозом', 'Отменён'
           ])
         || (isWarehouse()
           && request.resource.data.diff(resource.data).affectedKeys()

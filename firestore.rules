@@ -21,7 +21,14 @@ service cloud.firestore {
         && request.resource.data.active == true
         && request.resource.data.admin == false
         && request.resource.data.role in ['warehouse', 'manager', 'director'];
-      allow update: if isDirector()
+      allow update: if (activeUser() && request.auth.uid == userId
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['notificationSettings'])
+        && request.resource.data.notificationSettings is map
+        && request.resource.data.notificationSettings.keys().hasOnly(['chat', 'replies', 'orders'])
+        && request.resource.data.notificationSettings.chat is bool
+        && request.resource.data.notificationSettings.replies is bool
+        && request.resource.data.notificationSettings.orders is bool)
+        || isDirector()
         || (activeUser() && userDoc().data.admin == true && request.auth.uid != userId
           && request.resource.data.diff(resource.data).affectedKeys()
             .hasOnly(['displayName', 'role', 'active'])
@@ -36,7 +43,7 @@ service cloud.firestore {
     match /chatMessages/{messageId} {
       allow read: if activeUser();
       allow create: if activeUser()
-        && request.resource.data.keys().hasOnly(['text', 'authorId', 'authorName', 'createdAt', 'photos'])
+        && request.resource.data.keys().hasOnly(['text', 'authorId', 'authorName', 'createdAt', 'photos', 'replyToId', 'replyToAuthorId', 'replyToAuthorName', 'replyToText'])
         && request.resource.data.authorId == request.auth.uid
         && request.resource.data.authorName is string
         && request.resource.data.text is string
@@ -44,18 +51,26 @@ service cloud.firestore {
         && request.resource.data.createdAt is string
         && request.resource.data.photos is list
         && request.resource.data.photos.size() <= 5
+        && (!request.resource.data.keys().hasAny(['replyToId', 'replyToAuthorId', 'replyToAuthorName', 'replyToText'])
+          || (request.resource.data.replyToId is string
+            && request.resource.data.replyToAuthorId is string
+            && request.resource.data.replyToAuthorName is string
+            && request.resource.data.replyToText is string
+            && get(/databases/$(database)/documents/chatMessages/$(request.resource.data.replyToId)).data.authorId == request.resource.data.replyToAuthorId))
         && (request.resource.data.text.size() > 0 || request.resource.data.photos.size() > 0);
       allow update, delete: if false;
     }
 
     match /pushQueue/{eventId} {
       allow create: if activeUser()
-        && request.resource.data.keys().hasOnly(['title', 'body', 'authorId', 'orderId', 'target', 'createdAt', 'sentAt'])
+        && request.resource.data.keys().hasOnly(['title', 'body', 'authorId', 'orderId', 'target', 'category', 'recipientUserId', 'createdAt', 'sentAt'])
         && request.resource.data.authorId == request.auth.uid
         && request.resource.data.title is string
         && request.resource.data.body is string
         && request.resource.data.sentAt == null
-        && request.resource.data.target in ['site', 'chat'];
+        && request.resource.data.target in ['site', 'chat']
+        && request.resource.data.category in ['orders', 'chat', 'replies']
+        && request.resource.data.recipientUserId is string;
       allow read, update, delete: if false;
     }
 

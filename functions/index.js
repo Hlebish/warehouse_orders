@@ -53,18 +53,22 @@ async function markDone(ref, fields) {
   });
 }
 
-async function collectTokens() {
+async function collectTokens(category='orders', recipientUserId='') {
   const users = await db.collection('users').where('active', '==', true).get();
   const tokenGroups = await Promise.all(
     users.docs.map(user => user.ref.collection('pushTokens').get())
   );
 
-  // Do not send the same push twice to one app installation.
   const byInstallation = new Map();
   const byToken = new Map();
 
   for (let i = 0; i < tokenGroups.length; i++) {
     const user = users.docs[i];
+
+    if (recipientUserId && user.id !== recipientUserId) continue;
+
+    const settings = user.data()?.notificationSettings || {};
+    if (settings[category] === false) continue;
 
     for (const tokenDoc of tokenGroups[i].docs) {
       const data = tokenDoc.data() || {};
@@ -119,12 +123,14 @@ exports.sendWarehousePush = onDocumentCreated('pushQueue/{eventId}', async event
   const siteUrl = 'https://hlebish.github.io/warehouse_orders/';
   const orderId = String(data.orderId || '');
   const target = data.target === 'chat' ? 'chat' : 'site';
+  const category = ['orders', 'chat', 'replies'].includes(data.category) ? data.category : (target === 'chat' ? 'chat' : 'orders');
+  const recipientUserId = String(data.recipientUserId || '');
   const link = target === 'chat'
     ? `${siteUrl}?chat=1`
     : (orderId ? `${siteUrl}?order=${encodeURIComponent(orderId)}` : siteUrl);
 
   try {
-    const tokenDocs = await collectTokens();
+    const tokenDocs = await collectTokens(category, recipientUserId);
 
     if (!tokenDocs.length) {
       await markDone(snapshot.ref, {

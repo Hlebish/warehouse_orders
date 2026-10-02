@@ -20,18 +20,42 @@ const ASSETS = [
 self.addEventListener('notificationclick', event => {
   event.notification.close();
 
-  const link = event.notification?.data?.FCM_MSG?.data?.link
-    || event.notification?.data?.link
-    || SITE_URL;
+  const rawLink =
+    event.notification?.data?.link ||
+    event.notification?.data?.FCM_MSG?.data?.link ||
+    event.notification?.data?.FCM_MSG?.notification?.click_action ||
+    SITE_URL;
+
+  let link = SITE_URL;
+  try {
+    const url = new URL(String(rawLink), SITE_URL);
+    // Only allow navigation inside the warehouse app.
+    if (url.origin === new URL(SITE_URL).origin) {
+      link = url.href;
+    }
+  } catch {
+    link = SITE_URL;
+  }
 
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clientList => {
-      for (const client of clientList) {
-        if ('focus' in client) {
-          client.focus();
-          return client.navigate?.(link);
+      const sameSiteClient = clientList.find(client => {
+        try {
+          return new URL(client.url).origin === new URL(SITE_URL).origin;
+        } catch {
+          return false;
         }
+      });
+
+      if (sameSiteClient) {
+        return sameSiteClient.focus().then(() => {
+          if ('navigate' in sameSiteClient) {
+            return sameSiteClient.navigate(link);
+          }
+          return undefined;
+        });
       }
+
       return clients.openWindow(link);
     })
   );

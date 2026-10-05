@@ -9,8 +9,9 @@ let signedInUser=null,profileName='',canManageUsers=false,profileUnsubscribe=nul
 const roles={warehouse:'Кладовщик',manager:'Менеджер',director:'Директор'};
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const isoNow=()=>new Date().toISOString();
-const fmtDate=d=>new Intl.DateTimeFormat('ru-RU',{day:'2-digit',month:'short',year:'numeric'}).format(new Date(d));
-const fmtDateTime=d=>new Intl.DateTimeFormat('ru-RU',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}).format(new Date(d));
+const asDate=d=>{if(!d)return null;if(typeof d.toDate==='function')return d.toDate();if(typeof d.toMillis==='function')return new Date(d.toMillis());if(d instanceof Date)return d;const out=new Date(d);return Number.isNaN(out.getTime())?null:out};
+const fmtDate=d=>{const date=asDate(d);return date?new Intl.DateTimeFormat('ru-RU',{day:'2-digit',month:'short',year:'numeric'}).format(date):'—'};
+const fmtDateTime=d=>{const date=asDate(d);return date?new Intl.DateTimeFormat('ru-RU',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}).format(date):'—'};
 let state={orders:[],notices:[],role:'warehouse',seen:{},notificationSettings:{chat:true,replies:true,orders:true}};
 let activeFilter='all', selectedId=null, pendingDefectId=null, pendingNotificationOrderId='', pendingNotificationChat=false, chatReplyTo=null;
 const notificationParams=new URLSearchParams(location.search);

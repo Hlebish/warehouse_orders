@@ -947,3 +947,9 @@ body.dark-theme .order-article-view span:last-child{
 }
 
 .client-open{color:#287b58;text-decoration:none;cursor:pointer}.client-open:hover{text-decoration:underline}
+
+@media(max-width:720px){
+  .client-open{display:inline-block;min-height:28px;line-height:28px;padding:0 2px;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+  .detail-actions .small-button{min-height:38px;padding:9px 10px}
+  .field input{min-height:42px}
+}

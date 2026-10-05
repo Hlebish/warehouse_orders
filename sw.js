@@ -4,7 +4,7 @@ importScripts(
 );
 
 const SITE_URL = 'https://hlebish.github.io/warehouse_orders/';
-const CACHE = 'order-desk-fcm-v20';
+const CACHE = 'order-desk-fcm-v21';
 const ASSETS = [
   './',
   './index.html',
@@ -39,9 +39,13 @@ self.addEventListener('notificationclick', event => {
 
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clientList => {
+      const siteUrl = new URL(SITE_URL);
       const sameSiteClient = clientList.find(client => {
         try {
-          return new URL(client.url).origin === new URL(SITE_URL).origin;
+          const clientUrl = new URL(client.url);
+          return clientUrl.origin === siteUrl.origin &&
+            (clientUrl.pathname === siteUrl.pathname ||
+             clientUrl.pathname.startsWith(siteUrl.pathname));
         } catch {
           return false;
         }

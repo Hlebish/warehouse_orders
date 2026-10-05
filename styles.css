@@ -912,3 +912,34 @@ body.dark-theme .order-article-view b,
 body.dark-theme .order-article-view span:last-child{
   color:#eee !important;
 }
+
+
+/* Mobile modal + keyboard: keep action buttons visible above the on-screen keyboard. */
+@media(max-width:760px){
+  .modal-backdrop{
+    min-height:100dvh;
+    height:100dvh;
+    padding:8px;
+    align-items:flex-end;
+  }
+  .modal{
+    max-height:min(92dvh,850px);
+    overflow:auto;
+    overscroll-behavior:contain;
+    scroll-padding-bottom:90px;
+  }
+  .modal-foot{
+    position:sticky;
+    bottom:0;
+    z-index:3;
+    background:inherit;
+    box-shadow:0 -8px 18px rgba(0,0,0,.06);
+  }
+  body.dark-theme .modal-foot{
+    background:#151515 !important;
+    box-shadow:0 -8px 18px rgba(0,0,0,.28);
+  }
+  .chat-form{
+    padding-bottom:env(safe-area-inset-bottom,0px);
+  }
+}

@@ -113,25 +113,22 @@ service cloud.firestore {
         && request.resource.data.createdBy == request.auth.uid
         && request.resource.data.status in ['Создан', 'Собран', 'Отгружен кладовщиком', 'Под вопросом'];
       allow update: if isDirector()
-        || (canManageUsers()
-          && request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['status', 'articles', 'updatedAt', 'updatedBy', 'updatedByName'])
-          && request.resource.data.status in [
-            'Собран', 'Под вопросом', 'На согласовании',
-            'Одобрен на отгрузку клиенту', 'Отгружен кладовщиком', 'Ожидает самовывоза', 'Клиент забрал самовывозом', 'Перенесен', 'Отменён'
-          ])
-        || (isManager()
-          && request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['status', 'updatedAt', 'updatedBy', 'updatedByName'])
-          && request.resource.data.status in [
-            'Собран', 'Под вопросом', 'На согласовании',
-            'Одобрен на отгрузку клиенту', 'Отгружен кладовщиком', 'Ожидает самовывоза', 'Клиент забрал самовывозом', 'Отменён'
-          ])
-        || (isWarehouse()
-          && request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['status', 'updatedAt', 'updatedBy', 'updatedByName'])
-          && request.resource.data.status in ['Создан', 'Собран', 'Отгружен кладовщиком', 'Под вопросом', 'Перенесен']);
-      allow delete: if canManageUsers();
+      || (activeUser()
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['status', 'updatedAt', 'updatedBy', 'updatedByName'])
+        && request.resource.data.status in [
+          'Создан', 'Собран', 'Отгружен кладовщиком', 'Под вопросом',
+          'На согласовании', 'Одобрен на отгрузку клиенту',
+          'Ожидает самовывоза', 'Клиент забрал самовывозом',
+          'Перенесен', 'Отменён'
+        ])
+      || (isManager()
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['status', 'updatedAt', 'updatedBy', 'updatedByName']))
+      || (isWarehouse()
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['status', 'updatedAt', 'updatedBy', 'updatedByName']));
+    allow delete: if canManageUsers();
 
       match /entries/{entryId} {
         allow read: if activeUser();

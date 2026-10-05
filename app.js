@@ -56,7 +56,7 @@ async function save(){
    const articlesChanged=!!base&&!articlesEqual(base.articles||[],o.articles||[]);
    if(!base||!equal(next,prev)){
      if(base){next.updatedAt=isoNow();next.updatedBy=signedInUser.uid;next.updatedByName=profileName;o.updatedAt=next.updatedAt;o.updatedBy=next.updatedBy;o.updatedByName=profileName}
-     pendingWrites.add(o.id);pendingOrderData.set(o.id,{...o,number:next.number,client:next.client,status:next.status,articles:next.articles||[]});await setDoc(doc(db,'orders',o.id),next);serverCache.set(o.id,{...o,...next,entries:[...(o.entries||[])]});pendingWrites.delete(o.id);
+     pendingWrites.add(o.id);pendingOrderData.set(o.id,{...o,number:next.number,client:next.client,status:next.status,articles:next.articles||[]});await (newOrder?setDoc(doc(db,'orders',o.id),next):updateDoc(doc(db,'orders',o.id),next));serverCache.set(o.id,{...o,...next,entries:[...(o.entries||[])]});pendingWrites.delete(o.id);
      const articleBody=normalizeArticles(o.articles||[]).length?normalizeArticles(o.articles||[]).map(x=>`${x.article} × ${x.quantity}`).join(', '):'Все артикулы удалены.';
      const newOrderBody=newOrder?(o.articles?.length?`${o.client||'Создан новый заказ'} · ${articleBody}`:(o.client||'Создан новый заказ')):articlesChanged?articleBody:`Статус: ${next.status}`;
      await queuePush(newOrder?`Новый заказ № ${o.number}`:articlesChanged?`Артикулы заказа № ${o.number} изменены`:`Заказ № ${o.number} изменён`,newOrderBody,signedInUser.uid,o.id);

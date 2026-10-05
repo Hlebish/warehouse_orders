@@ -73,12 +73,13 @@ async function collectTokens(category='orders', recipientUserId='') {
     for (const tokenDoc of tokenGroups[i].docs) {
       const data = tokenDoc.data() || {};
       const token = String(data.token || '');
-      if (!token) continue;
+      if (!token || data.appId !== 'warehouse_orders') continue;
 
       const item = {
         ref: tokenDoc.ref,
         token,
         installationId: String(data.installationId || ''),
+        appId: String(data.appId || ''),
         updatedAt: String(data.updatedAt || ''),
         userId: user.id
       };

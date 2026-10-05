@@ -842,7 +842,7 @@ body.dark-theme .chat-photo-grid img,body.dark-theme .chat-photo-preview img{bor
 .status-pickup-waiting{background:#e8f7f8;color:#197b82}
 .status-pickup-done{background:#e7f3df;color:#4f7800}
 body.dark-theme .status-pickup-waiting{background:#173338 !important;color:#7dd9df !important}
-body.dark-theme .status-pickup-done{background:#263313 !important;color:#b1d85a !important}
+body.dark-theme .status-pickup-done{background:#123d25 !important;color:#8ee0a7 !important}
 
 /* Chat replies */
 .chat-message{position:relative}

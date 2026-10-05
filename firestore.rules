@@ -111,7 +111,7 @@ service cloud.firestore {
         && request.resource.data.articles is list
         && request.resource.data.articles.size() <= 100
         && request.resource.data.createdBy == request.auth.uid
-        && request.resource.data.status in ['Создан', 'Собран', 'Отгружен кладовщиком', 'Под вопросом'];
+        && request.resource.data.status in ['Создан', 'Собран', 'Отгружен кладовщиком', 'Под вопросом', 'Ожидает оплаты'];
       allow update: if isDirector()
       || (activeUser()
         && request.resource.data.diff(resource.data).affectedKeys()
@@ -121,13 +121,13 @@ service cloud.firestore {
         && request.resource.data.client is string
         && request.resource.data.client.size() > 0
         && request.resource.data.status in [
-          'Создан', 'Собран', 'Отгружен кладовщиком', 'Под вопросом',
+          'Создан', 'Собран', 'Отгружен кладовщиком', 'Под вопросом', 'Ожидает оплаты',
           'На согласовании', 'Одобрен на отгрузку клиенту',
           'Ожидает самовывоза', 'Клиент забрал самовывозом',
           'Перенесен', 'Отменён'
         ]
         && request.resource.data.status in [
-          'Создан', 'Собран', 'Отгружен кладовщиком', 'Под вопросом',
+          'Создан', 'Собран', 'Отгружен кладовщиком', 'Под вопросом', 'Ожидает оплаты',
           'На согласовании', 'Одобрен на отгрузку клиенту',
           'Ожидает самовывоза', 'Клиент забрал самовывозом',
           'Перенесен', 'Отменён'

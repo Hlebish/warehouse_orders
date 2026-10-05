@@ -100,7 +100,7 @@ service cloud.firestore {
 
     match /orders/{orderId} {
       allow read: if activeUser();
-      allow create: if (isWarehouse() || canManageUsers())
+      allow create: if (isWarehouse() || isManager() || canManageUsers())
         && request.resource.data.keys().hasOnly([
           'number', 'client', 'status', 'articles', 'createdAt', 'createdBy',
           'createdByName', 'updatedAt'

@@ -381,7 +381,7 @@ function openChat(){
   chatMessages=[];chatReplyTo=null;
   showModal('Общий чат','<div class="chat-shell"><div class="chat-messages" id="chatMessages"><div class="chat-empty">Загрузка сообщений…</div></div><form id="chatForm" class="chat-form"><div id="chatReplyPreview" class="chat-reply-preview" hidden></div><textarea id="chatInput" maxlength="1000" rows="2" placeholder="Напишите сообщение…" autocomplete="off" required></textarea><div class="chat-attach-row"><label class="chat-attach-button">📎 Фото<input id="chatPhotoInput" type="file" accept="image/*" multiple hidden></label><span id="chatPhotoHint">До 5 фото, по 8 МБ</span></div><div id="chatPhotoPreview" class="chat-photo-preview"></div></form></div>',[button('Закрыть','close'),button('Отправить','send-chat','primary-button')],'ОБЩИЙ ЧАТ');
   chatUnsubscribe=onSnapshot(collection(db,'chatMessages'),snap=>{
-    chatMessages=snap.docs.map(d=>({id:d.id,...d.data()})).filter(m=>m.text||Array.isArray(m.photos)&&m.photos.length).sort((x,y)=>new Date(x.createdAt)-new Date(y.createdAt));
+    chatMessages=snap.docs.map(d=>({id:d.id,...d.data()})).filter(m=>m.text||Array.isArray(m.photos)&&m.photos.length).sort((x,y)=>{const tx=x.createdAt?.toMillis?x.createdAt.toMillis():new Date(x.createdAt||0).getTime();const ty=y.createdAt?.toMillis?y.createdAt.toMillis():new Date(y.createdAt||0).getTime();return tx-ty||String(x.id).localeCompare(String(y.id));});
     renderChatMessages();
   },err=>{
     console.error('Не удалось загрузить общий чат',err);
@@ -400,7 +400,7 @@ function openChat(){
     input.disabled=true;
     if(photoInput)photoInput.disabled=true;
     try{
-      const createdAt=isoNow();
+      const createdAt=serverTimestamp();
       const photos=[];
       for(const file of files){
         const path=`chat/${signedInUser.uid}/${Date.now()}-${crypto.randomUUID()}-${file.name.replace(/[^a-zA-Z0-9._-]/g,'_')}`;

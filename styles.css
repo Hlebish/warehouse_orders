@@ -945,3 +945,5 @@ body.dark-theme .order-article-view span:last-child{
     padding-bottom:env(safe-area-inset-bottom,0px);
   }
 }
+
+.client-open{color:#287b58;text-decoration:none;cursor:pointer}.client-open:hover{text-decoration:underline}

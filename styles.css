@@ -881,3 +881,34 @@ body.dark-theme .notification-setting i.off{background:#303030;color:#aaa}
 
 /* Order articles */
 .article-editor{border:1px solid var(--line);border-radius:8px;padding:9px;background:#fafbfc}.article-editor-head{display:grid;grid-template-columns:1fr 105px 32px;gap:7px;padding:0 3px 6px;font-size:9px;font-weight:700;color:#929aa5;text-transform:uppercase}.order-article-row{display:grid;grid-template-columns:1fr 105px 32px;gap:7px;margin-top:7px}.order-article-row input{width:100%;border:1px solid #e3e6eb;border-radius:7px;padding:9px 10px;outline:0;font-size:12px;color:#35404c;background:#fff}.order-article-row input:focus{border-color:#7fa1ed;box-shadow:0 0 0 3px #4f80eb16}.article-remove{padding:0!important;height:36px;font-size:18px!important}.article-add{margin-top:8px}.order-articles-list{display:grid;gap:6px}.order-article-view{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 11px;border:1px solid var(--line);border-radius:7px;background:#fafbfc;font-size:11px;color:#66717e}.order-article-view b{color:#34404c;font-weight:700}.order-article-view span:last-child{white-space:nowrap;font-weight:700;color:#687382}@media(max-width:560px){.article-editor-head,.order-article-row{grid-template-columns:1fr 78px 32px}.order-article-row input{font-size:11px;padding:8px}.order-article-view{font-size:10px}body.dark-theme .article-editor,body.dark-theme .order-article-view{background:#181818;border-color:#343434}body.dark-theme .order-article-row input{background:#1d1d1d;color:#fff;border-color:#3c3c3c}}
+
+
+/* Dark theme: article editor */
+body.dark-theme .article-editor{
+  background:#181818 !important;
+  border-color:#343434 !important;
+}
+body.dark-theme .article-editor-head{
+  color:#aaa !important;
+}
+body.dark-theme .order-article-row input{
+  background:#1d1d1d !important;
+  color:#fff !important;
+  border-color:#3c3c3c !important;
+}
+body.dark-theme .order-article-row input::placeholder{
+  color:#888 !important;
+}
+body.dark-theme .order-article-row input:focus{
+  border-color:#669900 !important;
+  box-shadow:0 0 0 3px rgba(102,153,0,.16) !important;
+}
+body.dark-theme .order-article-view{
+  background:#181818 !important;
+  border-color:#343434 !important;
+  color:#ccc !important;
+}
+body.dark-theme .order-article-view b,
+body.dark-theme .order-article-view span:last-child{
+  color:#eee !important;
+}

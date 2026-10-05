@@ -48,7 +48,7 @@ service cloud.firestore {
         && request.resource.data.authorName is string
         && request.resource.data.text is string
         && request.resource.data.text.size() <= 1000
-        && request.resource.data.createdAt is string
+        && (request.resource.data.createdAt is timestamp || request.resource.data.createdAt is string)
         && request.resource.data.photos is list
         && request.resource.data.photos.size() <= 5
         && (!request.resource.data.keys().hasAny(['replyToId', 'replyToAuthorId', 'replyToAuthorName', 'replyToText'])

@@ -57,7 +57,8 @@
         <div class="page-heading"><div><div class="eyebrow">ОБРАБОТКА И СОГЛАСОВАНИЕ</div><h1>Заказы</h1><p>Сборка, комментарии и решения менеджеров в одной истории.</p></div><button class="primary-button" id="newOrderButton"><span>＋</span> Добавить заказ</button></div>
 
         <div class="stats-grid">
-          <article class="stat-card"><div class="stat-top"><span>Всего заказов</span><span class="stat-icon pale-blue">▦</span></div><strong id="statTotal">0</strong><small>В общей истории</small></article>
+          <article class="stat-card"><div class="stat-top"><span>Собрано</span><span class="stat-icon pale-blue">▦</span></div><strong id="statTotal">0</strong><small>Со статусом «Собран»</small></article>
+          <article class="stat-card"><div class="stat-top"><span>Создано</span><span class="stat-icon pale-blue">＋</span></div><strong id="statCreated">0</strong><small>Со статусом «Создан»</small></article>
           <article class="stat-card"><div class="stat-top"><span>Требуют внимания</span><span class="stat-icon pale-amber">!</span></div><strong id="statQuestions">0</strong><small>Дефекты и вопросы</small></article>
           <article class="stat-card"><div class="stat-top"><span>На согласовании</span><span class="stat-icon pale-violet">◷</span></div><strong id="statApproval">0</strong><small>Ожидают решения</small></article>
           <article class="stat-card"><div class="stat-top"><span>Одобрены к отгрузке</span><span class="stat-icon pale-green">✓</span></div><strong id="statReady">0</strong><small>Можно отгружать клиенту</small></article>
@@ -76,7 +77,7 @@
     <button type="button" data-menu-filter="Под вопросом">Под вопросом</button>
     <button type="button" data-menu-filter="Ожидает оплаты">Ожидает оплаты</button>
     <button type="button" data-menu-filter="На согласовании">На согласовании</button>
-    <button type="button" data-menu-filter="Одобрен на отгрузку клиенту">К отгрузке</button>
+    <button type="button" data-menu-filter="Одобрен на отгрузку клиенту">Одобрен к отгрузке</button>
     <button type="button" data-menu-filter="Ожидает самовывоза">Ожидает самовывоза</button>
     <button type="button" data-menu-filter="Клиент забрал самовывозом">Клиент забрал самовывозом</button>
     <button type="button" data-menu-filter="Перенесен">Перенесен</button>
@@ -95,6 +96,6 @@
   <div class="modal-backdrop" id="modalBackdrop" hidden><section class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle"><div class="modal-head"><div><span class="eyebrow" id="modalEyebrow">НОВАЯ КАРТОЧКА</span><h2 id="modalTitle">Добавить заказ</h2></div><button class="close-button" id="closeModal" aria-label="Закрыть">×</button></div><div class="modal-body" id="modalBody"></div><div class="modal-foot" id="modalFoot"></div></section></div>
   <div class="image-viewer" id="imageViewer" hidden role="dialog" aria-modal="true" aria-label="Просмотр фотографии"><button class="image-viewer-close" id="closeImageViewer" aria-label="Закрыть">×</button><img id="imageViewerImage" alt="Фото из комментария"></div>
   <div class="toast-stack" id="toastStack" aria-live="polite"></div>
-  <script type="module" src="app.js?v=20261005-chat2"></script>
+  <script type="module" src="app.js?v=20261005-stats1"></script>
 </body>
 </html>

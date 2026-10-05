@@ -132,7 +132,8 @@ async function syncPushToken(requestPermission=false){
       token,
       installationId,
       updatedAt:isoNow(),
-      userAgent:navigator.userAgent
+      userAgent:navigator.userAgent,
+      appId:'warehouse_orders'
     },{merge:true});
 
     await batch.commit();

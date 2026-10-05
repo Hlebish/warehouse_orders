@@ -102,18 +102,20 @@ service cloud.firestore {
       allow read: if activeUser();
       allow create: if (isWarehouse() || canManageUsers())
         && request.resource.data.keys().hasOnly([
-          'number', 'client', 'status', 'createdAt', 'createdBy',
+          'number', 'client', 'status', 'articles', 'createdAt', 'createdBy',
           'createdByName', 'updatedAt'
         ])
         && request.resource.data.number is string
         && request.resource.data.number.size() > 0
         && request.resource.data.client is string
+        && request.resource.data.articles is list
+        && request.resource.data.articles.size() <= 100
         && request.resource.data.createdBy == request.auth.uid
         && request.resource.data.status in ['Собран', 'Под вопросом'];
       allow update: if isDirector()
         || (canManageUsers()
           && request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['status', 'updatedAt', 'updatedBy', 'updatedByName'])
+            .hasOnly(['status', 'articles', 'updatedAt', 'updatedBy', 'updatedByName'])
           && request.resource.data.status in [
             'Собран', 'Под вопросом', 'На согласовании',
             'Одобрен на отгрузку клиенту', 'Ожидает самовывоза', 'Клиент забрал самовывозом', 'Перенесен', 'Отменён'

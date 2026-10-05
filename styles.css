@@ -953,3 +953,20 @@ body.dark-theme .order-article-view span:last-child{
   .detail-actions .small-button{min-height:38px;padding:9px 10px}
   .field input{min-height:42px}
 }
+
+
+/* Grouped order actions */
+.action-category{font-weight:800;min-width:145px;text-align:center}
+.warehouse-category{color:#4f7800 !important;background:#f0f6e5 !important;border-color:#dbe9bd !important}
+.manager-category{color:#2e6bd7 !important;background:#f0f5ff !important;border-color:#dce8ff !important}
+.order-action-menu{padding-top:2px}
+.order-action-menu-hint{font-size:11px;color:#7d8794;line-height:1.45;margin-bottom:12px}
+.order-action-menu-list{display:grid;gap:8px}
+.order-action-menu-list .small-button{width:100%;min-height:42px;text-align:left;padding:10px 12px;font-size:11px;font-weight:700}
+body.dark-theme .warehouse-category{color:#b8d86c !important;background:#263313 !important;border-color:#4e661d !important}
+body.dark-theme .manager-category{color:#a9c4ff !important;background:#202c42 !important;border-color:#35496a !important}
+body.dark-theme .order-action-menu-hint{color:#999 !important}
+@media(max-width:720px){
+  .action-category{width:100%;min-height:42px}
+  .order-action-menu-list .small-button{min-height:44px;font-size:12px}
+}

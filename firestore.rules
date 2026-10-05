@@ -111,7 +111,7 @@ service cloud.firestore {
         && request.resource.data.articles is list
         && request.resource.data.articles.size() <= 100
         && request.resource.data.createdBy == request.auth.uid
-        && request.resource.data.status in ['Собран', 'Под вопросом'];
+        && request.resource.data.status in ['Создан', 'Собран', 'Под вопросом'];
       allow update: if isDirector()
         || (canManageUsers()
           && request.resource.data.diff(resource.data).affectedKeys()
@@ -130,7 +130,7 @@ service cloud.firestore {
         || (isWarehouse()
           && request.resource.data.diff(resource.data).affectedKeys()
             .hasOnly(['status', 'updatedAt', 'updatedBy', 'updatedByName'])
-          && request.resource.data.status in ['Собран', 'Под вопросом', 'Перенесен']);
+          && request.resource.data.status in ['Создан', 'Собран', 'Под вопросом', 'Перенесен']);
       allow delete: if canManageUsers();
 
       match /entries/{entryId} {

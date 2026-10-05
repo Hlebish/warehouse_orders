@@ -28,11 +28,10 @@
   <aside class="sidebar" id="sidebar">
       <a class="brand" href="#"><img class="brand-mark brand-logo" src="amp-logo.png" alt="AMP Automobile Parts"><span>Склад<span class="brand-sub">Заказы и качество</span></span></a>
       <nav class="nav" aria-label="Основная навигация">
-        <button class="nav-item active" data-filter="all"><span class="nav-icon">▦</span>Общая история</button>
-      </nav>
+        </nav>
       <div class="sidebar-bottom">
         <button class="chat-sidebar-button" id="chatSidebarButton" type="button" aria-label="Открыть общий чат"><span>💬</span><span>Общий чат</span></button>
-        <div class="online-card"><span class="pulse"></span><div><b id="modeLabel">Демо-режим</b><small id="modeSub">Данные только на этом устройстве</small></div></div>
+        <div class="online-card cloud-online"><span class="pulse"></span><div><b id="modeLabel">Вы онлайн</b><small id="modeSub">Подключено к облаку</small></div></div>
         <div class="sidebar-user-actions"><button class="profile-button" id="profileButton"><span class="avatar">СК</span><span><b id="userName">Кладовщик</b><small id="userRole">Администратор</small></span><span class="dots">···</span></button></div>
       </div>
     </aside>
@@ -62,6 +61,8 @@
           <article class="stat-card"><div class="stat-top"><span>Требуют внимания</span><span class="stat-icon pale-amber">!</span></div><strong id="statQuestions">0</strong><small>Дефекты и вопросы</small></article>
           <article class="stat-card"><div class="stat-top"><span>На согласовании</span><span class="stat-icon pale-violet">◷</span></div><strong id="statApproval">0</strong><small>Ожидают решения</small></article>
           <article class="stat-card"><div class="stat-top"><span>Одобрены к отгрузке</span><span class="stat-icon pale-green">✓</span></div><strong id="statReady">0</strong><small>Можно отгружать клиенту</small></article>
+          <article class="stat-card"><div class="stat-top"><span>Ожидают оплаты</span><span class="stat-icon pale-neutral">₴</span></div><strong id="statPayment">0</strong><small>Оплата ещё не получена</small></article>
+          <article class="stat-card"><div class="stat-top"><span>Ожидают самовывоза</span><span class="stat-icon pale-cyan">⌂</span></div><strong id="statPickup">0</strong><small>Клиент должен забрать заказ</small></article>
         </div>
 
         <section class="orders-panel">

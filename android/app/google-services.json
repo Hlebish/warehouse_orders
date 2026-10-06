@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "329606730319",
+    "project_id": "sklad-18f38",
+    "storage_bucket": "sklad-18f38.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:329606730319:android:43a7b6489e9af208f5503a",
+        "android_client_info": {
+          "package_name": "com.amp.warehouseorders"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "329606730319-bqe5c2lkngq4jk87atifp6n9qnn3chfh.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCgee-ucL3jD32tNWPKaev2Yiq-eu16A7g"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "329606730319-bqe5c2lkngq4jk87atifp6n9qnn3chfh.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

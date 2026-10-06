@@ -973,3 +973,6 @@ body.dark-theme .order-action-menu-hint{color:#999 !important}
 
 @media(max-width:1180px){.stats-grid{grid-template-columns:repeat(3,minmax(0,1fr));}}
 @media(max-width:720px){.stats-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.stat-card{min-height:105px;padding:13px 14px 12px}.stat-top{font-size:10px}.stat-card strong{font-size:22px}.stat-card small{font-size:9px}}
+
+.site-version{font-size:9px;color:#a3aab3;white-space:nowrap}
+body.dark-theme .site-version{color:#777}

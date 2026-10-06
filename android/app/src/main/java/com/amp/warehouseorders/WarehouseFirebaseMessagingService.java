@@ -2,6 +2,8 @@ package com.amp.warehouseorders;
 
 import android.app.NotificationManager;
 import android.app.PendingIntent;
+import android.media.AudioManager;
+import android.media.ToneGenerator;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Build;
@@ -46,6 +48,19 @@ public class WarehouseFirebaseMessagingService extends FirebaseMessagingService 
 
         NotificationManager manager = getSystemService(NotificationManager.class);
         manager.notify(value(data, "eventId", String.valueOf(System.currentTimeMillis())).hashCode(), builder.build());
+        playWarehouseTone();
+    }
+
+    private void playWarehouseTone() {
+        try {
+            ToneGenerator tone = new ToneGenerator(AudioManager.STREAM_NOTIFICATION, 90);
+            tone.startTone(ToneGenerator.TONE_PROP_ACK, 180);
+            new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+                tone.startTone(ToneGenerator.TONE_PROP_BEEP2, 180);
+                new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(tone::release, 220);
+            }, 210);
+        } catch (Exception ignored) {
+        }
     }
 
     private String value(Map<String, String> data, String key, String fallback) {

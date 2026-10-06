@@ -9,7 +9,7 @@ service cloud.firestore {
     function role() { return userDoc().data.role; }
     function isDirector() { return activeUser() && role() == 'director'; }
     function isWarehouse() { return activeUser() && role() == 'warehouse'; }
-    function isManager() { return activeUser() && role() == 'manager'; }
+    function isManager() { return activeUser() && role() in ['manager', 'chief_accountant', 'accountant']; }
     function canManageUsers() { return activeUser() && (userDoc().data.admin == true || role() == 'director'); }
 
     match /users/{userId} {
@@ -20,7 +20,7 @@ service cloud.firestore {
         && request.resource.data.email is string
         && request.resource.data.active == true
         && request.resource.data.admin == false
-        && request.resource.data.role in ['warehouse', 'manager', 'director'];
+        && request.resource.data.role in ['warehouse', 'manager', 'chief_accountant', 'accountant', 'director'];
       allow update: if (activeUser() && request.auth.uid == userId
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['notificationSettings'])
         && request.resource.data.notificationSettings is map

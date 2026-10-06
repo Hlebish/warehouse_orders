@@ -11,6 +11,7 @@ import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import org.json.JSONObject;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;

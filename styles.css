@@ -976,3 +976,24 @@ body.dark-theme .order-action-menu-hint{color:#999 !important}
 
 .site-version{font-size:9px;color:#a3aab3;white-space:nowrap}
 body.dark-theme .site-version{color:#777}
+
+/* Chat upgrades: mentions + lightweight reactions */
+.chat-input-wrap{position:relative}
+.chat-mention-suggestions{position:absolute;left:0;right:0;bottom:calc(100% + 5px);z-index:20;background:var(--panel,#fff);border:1px solid var(--line);border-radius:9px;box-shadow:0 8px 24px rgba(0,0,0,.12);padding:4px;display:grid;gap:2px}
+.chat-mention-suggestions[hidden]{display:none}
+.chat-mention-suggestions button{border:0;background:transparent;border-radius:7px;padding:7px 9px;text-align:left;cursor:pointer;font-size:11px;color:#35404c}
+.chat-mention-suggestions button:hover{background:#f0f5ff}
+.chat-mention-suggestions small{color:#89919b;margin-left:4px}
+.chat-mention{font-weight:800;color:#2867dc;background:#eaf1ff;border-radius:4px;padding:0 2px}
+.chat-message-actions{display:flex;align-items:center;gap:10px;margin-top:5px}
+.chat-like-button{border:1px solid transparent;background:transparent;color:#737b86;border-radius:14px;padding:3px 7px;font-size:11px;cursor:pointer}
+.chat-like-button:hover{background:#f3f5f8;border-color:#dfe3e8}
+.chat-like-button.active{background:#eaf1ff;color:#2867dc;border-color:#cddcff}
+.chat-message-actions .chat-reply-button{margin-top:0}
+body.dark-theme .chat-mention-suggestions{background:#181818;border-color:#343434}
+body.dark-theme .chat-mention-suggestions button{color:#ddd}
+body.dark-theme .chat-mention-suggestions button:hover{background:#252d3a}
+body.dark-theme .chat-mention{color:#a9c4ff;background:#202c42}
+body.dark-theme .chat-like-button{color:#aaa}
+body.dark-theme .chat-like-button:hover{background:#242424;border-color:#3c3c3c}
+body.dark-theme .chat-like-button.active{background:#202c42;color:#a9c4ff;border-color:#35496a}

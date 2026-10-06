@@ -43,7 +43,7 @@ service cloud.firestore {
     match /chatMessages/{messageId} {
       allow read: if activeUser();
       allow create: if activeUser()
-        && request.resource.data.keys().hasOnly(['text', 'authorId', 'authorName', 'createdAt', 'photos', 'replyToId', 'replyToAuthorId', 'replyToAuthorName', 'replyToText'])
+        && request.resource.data.keys().hasOnly(['text', 'authorId', 'authorName', 'createdAt', 'photos', 'likes', 'replyToId', 'replyToAuthorId', 'replyToAuthorName', 'replyToText'])
         && request.resource.data.authorId == request.auth.uid
         && request.resource.data.authorName is string
         && request.resource.data.text is string
@@ -51,6 +51,9 @@ service cloud.firestore {
         && (request.resource.data.createdAt is timestamp || request.resource.data.createdAt is string)
         && request.resource.data.photos is list
         && request.resource.data.photos.size() <= 5
+        && request.resource.data.likes is list
+        && request.resource.data.likes is list
+        && request.resource.data.likes.size() <= 200
         && (!request.resource.data.keys().hasAny(['replyToId', 'replyToAuthorId', 'replyToAuthorName', 'replyToText'])
           || (request.resource.data.replyToId is string
             && request.resource.data.replyToAuthorId is string
@@ -58,7 +61,19 @@ service cloud.firestore {
             && request.resource.data.replyToText is string
             && get(/databases/$(database)/documents/chatMessages/$(request.resource.data.replyToId)).data.authorId == request.resource.data.replyToAuthorId))
         && (request.resource.data.text.size() > 0 || request.resource.data.photos.size() > 0);
-      allow update, delete: if false;
+      allow update: if activeUser()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes'])
+        && request.resource.data.likes is list
+        && request.resource.data.likes.size() <= 200
+        && resource.data.keys().hasAll(['likes'])
+        && (
+          (request.resource.data.likes.hasOnly(resource.data.likes.concat([request.auth.uid]))
+            && request.resource.data.likes.size() == resource.data.likes.size() + 1)
+          ||
+          (resource.data.likes.hasOnly(request.resource.data.likes.concat([request.auth.uid]))
+            && request.resource.data.likes.size() == resource.data.likes.size() - 1)
+        );
+      allow delete: if false;
     }
 
     match /pushQueue/{eventId} {

@@ -76,13 +76,14 @@ async function collectTokens(category='orders', recipientUserId='') {
     for (const tokenDoc of tokenGroups[i].docs) {
       const data = tokenDoc.data() || {};
       const token = String(data.token || '');
-      if (!token || data.appId !== 'warehouse_orders') continue;
+      if (!token || !['warehouse_orders','warehouse_orders_android'].includes(data.appId)) continue;
 
       const item = {
         ref: tokenDoc.ref,
         token,
         installationId: String(data.installationId || ''),
         appId: String(data.appId || ''),
+        platform: String(data.platform || (data.appId === 'warehouse_orders_android' ? 'android' : 'web')),
         updatedAt: String(data.updatedAt || ''),
         userId: user.id
       };
@@ -225,26 +226,48 @@ exports.sendWarehousePush = onDocumentCreated('pushQueue/{eventId}', async event
     for (let i = 0; i < tokenDocs.length; i += 500) {
       const group = tokenDocs.slice(i, i + 500);
 
-      const response = await messaging.sendEachForMulticast({
-  tokens: group.map(item => item.token),
-  data: {
-    title,
-    body,
-    eventId,
-    link,
-    orderId,
-    target
-  },
-  webpush: {
-    headers: {
-      Urgency: 'high',
-      TTL: '86400'
-    },
-    fcmOptions: {
-      link
-    }
-  }
-});
+      for (const platform of ['web', 'android']) {
+        const platformGroup = group.filter(item => item.platform === platform);
+        if (!platformGroup.length) continue;
+
+        const baseMessage = {
+          tokens: platformGroup.map(item => item.token),
+          data: {
+            title,
+            body,
+            eventId,
+            link,
+            orderId,
+            target
+          }
+        };
+
+        const message = platform === 'android'
+          ? {
+              ...baseMessage,
+              android: {
+                priority: 'high',
+                notification: {
+                  channelId: 'warehouse_orders',
+                  sound: 'warehouse_notification',
+                  tag: eventId
+                }
+              }
+            }
+          : {
+              ...baseMessage,
+              webpush: {
+                headers: {
+                  Urgency: 'high',
+                  TTL: '86400'
+                },
+                fcmOptions: {
+                  link
+                }
+              }
+            };
+
+        const response = await messaging.sendEachForMulticast(message);
 
       const removals = [];
 

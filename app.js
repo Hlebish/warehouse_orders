@@ -72,6 +72,24 @@ async function save(){
  }catch(err){console.error(err);toast('Не удалось сохранить изменения. Проверьте доступ и соединение.');}
 }
 async function queuePush(title,body,authorId,orderId='',target='site',category='',recipientUserId=''){try{const normalizedCategory=category||(target==='chat'?'chat':'orders');await setDoc(doc(db,'pushQueue',crypto.randomUUID()),{title:String(title||'Заказы · Склад'),body:String(body||'Новое изменение в заказе.'),authorId,orderId:String(orderId||''),target:target==='chat'?'chat':'site',category:normalizedCategory,recipientUserId:String(recipientUserId||''),createdAt:isoNow(),sentAt:null})}catch(err){console.warn('Push event was not queued',err)}}
+async function registerNativePushToken(token,installationId='') {
+  if (!signedInUser || !token) return;
+  try {
+    const tokenRef=doc(db,'users',signedInUser.uid,'pushTokens',encodeURIComponent(String(token)));
+    await setDoc(tokenRef,{
+      token:String(token),
+      installationId:String(installationId||''),
+      updatedAt:isoNow(),
+      userAgent:navigator.userAgent,
+      appId:'warehouse_orders_android',
+      platform:'android'
+    },{merge:true});
+  } catch(err) {
+    console.warn('Не удалось зарегистрировать Android push-токен',err);
+  }
+}
+window.registerNativePushToken=registerNativePushToken;
+
 async function syncPushToken(requestPermission=false){
   if(!('Notification' in window)||!('serviceWorker' in navigator)){
     if(requestPermission)toast('Этот браузер не поддерживает push-уведомления.');
@@ -187,7 +205,7 @@ onAuthStateChanged(auth,user=>{
  profileUnsubscribe=onSnapshot(doc(db,'users',user.uid),snap=>{
    if(!snap.exists()){showAuth('Учётная запись создана, но профиль не найден. Обратитесь к администратору.');$('authError').textContent=`UID: ${user.uid}`;return}
    const profile=snap.data();if(profile.active!==true||!roles[profile.role]){showAuth('Доступ отключён или роль не назначена. Обратитесь к администратору.');return}
-   state.role=profile.role;canManageUsers=profile.admin===true||profile.role==='director';profileName=profile.displayName||user.email||roles[profile.role];state.notificationSettings={chat:profile.notificationSettings?.chat!==false,replies:profile.notificationSettings?.replies!==false,orders:profile.notificationSettings?.orders!==false};$('userName').textContent=profileName;$('userRole').textContent=canManageUsers?`Администратор · ${roles[profile.role]}`:roles[profile.role];hideAuth();watchOrders();render();syncPushToken(false);if(pendingNotificationChat){pendingNotificationChat=false;history.replaceState({},'',location.pathname+location.hash);setTimeout(()=>openChat(),0);}
+   state.role=profile.role;canManageUsers=profile.admin===true||profile.role==='director';profileName=profile.displayName||user.email||roles[profile.role];state.notificationSettings={chat:profile.notificationSettings?.chat!==false,replies:profile.notificationSettings?.replies!==false,orders:profile.notificationSettings?.orders!==false};$('userName').textContent=profileName;$('userRole').textContent=canManageUsers?`Администратор · ${roles[profile.role]}`:roles[profile.role];hideAuth();watchOrders();render();syncPushToken(false);if(window.AndroidWarehouse?.requestNativePushToken){window.AndroidWarehouse.requestNativePushToken();}if(pendingNotificationChat){pendingNotificationChat=false;history.replaceState({},'',location.pathname+location.hash);setTimeout(()=>openChat(),0);}
  },err=>{console.error(err);showAuth('Не удалось проверить профиль сотрудника. Проверьте правила доступа Firestore.')});
 });
  $('loginForm').addEventListener('submit',async e=>{e.preventDefault();$('authError').textContent='';try{await signInWithEmailAndPassword(auth,$('loginEmail').value.trim(),$('loginPassword').value)}catch(err){$('authError').textContent=err.code==='auth/invalid-credential'?'Неверная почта или пароль.':err.code==='auth/too-many-requests'?'Слишком много попыток. Попробуйте позже.':'Не удалось войти. Проверьте почту и пароль.'}});

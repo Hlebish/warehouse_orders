@@ -318,7 +318,7 @@ async function uploadPhotos(orderId,entryId,blobs){
 
   return urls;
 }
-async async function saveEntry(){const kind=$('entryKind')?.value||'comment',text=$('entryText').value.trim(),article=$('article')?.value.trim()||'';if(!text){toast('Напишите сообщение.');return}if(kind==='defect'&&!article){toast('Для дефекта укажите артикул детали.');return}
+async function saveEntry(){const kind=$('entryKind')?.value||'comment',text=$('entryText').value.trim(),article=$('article')?.value.trim()||'';if(!text){toast('Напишите сообщение.');return}if(kind==='defect'&&!article){toast('Для дефекта укажите артикул детали.');return}
 const o=state.orders.find(x=>x.id===selectedId);if(!o)return;if(hasPendingDefect(o)&&kind!=='comment'){toast('Пока дефект не рассмотрен, можно добавлять только комментарии.');return}try{const photoBlobs=await readPhotos($('entryPhotos').files);
 const entryId=crypto.randomUUID();
 const photos=await uploadPhotos(o.id,entryId,photoBlobs);

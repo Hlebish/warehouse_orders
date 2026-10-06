@@ -381,18 +381,18 @@ function cancelChatReply(){
 }
 
 function chatMentionToken(name){
-  return String(name||'').trim().split(/\\s+/)[0].replace(/[^\\p{L}\\p{N}_-]/gu,'');
+  return String(name||'').trim().split(/\s+/)[0].replace(/[^\p{L}\p{N}_-]/gu,'');
 }
 function renderChatText(text){
   let out=esc(text||'');
-  out=out.replace(/(^|[\\s])(@[\\p{L}\\p{N}_-]{2,})/gu,'$1<span class="chat-mention">$2</span>');
+  out=out.replace(/(^|[\s])(@[\p{L}\p{N}_-]{2,})/gu,'$1<span class="chat-mention">$2</span>');
   return out;
 }
 function chatMentionSuggestions(){
   const input=$('chatInput'), list=$('chatMentionSuggestions');
   if(!input||!list)return;
   const value=input.value.slice(0,input.selectionStart??input.value.length);
-  const match=value.match(/(?:^|[\\s])@([\\p{L}\\p{N}_-]*)$/u);
+  const match=value.match(/(?:^|[\s])@([\p{L}\p{N}_-]*)$/u);
   if(!match){list.hidden=true;list.innerHTML='';return;}
   const needle=match[1].toLocaleLowerCase('ru');
   const people=[...new Map(chatMessages.filter(m=>m.authorId&&m.authorName).map(m=>[m.authorId,{id:m.authorId,name:m.authorName}])).values()]
@@ -407,7 +407,7 @@ function insertChatMention(token){
   const input=$('chatInput');
   if(!input)return;
   const start=input.selectionStart??input.value.length;
-  const before=input.value.slice(0,start).replace(/@[\\p{L}\\p{N}_-]*$/u,'@'+token);
+  const before=input.value.slice(0,start).replace(/@[\p{L}\p{N}_-]*$/u,'@'+token);
   input.value=before+input.value.slice(start);
   const pos=before.length;
   input.setSelectionRange(pos,pos);
@@ -494,7 +494,7 @@ function openChat(){
         ...(chatReplyTo?{replyToId:chatReplyTo.id,replyToAuthorId:chatReplyTo.authorId,replyToAuthorName:chatReplyTo.authorName||'Сотрудник',replyToText:(chatReplyTo.text||'📷 Фото').slice(0,300)}:{})
       });
       if(chatReplyTo){await queuePush('Ответ в общем чате',profileName+': '+(text?text.slice(0,160):'📷 Фото'),signedInUser.uid,'','chat','replies',chatReplyTo.authorId);}else{await queuePush('Общий чат',profileName+': '+(text?text.slice(0,160):'📷 Фото'),signedInUser.uid,'','chat','chat');}
-      const mentionedTokens=[...text.matchAll(/(^|[\\s])@([\\p{L}\\p{N}_-]{2,})/gu)].map(x=>x[2].toLocaleLowerCase('ru'));
+      const mentionedTokens=[...text.matchAll(/(^|[\s])@([\p{L}\p{N}_-]{2,})/gu)].map(x=>x[2].toLocaleLowerCase('ru'));
       const mentionedUsers=[...new Map(chatMessages.map(m=>[m.authorId,{id:m.authorId,name:m.authorName}])).values()]
         .filter(p=>p.id&&p.id!==signedInUser.uid&&mentionedTokens.includes(chatMentionToken(p.name).toLocaleLowerCase('ru')));
       for(const person of mentionedUsers){

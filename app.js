@@ -316,7 +316,7 @@ async function uploadPhotos(orderId,entryId,blobs){
 
   return urls;
 }
-async function saveEntry(){const kind=$('entryKind').value,text=$('entryText').value.trim(),article=$('article')?.value.trim()||'';if(!text){toast('Напишите сообщение.');return}if(kind==='defect'&&!article){toast('Для дефекта укажите артикул детали.');return}try{const photoBlobs=await readPhotos($('entryPhotos').files);
+async function saveEntry(){const kind=$('entryKind')?.value||'comment',text=$('entryText').value.trim(),article=$('article')?.value.trim()||'';if(!text){toast('Напишите сообщение.');return}if(kind==='defect'&&!article){toast('Для дефекта укажите артикул детали.');return}try{const photoBlobs=await readPhotos($('entryPhotos').files);
 const o=state.orders.find(x=>x.id===selectedId);
 const entryId=crypto.randomUUID();
 const photos=await uploadPhotos(o.id,entryId,photoBlobs);

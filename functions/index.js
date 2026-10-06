@@ -1,4 +1,6 @@
 const { onDocumentCreated } = require('firebase-functions/v2/firestore');
+const { onRequest } = require('firebase-functions/v2/https');
+const { defineSecret } = require('firebase-functions/params');
 const { setGlobalOptions } = require('firebase-functions/v2/options');
 const { logger } = require('firebase-functions');
 const { initializeApp } = require('firebase-admin/app');
@@ -8,6 +10,7 @@ const { getMessaging } = require('firebase-admin/messaging');
 initializeApp();
 const db = getFirestore();
 const messaging = getMessaging();
+const oneCImportKey = defineSecret('ONE_C_API_KEY');
 
 setGlobalOptions({
   region: 'europe-west1',
@@ -109,6 +112,78 @@ async function collectTokens(category='orders', recipientUserId='') {
 
   return result;
 }
+
+exports.import1COrder = onRequest(
+  { secrets: [oneCImportKey] },
+  async (req, res) => {
+    res.set('Content-Type', 'application/json; charset=utf-8');
+
+    if (req.method !== 'POST') {
+      return res.status(405).json({ ok: false, error: 'POST required' });
+    }
+
+    const apiKey = String(req.get('x-1c-api-key') || '');
+    if (!apiKey || apiKey !== oneCImportKey.value()) {
+      return res.status(401).json({ ok: false, error: 'Unauthorized' });
+    }
+
+    try {
+      const body = req.body && typeof req.body === 'object' ? req.body : {};
+      const number = String(body.number || '').trim();
+      const client = String(body.client || '').trim();
+      const sourceId = String(body.externalId || number).trim();
+      const articles = Array.isArray(body.articles)
+        ? body.articles.map(item => ({
+            article: String(item?.article || '').trim(),
+            quantity: Math.max(1, Number(item?.quantity) || 1)
+          })).filter(item => item.article)
+        : [];
+
+      if (!number) return res.status(400).json({ ok: false, error: 'number is required' });
+      if (!articles.length) return res.status(400).json({ ok: false, error: 'articles are required' });
+
+      const orderRef = db.collection('orders').doc('1c_' + encodeURIComponent(sourceId));
+      const existing = await orderRef.get();
+      const now = new Date();
+      const parsedDate = body.createdAt ? new Date(body.createdAt) : now;
+      const createdAt = Number.isNaN(parsedDate.getTime()) ? now : parsedDate;
+
+      const order = {
+        number,
+        client,
+        status: 'Создан',
+        articles,
+        createdAt: Timestamp.fromDate(createdAt),
+        createdBy: '1c',
+        createdByName: '1С',
+        updatedAt: FieldValue.serverTimestamp(),
+        source: '1c',
+        externalId: sourceId,
+        sourceType: String(body.sourceType || 'Заказ покупателя')
+      };
+
+      if (!existing.exists) {
+        await orderRef.set(order);
+      } else {
+        await orderRef.update({
+          number,
+          client,
+          articles,
+          source: '1c',
+          externalId: sourceId,
+          sourceType: String(body.sourceType || 'Заказ покупателя'),
+          updatedAt: FieldValue.serverTimestamp()
+        });
+      }
+
+      logger.info('1C order imported', { number, sourceId, updated: existing.exists });
+      return res.status(200).json({ ok: true, id: orderRef.id, number, updated: existing.exists });
+    } catch (error) {
+      logger.error('1C order import failed', { error: String(error?.message || error) });
+      return res.status(500).json({ ok: false, error: 'Import failed' });
+    }
+  }
+);
 
 exports.sendWarehousePush = onDocumentCreated('pushQueue/{eventId}', async event => {
   const snapshot = event.data;

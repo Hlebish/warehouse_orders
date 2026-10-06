@@ -54,21 +54,13 @@ public class MainActivity extends AppCompatActivity {
 
     private void createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            android.net.Uri sound = android.net.Uri.parse(
-                "android.resource://" + getPackageName() + "/" + com.amp.warehouseorders.R.raw.warehouse_notification
-            );
-            android.media.AudioAttributes audioAttributes = new android.media.AudioAttributes.Builder()
-                .setUsage(android.media.AudioAttributes.USAGE_NOTIFICATION)
-                .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                .build();
-
             NotificationChannel channel = new NotificationChannel(
                 CHANNEL_ID,
                 "Заказы · Склад",
                 NotificationManager.IMPORTANCE_HIGH
             );
             channel.setDescription("Уведомления заказов и чата");
-            channel.setSound(sound, audioAttributes);
+            channel.setSound(null, null);
             channel.enableVibration(true);
 
             NotificationManager manager = getSystemService(NotificationManager.class);

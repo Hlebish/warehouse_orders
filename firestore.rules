@@ -11,6 +11,7 @@ service cloud.firestore {
     function isWarehouse() { return activeUser() && role() == 'warehouse'; }
     function isManager() { return activeUser() && role() in ['manager', 'chief_accountant', 'accountant']; }
     function canManageUsers() { return activeUser() && (userDoc().data.admin == true || role() == 'director'); }
+    function chatLikes(data) { return data.keys().hasAll(['likes']) ? data.likes : []; }
 
     match /users/{userId} {
       allow read: if signedIn() && (request.auth.uid == userId || canManageUsers());
@@ -52,7 +53,6 @@ service cloud.firestore {
         && request.resource.data.photos is list
         && request.resource.data.photos.size() <= 5
         && request.resource.data.likes is list
-        && request.resource.data.likes is list
         && request.resource.data.likes.size() <= 200
         && (!request.resource.data.keys().hasAny(['replyToId', 'replyToAuthorId', 'replyToAuthorName', 'replyToText'])
           || (request.resource.data.replyToId is string
@@ -65,13 +65,12 @@ service cloud.firestore {
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes'])
         && request.resource.data.likes is list
         && request.resource.data.likes.size() <= 200
-        && resource.data.keys().hasAll(['likes'])
         && (
-          (request.resource.data.likes.hasOnly(resource.data.likes.concat([request.auth.uid]))
-            && request.resource.data.likes.size() == resource.data.likes.size() + 1)
+          (request.resource.data.likes.hasOnly(chatLikes(resource.data).concat([request.auth.uid]))
+            && request.resource.data.likes.size() == chatLikes(resource.data).size() + 1)
           ||
-          (resource.data.likes.hasOnly(request.resource.data.likes.concat([request.auth.uid]))
-            && request.resource.data.likes.size() == resource.data.likes.size() - 1)
+          (chatLikes(resource.data).hasOnly(request.resource.data.likes.concat([request.auth.uid]))
+            && request.resource.data.likes.size() == chatLikes(resource.data).size() - 1)
         );
       allow delete: if false;
     }

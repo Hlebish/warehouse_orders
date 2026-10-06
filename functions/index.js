@@ -200,7 +200,7 @@ exports.sendWarehousePush = onDocumentCreated('pushQueue/{eventId}', async event
   const siteUrl = 'https://hlebish.github.io/warehouse_orders/';
   const orderId = String(data.orderId || '');
   const target = data.target === 'chat' ? 'chat' : 'site';
-  const category = ['orders', 'chat', 'replies'].includes(data.category) ? data.category : (target === 'chat' ? 'chat' : 'orders');
+  const category = ['orders', 'chat', 'replies', 'likes'].includes(data.category) ? data.category : (target === 'chat' ? 'chat' : 'orders');
   const recipientUserId = String(data.recipientUserId || '');
   const link = target === 'chat'
     ? `${siteUrl}?chat=1`

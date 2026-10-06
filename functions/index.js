@@ -246,12 +246,7 @@ exports.sendWarehousePush = onDocumentCreated('pushQueue/{eventId}', async event
           ? {
               ...baseMessage,
               android: {
-                priority: 'high',
-                notification: {
-                  channelId: 'warehouse_orders',
-                  sound: 'warehouse_notification',
-                  tag: eventId
-                }
+                priority: 'high'
               }
             }
           : {
@@ -269,7 +264,7 @@ exports.sendWarehousePush = onDocumentCreated('pushQueue/{eventId}', async event
 
         const response = await messaging.sendEachForMulticast(message);
 
-      const removals = [];
+        const removals = [];
 
       response.responses.forEach((result, index) => {
         if (result.success) {
@@ -286,7 +281,7 @@ exports.sendWarehousePush = onDocumentCreated('pushQueue/{eventId}', async event
         }
       });
 
-      await Promise.all(removals);
+        await Promise.all(removals);
       }
     }
 

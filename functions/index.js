@@ -282,11 +282,12 @@ exports.sendWarehousePush = onDocumentCreated('pushQueue/{eventId}', async event
         failureCodes.set(code, (failureCodes.get(code) || 0) + 1);
 
         if (INVALID_TOKEN_CODES.has(code)) {
-          removals.push(group[index].ref.delete());
+          removals.push(platformGroup[index].ref.delete());
         }
       });
 
       await Promise.all(removals);
+      }
     }
 
     const failures = Object.fromEntries(failureCodes);

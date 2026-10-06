@@ -82,11 +82,8 @@ public class MainActivity extends AppCompatActivity {
 
     private void sendTokenToSite(String token, String installationId) {
         if (webView == null) return;
-        String safeToken = android.webkit.WebView.escapeHtml(token);
-        String safeInstallationId = android.webkit.WebView.escapeHtml(installationId);
         String js = "window.registerNativePushToken && window.registerNativePushToken(" +
-            "'" + safeToken.replace("'", "\'") + "'," +
-            "'" + safeInstallationId.replace("'", "\'") + "')";
+            JSONObject.quote(token) + "," + JSONObject.quote(installationId) + ")";
         webView.post(() -> webView.evaluateJavascript(js, null));
     }
 

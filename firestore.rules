@@ -25,9 +25,10 @@ service cloud.firestore {
       allow update: if (activeUser() && request.auth.uid == userId
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['notificationSettings'])
         && request.resource.data.notificationSettings is map
-        && request.resource.data.notificationSettings.keys().hasOnly(['chat', 'replies', 'orders'])
+        && request.resource.data.notificationSettings.keys().hasOnly(['chat', 'replies', 'likes', 'orders'])
         && request.resource.data.notificationSettings.chat is bool
         && request.resource.data.notificationSettings.replies is bool
+        && request.resource.data.notificationSettings.likes is bool
         && request.resource.data.notificationSettings.orders is bool)
         || isDirector()
         || (canManageUsers() && request.auth.uid != userId
@@ -83,7 +84,7 @@ service cloud.firestore {
         && request.resource.data.body is string
         && request.resource.data.sentAt == null
         && request.resource.data.target in ['site', 'chat']
-        && request.resource.data.category in ['orders', 'chat', 'replies']
+        && request.resource.data.category in ['orders', 'chat', 'replies', 'likes']
         && request.resource.data.recipientUserId is string;
       allow read, update, delete: if false;
     }

@@ -54,7 +54,7 @@ async function save(){
  for(const o of state.orders){
    const base=serverCache.get(o.id),newOrder=!base;
    const next=orderToCloud(o,newOrder),prev=base?orderToCloud(base):null;
-   const articlesChanged=!!base&&!articlesEqual(base.articles||[],o.articles||[]);
+   const articlesChanged=!!base&&!articlesContentEqual(base.articles||[],o.articles||[]);
    if(!base||!equal(next,prev)){
      if(base){next.updatedAt=isoNow();next.updatedBy=signedInUser.uid;next.updatedByName=profileName;o.updatedAt=next.updatedAt;o.updatedBy=next.updatedBy;o.updatedByName=profileName}
      pendingWrites.add(o.id);pendingOrderData.set(o.id,{...o,number:next.number,client:next.client,status:next.status,articles:next.articles||[]});await (newOrder?setDoc(doc(db,'orders',o.id),next):updateDoc(doc(db,'orders',o.id),next));serverCache.set(o.id,{...o,...next,entries:[...(o.entries||[])]});pendingWrites.delete(o.id);
@@ -290,7 +290,8 @@ function articlesEditorHtml(items=[]){return `<div class="article-editor" id="or
 function readArticles(){return [...document.querySelectorAll('#orderArticlesRows .order-article-row')].map(row=>({article:row.querySelector('.order-article-input')?.value.trim()||'',quantity:Math.max(1,Number(row.querySelector('.order-article-qty')?.value)||1)})).filter(x=>x.article)}
 function normalizeArticles(items=[]){return items.map(x=>({article:String(x.article||'').trim(),quantity:Math.max(1,Number(x.quantity)||1),collected:x.collected===true})).filter(x=>x.article)}
 const hasPendingDefect=o=>Array.isArray(o?.entries)&&o.entries.some(e=>e.kind==='defect'&&!e.decision);
-function articlesEqual(a=[],b=[]){return JSON.stringify(normalizeArticles(a))===JSON.stringify(normalizeArticles(b))}
+function articlesEqual(a=[],b=[]){return JSON.stringify(normalizeArticles(a).map(x=>({article:x.article,quantity:x.quantity})))===JSON.stringify(normalizeArticles(b).map(x=>({article:x.article,quantity:x.quantity})))}
+function articlesContentEqual(a=[],b=[]){return JSON.stringify((a||[]).map(x=>({article:String(x.article||'').trim(),quantity:Math.max(1,Number(x.quantity)||1)})).filter(x=>x.article))===JSON.stringify((b||[]).map(x=>({article:String(x.article||'').trim(),quantity:Math.max(1,Number(x.quantity)||1)})).filter(x=>x.article))}
 function openNewOrder(){if(!['warehouse','manager','chief_accountant','accountant'].includes(state.role)&&!canManageUsers){toast('Создавать карточки может только кладовщик, менеджер или администратор.');return}
 const managerCreate=isManagerRole()&&!canManageUsers;
 const statusOptions=managerCreate?'<option>Создан</option><option>Под вопросом</option>':'<option>Собран</option><option>Создан</option><option>Под вопросом</option>';

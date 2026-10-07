@@ -1032,3 +1032,7 @@ body.dark-theme .chat-upload-progress{background:rgba(255,255,255,.06)}
 .notice-unread{box-shadow:inset 3px 0 0 #e6b63f}
 body.dark-theme .chat-read-receipt{color:#8d98a4}
 body.dark-theme .chat-message.mine .chat-read-receipt{color:#b8d86c}
+
+
+/* Clickable order row status/comments + date separators */
+.row-open-status,.row-open-comments{border:0;background:transparent;padding:0;margin:0;cursor:pointer;color:inherit;font:inherit;display:inline-flex;align-items:center;gap:6px;text-align:left;-webkit-tap-highlight-color:transparent}.row-open-status:hover .status-pill,.row-open-comments:hover .entry-count{text-decoration:underline}.row-open-comments{min-height:30px}.comment-icon{font-size:15px;line-height:1}.date-separator td{padding:14px 10px 7px!important;border:0!important;background:transparent!important}.date-separator td::before{content:'';display:block;height:3px;background:#9aa1aa;border-radius:3px;margin-bottom:7px}.date-separator span{font-size:10px;font-weight:800;letter-spacing:.04em;color:#7c858f;text-transform:uppercase}.date-separator+tr td{border-top:0!important}body.dark-theme .date-separator td::before{background:#555}body.dark-theme .date-separator span{color:#999}.date-range-separator{font-size:12px;color:#8a929c;padding:0 2px;user-select:none}@media(max-width:760px){.date-filter{gap:4px!important}.date-filter input{min-width:0;width:100px}.row-open-comments,.row-open-status{min-height:38px}.date-separator td{padding-top:12px!important}}

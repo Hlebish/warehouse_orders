@@ -1022,3 +1022,13 @@ body.dark-theme .chat-upload-progress{background:rgba(255,255,255,.06)}
 .order-article-view .article-main small{font-size:11px;opacity:.7}
 
 .article-collected-state{font-size:12px;opacity:.78;white-space:nowrap}
+
+
+/* Chat read receipts + unread badge */
+.chat-read-receipt{font-size:11px;font-weight:800;letter-spacing:-2px;color:#8a949f;margin-left:auto;min-width:18px;text-align:right}
+.chat-message.mine .chat-read-receipt{color:#6f9b18}
+.chat-sidebar-button{position:relative}
+.chat-sidebar-button.has-unread-chat::after{content:'';position:absolute;right:9px;top:8px;width:9px;height:9px;border-radius:50%;background:#e6b63f;box-shadow:0 0 0 3px rgba(230,182,63,.16)}
+.notice-unread{box-shadow:inset 3px 0 0 #e6b63f}
+body.dark-theme .chat-read-receipt{color:#8d98a4}
+body.dark-theme .chat-message.mine .chat-read-receipt{color:#b8d86c}

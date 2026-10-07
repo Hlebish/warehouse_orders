@@ -7,7 +7,7 @@
   <meta name="description" content="Заказы, дефекты и согласование отгрузки в одном месте">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="./app-icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="styles.css?v=1.0.1.31">
+  <link rel="stylesheet" href="styles.css?v=1.0.1.32">
   <title>Заказы · Склад</title>
 </head>
 <body>
@@ -78,7 +78,7 @@
         </div>
 
         <section class="orders-panel">
-          <div class="panel-heading"><div><h2>Последние заказы</h2><p>Карточки и история изменений</p></div><div class="list-controls"><label class="search-box"><span>⌕</span><input id="searchInput" type="search" placeholder="Номер или клиент"></label><label class="search-box date-filter"><span>▣</span><input id="dateFilter" type="date" title="Найти заказы за дату" aria-label="Найти заказы за дату"></label><button class="secondary-button clear-date-button" id="clearDateButton" type="button" hidden>× Дата</button><div class="filter-menu-wrap">
+          <div class="panel-heading"><div><h2>Последние заказы</h2><p>Карточки и история изменений</p></div><div class="list-controls"><label class="search-box"><span>⌕</span><input id="searchInput" type="search" placeholder="Номер или клиент"></label><label class="search-box date-filter"><span>▣</span><input id="dateFromFilter" type="date" title="Дата от" aria-label="Дата от"><span class="date-range-separator">—</span><input id="dateToFilter" type="date" title="Дата до" aria-label="Дата до"></label><button class="secondary-button clear-date-button" id="clearDateButton" type="button" hidden>× Период</button><div class="filter-menu-wrap">
   <button class="filter-button" id="filterButton" type="button" aria-haspopup="true" aria-expanded="false">☷ <span>Фильтр</span></button>
   <div class="filter-menu" id="filterMenu" hidden>
     <button type="button" data-menu-filter="all">Все заказы</button>
@@ -99,7 +99,7 @@
           <div class="table-wrap"><table><thead><tr><th>ЗАКАЗ</th><th>КЛИЕНТ</th><th>СТАТУС</th><th>КОММЕНТАРИИ</th><th>СОЗДАН</th><th></th></tr></thead><tbody id="ordersBody"></tbody></table><div class="empty-state" id="emptyState"><div class="empty-icon">▤</div><b>Заказов пока нет</b><span>Добавьте номер заказа после сборки.</span><button class="secondary-button" id="emptyAddButton">＋ Добавить заказ</button></div></div>
           <div class="table-footer"><span id="listSummary">0 заказов</span><span>История сохраняется в карточке заказа</span></div>
         </section>
-        <footer class="page-footer"><span>Заказы · внутренняя система</span><span>Доступ по учётным записям сотрудников</span><span class="site-version">Версия 1.0.1.31</span></footer>
+        <footer class="page-footer"><span>Заказы · внутренняя система</span><span>Доступ по учётным записям сотрудников</span><span class="site-version">Версия 1.0.1.32</span></footer>
       </section>
     </main>
   </div>
@@ -107,6 +107,6 @@
   <div class="modal-backdrop" id="modalBackdrop" hidden><section class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle"><div class="modal-head"><div><span class="eyebrow" id="modalEyebrow">НОВАЯ КАРТОЧКА</span><h2 id="modalTitle">Добавить заказ</h2></div><button class="close-button" id="closeModal" aria-label="Закрыть">×</button></div><div class="modal-body" id="modalBody"></div><div class="modal-foot" id="modalFoot"></div></section></div>
   <div class="image-viewer" id="imageViewer" hidden role="dialog" aria-modal="true" aria-label="Просмотр фотографии"><button class="image-viewer-close" id="closeImageViewer" aria-label="Закрыть">×</button><img id="imageViewerImage" alt="Фото из комментария"></div>
   <div class="toast-stack" id="toastStack" aria-live="polite"></div>
-  <script type="module" src="app.js?v=1.0.1.31"></script>
+  <script type="module" src="app.js?v=1.0.1.32"></script>
 </body>
 </html>

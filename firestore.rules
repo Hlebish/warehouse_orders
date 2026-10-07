@@ -130,7 +130,7 @@ service cloud.firestore {
       allow update: if isDirector()
       || (activeUser()
         && request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['status', 'number', 'client', 'updatedAt', 'updatedBy', 'updatedByName'])
+          .hasOnly(['status', 'number', 'client', 'articles', 'updatedAt', 'updatedBy', 'updatedByName'])
         && request.resource.data.number is string
         && request.resource.data.number.size() > 0
         && request.resource.data.client is string

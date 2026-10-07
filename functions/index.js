@@ -186,7 +186,7 @@ exports.import1COrder = onRequest(
   }
 );
 
-exports.sendWarehousePush = onDocumentCreated('pushQueue/{eventId}', async event => {
+exports.sendWarehousePush = onDocumentCreated({ document: 'pushQueue/{eventId}', retry: true }, async event => {
   const snapshot = event.data;
   if (!snapshot) return;
 
@@ -213,7 +213,8 @@ exports.sendWarehousePush = onDocumentCreated('pushQueue/{eventId}', async event
       await markDone(snapshot.ref, {
         deliveryStatus: 'no_devices',
         acceptedCount: 0,
-        failedCount: 0
+        failedCount: 0,
+        diagnostic: 'На момент обработки не найдено ни одного активного устройства с push-токеном.'
       });
       logger.info('Push skipped: no registered devices', { eventId });
       return;
@@ -294,7 +295,13 @@ exports.sendWarehousePush = onDocumentCreated('pushQueue/{eventId}', async event
         failedCount: failed,
         failureCodes: failures
       });
-      logger.info('Push sent', { eventId, accepted, failed });
+      await markDone(snapshot.ref, {
+      deliveryStatus: failed ? (accepted ? 'partial' : 'failed') : 'sent',
+      acceptedCount: accepted,
+      failedCount: failed,
+      failureCodes: Object.fromEntries(failureCodes)
+    });
+    logger.info('Push sent', { eventId, accepted, failed, failureCodes: Object.fromEntries(failureCodes) });
       return;
     }
 

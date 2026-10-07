@@ -56,6 +56,43 @@ async function markDone(ref, fields) {
   });
 }
 
+async function createNotificationHistory(data, eventId) {
+  const category = ['orders', 'chat', 'replies', 'likes'].includes(data.category)
+    ? data.category
+    : (data.target === 'chat' ? 'chat' : 'orders');
+  const recipientUserId = String(data.recipientUserId || '');
+  const authorId = String(data.authorId || '');
+  const users = recipientUserId
+    ? await db.collection('users').where('active', '==', true).where('__name__', '==', recipientUserId).get()
+    : await db.collection('users').where('active', '==', true).get();
+
+  const batch = db.batch();
+  let count = 0;
+
+  for (const user of users.docs) {
+    if (!recipientUserId && user.id === authorId) continue;
+    const settings = user.data()?.notificationSettings || {};
+    if (settings[category] === false) continue;
+
+    const notificationRef = user.ref.collection('notifications').doc(eventId);
+    batch.set(notificationRef, {
+      title: String(data.title || 'Заказы · Склад').slice(0, 120),
+      message: String(data.body || 'Новое изменение.').slice(0, 500),
+      body: String(data.body || 'Новое изменение.').slice(0, 500),
+      orderId: String(data.orderId || ''),
+      target: data.target === 'chat' ? 'chat' : 'site',
+      category,
+      eventId,
+      createdAt: FieldValue.serverTimestamp(),
+      read: false
+    }, { merge: true });
+    count++;
+  }
+
+  if (count) await batch.commit();
+  return count;
+}
+
 async function collectTokens(category='orders', recipientUserId='') {
   const users = await db.collection('users').where('active', '==', true).get();
   const tokenGroups = await Promise.all(
@@ -202,6 +239,7 @@ exports.sendWarehousePush = onDocumentCreated({ document: 'pushQueue/{eventId}',
   const target = data.target === 'chat' ? 'chat' : 'site';
   const category = ['orders', 'chat', 'replies', 'likes'].includes(data.category) ? data.category : (target === 'chat' ? 'chat' : 'orders');
   const recipientUserId = String(data.recipientUserId || '');
+  await createNotificationHistory(data, eventId);
   const link = target === 'chat'
     ? `${siteUrl}?chat=1`
     : (orderId ? `${siteUrl}?order=${encodeURIComponent(orderId)}` : siteUrl);

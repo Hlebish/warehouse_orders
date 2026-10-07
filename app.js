@@ -309,6 +309,46 @@ function notify(){paintNotices()}
 function statusClass(s){return({'Собран':'status-assembled','Отгружен кладовщиком':'status-shipped','Ожидает оплаты':'status-payment','Под вопросом':'status-question','Дефект':'status-question','На согласовании':'status-approval','Одобрен на отгрузку клиенту':'status-ready','Ожидает самовывоза':'status-pickup-waiting','Клиент забрал самовывозом':'status-pickup-done','Самовывоз':'status-pickup-waiting','Перенесен':'status-transferred','Отменён':'status-cancel'})[s]||'status-neutral'}
 function statusPill(s){return `<span class="status-pill ${statusClass(s)}">${esc(s)}</span>`}
 function entriesCount(o){return(o.entries||[]).length}
+const statOrderConfig={
+  'Собран':{title:'Собранные заказы',hint:'Заказы со статусом «Собран»'},
+  'Создан':{title:'Созданные заказы',hint:'Заказы со статусом «Создан»'},
+  attention:{title:'Заказы требуют внимания',hint:'Заказы с вопросами и дефектами'},
+  'На согласовании':{title:'Заказы на согласовании',hint:'Ожидают решения менеджера'},
+  'Одобрен на отгрузку клиенту':{title:'Одобренные к отгрузке',hint:'Можно отгружать клиенту'},
+  'Ожидает оплаты':{title:'Ожидающие оплаты',hint:'Оплата ещё не получена'},
+  'Ожидает самовывоза':{title:'Ожидающие самовывоза',hint:'Клиент должен забрать заказ'},
+  'Перенесен':{title:'Перенесённые заказы',hint:'Висят сверху списка независимо от даты'}
+};
+function statOrderMatches(o,key){
+  if(key==='attention')return o.status==='Под вопросом'||o.status==='Дефект';
+  return o.status===key;
+}
+function openStatOrders(key){
+  const config=statOrderConfig[key];
+  if(!config)return;
+  const orders=state.orders.filter(o=>statOrderMatches(o,key)).sort((a,b)=>{
+    const aTransferred=a.status==='Перенесен',bTransferred=b.status==='Перенесен';
+    if(aTransferred!==bTransferred)return aTransferred?-1:1;
+    return new Date(orderDisplayDate(b)||0)-new Date(orderDisplayDate(a)||0);
+  });
+  const rows=orders.map(o=>{
+    const articleCount=Array.isArray(o.articles)?o.articles.length:0;
+    return `<button type="button" class="stat-order-item" data-open="${esc(o.id)}">
+      <span class="stat-order-main">
+        <b>№ ${esc(o.number)}</b>
+        <span>${esc(o.client||'Без клиента')}</span>
+      </span>
+      <span class="stat-order-meta">
+        ${statusPill(o.status)}
+        <small>${fmtDateTime(orderDisplayDate(o))} · ${articleCount} ${plural(articleCount,'позиция','позиции','позиций')}</small>
+      </span>
+    </button>`;
+  }).join('');
+  const body=orders.length
+    ? `<p class="stat-modal-hint">${esc(config.hint)} · найдено: <b>${orders.length}</b></p><div class="stat-order-list">${rows}</div>`
+    : `<div class="danger-note">Сейчас здесь нет заказов.</div>`;
+  showModal(config.title,body,[button('Закрыть','close')],'СПИСОК ЗАКАЗОВ');
+}
 function localDateKey(value){const d=asDate(value);if(!d)return '';return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-')}
 function orderDisplayDate(o){return o?.status==='Перенесен'?(o.transferredAt||o.createdAt):(o?.resumedAt||o?.createdAt)}
 function isDateInRange(o,dateFrom,dateTo){if(o?.status==='Перенесен')return true;const day=localDateKey(orderDisplayDate(o));if(dateFrom&&day<dateFrom)return false;if(dateTo&&day>dateTo)return false;return true}
@@ -694,6 +734,8 @@ async function toggleStaff(uid,active){if(!canManageUsers||uid===signedInUser.ui
 async function changeStaffRole(uid){if(!canManageUsers||uid===signedInUser.uid)return;const role=$(`staff-role-${uid}`)?.value;if(!roles[role])return;try{await updateDoc(doc(db,'users',uid),{role});toast(`Роль изменена: ${roles[role]}.`);showStaff()}catch(err){console.error(err);toast('Не удалось изменить роль. Проверьте права администратора и правила Firestore.')}}
 function backDetail(){if(selectedId)openOrder(selectedId);}
 document.addEventListener('click',e=>{
+  const statCard=e.target.closest('[data-stat-key]');
+  if(statCard){e.preventDefault();openStatOrders(statCard.dataset.statKey||'');return;}
   const mention=e.target.closest('[data-chat-mention]');
   if(mention){e.preventDefault();insertChatMention(mention.dataset.chatMention||'');return;}
   const like=e.target.closest('[data-action^="toggle-chat-like:"]');
@@ -712,6 +754,12 @@ window.addEventListener('popstate',()=>{
   }
   if(handlingSidebarPop)handlingSidebarPop=false;
 });document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeSidebar();if(!$('imageViewer').hidden){$('imageViewer').hidden=true;$('imageViewerImage').removeAttribute('src');return}if(!modal.hidden)closeModal()}});$('closeImageViewer').addEventListener('click',()=>{$('imageViewer').hidden=true;$('imageViewerImage').removeAttribute('src')});
-$('newOrderButton').addEventListener('click',openNewOrder);$('emptyAddButton').addEventListener('click',openNewOrder);$('closeModal').addEventListener('click',closeModal);$('searchInput').addEventListener('input',render);$('dateFromFilter').addEventListener('change',render);$('dateToFilter').addEventListener('change',render);$('clearDateButton').addEventListener('click',()=>{$('dateFromFilter').value='';$('dateToFilter').value='';render()});$('notificationButton').addEventListener('click',showNotifications);$('profileButton').addEventListener('click',profileMenu);$('chatSidebarButton').addEventListener('click',openChat);$('mobileMenu').addEventListener('click',openSidebar);function positionFilterMenu(){const button=$('filterButton'),menu=$('filterMenu');if(!button||!menu||menu.hidden)return;const r=button.getBoundingClientRect();const gap=6;const menuWidth=Math.max(205,r.width);let left=Math.min(r.right-menuWidth,window.innerWidth-8);left=Math.max(8,left);let top=r.bottom+gap;const menuHeight=menu.offsetHeight;if(top+menuHeight>window.innerHeight-8&&r.top-menuHeight-gap>=8)top=r.top-menuHeight-gap;menu.style.left=Math.round(left)+'px';menu.style.top=Math.round(top)+'px';menu.style.minWidth=Math.round(menuWidth)+'px'}$('filterButton').addEventListener('click',e=>{e.stopPropagation();const menu=$('filterMenu');const isOpen=!menu.hidden;menu.hidden=isOpen;$('filterButton').setAttribute('aria-expanded',String(!isOpen));if(!isOpen){updateFilterMenu();requestAnimationFrame(positionFilterMenu)}});document.querySelectorAll('[data-menu-filter]').forEach(btn=>btn.addEventListener('click',()=>{activeFilter=btn.dataset.menuFilter;render();updateFilterMenu();$('filterMenu').hidden=true;$('filterButton').setAttribute('aria-expanded','false')}));document.addEventListener('click',e=>{if(!e.target.closest('.filter-menu-wrap')){$('filterMenu').hidden=true;$('filterButton').setAttribute('aria-expanded','false')}});window.addEventListener('resize',positionFilterMenu);window.addEventListener('scroll',positionFilterMenu,true);function updateFilterMenu(){document.querySelectorAll('[data-menu-filter]').forEach(btn=>btn.classList.toggle('active',btn.dataset.menuFilter===activeFilter));}document.addEventListener('submit',e=>e.preventDefault());
+$('newOrderButton').addEventListener('click',openNewOrder);$('emptyAddButton').addEventListener('click',openNewOrder);$('closeModal').addEventListener('click',closeModal);$('searchInput').addEventListener('input',render);$('dateFromFilter').addEventListener('change',render);$('dateToFilter').addEventListener('change',render);$('clearDateButton').addEventListener('click',()=>{$('dateFromFilter').value='';$('dateToFilter').value='';render()});$('notificationButton').addEventListener('click',showNotifications);$('profileButton').addEventListener('click',profileMenu);$('chatSidebarButton').addEventListener('click',openChat);$('mobileMenu').addEventListener('click',openSidebar);function positionFilterMenu(){const button=$('filterButton'),menu=$('filterMenu');if(!button||!menu||menu.hidden)return;const r=button.getBoundingClientRect();const gap=6;const menuWidth=Math.max(205,r.width);let left=Math.min(r.right-menuWidth,window.innerWidth-8);left=Math.max(8,left);let top=r.bottom+gap;const menuHeight=menu.offsetHeight;if(top+menuHeight>window.innerHeight-8&&r.top-menuHeight-gap>=8)top=r.top-menuHeight-gap;menu.style.left=Math.round(left)+'px';menu.style.top=Math.round(top)+'px';menu.style.minWidth=Math.round(menuWidth)+'px'}$('filterButton').addEventListener('click',e=>{e.stopPropagation();const menu=$('filterMenu');const isOpen=!menu.hidden;menu.hidden=isOpen;$('filterButton').setAttribute('aria-expanded',String(!isOpen));if(!isOpen){updateFilterMenu();requestAnimationFrame(positionFilterMenu)}});document.querySelectorAll('[data-menu-filter]').forEach(btn=>btn.addEventListener('click',()=>{activeFilter=btn.dataset.menuFilter;render();updateFilterMenu();$('filterMenu').hidden=true;$('filterButton').setAttribute('aria-expanded','false')}));document.addEventListener('click',e=>{if(!e.target.closest('.filter-menu-wrap')){$('filterMenu').hidden=true;$('filterButton').setAttribute('aria-expanded','false')}});window.addEventListener('resize',positionFilterMenu);window.addEventListener('scroll',positionFilterMenu,true);function updateFilterMenu(){document.querySelectorAll('[data-menu-filter]').forEach(btn=>btn.classList.toggle('active',btn.dataset.menuFilter===activeFilter));}document.addEventListener('keydown',e=>{
+  if((e.key==='Enter'||e.key===' ')&&e.target.closest('.stat-card-clickable')){
+    e.preventDefault();
+    openStatOrders(e.target.closest('.stat-card-clickable').dataset.statKey||'');
+  }
+});
+document.addEventListener('submit',e=>e.preventDefault());
 if('serviceWorker'in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
 showAuth();

@@ -1,7 +1,7 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js';
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, createUserWithEmailAndPassword, updatePassword, EmailAuthProvider, reauthenticateWithCredential, GoogleAuthProvider, signInWithPopup, linkWithCredential } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js';
 import { getFirestore, collection, doc, onSnapshot, setDoc, deleteDoc, getDocs, getDoc, updateDoc, writeBatch, serverTimestamp, query, orderBy, limit, arrayUnion, arrayRemove } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
-import { getStorage, ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-storage.js';
+import { getStorage, ref as storageRef, uploadBytesResumable, getDownloadURL, deleteObject } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-storage.js';
 import { getMessaging, getToken, deleteToken, onMessage } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-messaging.js';
 import { firebaseConfig, vapidKey } from './firebase-config.js';
 const firebaseApp=initializeApp(firebaseConfig),auth=getAuth(firebaseApp),db=getFirestore(firebaseApp),messaging=getMessaging(firebaseApp),storage=getStorage(firebaseApp),staffAuth=getAuth(initializeApp(firebaseConfig,'amp-staff-provisioner'));
@@ -455,7 +455,7 @@ function openChat(){
   if(!signedInUser)return;
   chatUnsubscribe?.();
   chatMessages=[];chatReplyTo=null;
-  showModal('Общий чат','<div class="chat-shell"><div class="chat-messages" id="chatMessages"><div class="chat-empty">Загрузка сообщений…</div></div><form id="chatForm" class="chat-form"><div id="chatReplyPreview" class="chat-reply-preview" hidden></div><div class="chat-input-wrap"><textarea id="chatInput" maxlength="1000" rows="2" placeholder="Напишите сообщение… Используйте @ для упоминания" autocomplete="off" required></textarea><div id="chatMentionSuggestions" class="chat-mention-suggestions" hidden></div></div><div class="chat-attach-row"><label class="chat-attach-button">📎 Фото<input id="chatPhotoInput" type="file" accept="image/*" multiple hidden></label><span id="chatPhotoHint">До 5 фото, по 8 МБ</span></div><div id="chatPhotoPreview" class="chat-photo-preview"></div></form></div>',[button('Закрыть','close'),button('Отправить','send-chat','primary-button')],'ОБЩИЙ ЧАТ');
+  showModal('Общий чат','<div class="chat-shell"><div class="chat-messages" id="chatMessages"><div class="chat-empty">Загрузка сообщений…</div></div><form id="chatForm" class="chat-form"><div id="chatReplyPreview" class="chat-reply-preview" hidden></div><div class="chat-input-wrap"><textarea id="chatInput" maxlength="1000" rows="2" placeholder="Напишите сообщение… Используйте @ для упоминания" autocomplete="off" required></textarea><div id="chatMentionSuggestions" class="chat-mention-suggestions" hidden></div></div><div class="chat-attach-row"><label class="chat-attach-button">📎 Фото<input id="chatPhotoInput" type="file" accept="image/*" multiple hidden></label><span id="chatPhotoHint">До 5 фото, по 8 МБ</span></div><div id="chatUploadProgress" class="chat-upload-progress" hidden><div class="chat-upload-progress-track"><div id="chatUploadProgressBar" class="chat-upload-progress-bar"></div></div><span id="chatUploadProgressText">Загрузка…</span></div><div id="chatPhotoPreview" class="chat-photo-preview"></div></form></div>',[button('Закрыть','close'),button('Отправить','send-chat','primary-button')],'ОБЩИЙ ЧАТ');
   const chatQuery=query(collection(db,'chatMessages'),orderBy('createdAt','desc'),limit(100));
   chatUnsubscribe=onSnapshot(chatQuery,snap=>{
     chatMessages=snap.docs.map(d=>({id:d.id,...d.data()})).filter(m=>m.text||Array.isArray(m.photos)&&m.photos.length).sort((x,y)=>{const tx=x.createdAt?.toMillis?x.createdAt.toMillis():new Date(x.createdAt||0).getTime();const ty=y.createdAt?.toMillis?y.createdAt.toMillis():new Date(y.createdAt||0).getTime();return tx-ty||String(x.id).localeCompare(String(y.id));});
@@ -478,15 +478,39 @@ function openChat(){
     if(files.some(file=>!file.type.startsWith('image/')||file.size>8*1024*1024)){toast('Фото должны быть изображениями до 8 МБ каждое.');return}
     input.disabled=true;
     if(photoInput)photoInput.disabled=true;
+    const sendButton=document.querySelector('[data-action="send-chat"]');
+    const attachButton=document.querySelector('.chat-attach-button');
+    const progressWrap=$('chatUploadProgress');
+    const progressBar=$('chatUploadProgressBar');
+    const progressText=$('chatUploadProgressText');
+    if(sendButton)sendButton.disabled=true;
+    if(attachButton)attachButton.classList.add('disabled');
+    if(progressWrap)progressWrap.hidden=false;
+    if(progressBar)progressBar.style.width='0%';
+    if(progressText)progressText.textContent=files.length?'Подготовка загрузки…':'Отправка…';
     try{
       const createdAt=serverTimestamp();
       const photos=[];
+      const totalBytes=files.reduce((sum,file)=>sum+file.size,0);
+      let uploadedBytes=0;
       for(const file of files){
         const path=`chat/${signedInUser.uid}/${Date.now()}-${crypto.randomUUID()}-${file.name.replace(/[^a-zA-Z0-9._-]/g,'_')}`;
         const photoRef=storageRef(storage,path);
-        await uploadBytes(photoRef,file,{contentType:file.type});
-        photos.push(await getDownloadURL(photoRef));
+        await new Promise((resolve,reject)=>{
+          const task=uploadBytesResumable(photoRef,file,{contentType:file.type});
+          task.on('state_changed',snap=>{
+            const current=totalBytes?Math.min(100,((uploadedBytes+snap.bytesTransferred)/totalBytes)*100):0;
+            if(progressBar)progressBar.style.width=current.toFixed(1)+'%';
+            if(progressText)progressText.textContent=`Загрузка фото… ${Math.round(current)}%`;
+          },reject,async()=>{
+            uploadedBytes+=file.size;
+            photos.push(await getDownloadURL(photoRef));
+            resolve();
+          });
+        });
       }
+      if(progressBar)progressBar.style.width='100%';
+      if(progressText)progressText.textContent='Отправка сообщения…';
       await setDoc(doc(db,'chatMessages',crypto.randomUUID()),{
         text:text.slice(0,1000),
         authorId:signedInUser.uid,
@@ -514,6 +538,9 @@ function openChat(){
     }finally{
       input.disabled=false;
       if(photoInput)photoInput.disabled=false;
+      if(sendButton)sendButton.disabled=false;
+      if(attachButton)attachButton.classList.remove('disabled');
+      if(progressWrap){progressWrap.hidden=true;progressBar.style.width='0%';}
     }
   });
   $('chatPhotoInput').addEventListener('change',e=>{const files=Array.from(e.target.files||[]).slice(0,5);const preview=$('chatPhotoPreview');if(!preview)return;preview.innerHTML=files.map(file=>{const url=URL.createObjectURL(file);return `<span><img src="${url}" alt="Предпросмотр"><b>${esc(file.name)}</b></span>`}).join('');});

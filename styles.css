@@ -1018,7 +1018,5 @@ body.dark-theme .chat-like-button.active{background:#202c42;color:#a9c4ff;border
 [data-action="send-chat"]:disabled{opacity:.55;cursor:not-allowed}
 body.dark-theme .chat-upload-progress{background:rgba(255,255,255,.06)}
 
-.order-article-view.article-collected{opacity:.72}
-.order-article-view.article-collected .article-main b{text-decoration:line-through}
 .order-article-view .article-main{display:flex;flex-direction:column;gap:2px;min-width:0}
 .order-article-view .article-main small{font-size:11px;opacity:.7}

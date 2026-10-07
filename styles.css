@@ -1054,3 +1054,12 @@ body.dark-theme .chat-message.mine .chat-read-receipt{color:#b8d86c}
   .stat-order-meta{justify-items:end}
   .stat-order-meta small{white-space:normal;text-align:right}
 }
+
+body.dark-theme .stat-card-clickable:hover{border-color:#709b1f;box-shadow:0 8px 22px rgba(0,0,0,.38)}
+body.dark-theme .stat-card-clickable:focus-visible{border-color:#8fbf2f;box-shadow:0 0 0 3px rgba(143,191,47,.22)}
+body.dark-theme .stat-modal-hint{color:#aaa}
+body.dark-theme .stat-order-item{background:#1b1b1b;border-color:#3a3a3a;color:#eee}
+body.dark-theme .stat-order-item:hover{background:#222;border-color:#668c20}
+body.dark-theme .stat-order-main b{color:#b8d86c}
+body.dark-theme .stat-order-main span{color:#d0d0d0}
+body.dark-theme .stat-order-meta small{color:#999}

@@ -316,10 +316,8 @@ async function toggleArticleCollected(index){
     await save();
     render();
     openOrder(o.id);
-    toast(item.collected?`Артикул ${item.article} отмечен как собран.`:`Отметка «собрано» снята с ${item.article}.`);
   }catch(err){
     item.collected=!item.collected;
-    toast('Не удалось сохранить отметку.');
   }
 }
 async function saveArticles(){const o=state.orders.find(x=>x.id===selectedId);if(!o)return;if(hasPendingDefect(o)){toast('Редактирование заблокировано до решения по дефекту.');return;}const next=normalizeArticles(readArticles());

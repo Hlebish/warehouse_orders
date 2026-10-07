@@ -44,7 +44,7 @@ function watchChatBadge(){
   chatBadgeUnsubscribe=onSnapshot(q,snap=>{
     chatUnread=snap.docs.some(d=>{
       const m=d.data()||{};
-      return m.authorId!==signedInUser.uid && !(Array.isArray(m.readBy)&&m.readBy.includes(signedInUser.uid));
+      return m.authorId!==signedInUser.uid && Array.isArray(m.readBy) && !m.readBy.includes(signedInUser.uid);
     });
     paintChatBadge();
   },err=>console.error('Не удалось проверить непрочитанный чат',err));
@@ -52,7 +52,7 @@ function watchChatBadge(){
 function paintChatBadge(){$('chatSidebarButton')?.classList.toggle('has-unread-chat',chatUnread)}
 async function markChatMessagesRead(messages=[]){
   if(!signedInUser)return;
-  const unread=messages.filter(m=>m.authorId!==signedInUser.uid && !(Array.isArray(m.readBy)&&m.readBy.includes(signedInUser.uid)));
+  const unread=messages.filter(m=>m.authorId!==signedInUser.uid && Array.isArray(m.readBy) && !m.readBy.includes(signedInUser.uid));
   if(!unread.length){chatUnread=false;paintChatBadge();return;}
   await Promise.all(unread.map(m=>updateDoc(doc(db,'chatMessages',m.id),{readBy:arrayUnion(signedInUser.uid)}).catch(err=>console.warn('Не удалось отметить чат прочитанным',err))));
   chatUnread=false;paintChatBadge();

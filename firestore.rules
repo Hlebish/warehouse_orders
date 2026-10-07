@@ -37,6 +37,16 @@ service cloud.firestore {
           && request.resource.data.role in ['warehouse', 'manager', 'chief_accountant', 'accountant', 'director']);
       allow delete: if isDirector();
 
+
+      match /notifications/{notificationId} {
+        allow read: if activeUser() && request.auth.uid == userId;
+        allow update: if activeUser()
+          && request.auth.uid == userId
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read'])
+          && request.resource.data.read is bool;
+        allow create, delete: if false;
+      }
+
       match /pushTokens/{tokenId} {
         allow read, create, update, delete: if activeUser() && request.auth.uid == userId;
       }
@@ -45,7 +55,7 @@ service cloud.firestore {
     match /chatMessages/{messageId} {
       allow read: if activeUser();
       allow create: if activeUser()
-        && request.resource.data.keys().hasOnly(['text', 'authorId', 'authorName', 'createdAt', 'photos', 'likes', 'replyToId', 'replyToAuthorId', 'replyToAuthorName', 'replyToText'])
+        && request.resource.data.keys().hasOnly(['text', 'authorId', 'authorName', 'createdAt', 'photos', 'likes', 'readBy', 'replyToId', 'replyToAuthorId', 'replyToAuthorName', 'replyToText'])
         && request.resource.data.authorId == request.auth.uid
         && request.resource.data.authorName is string
         && request.resource.data.text is string
@@ -55,6 +65,9 @@ service cloud.firestore {
         && request.resource.data.photos.size() <= 5
         && request.resource.data.likes is list
         && request.resource.data.likes.size() <= 200
+        && request.resource.data.readBy is list
+        && request.resource.data.readBy.size() <= 200
+        && request.resource.data.readBy.hasAll([request.resource.data.authorId])
         && (!request.resource.data.keys().hasAny(['replyToId', 'replyToAuthorId', 'replyToAuthorName', 'replyToText'])
           || (request.resource.data.replyToId is string
             && request.resource.data.replyToAuthorId is string
@@ -63,15 +76,34 @@ service cloud.firestore {
             && get(/databases/$(database)/documents/chatMessages/$(request.resource.data.replyToId)).data.authorId == request.resource.data.replyToAuthorId))
         && (request.resource.data.text.size() > 0 || request.resource.data.photos.size() > 0);
       allow update: if activeUser()
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes'])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes', 'readBy'])
         && request.resource.data.likes is list
         && request.resource.data.likes.size() <= 200
+        && request.resource.data.readBy is list
+        && request.resource.data.readBy.size() <= 200
         && (
-          (request.resource.data.likes.hasOnly(chatLikes(resource.data).concat([request.auth.uid]))
-            && request.resource.data.likes.size() == chatLikes(resource.data).size() + 1)
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['readBy'])
           ||
-          (chatLikes(resource.data).hasOnly(request.resource.data.likes.concat([request.auth.uid]))
-            && request.resource.data.likes.size() == chatLikes(resource.data).size() - 1)
+          (
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes'])
+            &&
+            (
+              (request.resource.data.likes.hasOnly(chatLikes(resource.data).concat([request.auth.uid]))
+                && request.resource.data.likes.size() == chatLikes(resource.data).size() + 1)
+              ||
+              (chatLikes(resource.data).hasOnly(request.resource.data.likes.concat([request.auth.uid]))
+                && request.resource.data.likes.size() == chatLikes(resource.data).size() - 1)
+            )
+          )
+        )
+        && (
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes'])
+          ||
+          (
+            request.resource.data.readBy.hasAll(resource.data.readBy)
+            && request.resource.data.readBy.hasAll([request.auth.uid])
+            && request.resource.data.readBy.size() <= resource.data.readBy.size() + 1
+          )
         );
       allow delete: if false;
     }

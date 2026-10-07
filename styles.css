@@ -1009,3 +1009,11 @@ body.dark-theme .chat-mention{color:#a9c4ff;background:#202c42}
 body.dark-theme .chat-like-button{color:#aaa}
 body.dark-theme .chat-like-button:hover{background:#242424;border-color:#3c3c3c}
 body.dark-theme .chat-like-button.active{background:#202c42;color:#a9c4ff;border-color:#35496a}
+
+
+.chat-upload-progress{display:flex;align-items:center;gap:10px;margin-top:8px;padding:8px 10px;border-radius:10px;background:var(--surface-2,#f3f4f6);font-size:12px;color:var(--muted,#6b7280)}
+.chat-upload-progress-track{height:7px;flex:1;min-width:80px;overflow:hidden;border-radius:999px;background:rgba(127,127,127,.18)}
+.chat-upload-progress-bar{height:100%;width:0;border-radius:999px;background:currentColor;transition:width .15s ease}
+.chat-attach-button.disabled{pointer-events:none;opacity:.55}
+[data-action="send-chat"]:disabled{opacity:.55;cursor:not-allowed}
+body.dark-theme .chat-upload-progress{background:rgba(255,255,255,.06)}

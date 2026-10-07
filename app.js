@@ -71,7 +71,26 @@ async function save(){
  for(const [id,old] of serverCache){if(!currentIds.has(id)&&state.role==='director'){for(const e of old.entries||[])await deleteDoc(doc(db,'orders',id,'entries',e.id));await deleteDoc(doc(db,'orders',id));serverCache.delete(id)}}
  }catch(err){console.error(err);toast('Не удалось сохранить изменения. Проверьте доступ и соединение.');}
 }
-async function queuePush(title,body,authorId,orderId='',target='site',category='',recipientUserId=''){try{const normalizedCategory=category||(target==='chat'?'chat':'orders');await setDoc(doc(db,'pushQueue',crypto.randomUUID()),{title:String(title||'Заказы · Склад'),body:String(body||'Новое изменение в заказе.'),authorId,orderId:String(orderId||''),target:target==='chat'?'chat':'site',category:normalizedCategory,recipientUserId:String(recipientUserId||''),createdAt:isoNow(),sentAt:null})}catch(err){console.warn('Push event was not queued',err)}}
+async function queuePush(title,body,authorId,orderId='',target='site',category='',recipientUserId=''){
+  try{
+    const normalizedCategory=category||(target==='chat'?'chat':'orders');
+    await setDoc(doc(db,'pushQueue',crypto.randomUUID()),{
+      title:String(title||'Заказы · Склад'),
+      body:String(body||'Новое изменение в заказе.'),
+      authorId,
+      orderId:String(orderId||''),
+      target:target==='chat'?'chat':'site',
+      category:normalizedCategory,
+      recipientUserId:String(recipientUserId||''),
+      createdAt:isoNow(),
+      sentAt:null
+    });
+    return true;
+  }catch(err){
+    console.error('Push event was not queued',err);
+    return false;
+  }
+}
 async function registerNativePushToken(token,installationId='') {
   if (!signedInUser || !token) return;
   try {

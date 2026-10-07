@@ -150,7 +150,7 @@ service cloud.firestore {
       allow create: if (isWarehouse() || isManager() || canManageUsers())
         && request.resource.data.keys().hasOnly([
           'number', 'client', 'status', 'articles', 'createdAt', 'createdBy',
-          'createdByName', 'updatedAt'
+          'createdByName', 'updatedAt', 'transferredAt', 'resumedAt'
         ])
         && request.resource.data.number is string
         && request.resource.data.number.size() > 0
@@ -162,7 +162,7 @@ service cloud.firestore {
       allow update: if isDirector()
       || (activeUser()
         && request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['status', 'number', 'client', 'articles', 'updatedAt', 'updatedBy', 'updatedByName'])
+          .hasOnly(['status', 'number', 'client', 'articles', 'updatedAt', 'updatedBy', 'updatedByName', 'transferredAt', 'resumedAt'])
         && request.resource.data.number is string
         && request.resource.data.number.size() > 0
         && request.resource.data.client is string
@@ -181,10 +181,10 @@ service cloud.firestore {
         ])
       || (isManager()
         && request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['status', 'updatedAt', 'updatedBy', 'updatedByName']))
+          .hasOnly(['status', 'updatedAt', 'updatedBy', 'updatedByName', 'transferredAt', 'resumedAt']))
       || (isWarehouse()
         && request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['status', 'updatedAt', 'updatedBy', 'updatedByName']));
+          .hasOnly(['status', 'updatedAt', 'updatedBy', 'updatedByName', 'transferredAt', 'resumedAt']));
     allow delete: if canManageUsers();
 
       match /entries/{entryId} {

@@ -200,7 +200,45 @@ if(wasFirstEntries&&selectedId===d.id&&!modal.hidden&&modal.dataset.orderDetail=
 }
 onAuthStateChanged(auth,user=>{
  stopCloud();signedInUser=user;initialCloudLoad=true;
- if(!user){showAuth();return}
+ if(!user){function saveUiState(){
+  try{
+    sessionStorage.setItem('warehouseUiState',JSON.stringify({
+      scrollX:window.scrollX||0,
+      scrollY:window.scrollY||0,
+      activeFilter,
+      search:$('searchInput')?.value||'',
+      date:$('dateFilter')?.value||''
+    }));
+  }catch{}
+}
+function restoreUiState(){
+  try{
+    const raw=sessionStorage.getItem('warehouseUiState');
+    if(!raw)return;
+    const saved=JSON.parse(raw);
+    if(saved.activeFilter)activeFilter=saved.activeFilter;
+    if($('searchInput')&&typeof saved.search==='string')$('searchInput').value=saved.search;
+    if($('dateFilter')&&typeof saved.date==='string')$('dateFilter').value=saved.date;
+    render();
+    requestAnimationFrame(()=>requestAnimationFrame(()=>{
+      window.scrollTo(Number(saved.scrollX)||0,Number(saved.scrollY)||0);
+    }));
+  }catch{}
+}
+let lastUiSave=0;
+window.addEventListener('scroll',()=>{
+  const now=Date.now();
+  if(now-lastUiSave<150)return;
+  lastUiSave=now;
+  saveUiState();
+},{passive:true});
+window.addEventListener('pagehide',saveUiState);
+window.addEventListener('beforeunload',saveUiState);
+window.addEventListener('pageshow',e=>{
+  if(e.persisted)requestAnimationFrame(restoreUiState);
+});
+
+showAuth();return}
  showAuth('Проверяем доступ…');
  profileUnsubscribe=onSnapshot(doc(db,'users',user.uid),snap=>{
    if(!snap.exists()){showAuth('Учётная запись создана, но профиль не найден. Обратитесь к администратору.');$('authError').textContent=`UID: ${user.uid}`;return}

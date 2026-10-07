@@ -290,18 +290,12 @@ exports.sendWarehousePush = onDocumentCreated({ document: 'pushQueue/{eventId}',
 
     if (accepted > 0) {
       await markDone(snapshot.ref, {
-        deliveryStatus: failed ? 'partially_accepted' : 'accepted',
+        deliveryStatus: failed ? 'partial' : 'sent',
         acceptedCount: accepted,
         failedCount: failed,
         failureCodes: failures
       });
-      await markDone(snapshot.ref, {
-      deliveryStatus: failed ? (accepted ? 'partial' : 'failed') : 'sent',
-      acceptedCount: accepted,
-      failedCount: failed,
-      failureCodes: Object.fromEntries(failureCodes)
-    });
-    logger.info('Push sent', { eventId, accepted, failed, failureCodes: Object.fromEntries(failureCodes) });
+      logger.info('Push sent', { eventId, accepted, failed, failureCodes: failures });
       return;
     }
 

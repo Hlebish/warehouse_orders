@@ -1020,3 +1020,5 @@ body.dark-theme .chat-upload-progress{background:rgba(255,255,255,.06)}
 
 .order-article-view .article-main{display:flex;flex-direction:column;gap:2px;min-width:0}
 .order-article-view .article-main small{font-size:11px;opacity:.7}
+
+.article-collected-state{font-size:12px;opacity:.78;white-space:nowrap}

@@ -4,7 +4,7 @@ importScripts(
 );
 
 const SITE_URL = 'https://hlebish.github.io/warehouse_orders/';
-const CACHE = 'order-desk-fcm-v24';
+const CACHE = 'order-desk-fcm-v25';
 const ASSETS = [
   './',
   './index.html',
@@ -135,7 +135,7 @@ self.addEventListener('fetch', event => {
   event.respondWith((async () => {
     if (refreshFirst) {
       try {
-        const response = await fetch(event.request);
+        const response = await fetch(event.request, {cache: 'no-store'});
         if (response.ok) {
           await caches.open(CACHE).then(cache =>
             cache.put(event.request, response.clone())

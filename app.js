@@ -106,7 +106,14 @@ async function save(){
    serverCache.set(o.id,{...(serverCache.get(o.id)||o),...o,articles:normalizeArticles(o.articles||[]),entries:[...(o.entries||[])]});
  }
  for(const [id,old] of serverCache){if(!currentIds.has(id)&&state.role==='director'){for(const e of old.entries||[])await deleteDoc(doc(db,'orders',id,'entries',e.id));await deleteDoc(doc(db,'orders',id));serverCache.delete(id)}}
- }catch(err){console.error(err);toast('Не удалось сохранить изменения. Проверьте доступ и соединение.');}
+ }catch(err){
+  console.error('Ошибка сохранения заказа:',err);
+  const code=String(err?.code||'').trim();
+  const message=String(err?.message||'').trim();
+  const details=code?code.replace(/^.*?\//,''):message;
+  toast(details?'Не удалось сохранить: '+details:'Не удалось сохранить изменения. Проверьте доступ и соединение.');
+  throw err;
+}
 }
 async function queuePush(title,body,authorId,orderId='',target='site',category='',recipientUserId=''){
   try{

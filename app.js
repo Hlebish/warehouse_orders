@@ -748,24 +748,70 @@ function openChat(){
   setTimeout(()=>$('chatInput')?.focus(),50);
 }
 
-let shipmentCategoryMap=null;
-let shipmentCategoryMapPromise=null;
-
-async function loadShipmentCategoryMap(){
-  if(shipmentCategoryMap) return shipmentCategoryMap;
-  if(!shipmentCategoryMapPromise){
-    shipmentCategoryMapPromise=fetch('./data/shipment-categories.json',{cache:'no-store'})
-      .then(r=>r.ok?r.json():{})
-      .catch(err=>{console.warn('Не удалось загрузить категории склада',err);return {};})
-      .then(data=>shipmentCategoryMap=data||{});
-  }
-  return shipmentCategoryMapPromise;
-}
+const SHIPMENT_CATEGORY_RULES=[
+  ['Бампер',['бампер','bumper']],
+  ['Крыло',['крыло','кри́ло','крило','fender','wing']],
+  ['Решётка',['решетка','решётка','решітка','grille']],
+  ['Капот',['капот','hood','bonnet']],
+  ['Поршень',['поршень','поршни','поршня','piston']],
+  ['Амортизатор',['амортизатор','амортизатор','стойка','shock']],
+  ['Фара',['фара','headlight','headlamp']],
+  ['Прокладка',['прокладка','прокладки','gasket']],
+  ['Накладка',['накладка','накладки','trim']],
+  ['Фонарь',['фонарь','фонари','ліхтар','tail light','taillight']],
+  ['Подкрылок',['подкрылок','подкрылки','підкрилок','fender liner']],
+  ['Дверь',['дверь','двери','дверей','дверця','door']],
+  ['Зеркало',['зеркало','зеркала','дзеркало','mirror']],
+  ['Стекло',['стекло','стекла','скло','glass']],
+  ['Опора',['опора','опоры','mount']],
+  ['Клапан',['клапан','клапаны','valve']],
+  ['Крышка',['крышка','крышки','кришка','cover']],
+  ['Тормозная колодка',['колодка','колодки','тормозная колодка','brake pad']],
+  ['Тормозной диск',['тормозной диск','тормозные диски','brake disc']],
+  ['Радиатор',['радиатор','radiator']],
+  ['Насос',['насос','pump']],
+  ['Тяга',['тяга','тяги','tie rod']],
+  ['Сайлентблок',['сайлентблок','сайлентблоки','silentblock']],
+  ['Втулка',['втулка','втулки','bushing']],
+  ['Датчик',['датчик','датчики','sensor']],
+  ['Пружина',['пружина','пружины','spring']],
+  ['Ролик',['ролик','ролики','tensioner']],
+  ['Молдинг',['молдинг','молдинги','molding']],
+  ['Спойлер',['спойлер','спойлеры','spoiler']],
+  ['Наконечник',['наконечник','наконечники','tie rod end']]
+];
 
 function shipmentPartType(article){
-  const key=String(article||'').trim().toUpperCase();
-  return shipmentCategoryMap?.[key] || 'Прочее';
+  const raw=String(article||'').trim().toLowerCase();
+  if(!raw)return 'Прочее';
+
+  // Для наших AP-артикулов сохраняем точную классификацию по каталожному коду,
+  // но только как запасной вариант. Основной источник — название детали
+  // из складского каталога.
+  const code=raw.toUpperCase().replace(/[^A-ZА-Я0-9]/g,'');
+  const ap=code.match(/^AP[A-ZА-Я]{2}(\d+)$/);
+  const digit=ap?.[1]?.charAt(3)||'';
+  const codeFallback=({
+    '1':'Левое крыло',
+    '2':'Правое крыло',
+    '3':'Капот',
+    '6':'Бампер',
+    '7':'Задний бампер'
+  })[digit]||'';
+
+  // Если для позиции есть название в каталоге, оно должно иметь приоритет.
+  // Здесь используем переданный runtime-индекс названий склада, если он загружен.
+  const indexedName=window.shipmentCatalogNames?.[code]||'';
+  const text=(indexedName+' '+raw).replace(/<[^>]+>/g,' ').toLowerCase();
+
+  for(const [category,aliases] of SHIPMENT_CATEGORY_RULES){
+    if(aliases.some(alias=>text.includes(alias))) return category;
+  }
+
+  return codeFallback||'Прочее';
 }
+
+window.shipmentCategoryRules=SHIPMENT_CATEGORY_RULES;
 function shipmentItemsForDate(dateKey,categoryFilter=''){
   const map=new Map();
   for(const o of state.orders){
@@ -799,7 +845,6 @@ async function openShipmentDayOffset(days){
   await openShipmentManifest(shiftShipmentDate(current,days));
 }
 async function openShipmentManifest(dateKey=localDateKey(new Date()),categoryFilter=''){
-  await loadShipmentCategoryMap();
   let confirmation=null;
   try{const snap=await getDoc(doc(db,'shipmentDays',dateKey));if(snap.exists())confirmation=snap.data();}catch(err){console.warn(err);}
   const allItems=shipmentItemsForDate(dateKey),items=shipmentItemsForDate(dateKey,categoryFilter),groups=new Map();

@@ -275,7 +275,8 @@ onMessage(messaging,payload=>{
   if(n.title){
     const message=`${n.title}${n.body?`: ${n.body}`:''}`;
     const eventId=String(n.eventId||'');
-    const signature=`${target}|${orderId}|${message}`;
+    const category=String(n.category||'');
+    const signature=`${target}|${category}|${orderId}|${message}`;
     const now=Date.now();
     for(const [key,time] of recentPushEvents){if(now-time>10000)recentPushEvents.delete(key)}
     if((eventId&&recentPushEvents.has(`event:${eventId}`))||recentPushEvents.has(`msg:${signature}`))return;

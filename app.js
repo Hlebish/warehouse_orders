@@ -406,21 +406,34 @@ async function toggleArticleCollected(index){
   if(!o||!(state.role==='warehouse'||isManagerRole()||canManageUsers)||hasPendingDefect(o)||!Number.isInteger(index))return;
   const item=o.articles?.[index];
   if(!item)return;
-  if(state.role==='warehouse'&&item.collected===true){
-    toast('Кладовщик не может снять отметку «Собрано». Это может сделать менеджер.');
-    return;
-  }
-  item.collected=item.collected!==true;
+
+  const previousCollected=item.collected===true;
+  const previousStatus=o.status;
+  const previousAssembledAt=o.assembledAt;
+
+  item.collected=!previousCollected;
+
   const articles=Array.isArray(o.articles)?o.articles.filter(x=>String(x?.article||'').trim()):[];
-  if(articles.length>0&&articles.every(x=>x.collected===true)){
+  const allCollected=articles.length>0&&articles.every(x=>x.collected===true);
+
+  if(allCollected){
     o.status='Собран';
+    o.assembledAt=isoNow();
+  }else if(previousStatus==='Собран'){
+    o.status='Создан';
+    o.assembledAt=undefined;
   }
+
   try{
     await save();
     render();
     openOrder(o.id);
   }catch(err){
-    item.collected=!item.collected;
+    item.collected=previousCollected;
+    o.status=previousStatus;
+    o.assembledAt=previousAssembledAt;
+    console.error('Не удалось изменить отметку сборки',err);
+    toast('Не удалось изменить отметку сборки.');
   }
 }
 async function saveArticles(){const o=state.orders.find(x=>x.id===selectedId);if(!o)return;if(hasPendingDefect(o)){toast('Редактирование заблокировано до решения по дефекту.');return;}const next=normalizeArticles(readArticles());

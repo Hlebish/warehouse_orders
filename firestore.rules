@@ -236,11 +236,23 @@ service cloud.firestore {
     match /shipmentDays/{dateKey} {
       allow read: if activeUser();
 
+      // Отметки проверки отгрузки хранятся отдельно от заказов.
+      // Они не меняют статус заказа и доступны только кладовщику/администратору.
+      allow create: if (isWarehouse() || canManageUsers())
+        && request.resource.data.keys().hasOnly(['date','checkedArticles'])
+        && request.resource.data.date == dateKey
+        && request.resource.data.checkedArticles is list;
+
+      allow update: if (isWarehouse() || canManageUsers())
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['checkedArticles'])
+        && request.resource.data.date == dateKey
+        && request.resource.data.checkedArticles is list;
+
       // Подтвердить список могут кладовщик, менеджер и администратор.
-      allow create, update: if (isWarehouse() || isManager() || canManageUsers())
+      allow create: if (isWarehouse() || isManager() || canManageUsers())
         && request.resource.data.keys().hasOnly([
           'date','confirmed','confirmedBy','confirmedByName','confirmedAt','orderCount','itemCount',
-          'revokedBy','revokedByName','revokedAt'
+          'revokedBy','revokedByName','revokedAt','checkedArticles'
         ])
         && request.resource.data.date == dateKey
         && request.resource.data.confirmed == true
@@ -248,12 +260,13 @@ service cloud.firestore {
         && request.resource.data.confirmedByName is string
         && request.resource.data.confirmedAt is string
         && request.resource.data.orderCount is number
-        && request.resource.data.itemCount is number;
+        && request.resource.data.itemCount is number
+        && (!request.resource.data.keys().hasAny(['checkedArticles']) || request.resource.data.checkedArticles is list);
 
       // Снять подтверждение может только кладовщик или администратор.
       allow update: if (isWarehouse() || canManageUsers())
-        && request.resource.data.keys().hasOnly([
-          'date','confirmed','confirmedBy','confirmedByName','confirmedAt','orderCount','itemCount',
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'confirmed','confirmedBy','confirmedByName','confirmedAt','orderCount','itemCount',
           'revokedBy','revokedByName','revokedAt'
         ])
         && request.resource.data.date == dateKey
@@ -264,6 +277,20 @@ service cloud.firestore {
         && request.resource.data.orderCount is number
         && request.resource.data.itemCount is number;
 
+      // Повторно подтвердить существующий список.
+      allow update: if (isWarehouse() || isManager() || canManageUsers())
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'confirmed','confirmedBy','confirmedByName','confirmedAt','orderCount','itemCount',
+          'revokedBy','revokedByName','revokedAt'
+        ])
+        && request.resource.data.date == dateKey
+        && request.resource.data.confirmed == true
+        && request.resource.data.confirmedBy == request.auth.uid
+        && request.resource.data.confirmedByName is string
+        && request.resource.data.confirmedAt is string
+        && request.resource.data.orderCount is number
+        && request.resource.data.itemCount is number;
+      
       allow delete: if canManageUsers();
     }
   }

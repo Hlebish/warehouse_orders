@@ -166,7 +166,6 @@ service cloud.firestore {
         && request.resource.data.number is string
         && request.resource.data.number.size() > 0
         && request.resource.data.client is string
-        && request.resource.data.client.size() > 0
         && request.resource.data.status in [
           'Создан', 'Собран', 'Отгружен кладовщиком', 'Под вопросом', 'Дефект', 'Ожидает оплаты',
           'На согласовании', 'Одобрен на отгрузку клиенту',

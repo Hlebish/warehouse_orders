@@ -833,10 +833,18 @@ function shipmentPartType(article){
   return 'Прочее';
 }
 const shipmentCategoryOrder=['Левое крыло','Правое крыло','Капот','Поршень','Решётка','Левая решётка бампера','Правая решётка бампера','Передний бампер','Задний бампер','Усилитель бампера','Панель','Молдинг','Накладка/спойлер бампера','Подкрылок','Крепление','Зеркало','Фара','Фонарь','Стекло фары','Бампер','Прочее'];
+function shipmentOrderDateKey(o){
+  // Новые заказы имеют точную дату отгрузки.
+  if(o?.shippedAt)return localDateKey(o.shippedAt);
+  // Старые заказы могли быть отгружены до появления shippedAt.
+  // Для них используем дату сборки, а если её нет — дату последнего изменения.
+  // Это позволяет не потерять старые позиции во вкладке «Отгрузка».
+  return localDateKey(o?.assembledAt||o?.updatedAt||o?.createdAt);
+}
 function shipmentItemsForDate(dateKey){
   const map=new Map();
   for(const o of state.orders){
-    if(o.status!=='Отгружен кладовщиком'||localDateKey(o.shippedAt)!==dateKey)continue;
+    if(o.status!=='Отгружен кладовщиком'||shipmentOrderDateKey(o)!==dateKey)continue;
     for(const item of normalizeArticles(o.articles||[])){
       const key=String(item.article||'').trim().toUpperCase();
       if(!key)continue;

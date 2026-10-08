@@ -749,10 +749,18 @@ function openChat(){
 }
 
 function shipmentPartType(article){
-  const code=String(article||'').trim().toUpperCase();
-  const m=code.match(/(\d)(?!.*\d)/);
-  const digit=m?m[1]:'';
-  return ({'1':'Левое крыло','2':'Правое крыло','3':'Капот','6':'Бампер','7':'Задний бампер','8':'Решётка'})[digit]||'Прочее';
+  const code=String(article||'').trim().toUpperCase().replace(/[^A-ZА-Я0-9]/g,'');
+  // Внутренняя классификация склада: AP + 2 буквы марки + цифровая часть.
+  // Тип детали определяется 4-й цифрой цифровой части, а НЕ последней цифрой всего артикула.
+  const m=code.match(/^AP[A-ZА-Я]{2}(\\d+)/);
+  const digit=m?.[1]?.charAt(3)||'';
+  return ({
+    '1':'Левое крыло',
+    '2':'Правое крыло',
+    '3':'Капот',
+    '6':'Бампер',
+    '7':'Задний бампер'
+  })[digit]||'Прочее';
 }
 function shipmentItemsForDate(dateKey){
   const map=new Map();

@@ -761,5 +761,15 @@ $('newOrderButton').addEventListener('click',openNewOrder);$('emptyAddButton').a
   }
 });
 document.addEventListener('submit',e=>e.preventDefault());
-if('serviceWorker'in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
+if('serviceWorker'in navigator){
+  navigator.serviceWorker.addEventListener('message',event=>{
+    if(event.data?.type==='APP_UPDATED'){
+      const key='warehouse_orders_app_version';
+      const version=document.querySelector('meta[name="app-version"]')?.content||'';
+      if(version)localStorage.setItem(key,version);
+      window.location.reload();
+    }
+  });
+  window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
+}
 showAuth();

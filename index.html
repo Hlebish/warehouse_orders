@@ -7,8 +7,8 @@
   <meta name="description" content="Заказы, дефекты и согласование отгрузки в одном месте">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="./app-icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="styles.css?v=1.0.1.35">
-  <meta name="app-version" content="2026.10.08.9">
+  <link rel="stylesheet" href="styles.css?v=1.0.1.49">
+  <meta name="app-version" content="2026.10.08.10">
   <title>Заказы · Склад</title>
 
 <script>
@@ -68,6 +68,7 @@
         <div class="top-actions">
           <button class="top-history-button" id="shipmentManifestButton" data-action="shipment-manifest" type="button" title="Список деталей на отгрузку">📦 Отгрузка</button>
           <button class="top-history-button" id="siteHistoryButton" data-action="site-history" type="button" title="История действий по сайту">🕘 История</button>
+          <button class="top-history-button" id="analyticsButton" data-action="analytics" type="button" title="Статистика работы склада">📊 Статистика</button>
           <span class="top-divider"></span>
           <button class="icon-button" id="notificationButton" aria-label="Уведомления">
             <svg viewBox="0 0 24 24" aria-hidden="true" width="23" height="23" style="display:block;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;">
@@ -95,6 +96,8 @@
           <article class="stat-card stat-card-clickable" role="button" tabindex="0" data-stat-key="Перенесен" aria-label="Открыть перенесённые заказы"><div class="stat-top"><span>Перенесено</span><span class="stat-icon pale-violet">↻</span></div><strong id="statTransferred">0</strong><small>Заказы перенесены</small></article>
         </div>
 
+        <section class="work-insights" id="workInsights" hidden></section>
+
         <section class="orders-panel">
           <div class="panel-heading"><div><h2>Последние заказы</h2><p>Карточки и история изменений</p></div><div class="list-controls"><label class="search-box"><span>⌕</span><input id="searchInput" type="search" placeholder="Номер или клиент"></label><label class="search-box date-filter"><span>▣</span><input id="dateFromFilter" type="date" title="Дата от" aria-label="Дата от"><span class="date-range-separator">—</span><input id="dateToFilter" type="date" title="Дата до" aria-label="Дата до"></label><button class="secondary-button clear-date-button" id="clearDateButton" type="button" hidden>× Период</button><div class="filter-menu-wrap">
   <button class="filter-button" id="filterButton" type="button" aria-haspopup="true" aria-expanded="false">☷ <span>Фильтр</span></button>
@@ -117,7 +120,7 @@
           <div class="table-wrap"><table><thead><tr><th>ЗАКАЗ</th><th>КЛИЕНТ</th><th>СТАТУС</th><th>КОММЕНТАРИИ</th><th>СОЗДАН</th><th></th></tr></thead><tbody id="ordersBody"></tbody></table><div class="empty-state" id="emptyState"><div class="empty-icon">▤</div><b>Заказов пока нет</b><span>Добавьте номер заказа после сборки.</span><button class="secondary-button" id="emptyAddButton">＋ Добавить заказ</button></div></div>
           <div class="table-footer"><span id="listSummary">0 заказов</span><span>История сохраняется в карточке заказа</span></div>
         </section>
-        <footer class="page-footer"><span>Заказы · внутренняя система</span><span>Доступ по учётным записям сотрудников</span><span class="site-version">Версия 1.0.1.32</span></footer>
+        <footer class="page-footer"><span>Заказы · внутренняя система</span><span>Доступ по учётным записям сотрудников</span><span class="site-version">Версия 1.0.1.33</span></footer>
       </section>
     </main>
   </div>
@@ -125,6 +128,6 @@
   <div class="modal-backdrop" id="modalBackdrop" hidden><section class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle"><div class="modal-head"><div><span class="eyebrow" id="modalEyebrow">НОВАЯ КАРТОЧКА</span><h2 id="modalTitle">Добавить заказ</h2></div><button class="close-button" id="closeModal" aria-label="Закрыть">×</button></div><div class="modal-body" id="modalBody"></div><div class="modal-foot" id="modalFoot"></div></section></div>
   <div class="image-viewer" id="imageViewer" hidden role="dialog" aria-modal="true" aria-label="Просмотр фотографии"><button class="image-viewer-close" id="closeImageViewer" aria-label="Закрыть">×</button><img id="imageViewerImage" alt="Фото из комментария"></div>
   <div class="toast-stack" id="toastStack" aria-live="polite"></div>
-  <script type="module" src="app.js?v=1.0.1.47"></script>
+  <script type="module" src="app.js?v=1.0.1.49"></script>
 </body>
 </html>

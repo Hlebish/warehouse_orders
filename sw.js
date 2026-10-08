@@ -4,7 +4,7 @@ importScripts(
 );
 
 const SITE_URL = 'https://hlebish.github.io/warehouse_orders/';
-const CACHE = 'order-desk-fcm-v29';
+const CACHE = 'order-desk-fcm-v30';
 const ASSETS = [
   './',
   './index.html',
@@ -119,5 +119,5 @@ self.addEventListener('activate', event => {
 // by the page directly from the network. The service worker is kept only for FCM.
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET' || new URL(event.request.url).origin !== location.origin) return;
-  event.respondWith(fetch(event.request));
+  event.respondWith(fetch(event.request, {cache: 'no-store'}));
 });

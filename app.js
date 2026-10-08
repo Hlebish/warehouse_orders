@@ -808,7 +808,7 @@ async function confirmShipmentManifest(dateKey){
   openShipmentManifest(dateKey);
 }
 async function revokeShipmentManifest(dateKey){
-  if(!(canManageUsers||state.role==='warehouse'||state.role==='manager')){toast('У вас нет права снимать подтверждение.');return;}
+  if(!(canManageUsers||state.role==='warehouse')){toast('Снять подтверждение может только кладовщик или администратор.');return;}
   const snap=await getDoc(doc(db,'shipmentDays',dateKey));
   if(!snap.exists()||snap.data()?.confirmed!==true){toast('Подтверждение уже снято или отсутствует.');return;}
   const current=snap.data()||{};

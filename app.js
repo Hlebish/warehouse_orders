@@ -748,24 +748,25 @@ function openChat(){
   setTimeout(()=>$('chatInput')?.focus(),50);
 }
 
-function shipmentPartType(article){
-  const raw=String(article||'').trim().toUpperCase();
-  const code=raw.replace(/[^A-ZА-Я0-9]/g,'');
-  // Наши складские артикулы: AP + 2 буквы марки + цифровая часть.
-  // Классифицируем все такие артикулы по 4-й цифре цифровой части.
-  // Любой другой формат артикула целиком попадает в «Прочее».
-  const m=code.match(/^AP[A-ZА-Я]{2}(\d+)$/);
-  if(!m)return 'Прочее';
-  const digit=m[1].charAt(3);
-  return ({
-    '1':'Левое крыло',
-    '2':'Правое крыло',
-    '3':'Капот',
-    '6':'Бампер',
-    '7':'Задний бампер'
-  })[digit]||'Прочее';
+let shipmentCategoryMap=null;
+let shipmentCategoryMapPromise=null;
+
+async function loadShipmentCategoryMap(){
+  if(shipmentCategoryMap) return shipmentCategoryMap;
+  if(!shipmentCategoryMapPromise){
+    shipmentCategoryMapPromise=fetch('./data/shipment-categories.json',{cache:'no-store'})
+      .then(r=>r.ok?r.json():{})
+      .catch(err=>{console.warn('Не удалось загрузить категории склада',err);return {};})
+      .then(data=>shipmentCategoryMap=data||{});
+  }
+  return shipmentCategoryMapPromise;
 }
-function shipmentItemsForDate(dateKey){
+
+function shipmentPartType(article){
+  const key=String(article||'').trim().toUpperCase();
+  return shipmentCategoryMap?.[key] || 'Прочее';
+}
+function shipmentItemsForDate(dateKey,categoryFilter=''){
   const map=new Map();
   for(const o of state.orders){
     if(o.status!=='Отгружен кладовщиком'||localDateKey(o.shippedAt)!==dateKey)continue;
@@ -778,7 +779,8 @@ function shipmentItemsForDate(dateKey){
       map.set(key,current);
     }
   }
-  return [...map.values()].sort((a,b)=>a.type.localeCompare(b.type,'ru')||a.article.localeCompare(b.article,'ru'));
+  const items=[...map.values()].sort((a,b)=>a.type.localeCompare(b.type,'ru')||a.article.localeCompare(b.article,'ru'));
+  return categoryFilter ? items.filter(item=>item.type===categoryFilter) : items;
 }
 async function showAuditLog(){
   try{
@@ -796,14 +798,17 @@ async function openShipmentDayOffset(days){
   const current=$('shipmentDate')?.value||localDateKey(new Date());
   await openShipmentManifest(shiftShipmentDate(current,days));
 }
-async function openShipmentManifest(dateKey=localDateKey(new Date())){
+async function openShipmentManifest(dateKey=localDateKey(new Date()),categoryFilter=''){
+  await loadShipmentCategoryMap();
   let confirmation=null;
   try{const snap=await getDoc(doc(db,'shipmentDays',dateKey));if(snap.exists())confirmation=snap.data();}catch(err){console.warn(err);}
-  const items=shipmentItemsForDate(dateKey),groups=new Map();
+  const allItems=shipmentItemsForDate(dateKey),items=shipmentItemsForDate(dateKey,categoryFilter),groups=new Map();
   for(const item of items){if(!groups.has(item.type))groups.set(item.type,[]);groups.get(item.type).push(item);}
+  const categoryOptions=[...new Set(allItems.map(item=>item.type))].sort((a,b)=>a.localeCompare(b,'ru'));
   let html='<div class="shipment-day-picker"><button type="button" class="shipment-day-nav" data-action="shipment-day-prev" aria-label="Предыдущий день">‹</button><div class="shipment-day-current"><label for="shipmentDate">День отгрузки</label><input id="shipmentDate" type="date" value="'+esc(dateKey)+'"></div><button type="button" class="shipment-day-nav" data-action="shipment-day-next" aria-label="Следующий день">›</button></div><div class="shipment-day-quick"><button type="button" class="small-button primary-soft" data-action="shipment-day-today">Сегодня</button><button type="button" class="small-button" data-action="shipment-day-prev">← Предыдущий</button><button type="button" class="small-button" data-action="shipment-day-next">Следующий →</button></div>';
+  html+='<div class="field" style="margin:0 0 10px"><label for="shipmentCategoryFilter">Категория деталей</label><select id="shipmentCategoryFilter"><option value="">Все категории</option>'+categoryOptions.map(type=>'<option value="'+esc(type)+'"'+(type===categoryFilter?' selected':'')+'>'+esc(type)+'</option>').join('')+'</select></div>';
   const orderCount=new Set(items.flatMap(x=>x.orders)).size,itemCount=items.reduce((sum,x)=>sum+x.quantity,0);
-  html+='<p class="stat-modal-hint">Заказов: <b>'+orderCount+'</b> · деталей: <b>'+itemCount+'</b> · позиций: <b>'+items.length+'</b></p>';
+  html+='<p class="stat-modal-hint">Заказов: <b>'+orderCount+'</b> · деталей: <b>'+itemCount+'</b> · позиций: <b>'+items.length+'</b>'+(categoryFilter?' · категория: <b>'+esc(categoryFilter)+'</b>':'')+'</p>';
   for(const [type,list] of groups){html+='<div class="manifest-group"><h3>'+esc(type)+'</h3>';for(const x of list)html+='<div class="manifest-row"><span><b>'+esc(x.article)+'</b><small>'+x.orders.length+' заказ(ов)</small></span><strong>'+x.quantity+' шт.</strong></div>';html+='</div>';}
   if(!items.length)html+='<div class="danger-note">На этот день нет заказов со статусом «Отгружен кладовщиком».</div>';
   if(confirmation?.confirmed){
@@ -892,6 +897,11 @@ $('newOrderButton').addEventListener('click',openNewOrder);$('emptyAddButton').a
   if((e.key==='Enter'||e.key===' ')&&e.target.closest('.stat-card-clickable')){
     e.preventDefault();
     openStatOrders(e.target.closest('.stat-card-clickable').dataset.statKey||'');
+  }
+});
+document.addEventListener('change',e=>{
+  if(e.target?.id==='shipmentCategoryFilter'){
+    openShipmentManifest($('shipmentDate')?.value||localDateKey(new Date()),e.target.value||'');
   }
 });
 document.addEventListener('submit',e=>e.preventDefault());

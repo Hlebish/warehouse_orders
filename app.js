@@ -866,9 +866,8 @@ function shipmentItemsForDate(dateKey){
     for(const item of normalizeArticles(o.articles||[])){
       const key=String(item.article||'').trim().toUpperCase();
       if(!key)continue;
-      const current=map.get(key)||{article:key,quantity:0,type:shipmentPartType(key),orders:[],checked:true};
+      const current=map.get(key)||{article:key,quantity:0,type:shipmentPartType(key),orders:[]};
       current.quantity+=Number(item.quantity)||1;
-      current.checked=current.checked&&item.shipmentChecked===true;
       if(!current.orders.includes(o.number))current.orders.push(o.number);
       map.set(key,current);
     }
@@ -898,35 +897,20 @@ async function toggleShipmentItemChecked(dateKey,article){
   if(!(canManageUsers||state.role==='warehouse')){toast('Отметить проверку может только кладовщик или администратор.');return;}
   const key=String(article||'').trim().toUpperCase();
   if(!key)return;
-  const affected=state.orders.filter(o=>
-    o.status==='Отгружен кладовщиком' &&
-    shipmentOrderDateKey(o)===dateKey &&
-    (o.articles||[]).some(item=>String(item?.article||'').trim().toUpperCase()===key)
-  );
-  if(!affected.length){toast('Позиция не найдена.');return;}
-
-  const allChecked=affected.every(o=>
-    (o.articles||[])
-      .filter(item=>String(item?.article||'').trim().toUpperCase()===key)
-      .every(item=>item.shipmentChecked===true)
-  );
-  const nextChecked=!allChecked;
-
   try{
-    // ВАЖНО: здесь не вызываем save().
-    // Проверка отгрузки не является изменением заказа и не должна
-    // повторно сохранять/менять его статус. Обновляем только articles.
-    for(const o of affected){
-      const nextArticles=(o.articles||[]).map(item=>{
-        if(String(item?.article||'').trim().toUpperCase()!==key)return item;
-        return {...item,shipmentChecked:nextChecked};
-      });
-      await updateDoc(doc(db,'orders',o.id),{articles:nextArticles});
-      o.articles=nextArticles;
-      const cached=serverCache.get(o.id);
-      if(cached)serverCache.set(o.id,{...cached,articles:nextArticles});
-    }
-
+    const ref=doc(db,'shipmentDays',dateKey);
+    const snap=await getDoc(ref);
+    const data=snap.exists()?snap.data():{};
+    const checked=new Set(Array.isArray(data.checkedArticles)?data.checkedArticles.map(x=>String(x).trim().toUpperCase()).filter(Boolean):[]);
+    const nextChecked=!checked.has(key);
+    if(nextChecked)checked.add(key);else checked.delete(key);
+    await setDoc(ref,{
+      date:dateKey,
+      checkedArticles:[...checked],
+      updatedBy:signedInUser.uid,
+      updatedByName:profileName||roles[state.role],
+      updatedAt:isoNow()
+    },{merge:true});
     await writeAudit(
       nextChecked?'Проверена позиция на отгрузке':'Снята проверка позиции на отгрузке',
       'Дата: '+dateKey+'; артикул: '+key
@@ -940,7 +924,9 @@ async function toggleShipmentItemChecked(dateKey,article){
 async function openShipmentManifest(dateKey=localDateKey(new Date())){
   let confirmation=null;
   try{const snap=await getDoc(doc(db,'shipmentDays',dateKey));if(snap.exists())confirmation=snap.data();}catch(err){console.warn(err);}
-  const items=shipmentItemsForDate(dateKey),groups=new Map();
+  const shipmentDaySnap=await getDoc(doc(db,'shipmentDays',dateKey)).catch(()=>null);
+  const checkedArticles=new Set(shipmentDaySnap?.exists()&&Array.isArray(shipmentDaySnap.data()?.checkedArticles)?shipmentDaySnap.data().checkedArticles.map(x=>String(x).trim().toUpperCase()).filter(Boolean):[]);
+  const items=shipmentItemsForDate(dateKey).map(x=>({...x,checked:checkedArticles.has(String(x.article||'').trim().toUpperCase())})),groups=new Map();
   for(const item of items){if(!groups.has(item.type))groups.set(item.type,[]);groups.get(item.type).push(item);}
   const categoryTotals=new Map();
   for(const item of items)categoryTotals.set(item.type,(categoryTotals.get(item.type)||0)+item.quantity);

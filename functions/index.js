@@ -93,7 +93,7 @@ async function createNotificationHistory(data, eventId) {
   return count;
 }
 
-async function collectTokens(category='orders', recipientUserId='') {
+async function collectTokens(category='orders', recipientUserId='', authorId='') {
   const users = await db.collection('users').where('active', '==', true).get();
   const tokenGroups = await Promise.all(
     users.docs.map(user => user.ref.collection('pushTokens').get())
@@ -106,6 +106,7 @@ async function collectTokens(category='orders', recipientUserId='') {
     const user = users.docs[i];
 
     if (recipientUserId && user.id !== recipientUserId) continue;
+    if (!recipientUserId && authorId && user.id === authorId) continue;
 
     const settings = user.data()?.notificationSettings || {};
     if (settings[category] === false) continue;
@@ -245,7 +246,7 @@ exports.sendWarehousePush = onDocumentCreated({ document: 'pushQueue/{eventId}',
     : (orderId ? `${siteUrl}?order=${encodeURIComponent(orderId)}` : siteUrl);
 
   try {
-    const tokenDocs = await collectTokens(category, recipientUserId);
+    const tokenDocs = await collectTokens(category, recipientUserId, String(data.authorId || ''));
 
     if (!tokenDocs.length) {
       await markDone(snapshot.ref, {
@@ -277,7 +278,8 @@ exports.sendWarehousePush = onDocumentCreated({ document: 'pushQueue/{eventId}',
             eventId,
             link,
             orderId,
-            target
+            target,
+            category
           }
         };
 

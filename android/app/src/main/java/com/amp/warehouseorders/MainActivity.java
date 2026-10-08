@@ -3,6 +3,7 @@ package com.amp.warehouseorders;
 import android.Manifest;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
@@ -11,9 +12,9 @@ import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+
 import org.json.JSONObject;
 
-import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
@@ -25,6 +26,9 @@ public class MainActivity extends AppCompatActivity {
     private static final String SITE_URL = "https://hlebish.github.io/warehouse_orders/";
     private static final String CHANNEL_ID = "warehouse_orders";
     private static final int NOTIFICATION_PERMISSION_REQUEST = 1001;
+    private static final String PREFS = "warehouse_push";
+    private static final String PREF_TOKEN = "token";
+    private static final String PREF_INSTALLATION = "installationId";
 
     private WebView webView;
 
@@ -50,6 +54,14 @@ public class MainActivity extends AppCompatActivity {
         webView.setWebChromeClient(new WebChromeClient());
         webView.addJavascriptInterface(new AndroidBridge(), "AndroidWarehouse");
         webView.loadUrl(SITE_URL);
+        requestNativePushToken();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        sendCachedTokenToSite();
+        requestNativePushToken();
     }
 
     private void createNotificationChannel() {
@@ -80,6 +92,20 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    private void cacheToken(String token, String installationId) {
+        getSharedPreferences(PREFS, MODE_PRIVATE).edit()
+            .putString(PREF_TOKEN, token)
+            .putString(PREF_INSTALLATION, installationId == null ? "" : installationId)
+            .apply();
+    }
+
+    private void sendCachedTokenToSite() {
+        SharedPreferences prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
+        String token = prefs.getString(PREF_TOKEN, "");
+        String installationId = prefs.getString(PREF_INSTALLATION, "");
+        if (!token.isEmpty()) sendTokenToSite(token, installationId);
+    }
+
     private void sendTokenToSite(String token, String installationId) {
         if (webView == null) return;
         String js = "window.registerNativePushToken && window.registerNativePushToken(" +
@@ -87,18 +113,23 @@ public class MainActivity extends AppCompatActivity {
         webView.post(() -> webView.evaluateJavascript(js, null));
     }
 
+    private void requestNativePushToken() {
+        FirebaseMessaging.getInstance().getToken().addOnCompleteListener(task -> {
+            if (!task.isSuccessful()) return;
+            String token = task.getResult();
+
+            FirebaseInstallations.getInstance().getId().addOnCompleteListener(idTask -> {
+                String installationId = idTask.isSuccessful() ? idTask.getResult() : "";
+                cacheToken(token, installationId);
+                sendTokenToSite(token, installationId);
+            });
+        });
+    }
+
     private class AndroidBridge {
         @JavascriptInterface
         public void requestNativePushToken() {
-            FirebaseMessaging.getInstance().getToken().addOnCompleteListener(task -> {
-                if (!task.isSuccessful()) return;
-                String token = task.getResult();
-
-                FirebaseInstallations.getInstance().getId().addOnCompleteListener(idTask -> {
-                    String installationId = idTask.isSuccessful() ? idTask.getResult() : "";
-                    sendTokenToSite(token, installationId);
-                });
-            });
+            MainActivity.this.requestNativePushToken();
         }
     }
 

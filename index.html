@@ -7,8 +7,23 @@
   <meta name="description" content="Заказы, дефекты и согласование отгрузки в одном месте">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="./app-icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="styles.css?v=1.0.1.32">
+  <link rel="stylesheet" href="styles.css?v=1.0.1.33">
+  <meta name="app-version" content="2026.10.08.2">
   <title>Заказы · Склад</title>
+
+<script>
+(() => {
+  const VERSION = '2026.10.08.2';
+  const KEY = 'warehouse_orders_app_version';
+  const previous = localStorage.getItem(KEY);
+  if (previous && previous !== VERSION) {
+    localStorage.setItem(KEY, VERSION);
+    location.reload();
+    return;
+  }
+  localStorage.setItem(KEY, VERSION);
+})();
+</script>
 </head>
 <body>
   <section class="auth-gate" id="authGate" hidden>

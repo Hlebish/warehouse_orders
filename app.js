@@ -906,10 +906,7 @@ async function toggleShipmentItemChecked(dateKey,article){
     if(nextChecked)checked.add(key);else checked.delete(key);
     await setDoc(ref,{
       date:dateKey,
-      checkedArticles:[...checked],
-      updatedBy:signedInUser.uid,
-      updatedByName:profileName||roles[state.role],
-      updatedAt:isoNow()
+      checkedArticles:[...checked]
     },{merge:true});
     await writeAudit(
       nextChecked?'Проверена позиция на отгрузке':'Снята проверка позиции на отгрузке',

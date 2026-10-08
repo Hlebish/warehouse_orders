@@ -4,7 +4,7 @@ importScripts(
 );
 
 const SITE_URL = 'https://hlebish.github.io/warehouse_orders/';
-const CACHE = 'order-desk-fcm-v26';
+const CACHE = 'order-desk-fcm-v27';
 const ASSETS = [
   './',
   './index.html',
@@ -108,6 +108,10 @@ self.addEventListener('activate', event => {
     caches.keys()
       .then(keys => Promise.all(keys.map(key => caches.delete(key))))
       .then(() => self.clients.claim())
+      .then(() => self.clients.matchAll({type:'window', includeUncontrolled:true}))
+      .then(clientsList => {
+        clientsList.forEach(client => client.postMessage({type:'APP_UPDATED'}));
+      })
   );
 });
 

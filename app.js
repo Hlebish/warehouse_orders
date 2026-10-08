@@ -751,9 +751,10 @@ function openChat(){
 function shipmentPartType(article){
   const raw=String(article||'').trim().toUpperCase();
   const code=raw.replace(/[^A-ZА-Я0-9]/g,'');
-  // Наши складские артикулы: AP + 2 буквы марки + цифровая часть.
-  // Классифицируем все такие артикулы по 4-й цифре цифровой части.
-  // Любой другой формат артикула целиком попадает в «Прочее».
+  // Подтверждено по нашей базе products:
+  // складской артикул имеет формат AP + 2 буквы марки + цифровая часть.
+  // Категория определяется 4-й цифрой именно цифровой части.
+  // Любой другой формат артикула не пытаемся угадывать — он попадает в «Прочее».
   const m=code.match(/^AP[A-ZА-Я]{2}(\d+)$/);
   if(!m)return 'Прочее';
   const digit=m[1].charAt(3);
@@ -761,10 +762,11 @@ function shipmentPartType(article){
     '1':'Левое крыло',
     '2':'Правое крыло',
     '3':'Капот',
-    '6':'Бампер',
+    '6':'Передний бампер',
     '7':'Задний бампер'
   })[digit]||'Прочее';
 }
+const shipmentCategoryOrder=['Левое крыло','Правое крыло','Капот','Передний бампер','Задний бампер','Прочее'];
 function shipmentItemsForDate(dateKey){
   const map=new Map();
   for(const o of state.orders){
@@ -778,7 +780,10 @@ function shipmentItemsForDate(dateKey){
       map.set(key,current);
     }
   }
-  return [...map.values()].sort((a,b)=>a.type.localeCompare(b.type,'ru')||a.article.localeCompare(b.article,'ru'));
+  return [...map.values()].sort((a,b)=>{
+    const ai=shipmentCategoryOrder.indexOf(a.type),bi=shipmentCategoryOrder.indexOf(b.type);
+    return (ai-bi)||a.article.localeCompare(b.article,'ru');
+  });
 }
 async function showAuditLog(){
   try{
@@ -801,10 +806,20 @@ async function openShipmentManifest(dateKey=localDateKey(new Date())){
   try{const snap=await getDoc(doc(db,'shipmentDays',dateKey));if(snap.exists())confirmation=snap.data();}catch(err){console.warn(err);}
   const items=shipmentItemsForDate(dateKey),groups=new Map();
   for(const item of items){if(!groups.has(item.type))groups.set(item.type,[]);groups.get(item.type).push(item);}
+  const categoryTotals=new Map();
+  for(const item of items)categoryTotals.set(item.type,(categoryTotals.get(item.type)||0)+item.quantity);
+  const orderedGroups=shipmentCategoryOrder.filter(type=>groups.has(type)).map(type=>[type,groups.get(type)]);
   let html='<div class="shipment-day-picker"><button type="button" class="shipment-day-nav" data-action="shipment-day-prev" aria-label="Предыдущий день">‹</button><div class="shipment-day-current"><label for="shipmentDate">День отгрузки</label><input id="shipmentDate" type="date" value="'+esc(dateKey)+'"></div><button type="button" class="shipment-day-nav" data-action="shipment-day-next" aria-label="Следующий день">›</button></div><div class="shipment-day-quick"><button type="button" class="small-button primary-soft" data-action="shipment-day-today">Сегодня</button><button type="button" class="small-button" data-action="shipment-day-prev">← Предыдущий</button><button type="button" class="small-button" data-action="shipment-day-next">Следующий →</button></div>';
   const orderCount=new Set(items.flatMap(x=>x.orders)).size,itemCount=items.reduce((sum,x)=>sum+x.quantity,0);
-  html+='<p class="stat-modal-hint">Заказов: <b>'+orderCount+'</b> · деталей: <b>'+itemCount+'</b> · позиций: <b>'+items.length+'</b></p>';
-  for(const [type,list] of groups){html+='<div class="manifest-group"><h3>'+esc(type)+'</h3>';for(const x of list)html+='<div class="manifest-row"><span><b>'+esc(x.article)+'</b><small>'+x.orders.length+' заказ(ов)</small></span><strong>'+x.quantity+' шт.</strong></div>';html+='</div>';}
+  html+='<p class="stat-modal-hint">Заказов: <b>'+orderCount+'</b> · деталей: <b>'+itemCount+'</b> · артикулов: <b>'+items.length+'</b></p>';
+  if(items.length){
+    html+='<div class="shipment-category-summary">'+shipmentCategoryOrder.filter(type=>categoryTotals.has(type)).map(type=>'<div class="shipment-category-card"><span>'+esc(type)+'</span><strong>'+categoryTotals.get(type)+' шт.</strong></div>').join('')+'</div>';
+  }
+  for(const [type,list] of orderedGroups){
+    html+='<div class="manifest-group"><h3><span>'+esc(type)+'</span><b>'+categoryTotals.get(type)+' шт.</b></h3>';
+    for(const x of list)html+='<div class="manifest-row"><span><b>'+esc(x.article)+'</b><small>'+x.orders.length+' заказ(ов)</small></span><strong>'+x.quantity+' шт.</strong></div>';
+    html+='</div>';
+  }
   if(!items.length)html+='<div class="danger-note">На этот день нет заказов со статусом «Отгружен кладовщиком».</div>';
   if(confirmation?.confirmed){
     html+='<div class="danger-note">✓ Список подтверждён: '+esc(confirmation.confirmedByName||'Сотрудник')+' · '+fmtDateTime(confirmation.confirmedAt)+'</div>';

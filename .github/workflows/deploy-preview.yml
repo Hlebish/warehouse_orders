@@ -1,0 +1,74 @@
+name: Deploy main + branch preview
+
+on:
+  push:
+    branches:
+      - main
+      - feat/warehouse-workspace-upgrade
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v6
+        with:
+          ref: main
+          path: main-site
+
+      - name: Checkout feature branch
+        uses: actions/checkout@v6
+        with:
+          ref: feat/warehouse-workspace-upgrade
+          path: feature-site
+
+      - name: Assemble Pages site
+        run: |
+          rm -rf site
+          mkdir -p site/preview
+
+          # Production stays exactly from main.
+          rsync -a main-site/ site/ \
+            --exclude='.git' \
+            --exclude='.github' \
+            --exclude='android' \
+            --exclude='functions' \
+            --exclude='preview'
+
+          # The current feature branch is exposed only under /preview/.
+          for file in index.html app.js styles.css firebase-config.js sw.js manifest.webmanifest app-icon.svg amp-logo.png; do
+            if [ -f "feature-site/$file" ]; then
+              cp "feature-site/$file" "site/preview/$file"
+            fi
+          done
+
+          touch site/.nojekyll
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

@@ -76,26 +76,42 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
-messaging.onBackgroundMessage(payload => {
-  const data = payload?.data || {};
-  const title = String(data.title || 'Заказы · Склад');
-  const body = String(data.body || 'Новое изменение в заказе.');
-  const eventId = String(data.eventId || '');
-  const link = data.link || SITE_URL;
+const shownPushEvents=new Map();
 
-  self.registration.showNotification(title, {
+function showPushNotification(data={}){
+  const title=String(data.title||'Заказы · Склад');
+  const body=String(data.body||'Новое изменение в заказе.');
+  const eventId=String(data.eventId||'');
+  const link=String(data.link||SITE_URL);
+  const now=Date.now();
+
+  for(const [key,time] of shownPushEvents){
+    if(now-time>15000)shownPushEvents.delete(key);
+  }
+
+  if(eventId&&shownPushEvents.has(eventId))return;
+  if(eventId)shownPushEvents.set(eventId,now);
+
+  return self.registration.showNotification(title,{
     body,
-    icon: './amp-logo.png',
-    badge: './amp-logo.png',
-    tag: eventId || 'warehouse-push',
-    renotify: true,
-    silent: false,
-    vibrate: [200, 100, 200],
-    data: {
-      link,
-      eventId
-    }
+    icon:'./amp-logo.png',
+    badge:'./amp-logo.png',
+    tag:eventId||'warehouse-push',
+    renotify:true,
+    silent:false,
+    vibrate:[200,100,200],
+    data:{link,eventId}
   });
+}
+
+messaging.onBackgroundMessage(payload=>{
+  showPushNotification(payload?.data||payload?.notification||{});
+});
+
+self.addEventListener('message',event=>{
+  if(event.data?.type==='SHOW_FOREGROUND_NOTIFICATION'){
+    event.waitUntil(showPushNotification(event.data));
+  }
 });
 
 

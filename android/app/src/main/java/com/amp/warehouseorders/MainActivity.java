@@ -3,18 +3,18 @@ package com.amp.warehouseorders;
 import android.Manifest;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
-import android.content.SharedPreferences;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+
 import org.json.JSONObject;
 
-import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
@@ -26,11 +26,11 @@ public class MainActivity extends AppCompatActivity {
     private static final String SITE_URL = "https://hlebish.github.io/warehouse_orders/";
     private static final String CHANNEL_ID = "warehouse_orders";
     private static final int NOTIFICATION_PERMISSION_REQUEST = 1001;
-
-    private WebView webView;
     private static final String PREFS = "warehouse_push";
     private static final String PREF_TOKEN = "token";
     private static final String PREF_INSTALLATION = "installationId";
+
+    private WebView webView;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -54,6 +54,13 @@ public class MainActivity extends AppCompatActivity {
         webView.setWebChromeClient(new WebChromeClient());
         webView.addJavascriptInterface(new AndroidBridge(), "AndroidWarehouse");
         webView.loadUrl(SITE_URL);
+        requestNativePushToken();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        sendCachedTokenToSite();
         requestNativePushToken();
     }
 
@@ -110,6 +117,7 @@ public class MainActivity extends AppCompatActivity {
         FirebaseMessaging.getInstance().getToken().addOnCompleteListener(task -> {
             if (!task.isSuccessful()) return;
             String token = task.getResult();
+
             FirebaseInstallations.getInstance().getId().addOnCompleteListener(idTask -> {
                 String installationId = idTask.isSuccessful() ? idTask.getResult() : "";
                 cacheToken(token, installationId);
@@ -118,23 +126,10 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
-    @Override
-    protected void onResume() {
-        super.onResume();
-        sendCachedTokenToSite();
-        requestNativePushToken();
-    }
-
     private class AndroidBridge {
         @JavascriptInterface
         public void requestNativePushToken() {
-            requestNativePushToken();
-        }
-    }
-
-    /* old bridge implementation removed */
-    private class RemovedBridge {
-                if (!task.isSuccessful()) return;
+            MainActivity.this.requestNativePushToken();
         }
     }
 

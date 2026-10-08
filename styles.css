@@ -1305,3 +1305,10 @@ body.dark-theme .list-controls .date-filter input[type="date"]{
   color-scheme:dark;
 }
 body.dark-theme .list-controls .date-filter .date-range-separator{color:#aaa !important}
+
+/* === Unified status-card accent === */
+.stat-card:after,
+body.dark-theme .stat-card:after{
+  background:#669900 !important;
+  opacity:1 !important;
+}

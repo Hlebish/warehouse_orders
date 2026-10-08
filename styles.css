@@ -746,6 +746,71 @@ body.dark-theme .small-button.danger{
   color:#ff8178 !important;
   border-color:#6b2d2a !important;
 }
+
+/* Shipment manifest — polished dark theme */
+body.dark-theme .shipment-day-current label{color:#bfc5cc !important}
+body.dark-theme .shipment-day-current input{
+  background:#202020 !important;
+  color:#fff !important;
+  border-color:#414141 !important;
+  color-scheme:dark;
+}
+body.dark-theme .shipment-day-nav{
+  background:#202020 !important;
+  color:#d8d8d8 !important;
+  border-color:#414141 !important;
+  box-shadow:0 2px 7px rgba(0,0,0,.22);
+}
+body.dark-theme .shipment-day-nav:hover{
+  background:#2a351c !important;
+  color:#c4e875 !important;
+  border-color:#587322 !important;
+}
+body.dark-theme .shipment-day-quick .small-button{
+  background:#1d1d1d !important;
+  color:#d0d0d0 !important;
+  border-color:#3b3b3b !important;
+}
+body.dark-theme .shipment-day-quick .small-button:hover{
+  background:#272727 !important;
+  border-color:#4b4b4b !important;
+}
+body.dark-theme .shipment-day-quick .small-button.primary-soft{
+  background:#293717 !important;
+  color:#c1e56e !important;
+  border-color:#526d1f !important;
+}
+body.dark-theme .manifest-group{
+  border-color:#383838 !important;
+  background:#181818 !important;
+  box-shadow:0 4px 14px rgba(0,0,0,.18);
+}
+body.dark-theme .manifest-group h3{
+  background:#252525 !important;
+  color:#e8e8e8 !important;
+  border-bottom:1px solid #383838;
+}
+body.dark-theme .manifest-row{
+  background:#181818 !important;
+  border-top-color:#303030 !important;
+}
+body.dark-theme .manifest-row:hover{
+  background:#1e1e1e !important;
+}
+body.dark-theme .manifest-row b,
+body.dark-theme .manifest-row strong{color:#f2f2f2 !important}
+body.dark-theme .manifest-row small{color:#9fa6ae !important}
+body.dark-theme .danger-note{
+  background:#302817 !important;
+  color:#d7b66d !important;
+  border:1px solid #4d3d21;
+}
+body.dark-theme .shipment-revoked{
+  background:#321d1d !important;
+  color:#ff9690 !important;
+  border-color:#5b2d2a !important;
+}
+
 body.dark-theme .timeline-item,
 body.dark-theme .notice-item{
   background:#191919 !important;

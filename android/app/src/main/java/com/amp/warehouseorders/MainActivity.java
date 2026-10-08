@@ -6,6 +6,7 @@ import android.app.NotificationManager;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
+import android.content.SharedPreferences;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
@@ -27,6 +28,9 @@ public class MainActivity extends AppCompatActivity {
     private static final int NOTIFICATION_PERMISSION_REQUEST = 1001;
 
     private WebView webView;
+    private static final String PREFS = "warehouse_push";
+    private static final String PREF_TOKEN = "token";
+    private static final String PREF_INSTALLATION = "installationId";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -50,6 +54,7 @@ public class MainActivity extends AppCompatActivity {
         webView.setWebChromeClient(new WebChromeClient());
         webView.addJavascriptInterface(new AndroidBridge(), "AndroidWarehouse");
         webView.loadUrl(SITE_URL);
+        requestNativePushToken();
     }
 
     private void createNotificationChannel() {
@@ -80,6 +85,20 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    private void cacheToken(String token, String installationId) {
+        getSharedPreferences(PREFS, MODE_PRIVATE).edit()
+            .putString(PREF_TOKEN, token)
+            .putString(PREF_INSTALLATION, installationId == null ? "" : installationId)
+            .apply();
+    }
+
+    private void sendCachedTokenToSite() {
+        SharedPreferences prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
+        String token = prefs.getString(PREF_TOKEN, "");
+        String installationId = prefs.getString(PREF_INSTALLATION, "");
+        if (!token.isEmpty()) sendTokenToSite(token, installationId);
+    }
+
     private void sendTokenToSite(String token, String installationId) {
         if (webView == null) return;
         String js = "window.registerNativePushToken && window.registerNativePushToken(" +
@@ -87,18 +106,35 @@ public class MainActivity extends AppCompatActivity {
         webView.post(() -> webView.evaluateJavascript(js, null));
     }
 
+    private void requestNativePushToken() {
+        FirebaseMessaging.getInstance().getToken().addOnCompleteListener(task -> {
+            if (!task.isSuccessful()) return;
+            String token = task.getResult();
+            FirebaseInstallations.getInstance().getId().addOnCompleteListener(idTask -> {
+                String installationId = idTask.isSuccessful() ? idTask.getResult() : "";
+                cacheToken(token, installationId);
+                sendTokenToSite(token, installationId);
+            });
+        });
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        sendCachedTokenToSite();
+        requestNativePushToken();
+    }
+
     private class AndroidBridge {
         @JavascriptInterface
         public void requestNativePushToken() {
-            FirebaseMessaging.getInstance().getToken().addOnCompleteListener(task -> {
-                if (!task.isSuccessful()) return;
-                String token = task.getResult();
+            requestNativePushToken();
+        }
+    }
 
-                FirebaseInstallations.getInstance().getId().addOnCompleteListener(idTask -> {
-                    String installationId = idTask.isSuccessful() ? idTask.getResult() : "";
-                    sendTokenToSite(token, installationId);
-                });
-            });
+    /* old bridge implementation removed */
+    private class RemovedBridge {
+                if (!task.isSuccessful()) return;
         }
     }
 

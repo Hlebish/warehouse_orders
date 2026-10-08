@@ -63,8 +63,20 @@ async function markNotificationsRead(){
   if(!signedInUser)return;
   const unread=state.notices.filter(n=>!n.read);
   if(!unread.length){toast('Новых уведомлений нет.');return;}
-  await Promise.all(unread.map(n=>updateDoc(doc(db,'users',signedInUser.uid,'notifications',n.id),{read:true}).catch(err=>console.warn('Не удалось отметить уведомление',err))));
-  toast('Все уведомления отмечены прочитанными.');
+  const results=await Promise.all(unread.map(async n=>{
+    try{
+      await updateDoc(doc(db,'users',signedInUser.uid,'notifications',n.id),{read:true});
+      n.read=true;
+      return true;
+    }catch(err){
+      console.warn('Не удалось отметить уведомление',n.id,err);
+      return false;
+    }
+  }));
+  const failed=results.filter(ok=>!ok).length;
+  if(failed===0)toast('Все уведомления отмечены прочитанными.');
+  else toast('Не удалось отметить '+failed+' уведомлен'+(failed===1?'ие':'ия')+'. Проверьте доступ и повторите попытку.');
+  paintNotices();
 }
 
 function showAuth(message='Войдите с рабочей учётной записью.'){ $('authGate').hidden=false;document.querySelector('.app-shell').hidden=true;$('authMessage').textContent=message }

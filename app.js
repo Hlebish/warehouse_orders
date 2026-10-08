@@ -59,10 +59,10 @@ async function markChatMessagesRead(messages=[]){
   await Promise.all(unread.map(m=>updateDoc(doc(db,'chatMessages',m.id),{readBy:arrayUnion(signedInUser.uid)}).catch(err=>console.warn('Не удалось отметить чат прочитанным',err))));
   chatUnread=false;paintChatBadge();
 }
-async function markNotificationsRead(){
-  if(!signedInUser)return;
-  const unread=state.notices.filter(n=>!n.read);
-  if(!unread.length){toast('Новых уведомлений нет.');return;}
+async function markNotificationItemsRead(items=[],showToast=false){
+  if(!signedInUser)return {total:0,failed:0};
+  const unread=items.filter(n=>n&&!n.read);
+  if(!unread.length)return {total:0,failed:0};
   const results=await Promise.all(unread.map(async n=>{
     try{
       await updateDoc(doc(db,'users',signedInUser.uid,'notifications',n.id),{read:true});
@@ -74,9 +74,18 @@ async function markNotificationsRead(){
     }
   }));
   const failed=results.filter(ok=>!ok).length;
-  if(failed===0)toast('Все уведомления отмечены прочитанными.');
-  else toast('Не удалось отметить '+failed+' уведомлен'+(failed===1?'ие':'ия')+'. Проверьте доступ и повторите попытку.');
   paintNotices();
+  if(showToast){
+    if(failed===0)toast('Все уведомления отмечены прочитанными.');
+    else toast('Не удалось отметить '+failed+' уведомлен'+(failed===1?'ие':'ия')+'. Проверьте доступ и повторите попытку.');
+  }
+  return {total:unread.length,failed};
+}
+async function markNotificationsRead(){
+  if(!signedInUser)return;
+  const unread=state.notices.filter(n=>!n.read);
+  if(!unread.length){toast('Новых уведомлений нет.');return;}
+  await markNotificationItemsRead(unread,true);
 }
 
 function showAuth(message='Войдите с рабочей учётной записью.'){ $('authGate').hidden=false;document.querySelector('.app-shell').hidden=true;$('authMessage').textContent=message }
@@ -1123,6 +1132,13 @@ function showNotifications(){
       return '<article class="notification-entry notification-'+tone+' '+(n.read?'':'unread')+'"><span class="notification-dot"></span><div><b>'+esc(n.title||'Уведомление')+'</b><p>'+esc(n.message||n.body||'Новое событие')+'</p><small>'+fmtDateTime(n.createdAt||n.at)+'</small></div>'+(n.orderId?'<button type="button" class="small-button primary-soft" data-open="'+esc(n.orderId)+'">Открыть</button>':'')+'</article>';
     }).join('');
     const listEl=$('notificationList');if(listEl)listEl.innerHTML=rows||'<div class="danger-note">Уведомлений по фильтрам нет.</div>';
+    // Everything rendered in the notification center is considered seen.
+    // The explicit "Прочитать всё" button remains available for unread
+    // notifications that are not currently visible because of filters/search.
+    markNotificationItemsRead(list).then(()=>{
+      const summary=document.querySelector('.notification-summary b');
+      if(summary)summary.textContent=String(state.notices.filter(n=>!n.read).length);
+    });
   };
   const unread=state.notices.filter(n=>!n.read).length;
   const pushGranted=typeof Notification!=='undefined'&&Notification.permission==='granted';

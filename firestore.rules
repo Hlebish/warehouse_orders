@@ -230,25 +230,35 @@ service cloud.firestore {
 
     match /shipmentDays/{dateKey} {
       allow read: if activeUser();
+
+      // Подтвердить список могут кладовщик, менеджер и администратор.
       allow create, update: if (isWarehouse() || isManager() || canManageUsers())
         && request.resource.data.keys().hasOnly([
           'date','confirmed','confirmedBy','confirmedByName','confirmedAt','orderCount','itemCount',
           'revokedBy','revokedByName','revokedAt'
         ])
         && request.resource.data.date == dateKey
+        && request.resource.data.confirmed == true
+        && request.resource.data.confirmedBy == request.auth.uid
+        && request.resource.data.confirmedByName is string
+        && request.resource.data.confirmedAt is string
         && request.resource.data.orderCount is number
-        && request.resource.data.itemCount is number
-        && (
-          (request.resource.data.confirmed == true
-            && request.resource.data.confirmedBy == request.auth.uid
-            && request.resource.data.confirmedByName is string
-            && request.resource.data.confirmedAt is string)
-          ||
-          (request.resource.data.confirmed == false
-            && request.resource.data.revokedBy == request.auth.uid
-            && request.resource.data.revokedByName is string
-            && request.resource.data.revokedAt is string)
-        );
+        && request.resource.data.itemCount is number;
+
+      // Снять подтверждение может только кладовщик или администратор.
+      allow update: if (isWarehouse() || canManageUsers())
+        && request.resource.data.keys().hasOnly([
+          'date','confirmed','confirmedBy','confirmedByName','confirmedAt','orderCount','itemCount',
+          'revokedBy','revokedByName','revokedAt'
+        ])
+        && request.resource.data.date == dateKey
+        && request.resource.data.confirmed == false
+        && request.resource.data.revokedBy == request.auth.uid
+        && request.resource.data.revokedByName is string
+        && request.resource.data.revokedAt is string
+        && request.resource.data.orderCount is number
+        && request.resource.data.itemCount is number;
+
       allow delete: if canManageUsers();
     }
   }

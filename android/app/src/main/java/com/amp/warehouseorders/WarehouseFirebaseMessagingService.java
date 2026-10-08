@@ -44,7 +44,8 @@ public class WarehouseFirebaseMessagingService extends FirebaseMessagingService 
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setAutoCancel(true)
             .setContentIntent(pendingIntent)
-            .setCategory(NotificationCompat.CATEGORY_MESSAGE);
+            .setCategory(NotificationCompat.CATEGORY_MESSAGE)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC);
 
         NotificationManager manager = getSystemService(NotificationManager.class);
         manager.notify(value(data, "eventId", String.valueOf(System.currentTimeMillis())).hashCode(), builder.build());

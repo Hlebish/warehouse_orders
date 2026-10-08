@@ -432,19 +432,17 @@ function showWarehouseAnalytics(){
   const orders=state.orders.filter(Boolean);
   const today=orders.filter(o=>localDateKey(orderDisplayDate(o))===todayKey);
   const week=orders.filter(o=>{const d=asDate(orderDisplayDate(o));return d&&d>=new Date(weekStart.getFullYear(),weekStart.getMonth(),weekStart.getDate());});
-  const assembled=orders.filter(o=>o.assembledAt);
-  const shipped=orders.filter(o=>o.shippedAt);
-  const cycle=assembled.map(o=>{const a=asDate(o.createdAt),b=asDate(o.assembledAt);return a&&b?b-a:null}).filter(Number.isFinite);
-  const shipmentCycle=shipped.map(o=>{const a=asDate(o.assembledAt),b=asDate(o.shippedAt);return a&&b?b-a:null}).filter(Number.isFinite);
   const stuck=orders.filter(o=>['Создан','На согласовании','Ожидает оплаты','Ожидает самовывоза','Перенесен'].includes(o.status));
   const byStatus=new Map();
   orders.forEach(o=>byStatus.set(o.status,(byStatus.get(o.status)||0)+1));
   const statusRows=[...byStatus.entries()].sort((a,b)=>b[1]-a[1]).slice(0,8).map(([s,n])=>'<div class="analytics-status-row"><span>'+statusPill(s)+'</span><b>'+n+'</b></div>').join('');
+  const assembledToday=orders.filter(o=>o.status==='Собран'&&localDateKey(o.assembledAt||o.updatedAt)===todayKey).length;
+  const shippedToday=orders.filter(o=>o.status==='Отгружен кладовщиком'&&localDateKey(o.shippedAt||o.updatedAt)===todayKey).length;
   const body='<div class="analytics-grid">'+
     '<div class="analytics-kpi"><span>Заказов сегодня</span><b>'+today.length+'</b><small>за текущую дату</small></div>'+
     '<div class="analytics-kpi"><span>Заказов за 7 дней</span><b>'+week.length+'</b><small>по дате обработки</small></div>'+
-    '<div class="analytics-kpi"><span>Среднее время до сборки</span><b>'+formatDuration(cycle.reduce((a,b)=>a+b,0)/(cycle.length||1))+'</b><small>'+cycle.length+' собранных</small></div>'+
-    '<div class="analytics-kpi"><span>Среднее время от сборки до отгрузки</span><b>'+formatDuration(shipmentCycle.reduce((a,b)=>a+b,0)/(shipmentCycle.length||1))+'</b><small>'+shipmentCycle.length+' отгруженных</small></div>'+
+    '<div class="analytics-kpi"><span>Собрано сегодня</span><b>'+assembledToday+'</b><small>за текущую дату</small></div>'+
+    '<div class="analytics-kpi"><span>Отгружено сегодня</span><b>'+shippedToday+'</b><small>за текущую дату</small></div>'+
     '</div>'+
     '<div class="analytics-columns"><section class="analytics-panel"><h3>Статусы сейчас</h3>'+
     (statusRows||'<div class="danger-note">Нет данных.</div>')+

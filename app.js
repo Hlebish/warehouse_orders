@@ -749,11 +749,14 @@ function openChat(){
 }
 
 function shipmentPartType(article){
-  const code=String(article||'').trim().toUpperCase().replace(/[^A-ZА-Я0-9]/g,'');
-  // Внутренняя классификация склада: AP + 2 буквы марки + цифровая часть.
-  // Тип детали определяется 4-й цифрой цифровой части, а НЕ последней цифрой всего артикула.
-  const m=code.match(/^AP[A-ZА-Я]{2}(\\d+)/);
-  const digit=m?.[1]?.charAt(3)||'';
+  const raw=String(article||'').trim().toUpperCase();
+  const code=raw.replace(/[^A-ZА-Я0-9]/g,'');
+  // Наши складские артикулы: AP + 2 буквы марки + цифровая часть.
+  // Классифицируем все такие артикулы по 4-й цифре цифровой части.
+  // Любой другой формат артикула целиком попадает в «Прочее».
+  const m=code.match(/^AP[A-ZА-Я]{2}(\d+)$/);
+  if(!m)return 'Прочее';
+  const digit=m[1].charAt(3);
   return ({
     '1':'Левое крыло',
     '2':'Правое крыло',

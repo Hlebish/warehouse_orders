@@ -762,7 +762,7 @@ function shipmentPartType(article){
   // 15 — центральная/верхняя решётка бампера,
   // 16/17 — левая/правая решётка бампера,
   // 13 — спойлер/накладка бампера.
-  const ap=code.match(/^AP[A-ZА-Я]{2}(\\d+)$/);
+  const ap=code.match(/^AP[A-ZА-Я]{2}(\d+)$/);
   if(ap){
     const n=ap[1], suffix=n.slice(-2);
     const apTypes={
@@ -796,7 +796,7 @@ function shipmentPartType(article){
   // FPS:
   // Формат обычно FP XXXX YYY[-P]. Последняя группа — серия детали.
   // Ниже только серии, которые устойчиво подтверждаются нашим FPS-прайсом.
-  const fps=raw.match(/^FP\\s*[A-Z0-9]+\\s*([A-Z0-9]+(?:-[A-Z0-9]+)?)$/);
+  const fps=raw.match(/^FP\s*[A-Z0-9]+\s*([A-Z0-9]+(?:-[A-Z0-9]+)?)$/);
   if(fps){
     const suffix=fps[1];
     const fpsTypes={
@@ -825,7 +825,7 @@ function shipmentPartType(article){
   // Поэтому неизвестный Polcar-код безопасно остаётся в «Прочее».
   return 'Прочее';
 }
-const shipmentCategoryOrder=['Левое крыло','Правое крыло','Капот','Передний бампер','Задний бампер','Прочее'];
+const shipmentCategoryOrder=['Левое крыло','Правое крыло','Капот','Решётка','Левая решётка бампера','Правая решётка бампера','Передний бампер','Задний бампер','Усилитель бампера','Панель','Молдинг','Накладка/спойлер бампера','Подкрылок','Крепление','Зеркало','Фара','Фонарь','Стекло фары','Бампер','Прочее'];
 function shipmentItemsForDate(dateKey){
   const map=new Map();
   for(const o of state.orders){

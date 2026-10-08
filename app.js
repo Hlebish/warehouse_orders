@@ -1136,6 +1136,9 @@ function showNotifications(){
     // The explicit "Прочитать всё" button remains available for unread
     // notifications that are not currently visible because of filters/search.
     markNotificationItemsRead(list).then(()=>{
+      // Refresh the center immediately so the read styling disappears
+      // without requiring the user to close and reopen the bell.
+      render();
       const summary=document.querySelector('.notification-summary b');
       if(summary)summary.textContent=String(state.notices.filter(n=>!n.read).length);
     });

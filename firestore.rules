@@ -44,7 +44,8 @@ service cloud.firestore {
         allow update: if activeUser()
           && request.auth.uid == userId
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read'])
-          && request.resource.data.read is bool;
+          && request.resource.data.read is bool
+          && request.resource.data.read == true;
         allow create, delete: if false;
       }
 
@@ -220,11 +221,15 @@ service cloud.firestore {
       allow read: if activeUser();
       allow create: if activeUser()
         && request.resource.data.keys().hasOnly([
-          'action','details','orderId','actorId','actorName','actorRole','createdAt'
+          'action','details','orderId','actorId','actorName','actorRole','createdAt',
+          'entryId','previousStatus','newStatus'
         ])
         && request.resource.data.actorId == request.auth.uid
         && request.resource.data.action is string
-        && request.resource.data.details is string;
+        && request.resource.data.details is string
+        && (!request.resource.data.keys().hasAny(['entryId']) || request.resource.data.entryId is string)
+        && (!request.resource.data.keys().hasAny(['previousStatus']) || request.resource.data.previousStatus is string)
+        && (!request.resource.data.keys().hasAny(['newStatus']) || request.resource.data.newStatus is string);
       allow update, delete: if false;
     }
 

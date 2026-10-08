@@ -7,6 +7,7 @@ import android.media.ToneGenerator;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Build;
+import android.content.SharedPreferences;
 
 import androidx.annotation.NonNull;
 import androidx.core.app.NotificationCompat;
@@ -18,6 +19,14 @@ import java.util.Map;
 
 public class WarehouseFirebaseMessagingService extends FirebaseMessagingService {
     private static final String CHANNEL_ID = "warehouse_orders";
+
+    @Override
+    public void onNewToken(@NonNull String token) {
+        getSharedPreferences("warehouse_push", MODE_PRIVATE)
+            .edit()
+            .putString("token", token)
+            .apply();
+    }
 
     @Override
     public void onMessageReceived(@NonNull RemoteMessage remoteMessage) {

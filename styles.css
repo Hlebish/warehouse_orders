@@ -1146,11 +1146,6 @@ body.dark-theme .stat-order-meta small{color:#999}
 .stats-grid .stat-card strong,.stats-grid .stat-card small,.stats-grid .stat-card .stat-top{position:relative;z-index:1}
 .stats-grid .stat-card strong{color:currentColor}
 .stats-grid .stat-card small{color:#587066}
-.top-global-search{height:32px;width:150px;display:flex;align-items:center;gap:6px;padding:0 9px;border:1px solid #d4e5db;border-radius:9px;background:#fff;color:#779087;transition:border-color .15s,box-shadow .15s,width .15s}
-.top-global-search:focus-within{width:205px;border-color:#71a88b;box-shadow:0 0 0 3px #27835a12}
-.top-global-search span{font-size:15px;line-height:1}
-.top-global-search input{width:100%;min-width:0;border:0;outline:0;background:transparent;color:#29493b;font-size:10px}
-.top-global-search input::placeholder{color:#8b9d94}
 @media(max-width:760px){
  .top-global-search{width:110px;height:30px;background:#ffffff1c;border-color:#ffffff55;color:#fff}
  .top-global-search:focus-within{width:145px;box-shadow:none;border-color:#fff}

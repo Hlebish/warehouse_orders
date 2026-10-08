@@ -11,6 +11,7 @@ service cloud.firestore {
     function isWarehouse() { return activeUser() && role() == 'warehouse'; }
     function isManager() { return activeUser() && role() in ['manager', 'chief_accountant', 'accountant']; }
     function canManageUsers() { return activeUser() && (userDoc().data.admin == true || role() == 'director'); }
+    function canViewDeletedOrders() { return activeUser() && (userDoc().data.admin == true || role() in ['director', 'chief_accountant']); }
     function chatLikes(data) { return data.keys().hasAll(['likes']) ? data.likes : []; }
 
     match /users/{userId} {
@@ -124,7 +125,7 @@ service cloud.firestore {
     }
 
     match /deletedOrders/{archiveId} {
-      allow read: if canManageUsers();
+      allow read: if canViewDeletedOrders();
       allow create: if canManageUsers()
         && request.resource.data.deletedBy == request.auth.uid
         && request.resource.data.complete == false;
@@ -135,7 +136,7 @@ service cloud.firestore {
       allow delete: if false;
 
       match /entries/{entryId} {
-        allow read: if canManageUsers();
+        allow read: if canViewDeletedOrders();
         allow create, update: if canManageUsers()
           && get(/databases/$(database)/documents/deletedOrders/$(archiveId)).data.complete == false;
         allow delete: if false;

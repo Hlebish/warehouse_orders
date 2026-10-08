@@ -898,24 +898,39 @@ async function toggleShipmentItemChecked(dateKey,article){
   if(!(canManageUsers||state.role==='warehouse')){toast('Отметить проверку может только кладовщик или администратор.');return;}
   const key=String(article||'').trim().toUpperCase();
   if(!key)return;
-  const affected=[];
-  for(const o of state.orders){
-    if(o.status!=='Отгружен кладовщиком'||shipmentOrderDateKey(o)!==dateKey)continue;
-    for(const item of (o.articles||[])){
-      if(String(item?.article||'').trim().toUpperCase()===key)affected.push(o);
-    }
-  }
+  const affected=state.orders.filter(o=>
+    o.status==='Отгружен кладовщиком' &&
+    shipmentOrderDateKey(o)===dateKey &&
+    (o.articles||[]).some(item=>String(item?.article||'').trim().toUpperCase()===key)
+  );
   if(!affected.length){toast('Позиция не найдена.');return;}
-  const allChecked=affected.every(o=>(o.articles||[]).filter(item=>String(item?.article||'').trim().toUpperCase()===key).every(item=>item.shipmentChecked===true));
+
+  const allChecked=affected.every(o=>
+    (o.articles||[])
+      .filter(item=>String(item?.article||'').trim().toUpperCase()===key)
+      .every(item=>item.shipmentChecked===true)
+  );
   const nextChecked=!allChecked;
-  for(const o of affected){
-    for(const item of (o.articles||[])){
-      if(String(item?.article||'').trim().toUpperCase()===key)item.shipmentChecked=nextChecked;
-    }
-  }
+
   try{
-    await save();
-    await writeAudit(nextChecked?'Проверена позиция на отгрузке':'Снята проверка позиции на отгрузке','Дата: '+dateKey+'; артикул: '+key);
+    // ВАЖНО: здесь не вызываем save().
+    // Проверка отгрузки не является изменением заказа и не должна
+    // повторно сохранять/менять его статус. Обновляем только articles.
+    for(const o of affected){
+      const nextArticles=(o.articles||[]).map(item=>{
+        if(String(item?.article||'').trim().toUpperCase()!==key)return item;
+        return {...item,shipmentChecked:nextChecked};
+      });
+      await updateDoc(doc(db,'orders',o.id),{articles:nextArticles});
+      o.articles=nextArticles;
+      const cached=serverCache.get(o.id);
+      if(cached)serverCache.set(o.id,{...cached,articles:nextArticles});
+    }
+
+    await writeAudit(
+      nextChecked?'Проверена позиция на отгрузке':'Снята проверка позиции на отгрузке',
+      'Дата: '+dateKey+'; артикул: '+key
+    );
     openShipmentManifest(dateKey);
   }catch(err){
     console.error('Не удалось сохранить отметку проверки отгрузки',err);

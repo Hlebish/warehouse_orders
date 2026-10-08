@@ -809,6 +809,7 @@ async function openShipmentDayOffset(days){
   await openShipmentManifest(shiftShipmentDate(current,days));
 }
 async function openShipmentManifest(dateKey=localDateKey(new Date()),categoryFilter=''){
+  await loadShipmentCategoryMap();
   let confirmation=null;
   try{const snap=await getDoc(doc(db,'shipmentDays',dateKey));if(snap.exists())confirmation=snap.data();}catch(err){console.warn(err);}
   const allItems=shipmentItemsForDate(dateKey),items=shipmentItemsForDate(dateKey,categoryFilter),groups=new Map();

@@ -887,9 +887,53 @@ function shipmentArticleKey(article){
   return String(article||'').trim().split(/\s+/)[0].toUpperCase();
 }
 
+function normalizeShipmentCategory(raw,source=''){
+  const value=String(raw||'').trim();
+  const text=String(source||'').toLocaleLowerCase('ru');
+  if(/лев(ое|ая)?\s+крыл|крыл.*лев/i.test(text))return 'Левое крыло';
+  if(/прав(ое|ая)?\s+крыл|крыл.*прав/i.test(text))return 'Правое крыло';
+  if(/капот/i.test(text)||value==='Капот')return 'Капот';
+  if(/бампер/i.test(text)){
+    if(/задн|задний|rear/i.test(text))return 'Задний бампер';
+    if(/передн|передний|front/i.test(text))return 'Передний бампер';
+    return 'Бампер';
+  }
+  if(value==='Крыло'){
+    const digits=shipmentArticleKey(source).match(/(\d{4})$/)?.[1]||'';
+    if(digits.endsWith('1'))return 'Левое крыло';
+    if(digits.endsWith('2'))return 'Правое крыло';
+    return 'Левое крыло';
+  }
+  if(value==='Спойлер'||/спойлер|накладка.*бампер/i.test(text))return 'Накладка/спойлер бампера';
+  if(value==='Накладка')return 'Накладка/спойлер бампера';
+  if(value==='Решётка'||/реш[её]тк/i.test(text))return 'Решётка';
+  if(value==='Подкрылок'||/подкрыл/i.test(text))return 'Подкрылок';
+  if(value==='Усилитель')return 'Усилитель бампера';
+  if(value==='Стекло')return 'Стекло';
+  if(value==='Фара')return 'Фара';
+  if(value==='Фонарь')return 'Фонарь';
+  if(value==='Зеркало')return 'Зеркало';
+  if(value==='Молдинг')return 'Молдинг';
+  if(value==='Поршень')return 'Поршень';
+  if(value==='Крепление')return 'Крепление';
+  if(value==='Панель')return 'Панель';
+  if(value==='Амортизатор')return 'Амортизатор';
+  if(value==='Радиатор')return 'Радиатор';
+  return value && value!=='Прочее' ? value : 'Прочее';
+}
 function shipmentPartType(article){
   const key=shipmentArticleKey(article);
-  return shipmentCategoryMap?.[key] || 'Прочее';
+  const mapped=shipmentCategoryMap?.[key]||'';
+  const digits=key.match(/(\d{4})$/)?.[1]||'';
+  if(!mapped && digits){
+    const code=digits.slice(-1);
+    if(code==='1')return 'Левое крыло';
+    if(code==='2')return 'Правое крыло';
+    if(code==='3')return 'Капот';
+    if(code==='6')return 'Передний бампер';
+    if(code==='7')return 'Задний бампер';
+  }
+  return normalizeShipmentCategory(mapped,article);
 }
 const shipmentCategoryOrder=['Левое крыло','Правое крыло','Капот','Поршень','Решётка','Левая решётка бампера','Правая решётка бампера','Передний бампер','Задний бампер','Усилитель бампера','Панель','Молдинг','Накладка/спойлер бампера','Подкрылок','Крепление','Зеркало','Фара','Фонарь','Стекло фары','Бампер','Прочее'];
 function shipmentOrderDateKey(o){
@@ -925,7 +969,7 @@ async function showAuditLog(){
     const auditRows=snap.docs.map(d=>({id:d.id,...d.data()}));
     const actionOptions=[...new Set(auditRows.map(a=>String(a.action||'Действие')))].sort((a,b)=>a.localeCompare(b,'ru'));
     const roleOptions=[...new Set(auditRows.map(a=>String(roles[a.actorRole]||a.actorRole||'Сотрудник')))].sort((a,b)=>a.localeCompare(b,'ru'));
-    const controls='<div class="history-controls"><label class="search-box"><span>⌕</span><input id="auditSearch" type="search" placeholder="Сотрудник, заказ или действие"></label><select id="auditActionFilter"><option value="">Все действия</option>'+actionOptions.map(x=>'<option>'+esc(x)+'</option>').join('')+'</select><select id="auditRoleFilter"><option value="">Все роли</option>'+roleOptions.map(x=>'<option>'+esc(x)+'</option>').join('')+'</select><input id="auditDateFilter" type="date" title="Дата"></div><div id="auditList" class="timeline"></div>';
+    const controls='<div class="history-controls"><label class="search-box"><span>⌕</span><input id="auditSearch" type="search" placeholder="Сотрудник, заказ или действие"></label><select id="auditActionFilter"><option value="">Все действия</option>'+actionOptions.map(x=>'<option>'+esc(x)+'</option>').join('')+'</select><select id="auditRoleFilter"><option value="">Все роли</option>'+roleOptions.map(x=>'<option>'+esc(x)+'</option>').join('')+'</select><input id="auditDateFilter" type="date" title="Дата"></div><div class="history-result-count" id="auditResultCount"></div><div id="auditList" class="timeline"></div>';
     showModal('История действий по сайту',controls,[button('Закрыть','close')],'АУДИТ СИСТЕМЫ');
     const paint=()=>{
       const q=String($('auditSearch')?.value||'').toLocaleLowerCase('ru'),action=$('auditActionFilter')?.value||'',role=$('auditRoleFilter')?.value||'',date=$('auditDateFilter')?.value||'';
@@ -938,6 +982,7 @@ async function showAuditLog(){
         return true;
       });
       const list=$('auditList');if(!list)return;
+      const count=$('auditResultCount');if(count)count.textContent='Найдено записей: '+filtered.length;
       list.innerHTML=filtered.length?filtered.map(a=>{
         const raw=String(a.action||'Действие'),lower=raw.toLocaleLowerCase('ru');
         const tone=lower.includes('удал')||lower.includes('отмен')||lower.includes('дефект')?'red':lower.includes('статус')||lower.includes('одобр')?'blue':lower.includes('добав')||lower.includes('созда')?'green':lower.includes('отгруз')||lower.includes('провер')?'violet':'neutral';
@@ -1070,7 +1115,8 @@ function showNotifications(){
     const listEl=$('notificationList');if(listEl)listEl.innerHTML=rows||'<div class="danger-note">Уведомлений по фильтрам нет.</div>';
   };
   const unread=state.notices.filter(n=>!n.read).length;
-  const body='<div class="notification-toolbar"><label class="search-box"><span>⌕</span><input id="notificationSearch" type="search" placeholder="Поиск уведомлений"></label><select id="notificationFilter"><option value="">Все</option><option value="orders">Заказы</option><option value="chat">Общий чат</option><option value="replies">Ответы и упоминания</option><option value="likes">Лайки</option></select></div><div class="notification-settings-grid">'+['chat','replies','likes','orders'].map(k=>'<button type="button" class="notification-setting '+(state.notificationSettings[k]?'enabled':'disabled')+'" data-action="toggle-notification:'+k+'"><b>'+({chat:'💬 Чат',replies:'↩ Ответы',likes:'👍 Лайки',orders:'📦 Заказы'}[k])+'</b><small>'+(state.notificationSettings[k]?'Включены':'Выключены')+'</small></button>').join('')+'</div><div class="notification-summary"><b>'+unread+'</b> непрочитанных уведомлений</div><div id="notificationList" class="notification-list"></div>';
+  const pushGranted=typeof Notification!=='undefined'&&Notification.permission==='granted';
+  const body='<div class="push-device-controls"><div><b>Системные push-уведомления</b><small>'+(pushGranted?'Разрешены в браузере':'Можно включить на этом устройстве')+'</small></div><div class="push-device-buttons"><button type="button" class="small-button good" data-action="enable-notifications">🔔 Включить уведомления</button><button type="button" class="small-button danger" data-action="disable-notifications">🔕 Отключить уведомления</button></div></div><div class="notification-toolbar"><label class="search-box"><span>⌕</span><input id="notificationSearch" type="search" placeholder="Поиск уведомлений"></label><select id="notificationFilter"><option value="">Все</option><option value="orders">Заказы</option><option value="chat">Общий чат</option><option value="replies">Ответы и упоминания</option><option value="likes">Лайки</option></select></div><div class="notification-settings-grid">'+['chat','replies','likes','orders'].map(k=>'<button type="button" class="notification-setting '+(state.notificationSettings[k]?'enabled':'disabled')+'" data-action="toggle-notification:'+k+'"><b>'+({chat:'💬 Чат',replies:'↩ Ответы',likes:'👍 Лайки',orders:'📦 Заказы'}[k])+'</b><small>'+(state.notificationSettings[k]?'Включены':'Выключены')+'</small></button>').join('')+'</div><div class="notification-summary"><b>'+unread+'</b> непрочитанных уведомлений</div><div id="notificationList" class="notification-list"></div>';
   showModal('Уведомления',body,[button('Прочитать всё','mark-notifications-read','small-button good'),button('Закрыть','close')],'ЦЕНТР УВЕДОМЛЕНИЙ');
   $('notificationSearch')?.addEventListener('input',render);$('notificationFilter')?.addEventListener('change',render);render();
 }

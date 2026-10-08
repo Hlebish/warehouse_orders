@@ -20,7 +20,7 @@ service cloud.firestore {
         && request.resource.data.displayName is string
         && request.resource.data.email is string
         && request.resource.data.active == true
-        && request.resource.data.admin == false
+        && request.resource.data.admin == (request.resource.data.role == 'director')
         && request.resource.data.role in ['warehouse', 'manager', 'chief_accountant', 'accountant', 'director'];
       allow update: if (activeUser() && request.auth.uid == userId
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['notificationSettings'])
@@ -33,7 +33,8 @@ service cloud.firestore {
         || isDirector()
         || (canManageUsers() && request.auth.uid != userId
           && request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['displayName', 'role', 'active'])
+            .hasOnly(['displayName', 'role', 'active', 'admin'])
+          && request.resource.data.admin == (request.resource.data.role == 'director')
           && request.resource.data.role in ['warehouse', 'manager', 'chief_accountant', 'accountant', 'director']);
       allow delete: if isDirector();
 

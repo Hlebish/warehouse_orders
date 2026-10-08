@@ -796,7 +796,16 @@ async function loadShipmentCategoryMap(){
       const bytes=Uint8Array.from(atob(SHIPMENT_CATEGORY_DATA),c=>c.charCodeAt(0));
       const stream=new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
       const json=JSON.parse(await new Response(stream).text());
-      shipmentCategoryMap=Object.fromEntries(Object.entries(json).map(([article,id])=>[article,SHIPMENT_CATEGORY_IDS[id]||'Прочее']));
+
+      // В карте категорий хранится чистый артикул, а в заказах он иногда
+      // приходит вместе с описанием: "APCT0101C КРЫЛО ЛЕВОЕ CITROEN...".
+      // Нормализуем ключи, чтобы категория находилась независимо от регистра.
+      shipmentCategoryMap=Object.fromEntries(
+        Object.entries(json).map(([article,id])=>[
+          String(article||'').trim().split(/\s+/)[0].toUpperCase(),
+          SHIPMENT_CATEGORY_IDS[id]||'Прочее'
+        ])
+      );
     }catch(err){
       console.warn('Не удалось загрузить категории склада',err);
       shipmentCategoryMap={};
@@ -806,8 +815,14 @@ async function loadShipmentCategoryMap(){
   return shipmentCategoryPromise;
 }
 
+function shipmentArticleKey(article){
+  // Для строк вида "АРТИКУЛ ОПИСАНИЕ" берём только артикул.
+  // Если описания нет, поведение остаётся прежним.
+  return String(article||'').trim().split(/\s+/)[0].toUpperCase();
+}
+
 function shipmentPartType(article){
-  const key=String(article||'').trim().toUpperCase();
+  const key=shipmentArticleKey(article);
   return shipmentCategoryMap?.[key] || 'Прочее';
 }
 const shipmentCategoryOrder=['Левое крыло','Правое крыло','Капот','Поршень','Решётка','Левая решётка бампера','Правая решётка бампера','Передний бампер','Задний бампер','Усилитель бампера','Панель','Молдинг','Накладка/спойлер бампера','Подкрылок','Крепление','Зеркало','Фара','Фонарь','Стекло фары','Бампер','Прочее'];

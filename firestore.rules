@@ -155,7 +155,7 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly([
           'number', 'client', 'status', 'articles', 'createdAt', 'createdBy',
           'createdByName', 'updatedAt', 'transferredAt', 'resumedAt',
-          'assembledAt', 'shippedAt'
+          'assembledAt', 'shippedAt', 'returns'
         ])
         && request.resource.data.number is string
         && request.resource.data.number.size() > 0
@@ -171,7 +171,12 @@ service cloud.firestore {
         ];
 
       // Администратор и директор могут управлять заказом полностью.
-      allow update: if canManageUsers()
+      allow update: if (activeUser()
+        && resource.data.status == 'Отгружен кладовщиком'
+        && request.resource.data.status == resource.data.status
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['returns', 'updatedAt', 'updatedBy', 'updatedByName']))
+
+        || canManageUsers()
 
         // Менеджерская группа: после отгрузки редактирование полностью запрещено.
         || (isManager()
@@ -201,7 +206,7 @@ service cloud.firestore {
           ])
           && request.resource.data.authorId == request.auth.uid
           && request.resource.data.kind in [
-            'comment', 'question', 'defect', 'decision', 'viewed', 'system'
+            'comment', 'question', 'defect', 'decision', 'viewed', 'system', 'return'
           ]
           && request.resource.data.text is string
           && request.resource.data.photos is list

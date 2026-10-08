@@ -20,7 +20,7 @@ service cloud.firestore {
         && request.resource.data.displayName is string
         && request.resource.data.email is string
         && request.resource.data.active == true
-        && request.resource.data.admin == false
+        && request.resource.data.admin == (request.resource.data.role == 'director')
         && request.resource.data.role in ['warehouse', 'manager', 'chief_accountant', 'accountant', 'director'];
       allow update: if (activeUser() && request.auth.uid == userId
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['notificationSettings'])
@@ -33,7 +33,8 @@ service cloud.firestore {
         || isDirector()
         || (canManageUsers() && request.auth.uid != userId
           && request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['displayName', 'role', 'active'])
+            .hasOnly(['displayName', 'role', 'active', 'admin'])
+          && request.resource.data.admin == (request.resource.data.role == 'director')
           && request.resource.data.role in ['warehouse', 'manager', 'chief_accountant', 'accountant', 'director']);
       allow delete: if isDirector();
 
@@ -43,7 +44,8 @@ service cloud.firestore {
         allow update: if activeUser()
           && request.auth.uid == userId
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read'])
-          && request.resource.data.read is bool;
+          && request.resource.data.read is bool
+          && request.resource.data.read == true;
         allow create, delete: if false;
       }
 
@@ -147,10 +149,12 @@ service cloud.firestore {
 
     match /orders/{orderId} {
       allow read: if activeUser();
+
       allow create: if (isWarehouse() || isManager() || canManageUsers())
         && request.resource.data.keys().hasOnly([
           'number', 'client', 'status', 'articles', 'createdAt', 'createdBy',
-          'createdByName', 'updatedAt', 'transferredAt', 'resumedAt', 'assembledAt'
+          'createdByName', 'updatedAt', 'transferredAt', 'resumedAt',
+          'assembledAt', 'shippedAt'
         ])
         && request.resource.data.number is string
         && request.resource.data.number.size() > 0
@@ -158,36 +162,36 @@ service cloud.firestore {
         && request.resource.data.articles is list
         && request.resource.data.articles.size() <= 100
         && request.resource.data.createdBy == request.auth.uid
-        && request.resource.data.status in ['Создан', 'Собран', 'Отгружен кладовщиком', 'Под вопросом', 'Ожидает оплаты'];
-      allow update: if isDirector()
-      || (activeUser()
-        && request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['status', 'number', 'client', 'articles', 'updatedAt', 'updatedBy', 'updatedByName', 'transferredAt', 'resumedAt', 'assembledAt'])
-        && request.resource.data.number is string
-        && request.resource.data.number.size() > 0
-        && request.resource.data.client is string
         && request.resource.data.status in [
-          'Создан', 'Собран', 'Отгружен кладовщиком', 'Под вопросом', 'Дефект', 'Ожидает оплаты',
-          'На согласовании', 'Одобрен на отгрузку клиенту',
+          'Создан', 'Собран', 'Отгружен кладовщиком', 'Под вопросом', 'Дефект',
+          'Ожидает оплаты', 'На согласовании', 'Одобрен на отгрузку клиенту',
           'Ожидает самовывоза', 'Клиент забрал самовывозом', 'Самовывоз',
           'Перенесен', 'Отменён'
-        ]
-        && request.resource.data.status in [
-          'Создан', 'Собран', 'Отгружен кладовщиком', 'Под вопросом', 'Дефект', 'Ожидает оплаты',
-          'На согласовании', 'Одобрен на отгрузку клиенту',
-          'Ожидает самовывоза', 'Клиент забрал самовывозом', 'Самовывоз',
-          'Перенесен', 'Отменён'
-        ])
-      || (isManager()
-        && request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['status', 'updatedAt', 'updatedBy', 'updatedByName', 'transferredAt', 'resumedAt', 'assembledAt']))
-      || (isWarehouse()
-        && request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['status', 'articles', 'updatedAt', 'updatedBy', 'updatedByName', 'transferredAt', 'resumedAt', 'assembledAt']));
-    allow delete: if canManageUsers();
+        ];
+
+      // Администратор и директор могут управлять заказом полностью.
+      allow update: if canManageUsers()
+
+        // Менеджерская группа: после отгрузки редактирование полностью запрещено.
+        || (isManager()
+          && resource.data.status != 'Отгружен кладовщиком'
+          && request.resource.data.status != 'Отгружен кладовщиком'
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['status', 'updatedAt', 'updatedBy', 'updatedByName',
+              'transferredAt', 'resumedAt', 'assembledAt']))
+
+        // Кладовщик может менять состав/статус до момента отгрузки.
+        || (isWarehouse()
+          && resource.data.status != 'Отгружен кладовщиком'
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['status', 'articles', 'updatedAt', 'updatedBy', 'updatedByName',
+              'transferredAt', 'resumedAt', 'assembledAt', 'shippedAt']));
+
+      allow delete: if canManageUsers();
 
       match /entries/{entryId} {
         allow read: if activeUser();
+
         allow create: if activeUser()
           && request.resource.data.keys().hasOnly([
             'kind', 'article', 'text', 'authorId', 'authorName', 'createdAt',
@@ -201,14 +205,66 @@ service cloud.firestore {
           && request.resource.data.text is string
           && request.resource.data.photos is list
           && request.resource.data.photos.size() <= 5;
+
         allow update: if (isManager() || canManageUsers() || isDirector())
           && resource.data.kind == 'defect'
           && request.resource.data.diff(resource.data).affectedKeys()
             .hasOnly(['decision', 'decisionText', 'decidedBy', 'decidedByName', 'decidedAt'])
           && request.resource.data.decision in ['Подтверждён', 'Отменён']
           && request.resource.data.decisionText is string;
+
         allow delete: if canManageUsers();
       }
+    }
+
+    match /auditLog/{auditId} {
+      allow read: if activeUser();
+      allow create: if activeUser()
+        && request.resource.data.keys().hasOnly([
+          'action','details','orderId','actorId','actorName','actorRole','createdAt',
+          'entryId','previousStatus','newStatus'
+        ])
+        && request.resource.data.actorId == request.auth.uid
+        && request.resource.data.action is string
+        && request.resource.data.details is string
+        && (!request.resource.data.keys().hasAny(['entryId']) || request.resource.data.entryId is string)
+        && (!request.resource.data.keys().hasAny(['previousStatus']) || request.resource.data.previousStatus is string)
+        && (!request.resource.data.keys().hasAny(['newStatus']) || request.resource.data.newStatus is string);
+      allow update, delete: if false;
+    }
+
+    match /shipmentDays/{dateKey} {
+      allow read: if activeUser();
+
+      // Подтвердить список могут кладовщик, менеджер и администратор.
+      allow create, update: if (isWarehouse() || isManager() || canManageUsers())
+        && request.resource.data.keys().hasOnly([
+          'date','confirmed','confirmedBy','confirmedByName','confirmedAt','orderCount','itemCount',
+          'revokedBy','revokedByName','revokedAt'
+        ])
+        && request.resource.data.date == dateKey
+        && request.resource.data.confirmed == true
+        && request.resource.data.confirmedBy == request.auth.uid
+        && request.resource.data.confirmedByName is string
+        && request.resource.data.confirmedAt is string
+        && request.resource.data.orderCount is number
+        && request.resource.data.itemCount is number;
+
+      // Снять подтверждение может только кладовщик или администратор.
+      allow update: if (isWarehouse() || canManageUsers())
+        && request.resource.data.keys().hasOnly([
+          'date','confirmed','confirmedBy','confirmedByName','confirmedAt','orderCount','itemCount',
+          'revokedBy','revokedByName','revokedAt'
+        ])
+        && request.resource.data.date == dateKey
+        && request.resource.data.confirmed == false
+        && request.resource.data.revokedBy == request.auth.uid
+        && request.resource.data.revokedByName is string
+        && request.resource.data.revokedAt is string
+        && request.resource.data.orderCount is number
+        && request.resource.data.itemCount is number;
+
+      allow delete: if canManageUsers();
     }
   }
 }

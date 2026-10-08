@@ -896,8 +896,8 @@ function shipmentArticleKey(article){
 function shipmentTextCategory(article){
   const s=String(article||'').toLocaleLowerCase('ru').replace(/[()_,;:/\\-]+/g,' ').replace(/\s+/g,' ').trim();
   const has=(...p)=>p.some(x=>x.test(s));
-  if(has(/крыл[оі]\s+(лів|лев)/,/\b(лів|лев)\w*\s+крыл/))return 'Левое крыло';
-  if(has(/крыл[оі]\s+(прав|пра)\w*/,/\b(прав|пра)\w*\s+крыл/))return 'Правое крыло';
+  if(has(/кри\w*\s+(лів|ліва|ліве|лев|левая|левое)\w*/,/\b(лів|ліва|ліве|лев|левая|левое)\w*\s+кри\w*/))return 'Левое крыло';
+  if(has(/кри\w*\s+(прав|права|праве|правая|правое|пра)\w*/,/\b(прав|права|праве|правая|правое|пра)\w*\s+кри\w*/))return 'Правое крыло';
   if(/\bкапот\b/.test(s))return 'Капот';
   if(/реш[іи]тк\w*.*бампер|реш[её]тк\w*.*бампер/.test(s))return 'Решётка бампера';
   if(/реш[іи]тк\w*.*радіатор|реш[её]тк\w*.*радиатор/.test(s))return 'Решётка радиатора';

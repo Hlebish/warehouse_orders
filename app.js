@@ -231,7 +231,8 @@ async function syncPushToken(requestPermission=false){
       installationId,
       updatedAt:isoNow(),
       userAgent:navigator.userAgent,
-      appId:'warehouse_orders'
+      appId:'warehouse_orders',
+      platform:'web'
     },{merge:true});
 
     await batch.commit();
@@ -251,8 +252,41 @@ async function syncPushToken(requestPermission=false){
 async function enablePush(){
   await syncPushToken(true);
 }
+async function showForegroundPushNotification(data={}){
+  if(!('Notification' in window)||Notification.permission!=='granted'||!('serviceWorker' in navigator))return;
+  try{
+    const registration=await navigator.serviceWorker.ready;
+    registration.active?.postMessage({
+      type:'SHOW_FOREGROUND_NOTIFICATION',
+      title:String(data.title||'Заказы · Склад'),
+      body:String(data.body||'Новое изменение.'),
+      eventId:String(data.eventId||''),
+      link:String(data.link||location.href)
+    });
+  }catch(err){
+    console.warn('Не удалось показать системное push-уведомление',err);
+  }
+}
 const recentPushEvents=new Map();
-onMessage(messaging,payload=>{const n=payload.data||payload.notification||{};const orderId=String(n.orderId||'');const target=String(n.target||'site');if(n.title){const message=`${n.title}${n.body?`: ${n.body}`:''}`;const eventId=String(n.eventId||'');const signature=`${target}|${orderId}|${message}`;const now=Date.now();for(const [key,time] of recentPushEvents){if(now-time>10000)recentPushEvents.delete(key)}if((eventId&&recentPushEvents.has(`event:${eventId}`))||recentPushEvents.has(`msg:${signature}`))return;if(eventId)recentPushEvents.set(`event:${eventId}`,now);recentPushEvents.set(`msg:${signature}`,now);notify(message,orderId,target,target==='chat'?'chat':'orders');const t=toast(message,orderId);if(target==='chat'&&!orderId)t.addEventListener('click',()=>openChat())}});
+onMessage(messaging,payload=>{
+  const n=payload.data||payload.notification||{};
+  const orderId=String(n.orderId||'');
+  const target=String(n.target||'site');
+  if(n.title){
+    const message=`${n.title}${n.body?`: ${n.body}`:''}`;
+    const eventId=String(n.eventId||'');
+    const signature=`${target}|${orderId}|${message}`;
+    const now=Date.now();
+    for(const [key,time] of recentPushEvents){if(now-time>10000)recentPushEvents.delete(key)}
+    if((eventId&&recentPushEvents.has(`event:${eventId}`))||recentPushEvents.has(`msg:${signature}`))return;
+    if(eventId)recentPushEvents.set(`event:${eventId}`,now);
+    recentPushEvents.set(`msg:${signature}`,now);
+    showForegroundPushNotification(n);
+    notify(message,orderId,target,target==='chat'?'chat':'orders');
+    const t=toast(message,orderId);
+    if(target==='chat'&&!orderId)t.addEventListener('click',()=>openChat());
+  }
+});
 function stopCloud(){profileUnsubscribe?.();ordersUnsubscribe?.();chatUnsubscribe?.();chatBadgeUnsubscribe?.();notificationsUnsubscribe?.();profileUnsubscribe=ordersUnsubscribe=chatUnsubscribe=chatBadgeUnsubscribe=notificationsUnsubscribe=null;for(const stop of entryUnsubscribes.values())stop();entryUnsubscribes.clear();serverCache.clear();state.orders=[]}
 function watchOrders(){
  ordersUnsubscribe?.();

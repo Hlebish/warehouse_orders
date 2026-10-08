@@ -457,7 +457,7 @@ function renderWorkInsights(){
   transferred.slice(0,2).forEach(o=>add('violet','Перенесённый заказ № '+o.number,'Проверьте, не пора ли вернуть его в работу.',o.id));
   defects.slice(0,2).forEach(o=>add('red','Нужна проверка заказа № '+o.number,'Есть вопрос или нерассмотренный дефект.',o.id));
   approval.slice(0,2).forEach(o=>add('amber','Ждёт согласования № '+o.number,'Заказ ожидает решения менеджера.',o.id));
-  oldCreated.slice(0,2).forEach(o=>add('blue','Заказ № '+o.number задержался','Статус «Создан» держится больше суток.',o.id));
+  oldCreated.slice(0,2).forEach(o=>add('blue','Заказ № '+o.number+' задержался','Статус «Создан» держится больше суток.',o.id));
   if(!items.length){box.hidden=true;box.innerHTML='';return;}
   box.hidden=false;
   box.innerHTML='<div class="insights-head"><div><b>🧠 Требует внимания</b><span>Автоматические подсказки по текущим заказам</span></div><button type="button" class="insights-count">'+items.length+'</button></div><div class="insights-list">'+items.slice(0,6).map(x=>'<button type="button" class="insight-item insight-'+x.tone+'" '+(x.orderId?'data-open="'+esc(x.orderId)+'"':'')+'><span class="insight-dot"></span><span><b>'+esc(x.title)+'</b><small>'+esc(x.text)+'</small></span><span class="insight-arrow">›</span></button>').join('')+'</div>';

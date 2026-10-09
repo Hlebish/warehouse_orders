@@ -1368,3 +1368,42 @@ body.dark-theme .assembly-indicator{background:#123d2b;border-color:#246d49;colo
 .delivery-type-pill{display:inline-flex;align-items:center;gap:7px;max-width:100%;padding:4px 7px;border:1px solid transparent;border-radius:6px;background:transparent;color:var(--muted,#92949a);font-size:11px;font-weight:500;line-height:1.3;white-space:normal;text-align:left;cursor:pointer;transition:background .15s ease,color .15s ease}
 .delivery-type-pill:hover{background:rgba(128,128,128,.09);color:var(--text,#c8c9cc)}
 .delivery-type-icon{display:inline-flex;align-items:center;justify-content:center;flex:0 0 16px;width:16px;font-size:15px;line-height:1;color:inherit;opacity:.72}
+
+/* Order card actions: clear, aligned button layout */
+.detail-actions{
+  display:grid!important;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:8px!important;
+  padding:12px;
+  margin:0 0 18px!important;
+  border:1px solid var(--line);
+  border-radius:12px;
+  background:rgba(128,128,128,.045);
+}
+.detail-actions .small-button{
+  display:flex;
+  align-items:center;
+  justify-content:flex-start;
+  gap:7px;
+  width:100%;
+  min-width:0;
+  min-height:40px;
+  padding:9px 11px!important;
+  border-radius:9px!important;
+  font-size:11px!important;
+  line-height:1.25;
+  font-weight:650;
+  white-space:normal;
+  text-align:left;
+  box-shadow:none;
+  transition:background .15s,border-color .15s,transform .15s;
+}
+.detail-actions .small-button:hover{transform:translateY(-1px)}
+.detail-actions .small-button.primary-soft{background:rgba(120,160,40,.10)!important;border-color:rgba(120,160,40,.38)!important;color:var(--text,#a8d84a)!important}
+.detail-actions .small-button.good{background:rgba(50,150,90,.12)!important;border-color:rgba(50,150,90,.42)!important;color:#68c58b!important}
+.detail-actions .small-button.danger{background:rgba(205,65,60,.10)!important;border-color:rgba(205,65,60,.4)!important;color:#ef817a!important}
+.detail-actions .small-button.action-category{justify-content:center;font-weight:750}
+.detail-actions .small-button.warehouse-category{background:rgba(125,160,30,.15)!important;border-color:rgba(125,160,30,.45)!important}
+.detail-actions .small-button.manager-category{background:rgba(65,120,210,.15)!important;border-color:rgba(65,120,210,.42)!important;color:#8bb5ff!important}
+@media(max-width:560px){.detail-actions{grid-template-columns:repeat(2,minmax(0,1fr));padding:9px;gap:7px!important}.detail-actions .small-button{min-height:42px;font-size:10px!important;padding:8px!important}}
+@media(max-width:380px){.detail-actions{grid-template-columns:1fr}}

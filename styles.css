@@ -1681,3 +1681,51 @@ body.dark-theme .order-action-menu-list .manager-status-payment{color:#fff!impor
 .order-action-menu-list .warehouse-status-question{background:#5b3d0b!important;color:#fff!important;border-color:#b57a12!important}
 .order-action-menu-list .warehouse-status-pickup-waiting{background:#124e58!important;color:#fff!important;border-color:#248b98!important}
 .order-action-menu-list .warehouse-status-pickup-done{background:#145c38!important;color:#fff!important;border-color:#2d9b62!important}
+
+/* Order-card action panel: vivid, solid role colors and clearer utility actions */
+.detail-actions{
+  background:#17191c!important;
+  border-color:#666b72!important;
+}
+.detail-actions .small-button.action-category.manager-category{
+  background:#124fa8!important;
+  border:1px solid #2780ff!important;
+  color:#fff!important;
+}
+.detail-actions .small-button.action-category.warehouse-category{
+  background:#426b08!important;
+  border:1px solid #83c900!important;
+  color:#fff!important;
+}
+.detail-actions .detail-action-edit .small-button{
+  background:#303740!important;
+  border:1px solid #596574!important;
+  color:#fff!important;
+}
+.detail-actions .detail-action-bottom .small-button.danger{
+  background:#a90f19!important;
+  border:1px solid #ff3544!important;
+  color:#fff!important;
+}
+.detail-actions .detail-action-utility .small-button[data-action="add-comment"],
+.detail-actions .detail-action-utility .small-button[data-action="add-comment"]{
+  background:#303740!important;
+  border:1px solid #596574!important;
+  color:#fff!important;
+}
+.detail-actions .detail-action-utility .small-button[data-action="open-return"]{
+  background:#203f70!important;
+  border:1px solid #397fd1!important;
+  color:#fff!important;
+}
+.detail-actions .detail-action-utility .small-button[data-action="toggle-assembly"]{
+  background:#080a0c!important;
+  border:2px solid #fff!important;
+  color:#fff!important;
+  font-weight:700!important;
+  box-shadow:0 0 0 1px rgba(255,255,255,.08),0 0 12px rgba(255,255,255,.08);
+}
+.detail-actions .small-button{
+  opacity:1!important;
+  filter:none!important;
+}

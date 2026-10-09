@@ -160,7 +160,8 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly([
           'number', 'client', 'status', 'articles', 'createdAt', 'createdBy',
           'createdByName', 'updatedAt', 'transferredAt', 'resumedAt',
-          'assembledAt', 'shippedAt', 'returns'
+          'assembledAt', 'shippedAt', 'assemblyInProgress', 'assemblyStartedAt',
+          'assemblyStartedBy', 'assemblyStartedByName', 'returns'
         ])
         && request.resource.data.number is string
         && request.resource.data.number.size() > 0
@@ -216,7 +217,21 @@ service cloud.firestore {
           && resource.data.status != 'Отгружен кладовщиком'
           && request.resource.data.diff(resource.data).affectedKeys()
             .hasOnly(['status', 'articles', 'updatedAt', 'updatedBy', 'updatedByName',
-              'transferredAt', 'resumedAt', 'assembledAt', 'shippedAt']));
+              'transferredAt', 'resumedAt', 'assembledAt', 'shippedAt', 'assemblyInProgress',
+              'assemblyStartedAt', 'assemblyStartedBy', 'assemblyStartedByName']))
+        || (isWarehouse()
+          && resource.data.status != 'Отгружен кладовщиком'
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'assemblyInProgress', 'assemblyStartedAt', 'assemblyStartedBy', 'assemblyStartedByName',
+            'updatedAt', 'updatedBy', 'updatedByName'
+          ])
+          && request.resource.data.assemblyInProgress is bool
+          && request.resource.data.assemblyStartedAt is string
+          && request.resource.data.assemblyStartedBy is string
+          && request.resource.data.assemblyStartedByName is string
+          && request.resource.data.updatedAt is string
+          && request.resource.data.updatedBy == request.auth.uid
+          && request.resource.data.updatedByName is string);
 
       allow delete: if canManageUsers();
 

@@ -1533,3 +1533,17 @@ body.dark-theme .assembly-indicator{background:#123d2b;border-color:#246d49;colo
 .modal .order-detail-head .detail-meta{margin-top:9px!important}
 .modal .order-detail-head .detail-history-mini{margin-top:7px!important;max-width:100%!important}
 .modal .order-detail-head .detail-history-line{overflow-wrap:anywhere}
+
+/* Manager status choices mirror the order table's status colors */
+.order-action-menu-list .manager-status-created{background:#292929!important;color:#dedede!important;border-color:#484848!important}
+.order-action-menu-list .manager-status-approval{background:#fff0d4!important;color:#8a5100!important;border-color:#e8d2a6!important}
+.order-action-menu-list .manager-status-ready{background:#ddf0e2!important;color:#187b50!important;border-color:#b9dec5!important}
+.order-action-menu-list .manager-status-transferred{background:#f1edff!important;color:#7058b8!important;border-color:#d8cff5!important}
+.order-action-menu-list .manager-status-cancel{background:#f5e9e9!important;color:#a33a34!important;border-color:#e6c5c3!important}
+.order-action-menu-list .manager-status-viewed{background:transparent!important;color:var(--muted,#9aa3ad)!important;border-color:var(--line,#444)!important}
+.order-action-menu-list .manager-status-viewed:hover{background:rgba(128,128,128,.08)!important}
+body.dark-theme .order-action-menu-list .manager-status-created{background:#292929!important;color:#dedede!important;border-color:#484848!important}
+body.dark-theme .order-action-menu-list .manager-status-approval{background:#3b2b13!important;color:#f0c36a!important;border-color:#6a4c20!important}
+body.dark-theme .order-action-menu-list .manager-status-ready{background:#173a2a!important;color:#83d6a7!important;border-color:#2c6a49!important}
+body.dark-theme .order-action-menu-list .manager-status-transferred{background:#2b2345!important;color:#c0afff!important;border-color:#514078!important}
+body.dark-theme .order-action-menu-list .manager-status-cancel{background:#321c1c!important;color:#f08c86!important;border-color:#6b2d2a!important}

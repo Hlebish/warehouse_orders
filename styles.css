@@ -1407,3 +1407,53 @@ body.dark-theme .assembly-indicator{background:#123d2b;border-color:#246d49;colo
 .detail-actions .small-button.manager-category{background:rgba(65,120,210,.15)!important;border-color:rgba(65,120,210,.42)!important;color:#8bb5ff!important}
 @media(max-width:560px){.detail-actions{grid-template-columns:repeat(2,minmax(0,1fr));padding:9px;gap:7px!important}.detail-actions .small-button{min-height:42px;font-size:10px!important;padding:8px!important}}
 @media(max-width:380px){.detail-actions{grid-template-columns:1fr}}
+
+/* Order card: action groups span the full card width */
+.detail-actions{
+  display:flex!important;
+  flex-direction:column;
+  align-items:stretch;
+  gap:10px!important;
+  padding:12px;
+  margin:0 0 18px!important;
+  border:1px solid var(--line);
+  border-radius:12px;
+  background:rgba(128,128,128,.045);
+}
+.detail-action-group{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:8px;
+  width:100%;
+}
+.detail-action-group .small-button{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  width:100%;
+  min-width:0;
+  min-height:42px;
+  padding:9px 12px!important;
+  border-radius:9px!important;
+  font-size:11px!important;
+  line-height:1.25;
+  font-weight:700;
+  white-space:normal;
+  text-align:center;
+  box-shadow:none;
+}
+.detail-action-roles .small-button{min-height:46px;font-size:12px!important}
+.detail-action-edit .small-button{min-height:44px}
+.detail-action-bottom{padding-top:8px;border-top:1px solid var(--line)}
+.detail-action-utility{grid-template-columns:repeat(3,minmax(0,1fr));padding-top:8px;border-top:1px solid var(--line)}
+.detail-action-utility .small-button{font-size:10px!important}
+@media(max-width:560px){
+  .detail-actions{padding:9px;gap:8px!important}
+  .detail-action-group{gap:7px}
+  .detail-action-group .small-button{min-height:42px;font-size:10px!important;padding:8px!important}
+  .detail-action-roles .small-button{font-size:11px!important}
+  .detail-action-utility{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:380px){
+  .detail-action-group{grid-template-columns:1fr}
+}

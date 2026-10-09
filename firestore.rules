@@ -251,7 +251,7 @@ service cloud.firestore {
 
         allow create: if activeUser()
           && request.resource.data.keys().hasOnly([
-            'kind', 'article', 'text', 'authorId', 'authorName', 'createdAt',
+            'kind', 'article', 'text', 'important', 'authorId', 'authorName', 'createdAt',
             'photos', 'decision', 'decisionText', 'decidedBy',
             'decidedByName', 'decidedAt'
           ])
@@ -260,6 +260,7 @@ service cloud.firestore {
             'comment', 'question', 'defect', 'decision', 'viewed', 'system', 'return'
           ]
           && request.resource.data.text is string
+          && (!request.resource.data.keys().hasAny(['important']) || request.resource.data.important is bool)
           && request.resource.data.photos is list
           && request.resource.data.photos.size() <= 5;
 

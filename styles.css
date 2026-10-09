@@ -1609,3 +1609,19 @@ body.dark-theme .order-action-menu-list .manager-status-payment{color:#fff!impor
 .order-action-menu-list .warehouse-status-question{background:#302a13!important;color:#dfbf56!important;border-color:#665522!important}
 .order-action-menu-list .warehouse-status-pickup-waiting{background:#173338!important;color:#7dd9df!important;border-color:#28575d!important}
 .order-action-menu-list .warehouse-status-pickup-done{background:#123d25!important;color:#8ee0a7!important;border-color:#286b43!important}
+
+/* Shipped-by-warehouse action: same typography as other status buttons */
+.order-action-menu-list .small-button.shipped{
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  text-align:center!important;
+  font-family:'DM Sans',sans-serif!important;
+  font-size:14px!important;
+  font-style:normal!important;
+  font-weight:600!important;
+  line-height:1.35!important;
+  color:#fff!important;
+  background:#35183d!important;
+  border-color:#6d3a78!important;
+}

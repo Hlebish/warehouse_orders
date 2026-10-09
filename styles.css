@@ -1357,3 +1357,9 @@ body.dark-theme .stat-card:after{
   .modal{max-height:calc(100dvh - 8px);max-height:calc(100vh - 8px)}
   .modal-backdrop{padding:4px}
 }
+
+/* Shared live indicator for orders currently being assembled. */
+.assembly-indicator{display:flex;align-items:center;gap:6px;width:max-content;max-width:100%;margin-top:6px;padding:4px 7px;border:1px solid #ccebd8;border-radius:999px;background:#edfff4;color:#167346;font-size:9px;font-weight:700;line-height:1.2;white-space:nowrap}
+.assembly-light{display:inline-block;width:7px;height:7px;flex:0 0 7px;border-radius:50%;background:#24b66b;box-shadow:0 0 0 3px #24b66b26;animation:assemblyPulse 1.7s ease-in-out infinite}
+@keyframes assemblyPulse{0%,100%{box-shadow:0 0 0 2px #24b66b22}50%{box-shadow:0 0 0 5px #24b66b30}}
+body.dark-theme .assembly-indicator{background:#123d2b;border-color:#246d49;color:#9af0be}

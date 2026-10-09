@@ -107,7 +107,16 @@ function entryToCloud(e){
 }function entryFromCloud(id,d){return{id,kind:d.kind,article:d.article||'',text:d.text||'',authorId:d.authorId,author:d.authorName||'Сотрудник',createdAt:d.createdAt,photos:d.photos||[],...Object.fromEntries(['decision','decisionText','decidedBy','decidedByName','decidedAt'].filter(k=>d[k]!==undefined).map(k=>[k,d[k]]))}}
 function orderToCloud(o,isNew=false){return{number:o.number,client:o.client||'',status:o.status,...(o.returnCancelled===true?{returnCancelled:true}:{}),articles:Array.isArray(o.articles)?o.articles.map(x=>({article:String(x.article||'').trim(),quantity:Math.max(1,Number(x.quantity)||1),collected:x.collected===true,shipmentChecked:x.shipmentChecked===true})).filter(x=>x.article):[],createdAt:o.createdAt,createdBy:o.createdBy||auth.currentUser.uid,createdByName:o.author||profileName,updatedAt:o.updatedAt||o.createdAt,...(!isNew&&o.updatedBy?{updatedBy:o.updatedBy,updatedByName:o.updatedByName}:{}),...(o.transferredAt?{transferredAt:o.transferredAt}:{}),...(o.resumedAt?{resumedAt:o.resumedAt}:{}),...(o.assembledAt?{assembledAt:o.assembledAt}:{}),...(o.shippedAt?{shippedAt:o.shippedAt}:{}),...(Array.isArray(o.returns)?{returns:o.returns}:{} )}}
 function equal(a,b){return JSON.stringify(a)===JSON.stringify(b)}
-async function writeAudit(action,details='',orderId='',meta={}){if(!signedInUser)return;try{await setDoc(doc(db,'auditLog',crypto.randomUUID()),{action:String(action||'Действие'),details:String(details||''),orderId:String(orderId||''),actorId:signedInUser.uid,actorName:profileName||roles[state.role]||'Сотрудник',actorRole:state.role,createdAt:isoNow(),...meta});}catch(err){console.warn('Аудит не записан',err);}}
+async function writeAudit(action,details='',orderId='',meta={}){
+ if(!signedInUser)return;
+ try{
+  const id=String(orderId||'');
+  const order=state.orders.find(o=>o.id===id);
+  const orderNumber=String(meta.orderNumber||order?.number||'');
+  const safeMeta={...meta};delete safeMeta.orderNumber;
+  await setDoc(doc(db,'auditLog',crypto.randomUUID()),{action:String(action||'Действие'),details:String(details||''),orderId:id,...(orderNumber?{orderNumber}:{}),actorId:signedInUser.uid,actorName:profileName||roles[state.role]||'Сотрудник',actorRole:state.role,createdAt:isoNow(),...safeMeta});
+ }catch(err){console.warn('Аудит не записан',err);}
+}
 async function save(){
  if(!signedInUser)return;
  try{
@@ -1102,7 +1111,10 @@ async function showAuditLog(){
       list.innerHTML=filtered.length?filtered.map(a=>{
         const raw=String(a.action||'Действие'),lower=raw.toLocaleLowerCase('ru');
         const tone=lower.includes('удал')||lower.includes('отмен')||lower.includes('дефект')?'red':lower.includes('статус')||lower.includes('одобр')?'blue':lower.includes('добав')||lower.includes('созда')?'green':lower.includes('отгруз')||lower.includes('провер')?'violet':'neutral';
-        return '<article class="history-entry history-'+tone+'"><div class="history-entry-bar"></div><div class="timeline-top"><span><b>'+esc(a.actorName||'Сотрудник')+'</b> · '+fmtDateTime(a.createdAt)+'</span><span class="timeline-type">'+esc(roles[a.actorRole]||a.actorRole||'Действие')+'</span></div>'+(a.orderId?'<div class="timeline-article">Заказ: '+esc(a.orderId)+'</div>':'')+'<div class="timeline-text"><b>'+esc(raw)+'</b>'+(a.details?'<br>'+esc(a.details):'')+'</div></article>';
+        const linkedOrder=state.orders.find(o=>o.id===a.orderId);
+        const fromDetails=String(a.details||'').match(/заказ(?:а)?\s*№\s*([^·,;\n]+)/i);
+        const visibleOrderNumber=a.orderNumber||linkedOrder?.number||fromDetails?.[1]?.trim()||'';
+        return '<article class="history-entry history-'+tone+'"><div class="history-entry-bar"></div><div class="timeline-top"><span><b>'+esc(a.actorName||'Сотрудник')+'</b> · '+fmtDateTime(a.createdAt)+'</span><span class="timeline-type">'+esc(roles[a.actorRole]||a.actorRole||'Действие')+'</span></div>'+(a.orderId?'<div class="timeline-article">Заказ №: '+esc(visibleOrderNumber||a.orderId)+'</div>':'')+'<div class="timeline-text"><b>'+esc(raw)+'</b>'+(a.details?'<br>'+esc(a.details):'')+'</div></article>';
       }).join(''):'<div class="danger-note">По выбранным фильтрам записей нет.</div>';
     };
     ['auditSearch','auditActionFilter','auditRoleFilter','auditDateFilter'].forEach(id=>$(id)?.addEventListener('input',paint));

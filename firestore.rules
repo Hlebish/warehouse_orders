@@ -24,13 +24,18 @@ service cloud.firestore {
         && request.resource.data.admin == (request.resource.data.role == 'director')
         && request.resource.data.role in ['warehouse', 'manager', 'chief_accountant', 'accountant', 'director'];
       allow update: if (activeUser() && request.auth.uid == userId
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['notificationSettings'])
-        && request.resource.data.notificationSettings is map
-        && request.resource.data.notificationSettings.keys().hasOnly(['chat', 'replies', 'likes', 'orders'])
-        && request.resource.data.notificationSettings.chat is bool
-        && request.resource.data.notificationSettings.replies is bool
-        && request.resource.data.notificationSettings.likes is bool
-        && request.resource.data.notificationSettings.orders is bool)
+        && (
+          (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['notificationSettings'])
+            && request.resource.data.notificationSettings is map
+            && request.resource.data.notificationSettings.keys().hasOnly(['chat', 'replies', 'likes', 'orders'])
+            && request.resource.data.notificationSettings.chat is bool
+            && request.resource.data.notificationSettings.replies is bool
+            && request.resource.data.notificationSettings.likes is bool
+            && request.resource.data.notificationSettings.orders is bool)
+          ||
+          (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['extraPhoneNotifications'])
+            && request.resource.data.extraPhoneNotifications is bool)
+        ))
         || isDirector()
         || (canManageUsers() && request.auth.uid != userId
           && request.resource.data.diff(resource.data).affectedKeys()

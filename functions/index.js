@@ -16,7 +16,7 @@ setGlobalOptions({
   region: 'europe-west1',
   memory: '256MiB',
   timeoutSeconds: 60,
-  maxInstances: 1
+  maxInstances: 5
 });
 
 const INVALID_TOKEN_CODES = new Set([
@@ -240,7 +240,13 @@ exports.sendWarehousePush = onDocumentCreated({ document: 'pushQueue/{eventId}',
   const target = data.target === 'chat' ? 'chat' : 'site';
   const category = ['orders', 'chat', 'replies', 'likes'].includes(data.category) ? data.category : (target === 'chat' ? 'chat' : 'orders');
   const recipientUserId = String(data.recipientUserId || '');
-  await createNotificationHistory(data, eventId);
+  // Start notification history immediately, but do not make push delivery wait for it.
+  const historyPromise = createNotificationHistory(data, eventId).catch(error => {
+    logger.error('Notification history write failed', {
+      eventId,
+      error: String(error?.message || error)
+    });
+  });
   const link = target === 'chat'
     ? `${siteUrl}?chat=1`
     : (orderId ? `${siteUrl}?order=${encodeURIComponent(orderId)}` : siteUrl);
@@ -249,6 +255,7 @@ exports.sendWarehousePush = onDocumentCreated({ document: 'pushQueue/{eventId}',
     const tokenDocs = await collectTokens(category, recipientUserId, String(data.authorId || ''));
 
     if (!tokenDocs.length) {
+      await historyPromise;
       await markDone(snapshot.ref, {
         deliveryStatus: 'no_devices',
         acceptedCount: 0,
@@ -329,6 +336,7 @@ exports.sendWarehousePush = onDocumentCreated({ document: 'pushQueue/{eventId}',
     const failures = Object.fromEntries(failureCodes);
 
     if (accepted > 0) {
+      await historyPromise;
       await markDone(snapshot.ref, {
         deliveryStatus: failed ? 'partial' : 'sent',
         acceptedCount: accepted,
@@ -344,6 +352,7 @@ exports.sendWarehousePush = onDocumentCreated({ document: 'pushQueue/{eventId}',
       [...failureCodes.keys()].every(code => INVALID_TOKEN_CODES.has(code));
 
     if (onlyInvalidTokens) {
+      await historyPromise;
       await markDone(snapshot.ref, {
         deliveryStatus: 'no_valid_devices',
         acceptedCount: 0,

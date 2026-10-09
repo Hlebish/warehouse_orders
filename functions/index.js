@@ -70,8 +70,9 @@ async function createNotificationHistory(data, eventId) {
   let count = 0;
 
   for (const user of users.docs) {
-    if (!recipientUserId && user.id === authorId) continue;
-    const settings = user.data()?.notificationSettings || {};
+    const profile = user.data() || {};
+    if (!recipientUserId && user.id === authorId && profile.extraPhoneNotifications !== true) continue;
+    const settings = profile.notificationSettings || {};
     if (settings[category] === false) continue;
 
     const notificationRef = user.ref.collection('notifications').doc(eventId);
@@ -106,9 +107,12 @@ async function collectTokens(category='orders', recipientUserId='', authorId='')
     const user = users.docs[i];
 
     if (recipientUserId && user.id !== recipientUserId) continue;
-    if (!recipientUserId && authorId && user.id === authorId) continue;
 
-    const settings = user.data()?.notificationSettings || {};
+    const profile = user.data() || {};
+    // Own broadcast events are delivered to all registered devices only when opted in.
+    if (!recipientUserId && authorId && user.id === authorId && profile.extraPhoneNotifications !== true) continue;
+
+    const settings = profile.notificationSettings || {};
     if (settings[category] === false) continue;
 
     for (const tokenDoc of tokenGroups[i].docs) {

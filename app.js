@@ -575,10 +575,28 @@ async function saveReturn(){
   if(state.role!=='warehouse'&&!canManageUsers){toast('Возврат может оформить только кладовщик, администратор или директор.');return;}
   const items=[...document.querySelectorAll('.return-qty')].map(input=>({article:String(input.dataset.article||'').trim(),quantity:Math.min(Math.max(0,Math.floor(Number(input.value)||0)),Math.max(0,Math.floor(Number(input.dataset.max)||0)))})).filter(x=>x.article&&x.quantity>0);
   if(!items.length){toast('Укажите хотя бы одну позицию для возврата.');return;}
-  const reason=$('returnReason')?.value.trim()||'';const previousStatus=o.status;const entry={id:crypto.randomUUID(),createdAt:isoNow(),authorId:signedInUser.uid,author:profileName||roles[state.role],reason,items,previousStatus};
-  o.returns=Array.isArray(o.returns)?o.returns:[];o.returns.push(entry);o.status='Возврат';o.entries=Array.isArray(o.entries)?o.entries:[];
-  o.entries.push({id:crypto.randomUUID(),kind:'return',text:'Оформлен возврат: '+items.map(x=>x.article+' × '+x.quantity).join(', ')+(reason?' · '+reason:''),authorId:signedInUser.uid,author:profileName||roles[state.role],createdAt:entry.createdAt,photos:[]});
-  try{await save();closeModal();render();toast('Возврат оформлен.');notify('Возврат по заказу № '+o.number,o.id);openOrder(o.id);}catch(err){o.returns.pop();o.status=previousStatus;o.entries.pop();console.error('Не удалось сохранить возврат',err);toast('Не удалось сохранить возврат.');}
+  const reason=$('returnReason')?.value.trim()||'';
+  const previousStatus=o.status;
+  const createdAt=isoNow();
+  const entry={id:crypto.randomUUID(),createdAt,authorId:signedInUser.uid,author:profileName||roles[state.role],reason,items,previousStatus};
+  const nextReturns=[...(Array.isArray(o.returns)?JSON.parse(JSON.stringify(o.returns)):[]),entry];
+  try{
+    await updateDoc(doc(db,'orders',o.id),{returns:nextReturns,status:'Возврат',updatedAt:createdAt,updatedBy:signedInUser.uid,updatedByName:profileName||''});
+    o.returns=nextReturns;o.status='Возврат';o.updatedAt=createdAt;o.updatedBy=signedInUser.uid;o.updatedByName=profileName||'';
+    serverCache.set(o.id,{...o,returns:JSON.parse(JSON.stringify(nextReturns)),articles:(o.articles||[]).map(x=>({...x})),entries:[...(o.entries||[])]});
+    const historyEntry={id:crypto.randomUUID(),kind:'return',text:'Оформлен возврат: '+items.map(x=>x.article+' × '+x.quantity).join(', ')+(reason?' · '+reason:''),authorId:signedInUser.uid,author:profileName||roles[state.role],createdAt,photos:[]};
+    try{
+      await setDoc(doc(db,'orders',o.id,'entries',historyEntry.id),entryToCloud(historyEntry));
+      o.entries=Array.isArray(o.entries)?o.entries:[];o.entries.push(historyEntry);
+      serverCache.set(o.id,{...o,returns:JSON.parse(JSON.stringify(nextReturns)),articles:(o.articles||[]).map(x=>({...x})),entries:[...o.entries]});
+    }catch(historyError){console.warn('Возврат сохранён, но запись в истории не добавлена',historyError);}
+    await writeAudit('Возврат оформлен','Оформлен возврат по заказу № '+o.number,o.id,{previousStatus,newStatus:'Возврат'});
+    closeModal();render();toast('Возврат оформлен.');notify('Возврат по заказу № '+o.number,o.id);openOrder(o.id);
+  }catch(err){
+    console.error('Не удалось сохранить возврат',err);
+    const code=String(err?.code||'').replace(/^.*?\\//,'')||'ошибка';
+    toast('Не удалось сохранить возврат: '+code);
+  }
 }
 function openOrder(id){const o=state.orders.find(x=>x.id===id);if(!o)return;selectedId=id;const isManager=isManagerRole()||canManageUsers,isDirector=state.role==='director',hasOpenDefect=hasPendingDefect(o),shipmentLocked=isShipmentLocked(o);let actions=button('＋ Добавить комментарий','add-comment','small-button primary-soft');if((state.role==='warehouse'||canManageUsers)&&(!o.returnCancelled||canManageUsers))actions+=button('↩ Возврат','open-return','small-button primary-soft');if(!hasOpenDefect&&!shipmentLocked){actions+=button('⚠ Дефект','add-defect','small-button danger');actions+=button('✎ Редактировать данные','edit-order-info','small-button primary-soft');actions+=button('✎ Редактировать артикулы','edit-articles','small-button primary-soft');actions+=button('📦 Кладовщик','open-warehouse-actions','small-button action-category warehouse-category');actions+=button('📋 Менеджер','open-manager-actions','small-button action-category manager-category');if(canManageUsers)actions+=button('🗑 Удалить карточку','delete-order','small-button danger');}else if(shipmentLocked){actions+='<div class="danger-note">🔒 После статуса «Отгружен кладовщиком» менеджер, бухгалтер и главный бухгалтер больше не могут редактировать, отменять или удалять заказ.</div>';}else{actions='<div class="danger-note">⚠ В заказе есть нерассмотренный дефект. Редактирование и смена статуса заблокированы до вынесения решения. Комментарии по дефекту разрешены.</div>'}let articlesHtml='<div class="detail-section-title">Артикулы заказа · '+(o.articles||[]).length+'</div>';
 if((o.articles||[]).length){

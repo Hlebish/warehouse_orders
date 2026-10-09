@@ -1312,3 +1312,47 @@ body.dark-theme .stat-card:after{
   background:#669900 !important;
   opacity:1 !important;
 }
+
+
+/* Mobile: keep the order dialog scrollable while the on-screen keyboard is open. */
+@media(max-width:760px){
+  .modal-backdrop{
+    display:flex;
+    align-items:flex-start;
+    justify-content:center;
+    overflow-y:auto;
+    overflow-x:hidden;
+    padding:8px 8px max(8px, env(safe-area-inset-bottom));
+    -webkit-overflow-scrolling:touch;
+    overscroll-behavior:contain;
+  }
+  .modal{
+    display:flex;
+    flex-direction:column;
+    width:100%;
+    max-height:calc(100dvh - 16px);
+    max-height:calc(100vh - 16px);
+    margin:auto 0;
+    overflow:hidden;
+    min-height:0;
+  }
+  .modal-head,.modal-foot{flex:0 0 auto}
+  .modal-body{
+    flex:1 1 auto;
+    min-height:0;
+    overflow-y:auto;
+    overscroll-behavior:contain;
+    -webkit-overflow-scrolling:touch;
+    padding:16px;
+  }
+  .modal-body input,.modal-body textarea,.modal-body select{
+    scroll-margin-block:18px;
+  }
+  .modal-foot{
+    padding:10px 16px max(12px, env(safe-area-inset-bottom));
+  }
+}
+@media(max-width:760px) and (max-height:520px){
+  .modal{max-height:calc(100dvh - 8px);max-height:calc(100vh - 8px)}
+  .modal-backdrop{padding:4px}
+}

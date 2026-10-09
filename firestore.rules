@@ -185,6 +185,20 @@ service cloud.firestore {
         || canManageUsers()
 
         // Менеджерская группа: после отгрузки редактирование полностью запрещено.
+        // Любая активная роль может исправить только номер и имя клиента до отгрузки.
+        // Статус, состав заказа и остальные поля этой веткой менять нельзя.
+        || (activeUser()
+          && resource.data.status != 'Отгружен кладовщиком'
+          && request.resource.data.status == resource.data.status
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['number', 'client', 'updatedAt', 'updatedBy', 'updatedByName'])
+          && request.resource.data.number is string
+          && request.resource.data.number.size() > 0
+          && request.resource.data.client is string
+          && request.resource.data.updatedAt is string
+          && request.resource.data.updatedBy == request.auth.uid
+          && request.resource.data.updatedByName is string)
+
         || (isManager()
           && resource.data.status != 'Отгружен кладовщиком'
           && request.resource.data.status != 'Отгружен кладовщиком'

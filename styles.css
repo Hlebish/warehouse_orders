@@ -1547,3 +1547,32 @@ body.dark-theme .order-action-menu-list .manager-status-approval{background:#3b2
 body.dark-theme .order-action-menu-list .manager-status-ready{background:#173a2a!important;color:#83d6a7!important;border-color:#2c6a49!important}
 body.dark-theme .order-action-menu-list .manager-status-transferred{background:#2b2345!important;color:#c0afff!important;border-color:#514078!important}
 body.dark-theme .order-action-menu-list .manager-status-cancel{background:#321c1c!important;color:#f08c86!important;border-color:#6b2d2a!important}
+
+/* Centered, larger white labels in manager status buttons */
+.order-action-menu-list .manager-status-created,
+.order-action-menu-list .manager-status-approval,
+.order-action-menu-list .manager-status-ready,
+.order-action-menu-list .manager-status-transferred,
+.order-action-menu-list .manager-status-cancel,
+.order-action-menu-list .manager-status-viewed{
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  text-align:center!important;
+  font-family:'DM Sans',sans-serif!important;
+  font-size:14px!important;
+  font-weight:700!important;
+  line-height:1.35!important;
+}
+.order-action-menu-list .manager-status-created{color:#fff!important}
+.order-action-menu-list .manager-status-approval{color:#fff!important}
+.order-action-menu-list .manager-status-ready{color:#fff!important}
+.order-action-menu-list .manager-status-transferred{color:#fff!important}
+.order-action-menu-list .manager-status-cancel{color:#fff!important}
+.order-action-menu-list .manager-status-viewed{color:#fff!important}
+body.dark-theme .order-action-menu-list .manager-status-created{color:#fff!important}
+body.dark-theme .order-action-menu-list .manager-status-approval{color:#fff!important}
+body.dark-theme .order-action-menu-list .manager-status-ready{color:#fff!important}
+body.dark-theme .order-action-menu-list .manager-status-transferred{color:#fff!important}
+body.dark-theme .order-action-menu-list .manager-status-cancel{color:#fff!important}
+body.dark-theme .order-action-menu-list .manager-status-viewed{color:#fff!important}

@@ -1457,3 +1457,57 @@ body.dark-theme .assembly-indicator{background:#123d2b;border-color:#246d49;colo
 @media(max-width:380px){
   .detail-action-group{grid-template-columns:1fr}
 }
+
+/* Readable, consistent typography for order-card supporting details */
+.order-detail-head,
+.order-detail-head .detail-number,
+.order-detail-head .detail-client,
+.order-detail-head .detail-meta,
+.order-detail-head .detail-history-mini,
+.order-detail-head .detail-history-mini *,
+.order-article-view .article-main small,
+.detail-section-title,
+.timeline-top,
+.timeline-text,
+.timeline-type{
+  font-family:inherit!important;
+  font-style:normal;
+}
+.order-detail-head .detail-client{
+  font-size:12px!important;
+  line-height:1.5;
+  font-weight:400!important;
+}
+.order-detail-head .detail-meta{
+  margin-top:9px;
+  font-size:11px!important;
+  line-height:1.65!important;
+  font-weight:400!important;
+  color:var(--muted,#a0a7b0);
+}
+.order-detail-head .detail-history-mini{
+  max-width:100%;
+  margin-top:7px;
+  font-size:10px!important;
+  line-height:1.6!important;
+  font-weight:400!important;
+  letter-spacing:0;
+  color:var(--muted,#a0a7b0);
+}
+.order-article-view .article-main small{
+  display:block;
+  margin-top:3px;
+  font-size:11px!important;
+  line-height:1.45;
+  font-weight:400!important;
+  opacity:.82;
+}
+.detail-section-title{font-size:11px!important;line-height:1.5;font-weight:700!important;letter-spacing:.55px}
+.timeline-top{font-size:11px!important;line-height:1.5}
+.timeline-type{font-size:10px!important;line-height:1.35;font-weight:700!important}
+.timeline-text{font-size:12px!important;line-height:1.6!important;font-weight:400!important}
+@media(max-width:560px){
+  .order-detail-head .detail-meta{font-size:11px!important}
+  .order-detail-head .detail-history-mini{font-size:10px!important}
+  .timeline-text{font-size:12px!important}
+}

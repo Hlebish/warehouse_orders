@@ -1795,3 +1795,16 @@ body.dark-theme .order-action-menu-list .manager-status-payment{color:#fff!impor
   font-weight:700!important;
   min-height:46px;
 }
+
+/* Blue map button in the order article list */
+.order-article-view button[data-action="show-on-map"]{
+  background:#1558b0!important;
+  color:#fff!important;
+  border:1px solid #2f83ef!important;
+  font-weight:600!important;
+  opacity:1!important;
+}
+.order-article-view button[data-action="show-on-map"]:hover{
+  background:#0d4793!important;
+  border-color:#5a9fff!important;
+}

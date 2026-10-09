@@ -171,7 +171,7 @@ service cloud.firestore {
         ];
 
       // Администратор и директор могут управлять заказом полностью.
-      allow update: if (activeUser()
+      allow update: if ((isWarehouse() || canManageUsers())
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['returns', 'updatedAt', 'updatedBy', 'updatedByName'])
         && request.resource.data.returns is list
         && request.resource.data.returns.size() <= 500

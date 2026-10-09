@@ -1093,6 +1093,12 @@ async function showAuditLog(){
   try{
     const snap=await getDocs(query(collection(db,'auditLog'),orderBy('createdAt','desc'),limit(500)));
     const auditRows=snap.docs.map(d=>({id:d.id,...d.data()}));
+    // Recover readable numbers for orders that have already been deleted.
+    const deletedNumberById=new Map();
+    try{
+      const deletedSnap=await getDocs(collection(db,'deletedOrders'));
+      deletedSnap.docs.forEach(d=>{const data=d.data();if(data.number!==undefined&&data.number!==null)deletedNumberById.set(d.id,String(data.number));});
+    }catch(archiveErr){console.warn('Не удалось загрузить номера архивных заказов',archiveErr);}
     const actionOptions=[...new Set(auditRows.map(a=>String(a.action||'Действие')))].sort((a,b)=>a.localeCompare(b,'ru'));
     const roleOptions=[...new Set(auditRows.map(a=>String(roles[a.actorRole]||a.actorRole||'Сотрудник')))].sort((a,b)=>a.localeCompare(b,'ru'));
     const controls='<div class="history-controls"><label class="search-box"><span>⌕</span><input id="auditSearch" type="search" placeholder="Сотрудник, заказ или действие"></label><select id="auditActionFilter"><option value="">Все действия</option>'+actionOptions.map(x=>'<option>'+esc(x)+'</option>').join('')+'</select><select id="auditRoleFilter"><option value="">Все роли</option>'+roleOptions.map(x=>'<option>'+esc(x)+'</option>').join('')+'</select><input id="auditDateFilter" type="date" title="Дата"></div><div id="auditList" class="timeline"></div>';
@@ -1113,7 +1119,7 @@ async function showAuditLog(){
         const tone=lower.includes('удал')||lower.includes('отмен')||lower.includes('дефект')?'red':lower.includes('статус')||lower.includes('одобр')?'blue':lower.includes('добав')||lower.includes('созда')?'green':lower.includes('отгруз')||lower.includes('провер')?'violet':'neutral';
         const linkedOrder=state.orders.find(o=>o.id===a.orderId);
         const fromDetails=String(a.details||'').match(/заказ(?:а)?\s*№\s*([^·,;\n]+)/i);
-        const visibleOrderNumber=a.orderNumber||linkedOrder?.number||fromDetails?.[1]?.trim()||'';
+        const visibleOrderNumber=a.orderNumber||linkedOrder?.number||deletedNumberById.get(String(a.orderId||''))||fromDetails?.[1]?.trim()||'';
         return '<article class="history-entry history-'+tone+'"><div class="history-entry-bar"></div><div class="timeline-top"><span><b>'+esc(a.actorName||'Сотрудник')+'</b> · '+fmtDateTime(a.createdAt)+'</span><span class="timeline-type">'+esc(roles[a.actorRole]||a.actorRole||'Действие')+'</span></div>'+(a.orderId?'<div class="timeline-article">Заказ №: '+esc(visibleOrderNumber||a.orderId)+'</div>':'')+'<div class="timeline-text"><b>'+esc(raw)+'</b>'+(a.details?'<br>'+esc(a.details):'')+'</div></article>';
       }).join(''):'<div class="danger-note">По выбранным фильтрам записей нет.</div>';
     };

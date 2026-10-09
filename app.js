@@ -1226,18 +1226,11 @@ function showNotifications(){
     });
     const rows=list.map(n=>{
       const tone=notificationTone(n),category=n.category||(n.target==='chat'?'chat':'orders');
-      return '<article class="notification-entry notification-'+tone+' '+(n.read?'':'unread')+'"><span class="notification-dot"></span><div><b>'+esc(n.title||'Уведомление')+'</b><p>'+esc(n.message||n.body||'Новое событие')+'</p><small>'+fmtDateTime(n.createdAt||n.at)+'</small></div>'+(n.orderId?'<button type="button" class="small-button primary-soft" data-open="'+esc(n.orderId)+'">Открыть</button>':'')+'</article>';
+      return '<article role="button" tabindex="0" aria-label="Отметить уведомление прочитанным" class="notification-entry notification-'+tone+' '+(n.read?'':'unread')+'" data-notice-id="'+esc(n.id)+'"><span class="notification-dot"></span><div><b>'+esc(n.title||'Уведомление')+'</b><p>'+esc(n.message||n.body||'Новое событие')+'</p><small>'+fmtDateTime(n.createdAt||n.at)+'</small></div>'+(n.orderId?'<button type="button" class="small-button primary-soft" data-open="'+esc(n.orderId)+'">Открыть</button>':'')+'</article>';
     }).join('');
     const listEl=$('notificationList');if(listEl)listEl.innerHTML=rows||'<div class="danger-note">Уведомлений по фильтрам нет.</div>';
-    // Everything rendered in the notification center is considered seen.
-    // The explicit "Прочитать всё" button remains available for unread
-    // notifications that are not currently visible because of filters/search.
-    markNotificationItemsRead(list).then(()=>{
-      // Update only the unread counter; do not call render() here,
-      // because render() would reopen this renderer and create a loop.
-      const summary=document.querySelector('.notification-summary b');
-      if(summary)summary.textContent=String(state.notices.filter(n=>!n.read).length);
-    });
+    const summary=document.querySelector('.notification-summary b');
+    if(summary)summary.textContent=String(state.notices.filter(n=>!n.read).length);
   };
   const unread=state.notices.filter(n=>!n.read).length;
   const pushGranted=typeof Notification!=='undefined'&&Notification.permission==='granted';
@@ -1259,6 +1252,18 @@ async function toggleStaff(uid,active){if(!canManageUsers||uid===signedInUser.ui
 async function changeStaffRole(uid){if(!canManageUsers||uid===signedInUser.uid)return;const role=$(`staff-role-${uid}`)?.value;if(!roles[role])return;try{await updateDoc(doc(db,'users',uid),{role});toast(`Роль изменена: ${roles[role]}.`);showStaff()}catch(err){console.error(err);toast('Не удалось изменить роль. Проверьте права администратора и правила Firestore.')}}
 function backDetail(){if(selectedId)openOrder(selectedId);}
 document.addEventListener('click',e=>{
+  const noticeCard=e.target.closest('[data-notice-id]');
+  if(noticeCard){
+    const notice=state.notices.find(n=>n.id===noticeCard.dataset.noticeId);
+    const openButton=e.target.closest('[data-open]');
+    if(notice&&!notice.read)markNotificationItemsRead([notice]).then(result=>{
+      const summary=document.querySelector('.notification-summary b');
+      if(summary)summary.textContent=String(state.notices.filter(n=>!n.read).length);
+      if(result.failed===0){noticeCard.classList.remove('unread');noticeCard.setAttribute('aria-label','Прочитанное уведомление');}
+    });
+    if(openButton){e.preventDefault();openOrder(openButton.dataset.open);}
+    return;
+  }
   const statCard=e.target.closest('[data-stat-key]');
   if(statCard){e.preventDefault();openStatOrders(statCard.dataset.statKey||'');return;}
   const mention=e.target.closest('[data-chat-mention]');

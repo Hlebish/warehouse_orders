@@ -1363,3 +1363,10 @@ body.dark-theme .stat-card:after{
 .assembly-light{display:inline-block;width:7px;height:7px;flex:0 0 7px;border-radius:50%;background:#24b66b;box-shadow:0 0 0 3px #24b66b26;animation:assemblyPulse 1.7s ease-in-out infinite}
 @keyframes assemblyPulse{0%,100%{box-shadow:0 0 0 2px #24b66b22}50%{box-shadow:0 0 0 5px #24b66b30}}
 body.dark-theme .assembly-indicator{background:#123d2b;border-color:#246d49;color:#9af0be}
+
+/* Delivery type badge in the orders table. */
+.delivery-type-pill{display:inline-flex;align-items:center;max-width:100%;padding:5px 8px;border-radius:999px;font-size:11px;font-weight:700;line-height:1.25;white-space:normal}
+.delivery-city{background:#e8f1ff;color:#245bb5;border:1px solid #cbdcff}
+.delivery-pickup{background:#fff2d9;color:#8b5a00;border:1px solid #f2d99f}
+body.dark-theme .delivery-city{background:#1c3154;color:#b8d2ff;border-color:#304e7d}
+body.dark-theme .delivery-pickup{background:#493719;color:#ffdc91;border-color:#765722}

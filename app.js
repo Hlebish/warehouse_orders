@@ -612,7 +612,7 @@ function openOrder(id){const o=state.orders.find(x=>x.id===id);if(!o)return;sele
 if((o.articles||[]).length){
   articlesHtml+='<div class="order-articles-list">'+o.articles.map((x,i)=>{
     const collected=x.collected===true;
-    const collectedControl=(!shipmentLocked&&(state.role==='warehouse'||isManagerRole()||canManageUsers))
+    const collectedControl=(!shipmentLocked&&(state.role==='warehouse'||canManageUsers))
       ?button(collected?'✓ Собрано':'☐ Собрано','toggle-collected:'+i,'small-button '+(collected?'good':'primary-soft'))
       :'<span class="article-collected-state">'+(collected?'✓ Собрано':'☐ Не собрано')+'</span>';
     return '<div class="order-article-view '+(collected?'article-collected':'')+'"><span class="article-main"><b>'+esc(x.article)+'</b><small>'+(collected?'Собрано':'Не собрано')+'</small></span><span style="display:flex;align-items:center;gap:8px"><span>'+(Number(x.quantity)||1)+' шт.</span>'+collectedControl+'<button type="button" class="small-button primary-soft" data-action="show-on-map" data-map-article="'+esc(String(x.article||''))+'">🗺️ На карте</button></span></div>';

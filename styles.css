@@ -1511,3 +1511,25 @@ body.dark-theme .assembly-indicator{background:#123d2b;border-color:#246d49;colo
   .order-detail-head .detail-history-mini{font-size:10px!important}
   .timeline-text{font-size:12px!important}
 }
+
+/* Force identical typography for each line of order metadata and history */
+.modal .order-detail-head .detail-meta,
+.modal .order-detail-head .detail-meta .detail-meta-line,
+.modal .order-detail-head .detail-history-mini,
+.modal .order-detail-head .detail-history-mini .detail-history-line{
+  display:block;
+  margin:0!important;
+  padding:0!important;
+  font-family:'DM Sans',sans-serif!important;
+  font-size:11px!important;
+  font-style:normal!important;
+  font-weight:400!important;
+  line-height:1.65!important;
+  letter-spacing:0!important;
+  text-transform:none!important;
+  text-decoration:none!important;
+  color:#a6adb7!important;
+}
+.modal .order-detail-head .detail-meta{margin-top:9px!important}
+.modal .order-detail-head .detail-history-mini{margin-top:7px!important;max-width:100%!important}
+.modal .order-detail-head .detail-history-line{overflow-wrap:anywhere}

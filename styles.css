@@ -1766,3 +1766,24 @@ body.dark-theme .order-action-menu-list .manager-status-payment{color:#fff!impor
   border-color:#e9e9e9!important;
   color:#000!important;
 }
+
+/* One full-width neutral Edit button in the order card */
+.detail-action-edit{grid-template-columns:minmax(0,1fr)!important}
+.detail-actions .detail-action-edit .neutral-edit-button,
+.order-action-menu-list .neutral-edit-button{
+  width:100%!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  text-align:center!important;
+  background:#252525!important;
+  color:#f4f4f4!important;
+  border:1px solid #4b4b4b!important;
+  box-shadow:none!important;
+  font-family:'DM Sans',sans-serif!important;
+  font-size:13px!important;
+  font-weight:600!important;
+  opacity:1!important;
+}
+.detail-actions .detail-action-edit .neutral-edit-button:hover,
+.order-action-menu-list .neutral-edit-button:hover{background:#303030!important;border-color:#666!important}

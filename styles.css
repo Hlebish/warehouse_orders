@@ -1729,3 +1729,40 @@ body.dark-theme .order-action-menu-list .manager-status-payment{color:#fff!impor
   opacity:1!important;
   filter:none!important;
 }
+
+/* Neutral buttons inside manager and warehouse action tabs; preserve layout and typography */
+.order-action-menu-list .manager-status-created,
+.order-action-menu-list .manager-status-approval,
+.order-action-menu-list .manager-status-ready,
+.order-action-menu-list .manager-status-transferred,
+.order-action-menu-list .manager-status-cancel,
+.order-action-menu-list .manager-status-payment,
+.order-action-menu-list .manager-status-viewed,
+.order-action-menu-list .warehouse-status-question,
+.order-action-menu-list .warehouse-status-pickup-waiting,
+.order-action-menu-list .warehouse-status-pickup-done,
+.order-action-menu-list .small-button.shipped{
+  background:#252525!important;
+  color:#f4f4f4!important;
+  border-color:#4b4b4b!important;
+  box-shadow:none!important;
+}
+/* Deep burgundy for defect and delete actions */
+.detail-actions .detail-action-bottom .small-button.danger{
+  background:#4b101c!important;
+  border:1px solid #812438!important;
+  color:#fff!important;
+}
+/* White assembly action with black text */
+.detail-actions .detail-action-utility .small-button[data-action="toggle-assembly"]{
+  background:#fff!important;
+  border:2px solid #fff!important;
+  color:#111!important;
+  font-weight:700!important;
+  box-shadow:0 0 0 1px rgba(255,255,255,.12)!important;
+}
+.detail-actions .detail-action-utility .small-button[data-action="toggle-assembly"]:hover{
+  background:#e9e9e9!important;
+  border-color:#e9e9e9!important;
+  color:#000!important;
+}

@@ -641,6 +641,7 @@ async function toggleArticleCollected(index){
   const previousCollected=item.collected===true;
   const previousStatus=o.status;
   const previousAssembledAt=o.assembledAt;
+  const previousAssemblyInProgress=o.assemblyInProgress;
 
   item.collected=!previousCollected;
 
@@ -663,6 +664,7 @@ async function toggleArticleCollected(index){
     item.collected=previousCollected;
     o.status=previousStatus;
     o.assembledAt=previousAssembledAt;
+    o.assemblyInProgress=previousAssemblyInProgress;
     console.error('Не удалось изменить отметку сборки',err);
     toast('Не удалось изменить отметку сборки.');
   }

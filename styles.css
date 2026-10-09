@@ -1787,3 +1787,11 @@ body.dark-theme .order-action-menu-list .manager-status-payment{color:#fff!impor
 }
 .detail-actions .detail-action-edit .neutral-edit-button:hover,
 .order-action-menu-list .neutral-edit-button:hover{background:#303030!important;border-color:#666!important}
+
+/* Make the high-priority assembly action easier to notice */
+.detail-actions .detail-action-utility .small-button[data-action="toggle-assembly"]{
+  font-size:15px!important;
+  line-height:1.4!important;
+  font-weight:700!important;
+  min-height:46px;
+}

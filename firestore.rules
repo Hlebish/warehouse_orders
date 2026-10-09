@@ -279,10 +279,12 @@ service cloud.firestore {
       allow read: if activeUser();
       allow create: if activeUser()
         && request.resource.data.keys().hasOnly([
-          'action','details','orderId','actorId','actorName','actorRole','createdAt',
+          'action','details','orderId','orderNumber','actorId','actorName','actorRole','createdAt',
           'entryId','previousStatus','newStatus'
         ])
         && request.resource.data.actorId == request.auth.uid
+        && request.resource.data.actorRole is string
+        && (!request.resource.data.keys().hasAny(['orderNumber']) || request.resource.data.orderNumber is string)
         && request.resource.data.action is string
         && request.resource.data.details is string
         && (!request.resource.data.keys().hasAny(['entryId']) || request.resource.data.entryId is string)

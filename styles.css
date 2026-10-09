@@ -1639,3 +1639,45 @@ body.dark-theme .order-action-menu-list .manager-status-payment{color:#fff!impor
 .order-action-menu-list .warehouse-status-pickup-done{
   background:#123d25!important;color:#8ee0a7!important;border-color:#286b43!important;
 }
+
+/* Stronger contrast across the order card action panel */
+.detail-actions{
+  background:#1b1b1b!important;
+  border-color:#555!important;
+}
+.detail-actions .small-button.primary-soft{
+  background:#344b0b!important;
+  border-color:#6d970d!important;
+  color:#d9ff79!important;
+}
+.detail-actions .small-button.good{
+  background:#124d30!important;
+  border-color:#258552!important;
+  color:#a5f2bf!important;
+}
+.detail-actions .small-button.danger{
+  background:#571f1f!important;
+  border-color:#a83b36!important;
+  color:#ffaaa3!important;
+}
+.detail-actions .small-button.manager-category{
+  background:#20385d!important;
+  border-color:#3866a5!important;
+  color:#b8d3ff!important;
+}
+.detail-actions .small-button.warehouse-category{
+  background:#35480e!important;
+  border-color:#6f951b!important;
+  color:#e0ff8a!important;
+}
+/* More vivid manager and warehouse status choices */
+.order-action-menu-list .manager-status-created{background:#343434!important;color:#fff!important;border-color:#666!important}
+.order-action-menu-list .manager-status-approval{background:#5b3d0b!important;color:#fff!important;border-color:#b57a12!important}
+.order-action-menu-list .manager-status-ready{background:#145c38!important;color:#fff!important;border-color:#2d9b62!important}
+.order-action-menu-list .manager-status-transferred{background:#42286e!important;color:#fff!important;border-color:#8055c5!important}
+.order-action-menu-list .manager-status-cancel{background:#642323!important;color:#fff!important;border-color:#b9443d!important}
+.order-action-menu-list .manager-status-payment{background:#303030!important;color:#fff!important;border-color:#626262!important}
+.order-action-menu-list .small-button.shipped{background:#4b2058!important;color:#fff!important;border-color:#9849ae!important}
+.order-action-menu-list .warehouse-status-question{background:#5b3d0b!important;color:#fff!important;border-color:#b57a12!important}
+.order-action-menu-list .warehouse-status-pickup-waiting{background:#124e58!important;color:#fff!important;border-color:#248b98!important}
+.order-action-menu-list .warehouse-status-pickup-done{background:#145c38!important;color:#fff!important;border-color:#2d9b62!important}

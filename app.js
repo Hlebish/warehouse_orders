@@ -781,26 +781,27 @@ async function readPhotos(files){
   return out;
 }
 async function uploadPhotos(orderId,entryId,blobs){
-  const urls=[];
-
-  for(let i=0;i<blobs.length;i++){
+  return Promise.all(blobs.map(async(blob,i)=>{
     const path=`orders/${orderId}/${entryId}/photo-${i+1}-${crypto.randomUUID()}.jpg`;
     const fileRef=storageRef(storage,path);
-
-    await uploadBytes(fileRef,blobs[i],{
-      contentType:'image/jpeg'
-    });
-
-    urls.push(await getDownloadURL(fileRef));
-  }
-
-  return urls;
+    await uploadBytes(fileRef,blob,{contentType:'image/jpeg'});
+    return getDownloadURL(fileRef);
+  }));
 }
-async function saveEntry(){const kind=$('entryKind')?.value||'comment',text=$('entryText').value.trim(),article=$('article')?.value.trim()||'';if(!text){toast('Напишите сообщение.');return}if(kind==='defect'&&!article){toast('Для дефекта укажите артикул детали.');return}
-const o=state.orders.find(x=>x.id===selectedId);if(!o)return;if(kind!=='comment'&&!canEditOrder(o)){toast('После отгрузки заказ заблокирован для этой роли.');return;}if(hasPendingDefect(o)&&kind!=='comment'){toast('Пока дефект не рассмотрен, можно добавлять только комментарии.');return}try{const photoBlobs=await readPhotos($('entryPhotos').files);
+let entrySending=false;
+async function saveEntry(){
+  if(entrySending)return;
+  const kind=$('entryKind')?.value||'comment',text=$('entryText').value.trim(),article=$('article')?.value.trim()||'';if(!text){toast('Напишите сообщение.');return}if(kind==='defect'&&!article){toast('Для дефекта укажите артикул детали.');return}
+const o=state.orders.find(x=>x.id===selectedId);if(!o)return;if(kind!=='comment'&&!canEditOrder(o)){toast('После отгрузки заказ заблокирован для этой роли.');return;}if(hasPendingDefect(o)&&kind!=='comment'){toast('Пока дефект не рассмотрен, можно добавлять только комментарии.');return}const sendButton=document.querySelector('[data-action="save-entry"]');
+entrySending=true;
+if(sendButton){sendButton.disabled=true;sendButton.textContent='Отправка…';}
+try{
+const photoBlobs=await readPhotos($('entryPhotos').files);
 const entryId=crypto.randomUUID();
 const photos=await uploadPhotos(o.id,entryId,photoBlobs);
-o.entries.push({id:entryId,kind,article:kind==='defect'?article:'',text,author:profileName||roles[state.role],createdAt:isoNow(),photos});if(kind==='defect')o.status='Дефект';await save();await writeAudit(kind==='defect'?'Добавлен дефект':'Добавлен комментарий',text,o.id,{entryId});closeModal();render();toast('Запись добавлена в историю заказа.');notify(`${kind==='defect'?'Дефект':'Комментарий'} к заказу № ${o.number}`,o.id);openOrder(o.id)}catch(e){toast(e.message)}}
+o.entries.push({id:entryId,kind,article:kind==='defect'?article:'',text,author:profileName||roles[state.role],createdAt:isoNow(),photos});if(kind==='defect')o.status='Дефект';await save();await writeAudit(kind==='defect'?'Добавлен дефект':'Добавлен комментарий',text,o.id,{entryId});closeModal();render();toast('Запись добавлена в историю заказа.');notify(`${kind==='defect'?'Дефект':'Комментарий'} к заказу № ${o.number}`,o.id);openOrder(o.id)
+}catch(e){toast(e.message)}
+finally{entrySending=false;if(sendButton){sendButton.disabled=false;sendButton.textContent=kind==='defect'?'Добавить дефект':'Отправить';}}}
 async function setStatus(status,text,kind='system'){const o=state.orders.find(x=>x.id===selectedId);if(!o||!signedInUser)return;if(!canEditOrder(o)){toast('После отгрузки заказ заблокирован для этой роли.');return;}if(hasPendingDefect(o)){toast('Пока есть нерассмотренный дефект, другие изменения заказа заблокированы.');return;}const previous=o.status;const previousTransferredAt=o.transferredAt;const previousResumedAt=o.resumedAt;const previousAssembledAt=o.assembledAt;const previousShippedAt=o.shippedAt;const previousAssemblyInProgress=o.assemblyInProgress;const now=isoNow();const entry={id:crypto.randomUUID(),kind,text,authorId:signedInUser.uid,author:profileName||roles[state.role],createdAt:now,photos:[]};const statusUpdate={status,updatedAt:now,updatedBy:signedInUser.uid,updatedByName:profileName||roles[state.role]};if(status==='Собран'){o.assembledAt=now;statusUpdate.assembledAt=now;}if(status==='Отгружен кладовщиком'){o.shippedAt=now;statusUpdate.shippedAt=now;}if(status==='Собран'||status==='Отгружен кладовщиком'){o.assemblyInProgress=false;statusUpdate.assemblyInProgress=false;}if(status==='Перенесен'){o.transferredAt=now;}if(previous==='Перенесен'&&status!=='Перенесен'){o.resumedAt=now;statusUpdate.resumedAt=now;}try{o.status=status;await updateDoc(doc(db,'orders',o.id),statusUpdate);await setDoc(doc(db,'orders',o.id,'entries',entry.id),entryToCloud(entry));o.entries.push(entry);serverCache.set(o.id,{...serverCache.get(o.id),...o});await writeAudit('Изменён статус заказа',text,o.id,{previousStatus:previous,newStatus:status});await queuePush(`Заказ № ${o.number}: ${status}`,text,signedInUser.uid,o.id);render();notify(`Заказ № ${o.number}: ${status}`,o.id);openOrder(o.id)}catch(err){o.status=previous;o.transferredAt=previousTransferredAt;o.resumedAt=previousResumedAt;o.assembledAt=previousAssembledAt;o.shippedAt=previousShippedAt;o.assemblyInProgress=previousAssemblyInProgress;console.error('Ошибка изменения статуса заказа',err);toast('Не удалось изменить статус: '+(err?.message||'нет доступа'));}}
 function cancelOrder(){const o=state.orders.find(x=>x.id===selectedId);if(o&&!canEditOrder(o)){toast('После отгрузки заказ нельзя отменить этой ролью.');return;}showModal('Отменить заказ',`<p style="font-size:12px;color:#697382;margin:0 0 14px">Укажите причину отмены заказа № ${esc(o.number)}. Причина сохранится в истории.</p><div class="field"><label for="cancelReason">Причина отмены *</label><textarea id="cancelReason" required placeholder="Почему заказ отменён?"></textarea></div>`,[button('Назад','back-detail'),button('Отменить заказ','confirm-cancel','small-button danger')],'РЕШЕНИЕ МЕНЕДЖЕРА')}
 function approveOrder(){showModal('Одобрить на отгрузку',`<p style="font-size:12px;color:#697382;margin:0 0 12px">Заказ № ${esc(state.orders.find(x=>x.id===selectedId)?.number||'')} будет отмечен как одобренный к отгрузке клиенту.</p><div class="field"><label for="approvalComment">Комментарий менеджера (необязательно)</label><textarea id="approvalComment" placeholder="Добавьте пояснение для кладовщика"></textarea></div>`,[button('Назад','back-detail'),button('Одобрить','confirm-approve','small-button good')],'РЕШЕНИЕ МЕНЕДЖЕРА')}
@@ -938,14 +939,17 @@ function openChat(){
   });
   $('chatInput').addEventListener('input',chatMentionSuggestions);$('chatSearch')?.addEventListener('input',e=>{chatFilterText=e.target.value||'';renderChatMessages();});$('chatFilter')?.addEventListener('change',e=>{chatFilterMode=e.target.value||'all';renderChatMessages();});
   $('chatInput').addEventListener('keyup',chatMentionSuggestions);
+  let chatSending=false;
   $('chatForm').addEventListener('submit',async e=>{
     e.preventDefault();
+    if(chatSending)return;
     const input=$('chatInput');
     const text=input.value.trim();
     const photoInput=$('chatPhotoInput');
     const files=Array.from(photoInput?.files||[]).slice(0,5);
     if(!text&&!files.length||!signedInUser)return;
     if(files.some(file=>!file.type.startsWith('image/')||file.size>8*1024*1024)){toast('Фото должны быть изображениями до 8 МБ каждое.');return}
+    chatSending=true;
     input.disabled=true;
     if(photoInput)photoInput.disabled=true;
     const sendButton=document.querySelector('[data-action="send-chat"]');
@@ -961,24 +965,24 @@ function openChat(){
     try{
       const createdAt=serverTimestamp();
       const photos=[];
-      const totalBytes=files.reduce((sum,file)=>sum+file.size,0);
+      const compressedFiles=files.length?await readPhotos(files):[];
+      const totalBytes=compressedFiles.reduce((sum,file)=>sum+file.size,0);
       let uploadedBytes=0;
-      for(const file of files){
-        const path=`chat/${signedInUser.uid}/${Date.now()}-${crypto.randomUUID()}-${file.name.replace(/[^a-zA-Z0-9._-]/g,'_')}`;
+      await Promise.all(compressedFiles.map(async(file,index)=>{
+        const path=`chat/${signedInUser.uid}/${Date.now()}-${crypto.randomUUID()}-photo-${index+1}.jpg`;
         const photoRef=storageRef(storage,path);
         await new Promise((resolve,reject)=>{
-          const task=uploadBytesResumable(photoRef,file,{contentType:file.type});
+          const task=uploadBytesResumable(photoRef,file,{contentType:'image/jpeg'});
           task.on('state_changed',snap=>{
             const current=totalBytes?Math.min(100,((uploadedBytes+snap.bytesTransferred)/totalBytes)*100):0;
             if(progressBar)progressBar.style.width=current.toFixed(1)+'%';
             if(progressText)progressText.textContent=`Загрузка фото… ${Math.round(current)}%`;
           },reject,async()=>{
             uploadedBytes+=file.size;
-            photos.push(await getDownloadURL(photoRef));
-            resolve();
+            try{photos[index]=await getDownloadURL(photoRef);resolve()}catch(err){reject(err)}
           });
         });
-      }
+      }));
       if(progressBar)progressBar.style.width='100%';
       if(progressText)progressText.textContent='Отправка сообщения…';
       await setDoc(doc(db,'chatMessages',crypto.randomUUID()),{
@@ -1007,6 +1011,7 @@ function openChat(){
       console.error('Не удалось отправить сообщение в чат',err);
       toast(err?.code==='permission-denied'?'Нет доступа к chatMessages. Сначала опубликуйте firestore.rules.':'Не удалось отправить сообщение.');
     }finally{
+      chatSending=false;
       input.disabled=false;
       if(photoInput)photoInput.disabled=false;
       if(sendButton)sendButton.disabled=false;

@@ -1094,6 +1094,7 @@ body.dark-theme .chat-upload-progress{background:rgba(255,255,255,.06)}
 .chat-message.mine .chat-read-receipt{color:#6f9b18}
 .chat-sidebar-button{position:relative}
 .chat-sidebar-button.has-unread-chat::after{content:'';position:absolute;right:9px;top:8px;width:9px;height:9px;border-radius:50%;background:#e6b63f;box-shadow:0 0 0 3px rgba(230,182,63,.16)}
+.chat-sidebar-button.has-unread-chat-bell::after{content:'🔔';position:absolute;right:8px;top:5px;font-size:15px;line-height:1;filter:drop-shadow(0 1px 2px rgba(0,0,0,.25))}
 .notice-unread{box-shadow:inset 3px 0 0 #e6b63f}
 body.dark-theme .chat-read-receipt{color:#8d98a4}
 body.dark-theme .chat-message.mine .chat-read-receipt{color:#b8d86c}

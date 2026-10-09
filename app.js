@@ -650,16 +650,16 @@ async function toggleArticleCollected(index){
   const articles=Array.isArray(o.articles)?o.articles.filter(x=>String(x?.article||'').trim()):[];
   const allCollected=articles.length>0&&articles.every(x=>x.collected===true);
 
-  // Отметки «Собрано» не должны менять статус заказа,
-  // если кладовщик не запускал сборку.
-  if(previousAssemblyInProgress===true){
-    if(allCollected){
-      o.status='Собран';
-      o.assembledAt=isoNow();
-      o.assemblyInProgress=false;
-    }else if(previousStatus==='Собран'){
-      o.status='Создан';
-    }
+  // Как только все позиции отмечены собранными, заказ автоматически
+  // получает статус «Собран» независимо от того, запускали ли сборку кнопкой.
+  if(allCollected){
+    if(previousStatus!=='Собран')o.assembledAt=isoNow();
+    o.status='Собран';
+    o.assemblyInProgress=false;
+  }else if(previousStatus==='Собран'){
+    // Если снять отметку хотя бы с одной позиции, возвращаем заказ в «Создан».
+    o.status='Создан';
+    o.assembledAt='';
   }
 
   try{

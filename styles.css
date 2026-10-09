@@ -1808,3 +1808,38 @@ body.dark-theme .order-action-menu-list .manager-status-payment{color:#fff!impor
   background:#0d4793!important;
   border-color:#5a9fff!important;
 }
+
+/* Important comments are highlighted in the order timeline */
+.important-message-option{
+  display:flex!important;
+  align-items:center;
+  gap:9px;
+  padding:9px 11px;
+  border:1px solid #b78b18;
+  border-radius:8px;
+  background:#2e260e;
+  color:#f3d36a!important;
+  font-weight:600;
+}
+.important-message-option input{accent-color:#e5b91e;width:16px;height:16px}
+.timeline-item-important{
+  border:1px solid #d4a91b!important;
+  border-left:4px solid #f0c52d!important;
+  border-radius:10px;
+  padding:12px!important;
+  background:rgba(110,83,5,.13)!important;
+}
+.important-message-mark{
+  display:inline-flex;
+  align-items:center;
+  gap:4px;
+  margin-left:7px;
+  padding:2px 7px;
+  border-radius:5px;
+  background:#e5b91e;
+  color:#171717;
+  font-size:10px;
+  font-weight:800;
+  letter-spacing:.04em;
+  white-space:nowrap;
+}

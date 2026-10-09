@@ -1576,3 +1576,18 @@ body.dark-theme .order-action-menu-list .manager-status-ready{color:#fff!importa
 body.dark-theme .order-action-menu-list .manager-status-transferred{color:#fff!important}
 body.dark-theme .order-action-menu-list .manager-status-cancel{color:#fff!important}
 body.dark-theme .order-action-menu-list .manager-status-viewed{color:#fff!important}
+
+/* Payment status button matches the typography of the other manager status choices */
+.order-action-menu-list .manager-status-payment{
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  text-align:center!important;
+  font-family:'DM Sans',sans-serif!important;
+  font-size:14px!important;
+  font-style:normal!important;
+  font-weight:600!important;
+  line-height:1.35!important;
+  color:#fff!important;
+}
+body.dark-theme .order-action-menu-list .manager-status-payment{color:#fff!important}

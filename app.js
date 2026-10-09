@@ -634,7 +634,7 @@ async function saveOrderInfo(){const o=state.orders.find(x=>x.id===selectedId);i
 function editArticles(){const o=state.orders.find(x=>x.id===selectedId);if(!o)return;if(!canEditOrder(o)){toast('После отгрузки заказ заблокирован для этой роли.');return;}if(hasPendingDefect(o)){toast('Редактирование заблокировано до решения по дефекту.');return;}showModal(`Артикулы заказа № ${o.number}`,`<div class="field"><label>Состав заказа</label>${articlesEditorHtml(o.articles||[])}<span class="field-hint">Добавляйте новые позиции, меняйте количество или удаляйте ненужные.</span></div>`,[button('Назад','back-detail'),button('Сохранить артикулы','save-articles','primary-button')],'СОСТАВ ЗАКАЗА')}
 async function toggleArticleCollected(index){
   const o=state.orders.find(x=>x.id===selectedId);
-  if(!o||!(state.role==='warehouse'||isManagerRole()||canManageUsers)||hasPendingDefect(o)||!Number.isInteger(index))return;
+  if(!o||!(state.role==='warehouse'||canManageUsers)||hasPendingDefect(o)||!Number.isInteger(index))return;
   const item=o.articles?.[index];
   if(!item)return;
 

@@ -558,7 +558,8 @@ const statusHint=managerCreate?'Менеджер создаёт заказ со 
 showModal('Добавить заказ',`<form id="newOrderForm"><div class="form-grid"><div class="field"><label for="orderNumber">Номер заказа *</label><input id="orderNumber" required placeholder="Например, ЗК-18472" autocomplete="off"></div><div class="field"><label for="clientName">Имя клиента *</label><input id="clientName" required placeholder="Имя или название компании"></div></div><div class="field"><label>Артикулы заказа</label>${articlesEditorHtml([{article:'',quantity:1}])}<span class="field-hint">Для каждого артикула укажите количество. Можно добавлять и удалять позиции.</span></div><div class="field"><label for="startStatus">Начальный статус</label><select id="startStatus">${statusOptions}</select><span class="field-hint">${statusHint}</span></div><div class="field"><label for="initialComment">Комментарий (необязательно)</label><textarea id="initialComment" placeholder="Короткая заметка по заказу"></textarea></div></form>`,[button('Отмена','close'),button('Создать карточку','create-order','primary-button')],'НОВЫЙ ЗАКАЗ')}
 function returnedQuantityForArticle(o,article){
   const key=String(article||'').trim().toUpperCase();
-  return (Array.isArray(o?.returns)?o.returns:[]).reduce((sum,r)=>sum+(Array.isArray(r.items)?r.items.filter(x=>String(x.article||'').trim().toUpperCase()===key).reduce((n,x)=>n+(Number(x.quantity)||0),0):0),0);
+  // Отменённые возвраты не должны уменьшать доступное к возврату количество.
+  return (Array.isArray(o?.returns)?o.returns:[]).filter(r=>r?.status!=='cancelled').reduce((sum,r)=>sum+(Array.isArray(r.items)?r.items.filter(x=>String(x.article||'').trim().toUpperCase()===key).reduce((n,x)=>n+(Number(x.quantity)||0),0):0),0);
 }
 function openReturnForm(){
   const o=state.orders.find(x=>x.id===selectedId);if(!o)return;

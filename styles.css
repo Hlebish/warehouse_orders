@@ -1843,3 +1843,33 @@ body.dark-theme .order-action-menu-list .manager-status-payment{color:#fff!impor
   letter-spacing:.04em;
   white-space:nowrap;
 }
+
+
+/* Disabled role actions remain visible so every employee sees the same layout. */
+.detail-actions .role-action-locked,
+.detail-actions .role-action-locked:disabled{
+  position:relative;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:6px;
+  opacity:.48!important;
+  filter:grayscale(1);
+  cursor:not-allowed!important;
+  pointer-events:auto;
+  box-shadow:none!important;
+  transform:none!important;
+}
+.detail-actions .role-action-locked:hover{
+  background:#e9ecef!important;
+  border-color:#cbd0d6!important;
+  color:#737b85!important;
+}
+.role-action-ban{font-size:12px;line-height:1;filter:grayscale(0);opacity:.9}
+body.dark-theme .detail-actions .role-action-locked,
+body.dark-theme .detail-actions .role-action-locked:disabled{
+  background:#292d32!important;
+  border-color:#484d54!important;
+  color:#a1a6ad!important;
+  opacity:.58!important;
+}

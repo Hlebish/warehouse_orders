@@ -477,9 +477,21 @@ async function cancelReturnAction(orderId,returnId){
   const o=state.orders.find(x=>x.id===orderId),r=o?.returns?.find(x=>x.id===returnId);
   if(!o||!r||r.status==='cancelled'){toast('Возврат уже отменён или не найден.');return;}
   if(!confirm('Отменить возврат по заказу № '+o.number+'? Запись останется в истории.'))return;
-  const old={...r};r.status='cancelled';r.cancelledAt=isoNow();r.cancelledBy=signedInUser.uid;r.cancelledByName=profileName||'Администратор';
-  try{await save();await writeAudit('Возврат отменён','Отменён возврат по заказу № '+o.number,o.id);toast('Возврат отменён.');showReturns($('returnsDateFrom')?.value||'',$('returnsDateTo')?.value||'');}
-  catch(err){Object.assign(r,old);toast('Не удалось отменить возврат.');}
+  const oldReturns=JSON.parse(JSON.stringify(o.returns||[]));
+  const cancelledAt=isoNow();
+  const nextReturns=oldReturns.map(item=>item.id===returnId?{...item,status:'cancelled',cancelledAt,cancelledBy:signedInUser.uid,cancelledByName:profileName||'Администратор'}:item);
+  try{
+    const patch={returns:nextReturns,updatedAt:cancelledAt,updatedBy:signedInUser.uid,updatedByName:profileName||''};
+    await updateDoc(doc(db,'orders',o.id),patch);
+    o.returns=nextReturns;o.updatedAt=cancelledAt;o.updatedBy=signedInUser.uid;o.updatedByName=profileName||'';
+    serverCache.set(o.id,{...o,returns:JSON.parse(JSON.stringify(nextReturns)),entries:[...(o.entries||[])]});
+    await writeAudit('Возврат отменён','Отменён возврат по заказу № '+o.number,o.id);
+    toast('Возврат отменён. Запись сохранена в истории.');
+    showReturns($('returnsDateFrom')?.value||'',$('returnsDateTo')?.value||'');
+  }catch(err){
+    console.error('Не удалось сохранить отмену возврата',err);
+    toast('Не удалось отменить возврат: '+String(err?.code||'ошибка').replace(/^.*?\//,''));
+  }
 }
 function renderWorkInsights(){
   const box=$('workInsights');if(!box)return;

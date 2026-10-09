@@ -4,7 +4,7 @@ importScripts(
 );
 
 const SITE_URL = 'https://hlebish.github.io/warehouse_orders/';
-const CACHE = 'order-desk-fcm-v47';
+const CACHE = 'order-desk-fcm-v48';
 const ASSETS = [
   './',
   './index.html',

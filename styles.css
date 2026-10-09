@@ -1370,3 +1370,6 @@ body.dark-theme .assembly-indicator{background:#123d2b;border-color:#246d49;colo
 .delivery-pickup{background:#fff2d9;color:#8b5a00;border:1px solid #f2d99f}
 body.dark-theme .delivery-city{background:#1c3154;color:#b8d2ff;border-color:#304e7d}
 body.dark-theme .delivery-pickup{background:#493719;color:#ffdc91;border-color:#765722}
+
+.delivery-post{background:#e8f8ed;color:#17683b;border:1px solid #c2e8ce}
+body.dark-theme .delivery-post{background:#153d29;color:#a4edbf;border-color:#286344}

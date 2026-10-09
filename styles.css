@@ -1873,3 +1873,41 @@ body.dark-theme .detail-actions .role-action-locked:disabled{
   color:#a1a6ad!important;
   opacity:.58!important;
 }
+
+
+/* Neutral dark theme for manager and warehouse action tabs */
+body.dark-theme .manager-category,
+body.dark-theme .warehouse-category,
+body.dark-theme .order-action-menu-list .manager-status-created,
+body.dark-theme .order-action-menu-list .manager-status-approval,
+body.dark-theme .order-action-menu-list .manager-status-ready,
+body.dark-theme .order-action-menu-list .manager-status-transferred,
+body.dark-theme .order-action-menu-list .manager-status-cancel,
+body.dark-theme .order-action-menu-list .manager-status-viewed,
+body.dark-theme .order-action-menu-list .manager-status-payment,
+body.dark-theme .order-action-menu-list .manager-status-reschedule,
+body.dark-theme .order-action-menu-list .warehouse-status-question,
+body.dark-theme .order-action-menu-list .warehouse-status-pickup-waiting,
+body.dark-theme .order-action-menu-list .warehouse-status-pickup-done,
+body.dark-theme .order-action-menu-list .small-button.shipped {
+  background:#242424!important;
+  color:#e2e2e2!important;
+  border-color:#414141!important;
+  box-shadow:none!important;
+}
+body.dark-theme .order-action-menu-list .manager-status-created:hover,
+body.dark-theme .order-action-menu-list .manager-status-approval:hover,
+body.dark-theme .order-action-menu-list .manager-status-ready:hover,
+body.dark-theme .order-action-menu-list .manager-status-transferred:hover,
+body.dark-theme .order-action-menu-list .manager-status-cancel:hover,
+body.dark-theme .order-action-menu-list .manager-status-viewed:hover,
+body.dark-theme .order-action-menu-list .manager-status-payment:hover,
+body.dark-theme .order-action-menu-list .manager-status-reschedule:hover,
+body.dark-theme .order-action-menu-list .warehouse-status-question:hover,
+body.dark-theme .order-action-menu-list .warehouse-status-pickup-waiting:hover,
+body.dark-theme .order-action-menu-list .warehouse-status-pickup-done:hover,
+body.dark-theme .order-action-menu-list .small-button.shipped:hover {
+  background:#303030!important;
+  color:#fff!important;
+  border-color:#505050!important;
+}

@@ -489,7 +489,7 @@ async function cancelReturnAction(orderId,returnId){
     if(hasOtherActive)showReturns($('returnsDateFrom')?.value||'',$('returnsDateTo')?.value||'');else{closeModal();render();}
   }catch(err){
     console.error('Не удалось сохранить отмену возврата',err);
-    toast('Не удалось отменить возврат: '+String(err?.code||'ошибка').replace(/^.*?\\//,''));
+    toast('Не удалось отменить возврат: '+String(err?.code||'ошибка').replace(/^.*?\//,''));
   }
 }
 function renderWorkInsights(){
@@ -593,7 +593,7 @@ async function saveReturn(){
     closeModal();render();toast('Возврат оформлен.');notify('Возврат по заказу № '+o.number,o.id);openOrder(o.id);
   }catch(err){
     console.error('Не удалось сохранить возврат',err);
-    const code=String(err?.code||'').replace(/^.*?\\//,'')||'ошибка';
+    const code=String(err?.code||'').replace(/^.*?\//,'')||'ошибка';
     toast('Не удалось сохранить возврат: '+code);
   }
 }

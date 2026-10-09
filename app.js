@@ -670,6 +670,32 @@ const previous=normalizeArticles(o.articles||[]);if(articlesEqual(previous,next)
 function addComment(){showModal('Добавить комментарий',`<form id="entryForm"><div class="field"><label for="entryText">Сообщение *</label><textarea id="entryText" required placeholder="Напишите комментарий"></textarea></div><div class="field"><label for="entryPhotos">Фото (необязательно)</label><div class="upload-box">Прикрепить фотографии<input id="entryPhotos" type="file" accept="image/*" multiple></div><span class="field-hint">Можно отправить обычный текст без артикула и фотографий.</span></div></form>`,[button('Назад','back-detail'),button('Отправить','save-entry','primary-button')],'КОММЕНТАРИЙ');$('entryKind')?.remove()}
 function addDefect(){const o=state.orders.find(x=>x.id===selectedId);if(o&&!canEditOrder(o)){toast('После отгрузки заказ заблокирован для этой роли.');return;}if(o&&hasPendingDefect(o)){toast('У заказа уже есть нерассмотренный дефект.');return;}showModal('Добавить дефект',`<form id="entryForm"><input id="entryKind" type="hidden" value="defect"><div class="field"><label for="article">Артикул детали *</label><input id="article" placeholder="Например, APVW0802" autocomplete="off"></div><div class="field"><label for="entryText">Описание дефекта *</label><textarea id="entryText" required placeholder="Опишите, что не так с деталью"></textarea></div><div class="field"><label for="entryPhotos">Фото дефекта (необязательно)</label><div class="upload-box">Прикрепить фотографии<input id="entryPhotos" type="file" accept="image/*" multiple></div><span class="field-hint">Фото помогут менеджеру оценить дефект.</span></div></form>`,[button('Назад','back-detail'),button('Добавить дефект','save-entry','primary-button')],'ДЕФЕКТ ДЕТАЛИ')}
 async function saveOrder(){const n=$('orderNumber').value.trim(),client=$('clientName').value.trim();if(!n||!client){toast('Укажите номер заказа и имя клиента.');return}if(state.orders.some(o=>o.number.toLowerCase()===n.toLowerCase())){toast('Карточка с таким номером уже есть.');return}const articles=readArticles();const status=$('startStatus').value,comment=$('initialComment').value.trim();const o={id:crypto.randomUUID(),number:n,client,status,articles,createdAt:isoNow(),author:profileName||roles[state.role],createdBy:signedInUser.uid,entries:[]};if(comment)o.entries.push({id:crypto.randomUUID(),kind:'comment',text:comment,author:profileName||roles[state.role],createdAt:isoNow(),photos:[]});state.orders.unshift(o);await save();closeModal();render();toast('Карточка заказа создана.');notify(`Создан заказ № ${n}`,o.id)}
+function appendClipboardImages(event,inputId,maxFiles=5,maxBytes=8*1024*1024){
+  const input=$(inputId);
+  const items=Array.from(event.clipboardData?.items||[]).filter(item=>item.kind==='file'&&item.type.startsWith('image/'));
+  if(!input||!items.length)return false;
+  const pasted=items.map((item,index)=>item.getAsFile()).filter(Boolean).map((file,index)=>new File([file],file.name&&file.name!=='image.png'?file.name:`clipboard-image-${Date.now()}-${index+1}.${(file.type.split('/')[1]||'png').replace('jpeg','jpg')}`,{type:file.type||'image/png'}));
+  const existing=Array.from(input.files||[]);
+  const combined=[...existing,...pasted];
+  if(combined.length>maxFiles){toast('Можно прикрепить не более '+maxFiles+' изображений.');return true;}
+  if(combined.some(file=>file.size>maxBytes)){toast('Изображение из буфера слишком большое. Максимум '+Math.round(maxBytes/1024/1024)+' МБ на файл.');return true;}
+  try{
+    const transfer=new DataTransfer();
+    combined.forEach(file=>transfer.items.add(file));
+    input.files=transfer.files;
+    input.dispatchEvent(new Event('change',{bubbles:true}));
+    toast('Изображение из буфера добавлено.');
+  }catch(err){console.error('Не удалось добавить изображение из буфера',err);toast('Браузер не позволил прикрепить изображение из буфера. Используй кнопку «Фото».');}
+  return true;
+}
+document.addEventListener('paste',event=>{
+  const target=event.target;
+  if(target?.id==='chatInput'){
+    if(appendClipboardImages(event,'chatPhotoInput',5,8*1024*1024))event.preventDefault();
+  }else if(target?.id==='entryText'||target?.id==='article'){
+    if(appendClipboardImages(event,'entryPhotos',5,8*1024*1024))event.preventDefault();
+  }
+});
 async function readPhotos(files){
   if(files.length>5)throw new Error('К одной записи можно прикрепить не более пяти фото.');
 
@@ -865,7 +891,7 @@ function openChat(){
   if(!signedInUser)return;
   chatUnsubscribe?.();
   chatMessages=[];chatReplyTo=null;
-  showModal('Общий чат','<div class="chat-shell"><div class="chat-toolbar"><label class="search-box"><span>⌕</span><input id="chatSearch" type="search" placeholder="Поиск по чату"></label><select id="chatFilter"><option value="all">Все сообщения</option><option value="mine">Мои</option><option value="replies">С ответами</option><option value="photos">С фото</option></select></div><div class="chat-messages" id="chatMessages"><div class="chat-empty">Загрузка сообщений…</div></div><form id="chatForm" class="chat-form"><div id="chatReplyPreview" class="chat-reply-preview" hidden></div><div class="chat-input-wrap"><textarea id="chatInput" maxlength="1000" rows="2" placeholder="Напишите сообщение… Используйте @ для упоминания" autocomplete="off" required></textarea><div id="chatMentionSuggestions" class="chat-mention-suggestions" hidden></div></div><div class="chat-attach-row"><label class="chat-attach-button">📎 Фото<input id="chatPhotoInput" type="file" accept="image/*" multiple hidden></label><span id="chatPhotoHint">До 5 фото, по 8 МБ</span></div><div id="chatUploadProgress" class="chat-upload-progress" hidden><div class="chat-upload-progress-track"><div id="chatUploadProgressBar" class="chat-upload-progress-bar"></div></div><span id="chatUploadProgressText">Загрузка…</span></div><div id="chatPhotoPreview" class="chat-photo-preview"></div></form></div>',[button('Закрыть','close'),button('Отправить','send-chat','primary-button')],'ОБЩИЙ ЧАТ');
+  showModal('Общий чат','<div class="chat-shell"><div class="chat-toolbar"><label class="search-box"><span>⌕</span><input id="chatSearch" type="search" placeholder="Поиск по чату"></label><select id="chatFilter"><option value="all">Все сообщения</option><option value="mine">Мои</option><option value="replies">С ответами</option><option value="photos">С фото</option></select></div><div class="chat-messages" id="chatMessages"><div class="chat-empty">Загрузка сообщений…</div></div><form id="chatForm" class="chat-form"><div id="chatReplyPreview" class="chat-reply-preview" hidden></div><div class="chat-input-wrap"><textarea id="chatInput" maxlength="1000" rows="2" placeholder="Напишите сообщение… Используйте @ для упоминания (можно вставить фото из буфера)" autocomplete="off"></textarea><div id="chatMentionSuggestions" class="chat-mention-suggestions" hidden></div></div><div class="chat-attach-row"><label class="chat-attach-button">📎 Фото<input id="chatPhotoInput" type="file" accept="image/*" multiple hidden></label><span id="chatPhotoHint">До 5 фото, по 8 МБ</span></div><div id="chatUploadProgress" class="chat-upload-progress" hidden><div class="chat-upload-progress-track"><div id="chatUploadProgressBar" class="chat-upload-progress-bar"></div></div><span id="chatUploadProgressText">Загрузка…</span></div><div id="chatPhotoPreview" class="chat-photo-preview"></div></form></div>',[button('Закрыть','close'),button('Отправить','send-chat','primary-button')],'ОБЩИЙ ЧАТ');
   const chatQuery=query(collection(db,'chatMessages'),orderBy('createdAt','desc'),limit(100));
   chatUnsubscribe=onSnapshot(chatQuery,snap=>{
     chatMessages=snap.docs.map(d=>({id:d.id,...d.data()})).filter(m=>m.text||Array.isArray(m.photos)&&m.photos.length).sort((x,y)=>{const tx=x.createdAt?.toMillis?x.createdAt.toMillis():new Date(x.createdAt||0).getTime();const ty=y.createdAt?.toMillis?y.createdAt.toMillis():new Date(y.createdAt||0).getTime();return tx-ty||String(x.id).localeCompare(String(y.id));});

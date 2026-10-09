@@ -166,7 +166,7 @@ service cloud.firestore {
         && request.resource.data.number is string
         && request.resource.data.number.size() > 0
         && request.resource.data.client is string
-        && request.resource.data.deliveryType in ['city', 'pickup']
+        && request.resource.data.deliveryType in ['city', 'pickup', 'post']
         && request.resource.data.articles is list
         && request.resource.data.articles.size() <= 100
         && request.resource.data.createdBy == request.auth.uid
@@ -215,7 +215,7 @@ service cloud.firestore {
           && request.resource.data.updatedAt is string
           && request.resource.data.updatedBy == request.auth.uid
           && request.resource.data.updatedByName is string
-          && (!request.resource.data.keys().hasAny(['deliveryType']) || request.resource.data.deliveryType in ['city', 'pickup'])
+          && (!request.resource.data.keys().hasAny(['deliveryType']) || request.resource.data.deliveryType in ['city', 'pickup', 'post'])
           && (request.resource.data.status == resource.data.status
             || request.resource.data.status in [
               'Создан', 'Под вопросом', 'Дефект', 'Ожидает оплаты', 'На согласовании',

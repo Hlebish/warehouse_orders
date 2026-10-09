@@ -216,7 +216,7 @@ service cloud.firestore {
           && request.resource.data.updatedByName is string
           && (request.resource.data.status == resource.data.status
             || request.resource.data.status in [
-              'Создан', 'Под вопросом', 'Ожидает оплаты', 'На согласовании',
+              'Создан', 'Под вопросом', 'Дефект', 'Ожидает оплаты', 'На согласовании',
               'Одобрен на отгрузку клиенту', 'Ожидает самовывоза',
               'Клиент забрал самовывозом', 'Перенесен', 'Отменён'
             ]))

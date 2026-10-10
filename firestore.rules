@@ -196,6 +196,7 @@ service cloud.firestore {
         // Статус, состав заказа и остальные поля этой веткой менять нельзя.
         || (activeUser()
           && resource.data.status != 'Отгружен кладовщиком'
+          && resource.data.status != 'Клиент забрал самовывозом'
           && request.resource.data.status == resource.data.status
           && request.resource.data.diff(resource.data).affectedKeys()
             .hasOnly(['number', 'client', 'updatedAt', 'updatedBy', 'updatedByName'])
@@ -208,7 +209,9 @@ service cloud.firestore {
 
         || (isManager()
           && resource.data.status != 'Отгружен кладовщиком'
+          && resource.data.status != 'Клиент забрал самовывозом'
           && request.resource.data.status != 'Отгружен кладовщиком'
+          && request.resource.data.status != 'Клиент забрал самовывозом'
           && request.resource.data.diff(resource.data).affectedKeys()
             .hasOnly(['number', 'client', 'deliveryType', 'articles', 'status', 'updatedAt', 'updatedBy', 'updatedByName',
               'transferredAt', 'resumedAt', 'assembledAt'])
@@ -226,12 +229,14 @@ service cloud.firestore {
         // Кладовщик может менять состав/статус до момента отгрузки.
         || (isWarehouse()
           && resource.data.status != 'Отгружен кладовщиком'
+          && resource.data.status != 'Клиент забрал самовывозом'
           && request.resource.data.diff(resource.data).affectedKeys()
             .hasOnly(['status', 'articles', 'deliveryType', 'updatedAt', 'updatedBy', 'updatedByName',
               'transferredAt', 'resumedAt', 'assembledAt', 'shippedAt', 'assemblyInProgress',
               'assemblyStartedAt', 'assemblyStartedBy', 'assemblyStartedByName']))
         || (isWarehouse()
           && resource.data.status != 'Отгружен кладовщиком'
+          && resource.data.status != 'Клиент забрал самовывозом'
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
             'assemblyInProgress', 'assemblyStartedAt', 'assemblyStartedBy', 'assemblyStartedByName',
             'updatedAt', 'updatedBy', 'updatedByName'

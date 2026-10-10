@@ -62,14 +62,18 @@ async function createNotificationHistory(data, eventId) {
     : (data.target === 'chat' ? 'chat' : 'orders');
   const recipientUserId = String(data.recipientUserId || '');
   const authorId = String(data.authorId || '');
+  // For a direct notification, read only the recipient profile instead of querying
+  // the full active-user collection. Broadcasts still use the active-user query.
   const users = recipientUserId
-    ? await db.collection('users').where('active', '==', true).where('__name__', '==', recipientUserId).get()
-    : await db.collection('users').where('active', '==', true).get();
+    ? await db.collection('users').doc(recipientUserId).get().then(user =>
+        user.exists && user.data()?.active === true ? [user] : [])
+    : (await db.collection('users').where('active', '==', true).get()).docs;
 
-  const batch = db.batch();
+  let batch = db.batch();
   let count = 0;
+  let batchWrites = 0;
 
-  for (const user of users.docs) {
+  for (const user of users) {
     const profile = user.data() || {};
     if (!recipientUserId && user.id === authorId && profile.extraPhoneNotifications !== true) continue;
     const settings = profile.notificationSettings || {};
@@ -88,32 +92,43 @@ async function createNotificationHistory(data, eventId) {
       read: false
     }, { merge: true });
     count++;
+    batchWrites++;
+
+    // Firestore batches are limited to 500 writes.
+    if (batchWrites === 450) {
+      await batch.commit();
+      batch = db.batch();
+      batchWrites = 0;
+    }
   }
 
-  if (count) await batch.commit();
+  if (batchWrites) await batch.commit();
   return count;
 }
 
 async function collectTokens(category='orders', recipientUserId='', authorId='') {
-  const users = await db.collection('users').where('active', '==', true).get();
+  // Direct notifications should never enumerate every employee's devices.
+  const users = recipientUserId
+    ? await db.collection('users').doc(recipientUserId).get().then(user =>
+        user.exists && user.data()?.active === true ? [user] : [])
+    : (await db.collection('users').where('active', '==', true).get()).docs;
+
+  const eligibleUsers = users.filter(user => {
+    const profile = user.data() || {};
+    if (!recipientUserId && authorId && user.id === authorId && profile.extraPhoneNotifications !== true) return false;
+    return (profile.notificationSettings || {})[category] !== false;
+  });
+
+  // Only read push-token subcollections for users who can receive this event.
   const tokenGroups = await Promise.all(
-    users.docs.map(user => user.ref.collection('pushTokens').get())
+    eligibleUsers.map(user => user.ref.collection('pushTokens').get())
   );
 
   const byInstallation = new Map();
   const byToken = new Map();
 
   for (let i = 0; i < tokenGroups.length; i++) {
-    const user = users.docs[i];
-
-    if (recipientUserId && user.id !== recipientUserId) continue;
-
-    const profile = user.data() || {};
-    // Own broadcast events are delivered to all registered devices only when opted in.
-    if (!recipientUserId && authorId && user.id === authorId && profile.extraPhoneNotifications !== true) continue;
-
-    const settings = profile.notificationSettings || {};
-    if (settings[category] === false) continue;
+    const user = eligibleUsers[i];
 
     for (const tokenDoc of tokenGroups[i].docs) {
       const data = tokenDoc.data() || {};
@@ -133,10 +148,7 @@ async function collectTokens(category='orders', recipientUserId='', authorId='')
       if (item.installationId) {
         const key = user.id + ':' + item.installationId;
         const previous = byInstallation.get(key);
-
-        if (!previous || item.updatedAt >= previous.updatedAt) {
-          byInstallation.set(key, item);
-        }
+        if (!previous || item.updatedAt >= previous.updatedAt) byInstallation.set(key, item);
       } else if (!byToken.has(token)) {
         byToken.set(token, item);
       }

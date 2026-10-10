@@ -10,6 +10,24 @@ const roles={warehouse:'Кладовщик',manager:'Менеджер',chief_acc
 const isManagerRole=()=>['manager','chief_accountant','accountant'].includes(state.role);
 const isShipmentLocked=o=>['Отгружен кладовщиком','Клиент забрал самовывозом'].includes(o?.status)&&!canManageUsers;
 const canEditOrder=o=>!!o&&!isShipmentLocked(o);
+
+ // Cache derived search text per order object so typing in the search field does not
+ // repeatedly rebuild article strings for every row. The signature detects local edits.
+const orderSearchCache = new WeakMap();
+function orderSearchText(order) {
+  const articles = Array.isArray(order.articles) ? order.articles : [];
+  const signature = [order.number || '', order.client || '',
+    articles.map(item => String(item?.article || item || '').toLocaleLowerCase('ru')).join(' ')
+  ].join('\u0000');
+  const cached = orderSearchCache.get(order);
+  if (cached?.signature === signature) return cached.text;
+  const text = (String(order.number || '') + ' ' + String(order.client || '') + ' ' +
+    articles.map(item => String(item?.article || item || '').toLocaleLowerCase('ru')).join(' ')
+  ).toLocaleLowerCase('ru');
+  orderSearchCache.set(order, { signature, text });
+  return text;
+}
+
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const isoNow=()=>new Date().toISOString();
 const asDate=d=>{if(!d)return null;if(typeof d.toDate==='function')return d.toDate();if(typeof d.toMillis==='function')return new Date(d.toMillis());if(d instanceof Date)return d;const out=new Date(d);return Number.isNaN(out.getTime())?null:out};
@@ -123,24 +141,85 @@ async function save(){
  if(!signedInUser)return;
  try{
  const currentIds=new Set(state.orders.map(o=>o.id));
+ let batch=writeBatch(db),batchWrites=0;
+ const flushBatch=async()=>{if(batchWrites){await batch.commit();batch=writeBatch(db);batchWrites=0;}};
+ const addBatchWrite=async write=>{
+   if(batchWrites>=450)await flushBatch();
+   write(batch);
+   batchWrites++;
+ };
+
  for(const o of state.orders){
+   const pushTasks=[];
    const base=serverCache.get(o.id),newOrder=!base;
    const next=orderToCloud(o,newOrder),prev=base?orderToCloud(base):null;
+   const orderChanged=!base||!equal(next,prev);
    const articlesChanged=!!base&&!articlesContentEqual(base.articles||[],o.articles||[]);
-   if(!base||!equal(next,prev)){
-     if(base){next.updatedAt=isoNow();next.updatedBy=signedInUser.uid;next.updatedByName=profileName;o.updatedAt=next.updatedAt;o.updatedBy=next.updatedBy;o.updatedByName=profileName}
-     pendingWrites.add(o.id);pendingOrderData.set(o.id,{...o,number:next.number,client:next.client,status:next.status,articles:next.articles||[]});await (newOrder?setDoc(doc(db,'orders',o.id),next):updateDoc(doc(db,'orders',o.id),next));serverCache.set(o.id,{...o,...next,entries:[...(o.entries||[])]});pendingWrites.delete(o.id);
-     const articleBody=normalizeArticles(o.articles||[]).length?normalizeArticles(o.articles||[]).map(x=>`${x.article} × ${x.quantity}`).join(', '):'Все артикулы удалены.';
-     const newOrderBody=newOrder?(o.articles?.length?`${o.client||'Создан новый заказ'} · ${articleBody}`:(o.client||'Создан новый заказ')):articlesChanged?articleBody:`Статус: ${next.status}`;
-     await queuePush(newOrder?`Новый заказ № ${o.number}`:articlesChanged?`Артикулы заказа № ${o.number} изменены`:`Заказ № ${o.number} изменён`,newOrderBody,signedInUser.uid,o.id);
-     serverCache.set(o.id,{...o,...next,articles:next.articles||[],entries:base?.entries||[]});
+
+   if(orderChanged){
+     if(base){
+       next.updatedAt=isoNow();
+       next.updatedBy=signedInUser.uid;
+       next.updatedByName=profileName;
+       o.updatedAt=next.updatedAt;
+       o.updatedBy=next.updatedBy;
+       o.updatedByName=profileName;
+     }
+     pendingWrites.add(o.id);
+     pendingOrderData.set(o.id,{...o,number:next.number,client:next.client,status:next.status,articles:next.articles||[]});
+     const orderRef=doc(db,'orders',o.id);
+     await addBatchWrite(b=>newOrder?b.set(orderRef,next):b.update(orderRef,next));
+
+     const normalizedArticles=normalizeArticles(o.articles||[]);
+     const articleBody=normalizedArticles.length
+       ?normalizedArticles.map(x=>`${x.article} × ${x.quantity}`).join(', ')
+       :'Все артикулы удалены.';
+     const newOrderBody=newOrder
+       ?(o.articles?.length?`${o.client||'Создан новый заказ'} · ${articleBody}`:(o.client||'Создан новый заказ'))
+       :articlesChanged?articleBody:`Статус: ${next.status}`;
+     pushTasks.push(()=>queuePush(
+       newOrder?`Новый заказ № ${o.number}`:articlesChanged?`Артикулы заказа № ${o.number} изменены`:`Заказ № ${o.number} изменён`,
+       newOrderBody,signedInUser.uid,o.id
+     ));
    }
+
    const oldEntries=new Map((base?.entries||[]).map(e=>[e.id,e]));
-   for(const e of o.entries||[]){const cloud=entryToCloud(e),old=oldEntries.get(e.id);if(!old||!equal(cloud,entryToCloud(old))){await setDoc(doc(db,'orders',o.id,'entries',e.id),cloud);if(!newOrder&&e.kind!=='viewed'&&e.kind!=='system'){const label=e.kind==='decision'?'Решение':e.kind==='defect'?'Дефект':e.kind==='question'?'Вопрос':'Комментарий';const body=e.kind==='decision'&&e.decision?`Решение: ${e.decision}. ${e.decisionText||e.text||''}`:e.text||label;await queuePush(`Заказ № ${o.number}: ${label}`,body,signedInUser.uid,o.id)}oldEntries.delete(e.id)}else oldEntries.delete(e.id)}
-   if(state.role==='director'||canManageUsers){for(const removedId of oldEntries.keys()){await deleteDoc(doc(db,'orders',o.id,'entries',removedId));await queuePush(`Заказ № ${o.number} изменён`,'Запись из истории была удалена директором.',signedInUser.uid,o.id)}}
+   for(const e of o.entries||[]){
+     const cloud=entryToCloud(e),old=oldEntries.get(e.id);
+     if(!old||!equal(cloud,entryToCloud(old))){
+       await addBatchWrite(b=>b.set(doc(db,'orders',o.id,'entries',e.id),cloud));
+       if(!newOrder&&e.kind!=='viewed'&&e.kind!=='system'){
+         const label=e.kind==='decision'?'Решение':e.kind==='defect'?'Дефект':e.kind==='question'?'Вопрос':'Комментарий';
+         const body=e.kind==='decision'&&e.decision?`Решение: ${e.decision}. ${e.decisionText||e.text||''}`:e.text||label;
+         pushTasks.push(()=>queuePush(`Заказ № ${o.number}: ${label}`,body,signedInUser.uid,o.id));
+       }
+       oldEntries.delete(e.id);
+     }else oldEntries.delete(e.id);
+   }
+
+   if(state.role==='director'||canManageUsers){
+     for(const removedId of oldEntries.keys()){
+       await addBatchWrite(b=>b.delete(doc(db,'orders',o.id,'entries',removedId)));
+       pushTasks.push(()=>queuePush(`Заказ № ${o.number} изменён`,'Запись из истории была удалена директором.',signedInUser.uid,o.id));
+     }
+   }
+
+   // Persist the order and its changed history entries together, reducing
+   // round-trips while ensuring push notifications are queued only after data commits.
+   await flushBatch();
+   await Promise.all(pushTasks.map(task=>task()));
+   pendingWrites.delete(o.id);
    serverCache.set(o.id,{...(serverCache.get(o.id)||o),...o,articles:normalizeArticles(o.articles||[]),entries:[...(o.entries||[])]});
  }
- for(const [id,old] of serverCache){if(!currentIds.has(id)&&state.role==='director'){for(const e of old.entries||[])await deleteDoc(doc(db,'orders',id,'entries',e.id));await deleteDoc(doc(db,'orders',id));serverCache.delete(id)}}
+
+ for(const [id,old] of serverCache){
+   if(!currentIds.has(id)&&state.role==='director'){
+     for(const e of old.entries||[])await addBatchWrite(b=>b.delete(doc(db,'orders',id,'entries',e.id)));
+     await addBatchWrite(b=>b.delete(doc(db,'orders',id)));
+     serverCache.delete(id);
+   }
+ }
+ await flushBatch();
  }catch(err){
   console.error('Ошибка сохранения заказа:',err);
   const code=String(err?.code||'').trim();
@@ -148,7 +227,7 @@ async function save(){
   const details=code?code.replace(/^.*?\//,''):message;
   toast(details?'Не удалось сохранить: '+details:'Не удалось сохранить изменения. Проверьте доступ и соединение.');
   throw err;
-}
+ }
 }
 async function queuePush(title,body,authorId,orderId='',target='site',category='',recipientUserId=''){
   try{
@@ -524,7 +603,7 @@ function notificationTone(n){
   const cat=n.category||(n.target==='chat'?'chat':'orders');
   return cat==='chat'?'blue':cat==='replies'?'violet':cat==='likes'?'pink':'green';
 }
-function render(){const search=$('searchInput').value.toLocaleLowerCase('ru');const dateFrom=$('dateFromFilter')?.value||'';const dateTo=$('dateToFilter')?.value||'';let orders=[...state.orders].sort((a,b)=>{const aTransferred=a.status==='Перенесен',bTransferred=b.status==='Перенесен';if(aTransferred!==bTransferred)return aTransferred?-1:1;return new Date(orderDisplayDate(b)||0)-new Date(orderDisplayDate(a)||0)});if(activeFilter!=='all')orders=orders.filter(o=>o.status===activeFilter);if(search)orders=orders.filter(o=>{const basic=(o.number+' '+o.client).toLocaleLowerCase('ru');const articles=(Array.isArray(o.articles)?o.articles:[]).map(x=>String(x?.article||x||'').toLocaleLowerCase('ru')).join(' ');return basic.includes(search)||articles.includes(search)});if(dateFrom||dateTo)orders=orders.filter(o=>isDateInRange(o,dateFrom,dateTo));const hasDateFilter=!!(dateFrom||dateTo);$('clearDateButton').hidden=!hasDateFilter;let previousDate='';const rows=[];for(const o of orders){const displayDate=orderDisplayDate(o);const day=localDateKey(displayDate);if(day!==previousDate){rows.push(`<tr class="date-separator"><td colspan="7"><span>${esc(fmtDate(displayDate))}</span></td></tr>`);previousDate=day}rows.push(`<tr data-order="${esc(o.id)}"><td><a class="order-number" href="#" data-open="${esc(o.id)}">№ ${esc(o.number)}</a><span class="client-sub">создал ${esc(o.author||'Кладовщик')}</span></td><td><a class="client-name client-open" href="#" data-open="${esc(o.id)}">${esc(o.client)}</a><span class="client-sub">${fmtDateTime(displayDate)}</span></td><td><button type="button" class="row-open-status" data-open="${esc(o.id)}" title="Открыть заказ">${statusPill(o.status)}</button>${assemblyIndicator(o)}</td><td><button type="button" class="delivery-type-pill" data-open="${esc(o.id)}" title="Открыть карточку заказа"><span class="delivery-type-icon" aria-hidden="true">${o.deliveryType==='pickup'?'♧':o.deliveryType==='post'?'✉':'↗'}</span><span>${o.deliveryType==='pickup'?'Самовывоз':o.deliveryType==='post'?'Доставка почтой':'Доставка по городу'}</span></button></td><td><button type="button" class="row-open-comments" data-open="${esc(o.id)}" title="Открыть заказ"><span class="comment-icon">💬</span><span class="entry-count">${entriesCount(o)}</span></button></td><td class="time-cell">${fmtDate(displayDate)}</td><td><button class="row-menu" title="Открыть карточку" data-open="${esc(o.id)}">···</button></td></tr>`)}$('ordersBody').innerHTML=rows.join('');const empty=orders.length===0;$('emptyState').classList.toggle('visible',empty);$('ordersBody').style.display=empty?'none':'';$('statTotal').textContent=state.orders.filter(o=>o.status==='Собран').length;$('statCreated').textContent=state.orders.filter(o=>o.status==='Создан').length;$('statQuestions').textContent=state.orders.filter(o=>o.status==='Под вопросом').length;$('statApproval').textContent=state.orders.filter(o=>o.status==='На согласовании').length;$('statReady').textContent=state.orders.filter(o=>o.status==='Одобрен на отгрузку клиенту').length;$('statPayment').textContent=state.orders.filter(o=>o.status==='Ожидает оплаты').length;$('statPickup').textContent=state.orders.filter(o=>o.status==='Ожидает самовывоза').length;$('statTransferred').textContent=state.orders.filter(o=>o.status==='Перенесен').length;$('listSummary').textContent=`${orders.length} ${plural(orders.length,'заказ','заказа','заказов')}`;$('userName').textContent=profileName||roles[state.role];$('userRole').textContent=canManageUsers?`Администратор · ${roles[state.role]}`:roles[state.role];$('modeLabel').textContent='Вы онлайн';$('modeSub').textContent='Подключено к облаку';$('today').textContent=new Intl.DateTimeFormat('ru-RU',{weekday:'short',day:'numeric',month:'long'}).format(new Date());document.querySelectorAll('.nav-item').forEach(b=>b.classList.toggle('active',b.dataset.filter===activeFilter));paintNotices();renderWorkInsights()}
+function render(){const search=$('searchInput').value.toLocaleLowerCase('ru');const dateFrom=$('dateFromFilter')?.value||'';const dateTo=$('dateToFilter')?.value||'';let orders=[...state.orders].sort((a,b)=>{const aTransferred=a.status==='Перенесен',bTransferred=b.status==='Перенесен';if(aTransferred!==bTransferred)return aTransferred?-1:1;return new Date(orderDisplayDate(b)||0)-new Date(orderDisplayDate(a)||0)});if(activeFilter!=='all')orders=orders.filter(o=>o.status===activeFilter);if(search)orders=orders.filter(o=>orderSearchText(o).includes(search));if(dateFrom||dateTo)orders=orders.filter(o=>isDateInRange(o,dateFrom,dateTo));const hasDateFilter=!!(dateFrom||dateTo);$('clearDateButton').hidden=!hasDateFilter;let previousDate='';const rows=[];for(const o of orders){const displayDate=orderDisplayDate(o);const day=localDateKey(displayDate);if(day!==previousDate){rows.push(`<tr class="date-separator"><td colspan="7"><span>${esc(fmtDate(displayDate))}</span></td></tr>`);previousDate=day}rows.push(`<tr data-order="${esc(o.id)}"><td><a class="order-number" href="#" data-open="${esc(o.id)}">№ ${esc(o.number)}</a><span class="client-sub">создал ${esc(o.author||'Кладовщик')}</span></td><td><a class="client-name client-open" href="#" data-open="${esc(o.id)}">${esc(o.client)}</a><span class="client-sub">${fmtDateTime(displayDate)}</span></td><td><button type="button" class="row-open-status" data-open="${esc(o.id)}" title="Открыть заказ">${statusPill(o.status)}</button>${assemblyIndicator(o)}</td><td><button type="button" class="delivery-type-pill" data-open="${esc(o.id)}" title="Открыть карточку заказа"><span class="delivery-type-icon" aria-hidden="true">${o.deliveryType==='pickup'?'♧':o.deliveryType==='post'?'✉':'↗'}</span><span>${o.deliveryType==='pickup'?'Самовывоз':o.deliveryType==='post'?'Доставка почтой':'Доставка по городу'}</span></button></td><td><button type="button" class="row-open-comments" data-open="${esc(o.id)}" title="Открыть заказ"><span class="comment-icon">💬</span><span class="entry-count">${entriesCount(o)}</span></button></td><td class="time-cell">${fmtDate(displayDate)}</td><td><button class="row-menu" title="Открыть карточку" data-open="${esc(o.id)}">···</button></td></tr>`)}$('ordersBody').innerHTML=rows.join('');const empty=orders.length===0;$('emptyState').classList.toggle('visible',empty);$('ordersBody').style.display=empty?'none':'';$('statTotal').textContent=state.orders.filter(o=>o.status==='Собран').length;$('statCreated').textContent=state.orders.filter(o=>o.status==='Создан').length;$('statQuestions').textContent=state.orders.filter(o=>o.status==='Под вопросом').length;$('statApproval').textContent=state.orders.filter(o=>o.status==='На согласовании').length;$('statReady').textContent=state.orders.filter(o=>o.status==='Одобрен на отгрузку клиенту').length;$('statPayment').textContent=state.orders.filter(o=>o.status==='Ожидает оплаты').length;$('statPickup').textContent=state.orders.filter(o=>o.status==='Ожидает самовывоза').length;$('statTransferred').textContent=state.orders.filter(o=>o.status==='Перенесен').length;$('listSummary').textContent=`${orders.length} ${plural(orders.length,'заказ','заказа','заказов')}`;$('userName').textContent=profileName||roles[state.role];$('userRole').textContent=canManageUsers?`Администратор · ${roles[state.role]}`:roles[state.role];$('modeLabel').textContent='Вы онлайн';$('modeSub').textContent='Подключено к облаку';$('today').textContent=new Intl.DateTimeFormat('ru-RU',{weekday:'short',day:'numeric',month:'long'}).format(new Date());document.querySelectorAll('.nav-item').forEach(b=>b.classList.toggle('active',b.dataset.filter===activeFilter));paintNotices();renderWorkInsights()}
 function plural(n,a,b,c){n=Math.abs(n)%100;const d=n%10;return n>10&&n<20?c:d>1&&d<5?b:d===1?a:c}
 function toast(msg,orderId=''){const t=document.createElement('div');t.className='toast'+(orderId?' toast-clickable':'');t.textContent=msg;if(orderId)t.addEventListener('click',()=>{t.remove();openOrder(orderId)});$('toastStack').append(t);setTimeout(()=>t.remove(),3500);return t}
 let modalHistoryEntry=false;

@@ -1935,3 +1935,34 @@ body.dark-theme .order-action-menu-list .small-button.shipped:hover {
     font-size:14px!important;
   }
 }
+
+
+/* Mobile usability and rendering refinements */
+@media(max-width:720px){
+  .table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain}
+  .table-wrap table{min-width:760px}
+  .list-controls{align-items:stretch;gap:8px}
+  .search-box{min-width:0;min-height:42px}
+  .search-box input,.field input,.field select,.field textarea,
+  input,select,textarea{font-size:16px}
+  button,.nav-item,.icon-button,.row-open-status,.delivery-type-pill,
+  .row-open-comments,.row-menu{touch-action:manipulation}
+  .nav-item{min-height:44px}
+  .modal{width:100%;max-width:100%;overflow:hidden}
+  .modal-body{overflow-y:auto;overscroll-behavior:contain}
+  .modal-foot{display:flex;flex-wrap:wrap;gap:9px}
+  .modal-foot button{min-height:44px;flex:1 1 auto}
+  .form-grid .field{min-width:0}
+  .page-heading{flex-wrap:wrap}
+  .page-heading .primary-button{min-height:42px}
+}
+@media(max-width:420px){
+  .content{padding-left:10px;padding-right:10px}
+  .topbar{padding-left:10px;padding-right:10px}
+  .page-heading h1{font-size:21px}
+  .stats-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .stat-card{min-width:0}
+  .panel-heading{padding:12px}
+  .modal-head,.modal-body{padding-left:13px;padding-right:13px}
+  .modal-foot{padding-left:13px;padding-right:13px}
+}

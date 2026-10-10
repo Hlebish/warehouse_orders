@@ -224,7 +224,7 @@ async function save(){
   console.error('Ошибка сохранения заказа:',err);
   const code=String(err?.code||'').trim();
   const message=String(err?.message||'').trim();
-  const details=code?code.replace(/^.*?\\//,''):message;
+  const details=code?code.replace(/^.*?\//,''):message;
   toast(details?'Не удалось сохранить: '+details:'Не удалось сохранить изменения. Проверьте доступ и соединение.');
   throw err;
  }

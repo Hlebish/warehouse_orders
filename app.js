@@ -141,32 +141,94 @@ async function save(){
  if(!signedInUser)return;
  try{
  const currentIds=new Set(state.orders.map(o=>o.id));
+ const pushTasks=[];
+ let batch=writeBatch(db),batchWrites=0;
+ const flushBatch=async()=>{if(batchWrites){await batch.commit();batch=writeBatch(db);batchWrites=0;}};
+ const addBatchWrite=async write=>{
+   if(batchWrites>=450)await flushBatch();
+   write(batch);
+   batchWrites++;
+ };
+
  for(const o of state.orders){
    const base=serverCache.get(o.id),newOrder=!base;
    const next=orderToCloud(o,newOrder),prev=base?orderToCloud(base):null;
+   const orderChanged=!base||!equal(next,prev);
    const articlesChanged=!!base&&!articlesContentEqual(base.articles||[],o.articles||[]);
-   if(!base||!equal(next,prev)){
-     if(base){next.updatedAt=isoNow();next.updatedBy=signedInUser.uid;next.updatedByName=profileName;o.updatedAt=next.updatedAt;o.updatedBy=next.updatedBy;o.updatedByName=profileName}
-     pendingWrites.add(o.id);pendingOrderData.set(o.id,{...o,number:next.number,client:next.client,status:next.status,articles:next.articles||[]});await (newOrder?setDoc(doc(db,'orders',o.id),next):updateDoc(doc(db,'orders',o.id),next));serverCache.set(o.id,{...o,...next,entries:[...(o.entries||[])]});pendingWrites.delete(o.id);
-     const normalizedArticles=normalizeArticles(o.articles||[]);const articleBody=normalizedArticles.length?normalizedArticles.map(x=>`${x.article} × ${x.quantity}`).join(', '):'Все артикулы удалены.';
-     const newOrderBody=newOrder?(o.articles?.length?`${o.client||'Создан новый заказ'} · ${articleBody}`:(o.client||'Создан новый заказ')):articlesChanged?articleBody:`Статус: ${next.status}`;
-     await queuePush(newOrder?`Новый заказ № ${o.number}`:articlesChanged?`Артикулы заказа № ${o.number} изменены`:`Заказ № ${o.number} изменён`,newOrderBody,signedInUser.uid,o.id);
-     serverCache.set(o.id,{...o,...next,articles:next.articles||[],entries:base?.entries||[]});
+
+   if(orderChanged){
+     if(base){
+       next.updatedAt=isoNow();
+       next.updatedBy=signedInUser.uid;
+       next.updatedByName=profileName;
+       o.updatedAt=next.updatedAt;
+       o.updatedBy=next.updatedBy;
+       o.updatedByName=profileName;
+     }
+     pendingWrites.add(o.id);
+     pendingOrderData.set(o.id,{...o,number:next.number,client:next.client,status:next.status,articles:next.articles||[]});
+     const orderRef=doc(db,'orders',o.id);
+     await addBatchWrite(b=>newOrder?b.set(orderRef,next):b.update(orderRef,next));
+
+     const normalizedArticles=normalizeArticles(o.articles||[]);
+     const articleBody=normalizedArticles.length
+       ?normalizedArticles.map(x=>`${x.article} × ${x.quantity}`).join(', ')
+       :'Все артикулы удалены.';
+     const newOrderBody=newOrder
+       ?(o.articles?.length?`${o.client||'Создан новый заказ'} · ${articleBody}`:(o.client||'Создан новый заказ'))
+       :articlesChanged?articleBody:`Статус: ${next.status}`;
+     pushTasks.push(()=>queuePush(
+       newOrder?`Новый заказ № ${o.number}`:articlesChanged?`Артикулы заказа № ${o.number} изменены`:`Заказ № ${o.number} изменён`,
+       newOrderBody,signedInUser.uid,o.id
+     ));
    }
+
    const oldEntries=new Map((base?.entries||[]).map(e=>[e.id,e]));
-   for(const e of o.entries||[]){const cloud=entryToCloud(e),old=oldEntries.get(e.id);if(!old||!equal(cloud,entryToCloud(old))){await setDoc(doc(db,'orders',o.id,'entries',e.id),cloud);if(!newOrder&&e.kind!=='viewed'&&e.kind!=='system'){const label=e.kind==='decision'?'Решение':e.kind==='defect'?'Дефект':e.kind==='question'?'Вопрос':'Комментарий';const body=e.kind==='decision'&&e.decision?`Решение: ${e.decision}. ${e.decisionText||e.text||''}`:e.text||label;await queuePush(`Заказ № ${o.number}: ${label}`,body,signedInUser.uid,o.id)}oldEntries.delete(e.id)}else oldEntries.delete(e.id)}
-   if(state.role==='director'||canManageUsers){for(const removedId of oldEntries.keys()){await deleteDoc(doc(db,'orders',o.id,'entries',removedId));await queuePush(`Заказ № ${o.number} изменён`,'Запись из истории была удалена директором.',signedInUser.uid,o.id)}}
+   for(const e of o.entries||[]){
+     const cloud=entryToCloud(e),old=oldEntries.get(e.id);
+     if(!old||!equal(cloud,entryToCloud(old))){
+       await addBatchWrite(b=>b.set(doc(db,'orders',o.id,'entries',e.id),cloud));
+       if(!newOrder&&e.kind!=='viewed'&&e.kind!=='system'){
+         const label=e.kind==='decision'?'Решение':e.kind==='defect'?'Дефект':e.kind==='question'?'Вопрос':'Комментарий';
+         const body=e.kind==='decision'&&e.decision?`Решение: ${e.decision}. ${e.decisionText||e.text||''}`:e.text||label;
+         pushTasks.push(()=>queuePush(`Заказ № ${o.number}: ${label}`,body,signedInUser.uid,o.id));
+       }
+       oldEntries.delete(e.id);
+     }else oldEntries.delete(e.id);
+   }
+
+   if(state.role==='director'||canManageUsers){
+     for(const removedId of oldEntries.keys()){
+       await addBatchWrite(b=>b.delete(doc(db,'orders',o.id,'entries',removedId)));
+       pushTasks.push(()=>queuePush(`Заказ № ${o.number} изменён`,'Запись из истории была удалена директором.',signedInUser.uid,o.id));
+     }
+   }
+
+   // Persist the order and its changed history entries together, reducing
+   // round-trips while ensuring push notifications are queued only after data commits.
+   await flushBatch();
+   pendingWrites.delete(o.id);
    serverCache.set(o.id,{...(serverCache.get(o.id)||o),...o,articles:normalizeArticles(o.articles||[]),entries:[...(o.entries||[])]});
  }
- for(const [id,old] of serverCache){if(!currentIds.has(id)&&state.role==='director'){for(const e of old.entries||[])await deleteDoc(doc(db,'orders',id,'entries',e.id));await deleteDoc(doc(db,'orders',id));serverCache.delete(id)}}
+
+ for(const [id,old] of serverCache){
+   if(!currentIds.has(id)&&state.role==='director'){
+     for(const e of old.entries||[])await addBatchWrite(b=>b.delete(doc(db,'orders',id,'entries',e.id)));
+     await addBatchWrite(b=>b.delete(doc(db,'orders',id)));
+     serverCache.delete(id);
+   }
+ }
+ await flushBatch();
+ // These independent queue writes can run concurrently after the order data is safe.
+ await Promise.all(pushTasks.map(task=>task()));
  }catch(err){
   console.error('Ошибка сохранения заказа:',err);
   const code=String(err?.code||'').trim();
   const message=String(err?.message||'').trim();
-  const details=code?code.replace(/^.*?\//,''):message;
+  const details=code?code.replace(/^.*?\\//,''):message;
   toast(details?'Не удалось сохранить: '+details:'Не удалось сохранить изменения. Проверьте доступ и соединение.');
   throw err;
-}
+ }
 }
 async function queuePush(title,body,authorId,orderId='',target='site',category='',recipientUserId=''){
   try{

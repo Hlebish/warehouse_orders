@@ -141,7 +141,6 @@ async function save(){
  if(!signedInUser)return;
  try{
  const currentIds=new Set(state.orders.map(o=>o.id));
- const pushTasks=[];
  let batch=writeBatch(db),batchWrites=0;
  const flushBatch=async()=>{if(batchWrites){await batch.commit();batch=writeBatch(db);batchWrites=0;}};
  const addBatchWrite=async write=>{
@@ -151,6 +150,7 @@ async function save(){
  };
 
  for(const o of state.orders){
+   const pushTasks=[];
    const base=serverCache.get(o.id),newOrder=!base;
    const next=orderToCloud(o,newOrder),prev=base?orderToCloud(base):null;
    const orderChanged=!base||!equal(next,prev);
@@ -207,6 +207,7 @@ async function save(){
    // Persist the order and its changed history entries together, reducing
    // round-trips while ensuring push notifications are queued only after data commits.
    await flushBatch();
+   await Promise.all(pushTasks.map(task=>task()));
    pendingWrites.delete(o.id);
    serverCache.set(o.id,{...(serverCache.get(o.id)||o),...o,articles:normalizeArticles(o.articles||[]),entries:[...(o.entries||[])]});
  }
@@ -219,8 +220,6 @@ async function save(){
    }
  }
  await flushBatch();
- // These independent queue writes can run concurrently after the order data is safe.
- await Promise.all(pushTasks.map(task=>task()));
  }catch(err){
   console.error('Ошибка сохранения заказа:',err);
   const code=String(err?.code||'').trim();

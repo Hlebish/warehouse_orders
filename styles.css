@@ -2346,3 +2346,30 @@ body.dark-theme .chat-message.chat-author-role-director{background:linear-gradie
 .chat-day-divider:before,.chat-day-divider:after{content:"";height:1px;flex:1;background:rgba(143,166,133,.2)}
 .chat-day-divider span{padding:5px 10px;border:1px solid rgba(143,166,133,.2);border-radius:999px;background:rgba(30,38,28,.8);white-space:nowrap}
 .chat-author-line{align-items:center}
+
+
+/* Compact messenger-style bubbles with avatars sitting outside the bubble */
+.chat-message{position:relative!important;padding:8px 10px!important;border-radius:13px!important;max-width:72%!important}
+.chat-message-head{margin-bottom:4px!important;gap:6px!important}
+.chat-author-line{position:static!important;gap:6px!important;padding-left:0!important}
+.chat-role-avatar{position:absolute!important;left:-34px!important;top:7px!important;width:25px!important;height:25px!important;min-width:25px!important;font-size:12px!important;box-shadow:0 2px 7px rgba(0,0,0,.22)}
+.chat-message.mine .chat-role-avatar{left:auto!important;right:-34px!important}
+.chat-message-head b{font-size:11px!important}
+.chat-role-badge{padding:3px 6px!important;font-size:9px!important}
+.chat-message-head time{font-size:9px!important}
+.chat-message-text{font-size:12px!important;line-height:1.45!important;margin-top:2px!important}
+.chat-message-actions{margin-top:6px!important;gap:12px!important}
+.chat-message-actions button{font-size:11px!important;padding-top:2px!important;padding-bottom:2px!important}
+.chat-photo-grid{margin-top:7px!important}
+.chat-photo-grid img{max-height:220px!important;border-radius:9px!important}
+.chat-day-divider{margin:5px 0 2px!important}
+.chat-day-divider span{padding:3px 9px!important;font-size:10px!important}
+.chat-messages{padding:12px 42px 14px!important;gap:8px!important}
+@media(max-width:760px){
+ .chat-message{max-width:84%!important;padding:7px 9px!important}
+ .chat-messages{padding:10px 34px 12px!important;gap:8px!important}
+ .chat-role-avatar{left:-29px!important;width:22px!important;height:22px!important;min-width:22px!important}
+ .chat-message.mine .chat-role-avatar{right:-29px!important;left:auto!important}
+ .chat-message-head{flex-wrap:wrap!important}
+ .chat-message-head time{font-size:9px!important}
+}

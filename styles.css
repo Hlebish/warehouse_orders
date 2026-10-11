@@ -2288,3 +2288,42 @@ body.dark-theme .modal:has(.chat-shell) .modal-foot{background-color:#151615!imp
 .chat-message.chat-author-role-accountant{border-color:#d5a044!important}
 .chat-message.chat-author-role-director{border-color:#cf6259!important}
 .chat-message.chat-author-role-unknown{border-color:#626b60!important}
+
+
+/* General chat refresh: spacious, polished dark-green layout */
+.chat-shell{gap:12px!important}
+.chat-toolbar{gap:10px!important;margin-bottom:12px!important}
+.chat-toolbar .search-box,.chat-toolbar select{min-height:42px!important;border-radius:12px!important}
+.chat-messages{padding:12px 10px 16px!important;gap:12px!important;border-radius:16px!important;background:linear-gradient(145deg,rgba(10,15,11,.72),rgba(17,22,17,.56))!important;border:1px solid rgba(143,166,133,.17)!important}
+.chat-message{max-width:78%!important;padding:12px 14px!important;border-radius:15px!important;box-shadow:0 5px 18px rgba(0,0,0,.13)!important;transition:border-color .18s ease,transform .18s ease}
+.chat-message.mine{background:linear-gradient(145deg,#202a1e,#1c241b)!important}
+.chat-message-head{gap:9px!important;margin-bottom:8px!important}
+.chat-author-line{display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap}
+.chat-message-head b{font-size:12px!important;letter-spacing:.1px}
+.chat-role-badge{border-radius:999px!important;padding:4px 8px!important;font-size:10px!important;font-weight:650!important}
+.chat-message-text{font-size:13px!important;line-height:1.6!important}
+.chat-photo-grid{gap:8px!important;margin-top:10px!important}
+.chat-photo-grid img{border-radius:11px!important;max-width:100%;object-fit:cover}
+.chat-message-actions{align-items:center!important;gap:14px!important;margin-top:10px!important}
+.chat-message-actions button{transition:opacity .15s ease,background .15s ease}
+.chat-reply-button{font-weight:650!important}
+.chat-form{gap:12px!important;padding:12px!important;border-radius:16px!important;background:linear-gradient(145deg,rgba(28,34,26,.8),rgba(20,24,20,.9))!important;border:1px solid rgba(143,166,133,.2)!important}
+.chat-form textarea,.chat-form .chat-input-wrap textarea{min-height:74px!important;padding:13px 14px!important;border-radius:13px!important;line-height:1.5!important}
+.chat-attach-button{min-height:44px!important;border-radius:12px!important}
+.chat-form .primary-button{min-height:44px!important;border-radius:12px!important;font-weight:700!important;box-shadow:0 5px 16px rgba(105,157,35,.16)!important}
+.chat-upload-progress{border-radius:10px!important;overflow:hidden}
+body.dark-theme .chat-message{background:linear-gradient(145deg,#1b201a,#20271e)!important;border-color:#454f40}
+body.dark-theme .chat-message.mine{background:linear-gradient(145deg,#202b1e,#1d281c)!important}
+body.dark-theme .chat-message.chat-author-role-admin{border-color:#d96a6a!important}
+body.dark-theme .chat-message.chat-author-role-warehouse{border-color:#5cae83!important}
+body.dark-theme .chat-message.chat-author-role-manager{border-color:#5c91db!important}
+body.dark-theme .chat-message.chat-author-role-chief-accountant{border-color:#ae7bd2!important}
+body.dark-theme .chat-message.chat-author-role-accountant{border-color:#d5a044!important}
+body.dark-theme .chat-message.chat-author-role-director{border-color:#cf6259!important}
+body.dark-theme .chat-message.chat-author-role-unknown{border-color:#626b60!important}
+@media(max-width:760px){
+ .chat-messages{padding:9px 7px 12px!important;gap:10px!important}
+ .chat-message{max-width:92%!important;padding:10px 11px!important}
+ .chat-form{padding:9px!important;gap:9px!important}
+ .chat-form textarea,.chat-form .chat-input-wrap textarea{min-height:66px!important}
+}

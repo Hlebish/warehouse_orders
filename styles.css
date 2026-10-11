@@ -2018,3 +2018,15 @@ body.dark-theme .stat-ready{--status-accent:#5e9b7b}
 body.dark-theme .stat-payment{--status-accent:#c7c7c7}
 body.dark-theme .stat-pickup{--status-accent:#4f9fa5}
 body.dark-theme .stat-transferred{--status-accent:#c7c7c7}
+
+
+/* Final override: keep the dashboard's left border in sync with each status accent,
+   including dark mode rules that otherwise reset the full border color. */
+.stats-grid .stat-card.stat-assembled{border-left-color:#aeb4bc!important}
+.stats-grid .stat-card.stat-created{border-left-color:#777f89!important}
+.stats-grid .stat-card.stat-attention{border-left-color:#d5a34c!important}
+.stats-grid .stat-card.stat-approval{border-left-color:#d18a35!important}
+.stats-grid .stat-card.stat-ready{border-left-color:#78b89a!important}
+.stats-grid .stat-card.stat-payment{border-left-color:#d5d8dc!important}
+.stats-grid .stat-card.stat-pickup{border-left-color:#78bfc4!important}
+.stats-grid .stat-card.stat-transferred{border-left-color:#d5d8dc!important}

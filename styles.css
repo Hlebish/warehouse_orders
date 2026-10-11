@@ -2278,3 +2278,13 @@ body.dark-theme .modal:has(.chat-shell) .modal-foot{background-color:#151615!imp
 .chat-message-head{align-items:flex-start!important}
 .chat-message-head time{white-space:nowrap;padding-top:2px}
 @media(max-width:520px){.chat-message-head{gap:7px!important;flex-wrap:wrap}.chat-role-badge{font-size:9px;padding:3px 6px}.chat-author-line{gap:5px}}
+
+
+/* Role-colored borders for general chat message cards */
+.chat-message.chat-author-role-admin{border-color:#d96a6a!important}
+.chat-message.chat-author-role-warehouse{border-color:#5cae83!important}
+.chat-message.chat-author-role-manager{border-color:#5c91db!important}
+.chat-message.chat-author-role-chief-accountant{border-color:#ae7bd2!important}
+.chat-message.chat-author-role-accountant{border-color:#d5a044!important}
+.chat-message.chat-author-role-director{border-color:#cf6259!important}
+.chat-message.chat-author-role-unknown{border-color:#626b60!important}

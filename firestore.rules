@@ -63,9 +63,10 @@ service cloud.firestore {
     match /chatMessages/{messageId} {
       allow read: if activeUser();
       allow create: if activeUser()
-        && request.resource.data.keys().hasOnly(['text', 'authorId', 'authorName', 'createdAt', 'photos', 'likes', 'readBy', 'replyToId', 'replyToAuthorId', 'replyToAuthorName', 'replyToText'])
+        && request.resource.data.keys().hasOnly(['text', 'authorId', 'authorName', 'authorRole', 'createdAt', 'photos', 'likes', 'readBy', 'replyToId', 'replyToAuthorId', 'replyToAuthorName', 'replyToText'])
         && request.resource.data.authorId == request.auth.uid
         && request.resource.data.authorName is string
+        && request.resource.data.authorRole == role()
         && request.resource.data.text is string
         && request.resource.data.text.size() <= 1000
         && (request.resource.data.createdAt is timestamp || request.resource.data.createdAt is string)

@@ -2137,3 +2137,14 @@ body.dark-theme .stats-grid .stat-card small{
  .stats-grid .stat-card .stat-icon,body.dark-theme .stats-grid .stat-card .stat-icon{flex-basis:36px!important;width:36px!important;height:36px!important}
  .stats-grid .stat-card .stat-label{font-size:10px!important}
 }
+
+
+/* The two dashboard icons are authored directly in index.html. Disable old pseudo-icons to avoid stacking symbols. */
+.stats-grid .stat-card.stat-assembled .stat-icon,
+.stats-grid .stat-card.stat-pickup .stat-icon{font-size:29px!important}
+.stats-grid .stat-card.stat-assembled .stat-icon:before,
+.stats-grid .stat-card.stat-pickup .stat-icon:before{content:none!important;display:none!important}
+@media(max-width:620px){
+ .stats-grid .stat-card.stat-assembled .stat-icon,
+ .stats-grid .stat-card.stat-pickup .stat-icon{font-size:21px!important}
+}

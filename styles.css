@@ -2258,3 +2258,23 @@ body.dark-theme .modal:has(.chat-shell) .modal-foot{background-color:#151615!imp
   .chat-form textarea{min-height:54px!important}
   .modal:has(.chat-shell) .modal-foot{padding:10px 12px calc(10px + env(safe-area-inset-bottom))!important}
 }
+
+
+/* Distinct author role markers in the general chat */
+.chat-author-line{display:inline-flex;align-items:center;flex-wrap:wrap;gap:7px;min-width:0}
+.chat-author-line>b{font-weight:700}
+.chat-role-badge{
+ display:inline-flex;align-items:center;gap:4px;padding:3px 7px;border:1px solid currentColor;
+ border-radius:999px;font-size:10px;font-weight:700;line-height:1.2;white-space:nowrap;
+ background:color-mix(in srgb,currentColor 10%,transparent);letter-spacing:.05px
+}
+.chat-role-badge>span{font-size:12px;line-height:1}
+.chat-role-warehouse{color:#78c8a2;background:rgba(56,155,105,.12);border-color:rgba(93,191,141,.34)}
+.chat-role-manager{color:#83b8ff;background:rgba(62,125,210,.12);border-color:rgba(105,163,239,.34)}
+.chat-role-chief-accountant{color:#d4a4ff;background:rgba(155,90,205,.12);border-color:rgba(190,132,231,.34)}
+.chat-role-accountant{color:#f0c16f;background:rgba(203,145,43,.12);border-color:rgba(229,177,83,.34)}
+.chat-role-director{color:#ff9b91;background:rgba(207,81,71,.12);border-color:rgba(237,123,112,.34)}
+.chat-role-unknown{color:#a7aea5;background:rgba(140,148,138,.1);border-color:#4b5149}
+.chat-message-head{align-items:flex-start!important}
+.chat-message-head time{white-space:nowrap;padding-top:2px}
+@media(max-width:520px){.chat-message-head{gap:7px!important;flex-wrap:wrap}.chat-role-badge{font-size:9px;padding:3px 6px}.chat-author-line{gap:5px}}

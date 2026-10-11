@@ -995,7 +995,9 @@ function renderChatMessages(){
       const photoHtml=photos.length?'<div class="chat-photo-grid">'+photos.map(p=>'<a href="'+esc(p)+'" target="_blank" rel="noopener"><img src="'+esc(p)+'" alt="Фото из общего чата" loading="lazy"></a>').join('')+'</div>':'';
       const replyHtml=m.replyToId?'<div class="chat-reply-quote"><b>Ответ на '+esc(m.replyToAuthorName||'сообщение')+'</b><span>'+esc(m.replyToText||'📷 Фото')+'</span></div>':'';
       const likeHtml='<button type="button" class="chat-like-button '+(liked?'active':'')+'" data-action="toggle-chat-like:'+esc(m.id)+'" aria-label="Нравится">👍 <span>'+likes.length+'</span></button>'; const readBy=Array.isArray(m.readBy)?m.readBy:[]; const receipt=mine?'<span class="chat-read-receipt" title="'+(readBy.some(id=>id!==signedInUser?.uid)?'Прочитано':'Отправлено')+'">'+(readBy.some(id=>id!==signedInUser?.uid)?'✓✓':'✓')+'</span>':'';
-      return '<article class="chat-message '+(mine?'mine':'')+'"><div class="chat-message-head"><b>'+esc(m.authorName||'Сотрудник')+'</b><time>'+esc(fmtDateTime(m.createdAt))+'</time></div>'+replyHtml+'<div class="chat-message-text">'+renderChatText(m.text)+'</div>'+photoHtml+'<div class="chat-message-actions">'+likeHtml+'<button type="button" class="chat-reply-button" data-action="reply-chat:'+esc(m.id)+'">↩ Ответить</button>'+receipt+'</div></article>';
+      const roleMeta=({warehouse:{label:'Кладовщик',icon:'▦',tone:'warehouse'},manager:{label:'Менеджер',icon:'↗',tone:'manager'},chief_accountant:{label:'Главный бухгалтер',icon:'₽',tone:'chief-accountant'},accountant:{label:'Бухгалтер',icon:'▤',tone:'accountant'},director:{label:'Директор',icon:'♛',tone:'director'}})[m.authorRole]||{label:'Сотрудник',icon:'•',tone:'unknown'};
+      const roleBadge='<span class="chat-role-badge chat-role-'+roleMeta.tone+'" title="'+esc(roleMeta.label)+'"><span aria-hidden="true">'+roleMeta.icon+'</span>'+esc(roleMeta.label)+'</span>';
+      return '<article class="chat-message '+(mine?'mine':'')+'"><div class="chat-message-head"><span class="chat-author-line"><b>'+esc(m.authorName||'Сотрудник')+'</b>'+roleBadge+'</span><time>'+esc(fmtDateTime(m.createdAt))+'</time></div>'+replyHtml+'<div class="chat-message-text">'+renderChatText(m.text)+'</div>'+photoHtml+'<div class="chat-message-actions">'+likeHtml+'<button type="button" class="chat-reply-button" data-action="reply-chat:'+esc(m.id)+'">↩ Ответить</button>'+receipt+'</div></article>';
     }).join('');
     box.scrollTop=box.scrollHeight;
   }
@@ -1070,6 +1072,7 @@ function openChat(){
         text:text.slice(0,1000),
         authorId:signedInUser.uid,
         authorName:profileName,
+        authorRole:state.role,
         createdAt,
         photos,
         likes:[],

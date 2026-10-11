@@ -1308,11 +1308,26 @@ body.dark-theme .list-controls .date-filter input[type="date"]{
 body.dark-theme .list-controls .date-filter .date-range-separator{color:#aaa !important}
 
 /* === Unified status-card accent === */
-.stat-card:after,
-body.dark-theme .stat-card:after{
-  background:#669900 !important;
-  opacity:1 !important;
+/* Dashboard status palette: one accent per status, including the left stripe and icon medallion. */
+.stats-grid .stat-card:after,
+body.dark-theme .stats-grid .stat-card:after{
+  background:var(--status-accent,#cfd4da)!important;
+  opacity:1!important;
 }
+.stats-grid .stat-card.stat-assembled{--status-accent:#aeb4bc;--status-soft:#303338;--status-ink:#d1d5da;--status-border:#50545a}
+.stats-grid .stat-card.stat-created{--status-accent:#777f89;--status-soft:#292d32;--status-ink:#aeb5bd;--status-border:#464c53}
+.stats-grid .stat-card.stat-attention{--status-accent:#d5a34c;--status-soft:#382f1b;--status-ink:#e4bb65;--status-border:#594823}
+.stats-grid .stat-card.stat-approval{--status-accent:#d18a35;--status-soft:#39291b;--status-ink:#e5a75b;--status-border:#624326}
+.stats-grid .stat-card.stat-ready{--status-accent:#78b89a;--status-soft:#20372b;--status-ink:#8dc8a7;--status-border:#345541}
+.stats-grid .stat-card.stat-payment{--status-accent:#d5d8dc;--status-soft:#303030;--status-ink:#f0f0f0;--status-border:#515151}
+.stats-grid .stat-card.stat-pickup{--status-accent:#78bfc4;--status-soft:#173338;--status-ink:#7dd9df;--status-border:#28575d}
+.stats-grid .stat-card.stat-transferred{--status-accent:#d5d8dc;--status-soft:#303030;--status-ink:#f0f0f0;--status-border:#515151}
+/* Use clearer, semantically distinct symbols for the two dashboard actions. */
+.stats-grid .stat-card.stat-assembled .stat-icon{font-size:0!important}
+.stats-grid .stat-card.stat-assembled .stat-icon:before{content:'▣';font-size:25px;line-height:1}
+.stats-grid .stat-card.stat-pickup .stat-icon{font-size:0!important}
+.stats-grid .stat-card.stat-pickup .stat-icon:before{content:'🚗';font-size:23px;line-height:1}
+
 
 
 /* Mobile: keep the order dialog scrollable while the on-screen keyboard is open. */

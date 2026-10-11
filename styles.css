@@ -2327,3 +2327,22 @@ body.dark-theme .chat-message.chat-author-role-unknown{border-color:#626b60!impo
  .chat-form{padding:9px!important;gap:9px!important}
  .chat-form textarea,.chat-form .chat-input-wrap textarea{min-height:66px!important}
 }
+
+
+/* Role-tinted chat cards, circular role avatars and date separators */
+body.dark-theme .chat-message.chat-author-role-admin{background:linear-gradient(135deg,rgba(112,43,43,.34),rgba(48,27,27,.92))!important}
+body.dark-theme .chat-message.chat-author-role-warehouse{background:linear-gradient(135deg,rgba(42,100,65,.34),rgba(28,39,29,.96))!important}
+body.dark-theme .chat-message.chat-author-role-manager{background:linear-gradient(135deg,rgba(39,77,132,.42),rgba(25,36,54,.96))!important}
+body.dark-theme .chat-message.chat-author-role-chief-accountant{background:linear-gradient(135deg,rgba(91,52,122,.38),rgba(39,29,48,.96))!important}
+body.dark-theme .chat-message.chat-author-role-accountant{background:linear-gradient(135deg,rgba(125,86,28,.35),rgba(46,38,25,.96))!important}
+body.dark-theme .chat-message.chat-author-role-director{background:linear-gradient(135deg,rgba(125,49,43,.38),rgba(48,29,27,.96))!important}
+.chat-role-avatar{display:inline-flex;align-items:center;justify-content:center;flex:0 0 27px;width:27px;height:27px;border-radius:50%;font-size:13px;font-weight:700;background:rgba(140,148,138,.15);border:1px solid currentColor;color:#a7aea5}
+.chat-role-avatar-warehouse{color:#78c8a2;background:rgba(56,155,105,.17)}
+.chat-role-avatar-manager{color:#83b8ff;background:rgba(62,125,210,.2)}
+.chat-role-avatar-chief-accountant{color:#d4a4ff;background:rgba(155,90,205,.2)}
+.chat-role-avatar-accountant{color:#f0c16f;background:rgba(203,145,43,.2)}
+.chat-role-avatar-director,.chat-role-avatar-admin{color:#ff9b91;background:rgba(207,81,71,.2)}
+.chat-day-divider{display:flex;align-items:center;gap:12px;width:100%;margin:8px 0 4px;color:#9ba69a;font-size:11px}
+.chat-day-divider:before,.chat-day-divider:after{content:"";height:1px;flex:1;background:rgba(143,166,133,.2)}
+.chat-day-divider span{padding:5px 10px;border:1px solid rgba(143,166,133,.2);border-radius:999px;background:rgba(30,38,28,.8);white-space:nowrap}
+.chat-author-line{align-items:center}

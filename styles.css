@@ -1999,3 +1999,22 @@ body.dark-theme .stat-pickup{--status-accent:#4f9fa5;--status-soft:#173338;--sta
 body.dark-theme .stat-transferred{--status-accent:#c7c7c7;--status-soft:#303030;--status-ink:#f0f0f0;--status-border:#515151}
 @media(max-width:1050px){.stats-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:520px){.stats-grid{gap:9px}.stat-card{gap:10px;min-height:108px;padding:13px 10px}.stat-icon{flex-basis:40px;width:40px;height:40px;font-size:21px}.stat-label{font-size:11px}.stat-card strong{font-size:24px}.stat-card small{font-size:9px}}
+
+
+/* Dashboard left-edge accents follow the existing order-status palette */
+.stat-assembled{--status-accent:#aeb4bc}
+.stat-created{--status-accent:#777f89}
+.stat-attention{--status-accent:#d5a34c}
+.stat-approval{--status-accent:#d18a35}
+.stat-ready{--status-accent:#78b89a}
+.stat-payment{--status-accent:#d5d8dc}
+.stat-pickup{--status-accent:#78bfc4}
+.stat-transferred{--status-accent:#d5d8dc}
+body.dark-theme .stat-assembled{--status-accent:#aeb4bc}
+body.dark-theme .stat-created{--status-accent:#777f89}
+body.dark-theme .stat-attention{--status-accent:#b58b3f}
+body.dark-theme .stat-approval{--status-accent:#d18a35}
+body.dark-theme .stat-ready{--status-accent:#5e9b7b}
+body.dark-theme .stat-payment{--status-accent:#c7c7c7}
+body.dark-theme .stat-pickup{--status-accent:#4f9fa5}
+body.dark-theme .stat-transferred{--status-accent:#c7c7c7}

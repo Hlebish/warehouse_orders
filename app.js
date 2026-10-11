@@ -987,7 +987,11 @@ function renderChatMessages(){
   if(!visibleMessages.length){
     box.innerHTML='<div class="chat-empty">Пока никто ничего не написал. Будьте первым 🙂</div>';
   }else{
+    let previousChatDay='';
     box.innerHTML=visibleMessages.map(m=>{
+      const chatDateLabel=fmtDateTime(m.createdAt).split(',')[0];
+      const chatDayDivider=chatDateLabel!==previousChatDay?'<div class="chat-day-divider"><span>'+esc(chatDateLabel)+'</span></div>':'';
+      previousChatDay=chatDateLabel;
       const mine=m.authorId===signedInUser?.uid;
       const photos=Array.isArray(m.photos)?m.photos:[];
       const likes=Array.isArray(m.likes)?m.likes:[];
@@ -997,7 +1001,7 @@ function renderChatMessages(){
       const likeHtml='<button type="button" class="chat-like-button '+(liked?'active':'')+'" data-action="toggle-chat-like:'+esc(m.id)+'" aria-label="Нравится">👍 <span>'+likes.length+'</span></button>'; const readBy=Array.isArray(m.readBy)?m.readBy:[]; const receipt=mine?'<span class="chat-read-receipt" title="'+(readBy.some(id=>id!==signedInUser?.uid)?'Прочитано':'Отправлено')+'">'+(readBy.some(id=>id!==signedInUser?.uid)?'✓✓':'✓')+'</span>':'';
       const roleMeta=({admin:{label:'Администратор',icon:'⚙',tone:'admin'},administrator:{label:'Администратор',icon:'⚙',tone:'admin'},warehouse:{label:'Кладовщик',icon:'▦',tone:'warehouse'},manager:{label:'Менеджер',icon:'↗',tone:'manager'},chief_accountant:{label:'Главный бухгалтер',icon:'₽',tone:'chief-accountant'},accountant:{label:'Бухгалтер',icon:'▤',tone:'accountant'},director:{label:'Директор',icon:'♛',tone:'director'}})[m.authorRole]||{label:'Сотрудник',icon:'•',tone:'unknown'};
       const roleBadge='<span class="chat-role-badge chat-role-'+roleMeta.tone+'" title="'+esc(roleMeta.label)+'"><span aria-hidden="true">'+roleMeta.icon+'</span>'+esc(roleMeta.label)+'</span>';
-      return '<article class="chat-message chat-author-role-'+roleMeta.tone+' '+(mine?'mine':'')+'"><div class="chat-message-head"><span class="chat-author-line"><b>'+esc(m.authorName||'Сотрудник')+'</b>'+roleBadge+'</span><time>'+esc(fmtDateTime(m.createdAt))+'</time></div>'+replyHtml+'<div class="chat-message-text">'+renderChatText(m.text)+'</div>'+photoHtml+'<div class="chat-message-actions">'+likeHtml+'<button type="button" class="chat-reply-button" data-action="reply-chat:'+esc(m.id)+'">↩ Ответить</button>'+receipt+'</div></article>';
+      return chatDayDivider+'<article class="chat-message chat-author-role-'+roleMeta.tone+' '+(mine?'mine':'')+'"><div class="chat-message-head"><span class="chat-author-line"><span class="chat-role-avatar chat-role-avatar-'+roleMeta.tone+'" aria-hidden="true">'+roleMeta.icon+'</span><b>'+esc(m.authorName||'Сотрудник')+'</b>'+roleBadge+'</span><time>'+esc(fmtDateTime(m.createdAt))+'</time></div>'+replyHtml+'<div class="chat-message-text">'+renderChatText(m.text)+'</div>'+photoHtml+'<div class="chat-message-actions">'+likeHtml+'<button type="button" class="chat-reply-button" data-action="reply-chat:'+esc(m.id)+'">↩ Ответить</button>'+receipt+'</div></article>';
     }).join('');
     box.scrollTop=box.scrollHeight;
   }

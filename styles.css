@@ -2383,3 +2383,23 @@ body.dark-theme .chat-message.chat-author-role-director{background:linear-gradie
 .chat-order-comment{display:flex;flex-direction:column;gap:5px;align-self:stretch;width:100%;padding:9px 11px;border:1px solid #e1e4e7;border-radius:9px;background:#f3f4f5;color:#777;text-align:left;cursor:pointer;opacity:.88}.chat-order-comment:hover{background:#eceef0;border-color:#cfd3d8}.chat-order-comment-label{font-size:10px;font-weight:700;color:#7c838b}.chat-order-comment-author{font-size:9px;color:#9298a0}.chat-order-comment-text{font-size:11px;line-height:1.4;white-space:pre-wrap;overflow-wrap:anywhere;color:#737a82}.chat-order-comment-link{font-size:9px;color:#858d96}
 body.dark-theme .chat-order-comment{background:#1b1d20;border-color:#33373b;color:#999}body.dark-theme .chat-order-comment-label,body.dark-theme .chat-order-comment-text{color:#a0a5ab}body.dark-theme .chat-order-comment-author,body.dark-theme .chat-order-comment-link{color:#777e86}
 @media(max-width:760px){.mention-center-button{bottom:12px;max-width:calc(100vw - 24px);font-size:11px;padding:10px 13px}}
+
+
+/* Mention center contrast fixes for dark theme */
+body.dark-theme .mention-center-item{
+  background:#202124!important;
+  color:#f1f3f4!important;
+  border-color:#3b3f44!important;
+}
+body.dark-theme .mention-center-item b,
+body.dark-theme .mention-center-item span{color:#f1f3f4!important}
+body.dark-theme .mention-center-item small{color:#aab0b7!important}
+body.dark-theme .mention-center-item:hover{background:#292c30!important;border-color:#51565d!important}
+body.dark-theme .mention-center-button{
+  background:#202124!important;
+  color:#f1f3f4!important;
+  border-color:#3b3f44!important;
+  box-shadow:0 8px 28px rgba(0,0,0,.45)!important;
+}
+body.dark-theme .mention-center-icon{background:#263b30!important;color:#70d7a0!important}
+body.dark-theme .mention-center-button b{background:#16845b!important;color:#fff!important}

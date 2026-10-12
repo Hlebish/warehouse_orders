@@ -801,7 +801,7 @@ async function toggleAssemblyProgress(){
 }
 async function saveArticles(){const o=state.orders.find(x=>x.id===selectedId);if(!o)return;if(!canEditOrder(o)){toast('После отгрузки заказ заблокирован для этой роли.');return;}if(hasPendingDefect(o)){toast('Редактирование заблокировано до решения по дефекту.');return;}const next=normalizeArticles(readArticles());
 const previous=normalizeArticles(o.articles||[]);if(articlesEqual(previous,next)){backDetail();return}o.articles=next;o.entries.push({id:crypto.randomUUID(),kind:'system',text:`Состав заказа изменён: ${next.length?next.map(x=>`${x.article} × ${x.quantity}`).join(', '):'артикулы удалены'}`,authorId:signedInUser.uid,author:profileName||roles[state.role],createdAt:isoNow(),photos:[]});await save();closeModal();render();toast('Артикулы заказа сохранены.');notify(`Артикулы заказа № ${o.number} изменены`,o.id);openOrder(o.id)}
-function addComment(){showModal('Добавить комментарий',`<form id="entryForm"><div class="field"><label for="entryText">Сообщение *</label><textarea id="entryText" required placeholder="Напишите комментарий; для обращения используйте @Имя"></textarea></div><div class="field"><label class="important-message-option"><input id="entryImportant" type="checkbox"> <span>⚠ Сделать важным сообщением</span></label></div><div class="field"><label for="entryPhotos">Фото (необязательно)</label><div class="upload-box">Прикрепить фотографии<input id="entryPhotos" type="file" accept="image/*" multiple></div><span class="field-hint">Можно отправить обычный текст без артикула и фотографий.</span></div></form>`,[button('Назад','back-detail'),button('Отправить','save-entry','primary-button')],'КОММЕНТАРИЙ');$('entryKind')?.remove()}
+function addComment(){showModal('Добавить комментарий',`<form id="entryForm"><div class="field entry-mention-wrap"><label for="entryText">Сообщение *</label><textarea id="entryText" required placeholder="Напишите комментарий; используйте @ для упоминания" autocomplete="off"></textarea><div id="entryMentionSuggestions" class="chat-mention-suggestions entry-mention-suggestions" hidden></div></div><div class="field"><label class="important-message-option"><input id="entryImportant" type="checkbox"> <span>⚠ Сделать важным сообщением</span></label></div><div class="field"><label for="entryPhotos">Фото (необязательно)</label><div class="upload-box">Прикрепить фотографии<input id="entryPhotos" type="file" accept="image/*" multiple></div><span class="field-hint">Можно отправить обычный текст без артикула и фотографий.</span></div></form>`,[button('Назад','back-detail'),button('Отправить','save-entry','primary-button')],'КОММЕНТАРИЙ');$('entryKind')?.remove()}
 function addDefect(){const o=state.orders.find(x=>x.id===selectedId);if(!o)return;if(!canEditOrder(o)){toast('После отгрузки заказ заблокирован для этой роли.');return;}if(hasPendingDefect(o)){toast('У заказа уже есть нерассмотренный дефект.');return;}const options=(o.articles||[]).map((x,i)=>`<option value="${i}">${esc(x.article)} · ${Number(x.quantity)||1} шт. · позиция ${i+1}</option>`).join('');if(!options){toast('В заказе нет позиций для выбора дефекта.');return;}showModal('Добавить дефект',`<form id="entryForm"><input id="entryKind" type="hidden" value="defect"><div class="field"><label for="articleIndex">Позиция заказа *</label><select id="articleIndex" required><option value="">Выберите артикул из заказа</option>${options}</select></div><div class="field"><label for="entryText">Описание дефекта *</label><textarea id="entryText" required placeholder="Опишите, что не так с деталью"></textarea></div><div class="field"><label for="entryPhotos">Фото дефекта (необязательно)</label><div class="upload-box">Прикрепить фотографии<input id="entryPhotos" type="file" accept="image/*" multiple></div><span class="field-hint">Фото помогут оценить дефект.</span></div></form>`,[button('Назад','back-detail'),button('Добавить дефект','save-entry','primary-button')],'ДЕФЕКТ ДЕТАЛИ')}
 function editDefect(entryId){const o=state.orders.find(x=>x.id===selectedId),e=o?.entries.find(x=>x.id===entryId);if(!o||!e||e.kind!=='defect'||e.decision||!(state.role==='warehouse'||canManageUsers)||!canEditOrder(o)){toast('Редактировать можно только нерассмотренный дефект в доступном для редактирования заказе.');return;}const options=(o.articles||[]).map((x,i)=>`<option value="${i}"${(Number.isInteger(e.articleIndex)?e.articleIndex===i:x.article===e.article)?' selected':''}>${esc(x.article)} · ${Number(x.quantity)||1} шт. · позиция ${i+1}</option>`).join('');showModal('Редактировать дефект',`<form id="editDefectForm"><div class="field"><label for="editDefectArticleIndex">Позиция заказа *</label><select id="editDefectArticleIndex" required>${options}</select></div><div class="field"><label for="editDefectText">Описание дефекта *</label><textarea id="editDefectText" required>${esc(e.text||'')}</textarea></div><div class="field"><label>Текущие фото</label><div class="photo-grid">${(e.photos||[]).map(p=>`<img src="${p}" alt="Фото дефекта" data-photo="${p}">`).join('')||'<span class="field-hint">Фото не прикреплены.</span>'}</div></div><div class="field"><label for="editDefectPhotos">Добавить фото</label><div class="upload-box">Прикрепить фотографии<input id="editDefectPhotos" type="file" accept="image/*" multiple></div><span class="field-hint">Существующие фото сохранятся; всего не более пяти фото.</span></div></form>`,[button('Назад','back-detail'),button('Сохранить дефект','save-defect-edit','primary-button')],'РЕДАКТИРОВАНИЕ ДЕФЕКТА');modal.dataset.editDefectId=entryId;}
 async function saveDefectEdit(){const o=state.orders.find(x=>x.id===selectedId),id=modal.dataset.editDefectId,e=o?.entries.find(x=>x.id===id);if(!o||!e||e.kind!=='defect'||e.decision||!(state.role==='warehouse'||canManageUsers)||!canEditOrder(o)){toast('Редактирование недоступно для этого заказа.');return;}const articleIndex=Number($('editDefectArticleIndex')?.value),article=o.articles?.[articleIndex]?.article,text=$('editDefectText')?.value.trim()||'';if(!article||!Number.isInteger(articleIndex)||articleIndex<0||!text){toast('Выберите позицию и заполните описание.');return;}try{const blobs=await readPhotos($('editDefectPhotos')?.files||[]);if((e.photos||[]).length+blobs.length>5){toast('Всего можно прикрепить не более пяти фото.');return;}const added=await uploadPhotos(o.id,e.id,blobs);e.article=article;e.articleIndex=articleIndex;e.text=text;e.photos=[...(e.photos||[]),...added];await save();await writeAudit('Изменён дефект',`Артикул: ${article}`,o.id,{entryId:id});closeModal();render();openOrder(o.id);toast('Дефект обновлён.');}catch(err){console.error(err);toast(err.message||'Не удалось сохранить дефект.');}}
@@ -969,6 +969,32 @@ function chatMentionSuggestions(){
   if(!people.length){list.hidden=true;list.innerHTML='';return;}
   list.innerHTML=people.map(p=>'<button type="button" data-chat-mention="'+esc(chatMentionToken(p.name))+'">@'+esc(chatMentionToken(p.name))+' <small>'+esc(p.name)+'</small></button>').join('');
   list.hidden=false;
+}
+function entryMentionSuggestions(){
+  const input=$('entryText'),list=$('entryMentionSuggestions');
+  if(!input||!list)return;
+  const value=input.value.slice(0,input.selectionStart??input.value.length);
+  const match=value.match(/(?:^|[\\s])@([\\p{L}\\p{N}_-]*)$/u);
+  if(!match){list.hidden=true;list.innerHTML='';return;}
+  const needle=match[1].toLocaleLowerCase('ru');
+  const people=[...new Map(chatMessages.filter(m=>m.authorId&&m.authorName).map(m=>[m.authorId,{id:m.authorId,name:m.authorName}])).values()]
+    .filter(p=>p.id!==signedInUser?.uid)
+    .filter(p=>chatMentionToken(p.name).toLocaleLowerCase('ru').startsWith(needle))
+    .slice(0,6);
+  if(!people.length){list.hidden=true;list.innerHTML='';return;}
+  list.innerHTML=people.map(p=>'<button type="button" data-entry-mention="'+esc(chatMentionToken(p.name))+'">@'+esc(chatMentionToken(p.name))+' <small>'+esc(p.name)+'</small></button>').join('');
+  list.hidden=false;
+}
+function insertEntryMention(token){
+  const input=$('entryText');
+  if(!input)return;
+  const start=input.selectionStart??input.value.length;
+  const before=input.value.slice(0,start).replace(/@[\\p{L}\\p{N}_-]*$/u,'@'+token);
+  input.value=before+input.value.slice(start);
+  const pos=before.length;
+  input.setSelectionRange(pos,pos);
+  input.focus();
+  entryMentionSuggestions();
 }
 function insertChatMention(token){
   const input=$('chatInput');
@@ -1426,6 +1452,8 @@ function backProfile(){closeModal();profileMenu()}
 async function toggleStaff(uid,active){if(!canManageUsers||uid===signedInUser.uid)return;try{await updateDoc(doc(db,'users',uid),{active});toast(active?'Доступ сотрудника включён.':'Доступ сотрудника отключён.');showStaff()}catch(err){console.error(err);toast('Не удалось изменить доступ сотрудника.')}}
 async function changeStaffRole(uid){if(!canManageUsers||uid===signedInUser.uid)return;const role=$(`staff-role-${uid}`)?.value;if(!roles[role])return;try{await updateDoc(doc(db,'users',uid),{role});toast(`Роль изменена: ${roles[role]}.`);showStaff()}catch(err){console.error(err);toast('Не удалось изменить роль. Проверьте права администратора и правила Firestore.')}}
 function backDetail(){if(selectedId)openOrder(selectedId);}
+document.addEventListener('input',e=>{if(e.target?.id==='entryText')entryMentionSuggestions();});
+document.addEventListener('keyup',e=>{if(e.target?.id==='entryText')entryMentionSuggestions();});
 document.addEventListener('click',e=>{
   const noticeCard=e.target.closest('[data-notice-id]');
   if(noticeCard){
@@ -1441,6 +1469,8 @@ document.addEventListener('click',e=>{
   }
   const statCard=e.target.closest('[data-stat-key]');
   if(statCard){e.preventDefault();openStatOrders(statCard.dataset.statKey||'');return;}
+  const entryMention=e.target.closest('[data-entry-mention]');
+  if(entryMention){e.preventDefault();insertEntryMention(entryMention.dataset.entryMention||'');return;}
   const mention=e.target.closest('[data-chat-mention]');
   if(mention){e.preventDefault();insertChatMention(mention.dataset.chatMention||'');return;}
   const like=e.target.closest('[data-action^="toggle-chat-like:"]');

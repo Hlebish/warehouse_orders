@@ -259,7 +259,7 @@ service cloud.firestore {
           && request.resource.data.keys().hasOnly([
             'kind', 'article', 'text', 'important', 'authorId', 'authorName', 'createdAt',
             'photos', 'decision', 'decisionText', 'decidedBy',
-            'decidedByName', 'decidedAt'
+            'decidedByName', 'decidedAt', 'articleIndex'
           ])
           && request.resource.data.authorId == request.auth.uid
           && request.resource.data.kind in [
@@ -275,7 +275,25 @@ service cloud.firestore {
           && request.resource.data.diff(resource.data).affectedKeys()
             .hasOnly(['decision', 'decisionText', 'decidedBy', 'decidedByName', 'decidedAt'])
           && request.resource.data.decision in ['Подтверждён', 'Отменён']
-          && request.resource.data.decisionText is string;
+          && request.resource.data.decisionText is string
+
+          || ((isWarehouse() || canManageUsers())
+            && resource.data.kind == 'defect'
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['article', 'articleIndex', 'text', 'photos'])
+            && request.resource.data.article is string
+            && request.resource.data.articleIndex is int
+            && request.resource.data.text is string
+            && request.resource.data.photos is list
+            && request.resource.data.photos.size() <= 5)
+
+          || ((isWarehouse() || canManageUsers())
+            && resource.data.kind == 'defect'
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['decision', 'decisionText', 'decidedBy', 'decidedByName', 'decidedAt'])
+            && request.resource.data.decision == 'Удалена из заказа'
+            && request.resource.data.decisionText is string
+            && request.resource.data.decidedBy is string
+            && request.resource.data.decidedByName is string
+            && request.resource.data.decidedAt is string);
 
         allow delete: if canManageUsers();
       }

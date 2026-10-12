@@ -284,16 +284,7 @@ service cloud.firestore {
             && request.resource.data.articleIndex is int
             && request.resource.data.text is string
             && request.resource.data.photos is list
-            && request.resource.data.photos.size() <= 5)
-
-          || ((isWarehouse() || canManageUsers())
-            && resource.data.kind == 'defect'
-            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['decision', 'decisionText', 'decidedBy', 'decidedByName', 'decidedAt'])
-            && request.resource.data.decision == 'Удалена из заказа'
-            && request.resource.data.decisionText is string
-            && request.resource.data.decidedBy is string
-            && request.resource.data.decidedByName is string
-            && request.resource.data.decidedAt is string);
+            && request.resource.data.photos.size() <= 5);
 
         allow delete: if canManageUsers();
       }

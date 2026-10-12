@@ -51,12 +51,20 @@ applyTheme(savedTheme);
 function watchNotifications(){
   notificationsUnsubscribe?.();
   if(!signedInUser)return;
+  let knownNoticeIds=new Set(state.notices.map(n=>n.id));
   const q=query(collection(db,'users',signedInUser.uid,'notifications'),orderBy('createdAt','desc'),limit(100));
   notificationsUnsubscribe=onSnapshot(q,snap=>{
-    state.notices=snap.docs.map(d=>({id:d.id,...d.data(),at:d.data().createdAt||d.data().at||isoNow()}));
-    paintNotices();
+    const next=snap.docs.map(d=>({id:d.id,...d.data(),at:d.data().createdAt||d.data().at||isoNow()}));
+    if(knownNoticeIds.size){next.filter(n=>!knownNoticeIds.has(n.id)&&isMentionNotice(n)&&!n.read).forEach(showMentionToast)}
+    knownNoticeIds=new Set(next.map(n=>n.id));state.notices=next;paintNotices();paintMentionCenter();
   },err=>console.error('Не удалось загрузить историю уведомлений',err));
 }
+function isMentionNotice(n){const t=String(n?.title||'').toLocaleLowerCase('ru');return t.includes('упомянули вас')||t.includes('вас упомянули')||n?.isMention===true}
+function unreadMentionNotices(){return state.notices.filter(n=>!n.read&&isMentionNotice(n))}
+function paintMentionCenter(){const b=$('mentionCenterButton'),c=$('mentionCenterCount'),l=$('mentionCenterLabel');if(!b||!c||!l)return;const n=unreadMentionNotices().length;c.textContent=String(n);b.hidden=n===0;l.textContent=n===1?'Вас упомянули':`У вас ${n} новых упоминания`}
+function showMentionToast(n){const text=String(n.message||n.body||'Вас упомянули в сообщении');const t=toast(`${n.title||'Вас упомянули'}: ${text}`,String(n.orderId||''));t.classList.add('mention-toast');t.setAttribute('role','button');t.tabIndex=0;t.addEventListener('click',()=>openMentionNotice(n));t.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openMentionNotice(n)}})}
+function openMentionNotice(n){if(n?.orderId){closeModal();openOrder(String(n.orderId));return}if(n?.target==='chat'||n?.category==='chat'||n?.category==='replies'){openChat();return}showNotifications()}
+function openMentionCenter(){const items=unreadMentionNotices();if(!items.length){showNotifications();return}const body='<div class="mention-center-list">'+items.map(n=>'<button type="button" class="mention-center-item" data-mention-notice="'+esc(n.id)+'"><b>'+esc(n.title||'Вас упомянули')+'</b><span>'+esc(n.message||n.body||'Новое упоминание')+'</span><small>'+esc(fmtDateTime(n.createdAt||n.at))+'</small></button>').join('')+'</div>';showModal('Новые упоминания',body,[button('Все уведомления','show-notifications','small-button'),button('Закрыть','close')],'ВАС УПОМЯНУЛИ')}
 function watchChatBadge(){
   chatBadgeUnsubscribe?.();
   if(!signedInUser)return;
@@ -381,10 +389,8 @@ onMessage(messaging,payload=>{
     if((eventId&&recentPushEvents.has(`event:${eventId}`))||recentPushEvents.has(`msg:${signature}`))return;
     if(eventId)recentPushEvents.set(`event:${eventId}`,now);
     recentPushEvents.set(`msg:${signature}`,now);
-    showForegroundPushNotification(n);
+    if(String(n.title||'').toLocaleLowerCase('ru').includes('упомянули вас')||String(n.title||'').toLocaleLowerCase('ru').includes('вас упомянули')){showForegroundPushNotification(n);showMentionToast(n)}
     notify(message,orderId,target,target==='chat'?'chat':'orders');
-    const t=toast(message,orderId);
-    if(target==='chat'&&!orderId)t.addEventListener('click',()=>openChat());
   }
 });
 function stopCloud(){profileUnsubscribe?.();ordersUnsubscribe?.();chatUnsubscribe?.();chatBadgeUnsubscribe?.();notificationsUnsubscribe?.();profileUnsubscribe=ordersUnsubscribe=chatUnsubscribe=chatBadgeUnsubscribe=notificationsUnsubscribe=null;for(const stop of entryUnsubscribes.values())stop();entryUnsubscribes.clear();serverCache.clear();state.orders=[]}
@@ -994,9 +1000,12 @@ function renderChatMessages(){
   const box=$('chatMessages');
   if(!box)return;
   const queryText=chatFilterText.toLocaleLowerCase('ru');
-  const visibleMessages=chatMessages.filter(m=>{
+  const orderCommentMessages=state.orders.flatMap(o=>(o.entries||[]).filter(e=>e.kind==='comment'&&String(e.text||'').trim()).map(e=>({id:'order-comment-'+o.id+'-'+e.id,source:'order-comment',orderId:o.id,orderNumber:o.number,client:o.client||'',authorName:e.author||'Сотрудник',text:e.text||'',createdAt:e.createdAt||o.createdAt,photos:Array.isArray(e.photos)?e.photos:[]})));
+  const combinedMessages=[...chatMessages,...orderCommentMessages].sort((x,y)=>{const time=v=>v?.toMillis?v.toMillis():new Date(v||0).getTime();return time(x.createdAt)-time(y.createdAt)||String(x.id).localeCompare(String(y.id))});
+  const visibleMessages=combinedMessages.filter(m=>{
     const hay=(String(m.authorName||'')+' '+String(m.text||'')+' '+String(m.replyToText||'')).toLocaleLowerCase('ru');
     if(queryText&&!hay.includes(queryText))return false;
+    if(chatFilterMode==='mine'&&m.source==='order-comment')return false;
     if(chatFilterMode==='mine'&&m.authorId!==signedInUser?.uid)return false;
     if(chatFilterMode==='photos'&&!(Array.isArray(m.photos)&&m.photos.length))return false;
     if(chatFilterMode==='replies'&&!m.replyToId)return false;
@@ -1012,6 +1021,10 @@ function renderChatMessages(){
       previousChatDay=chatDateLabel;
       const mine=m.authorId===signedInUser?.uid;
       const photos=Array.isArray(m.photos)?m.photos:[];
+      if(m.source==='order-comment'){
+        const photoHtml=photos.length?'<div class="chat-photo-grid">'+photos.map(p=>'<a href="'+esc(p)+'" target="_blank" rel="noopener"><img src="'+esc(p)+'" alt="Фото комментария к заказу" loading="lazy"></a>').join('')+'</div>':'';
+        return chatDayDivider+'<button type="button" class="chat-order-comment" data-open-order-comment="'+esc(m.orderId)+'"><span class="chat-order-comment-label">Комментарий к заказу № '+esc(m.orderNumber)+'</span><span class="chat-order-comment-author">'+esc(m.authorName)+' · '+esc(m.client||'Заказ')+'</span><span class="chat-order-comment-text">'+esc(m.text)+'</span>'+photoHtml+'<span class="chat-order-comment-link">Открыть заказ ↗</span></button>';
+      }
       const likes=Array.isArray(m.likes)?m.likes:[];
       const liked=likes.includes(signedInUser?.uid);
       const photoHtml=photos.length?'<div class="chat-photo-grid">'+photos.map(p=>'<a href="'+esc(p)+'" target="_blank" rel="noopener"><img src="'+esc(p)+'" alt="Фото из общего чата" loading="lazy"></a>').join('')+'</div>':'';
@@ -1483,6 +1496,12 @@ document.addEventListener('change',e=>{
   if(e.target?.id==='shipmentCategoryFilter'){
     openShipmentManifest($('shipmentDate')?.value||localDateKey(new Date()),e.target.value||'');
   }
+});
+document.addEventListener('click',e=>{
+  const oc=e.target.closest('[data-open-order-comment]');if(oc){e.preventDefault();openOrder(oc.dataset.openOrderComment);return;}
+  const mi=e.target.closest('[data-mention-notice]');if(mi){const n=state.notices.find(x=>x.id===mi.dataset.mentionNotice);if(n){markNotificationItemsRead([n]);openMentionNotice(n)}return;}
+  if(e.target.closest('#mentionCenterButton')){openMentionCenter();return;}
+  if(e.target.closest('[data-action="show-notifications"]')){showNotifications();return;}
 });
 document.addEventListener('submit',e=>e.preventDefault());
 if('serviceWorker'in navigator){

@@ -989,7 +989,7 @@ function insertEntryMention(token){
   const input=$('entryText');
   if(!input)return;
   const start=input.selectionStart??input.value.length;
-  const before=input.value.slice(0,start).replace(/@[\\p{L}\\p{N}_-]*$/u,'@'+token);
+  const before=input.value.slice(0,start).replace(/@[\p{L}\p{N}_-]*$/u,'@'+token);
   input.value=before+input.value.slice(start);
   const pos=before.length;
   input.setSelectionRange(pos,pos);

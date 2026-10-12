@@ -274,7 +274,7 @@ service cloud.firestore {
           && resource.data.kind == 'defect'
           && request.resource.data.diff(resource.data).affectedKeys()
             .hasOnly(['decision', 'decisionText', 'decidedBy', 'decidedByName', 'decidedAt'])
-          && request.resource.data.decision in ['Подтверждён', 'Отменён']
+          && request.resource.data.decision in ['Подтверждён', 'Отменён', 'Удалена из заказа']
           && request.resource.data.decisionText is string
 
           || ((isWarehouse() || canManageUsers())

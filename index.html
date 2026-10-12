@@ -7,13 +7,13 @@
   <meta name="description" content="Заказы, дефекты и согласование отгрузки в одном месте">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="./app-icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="styles.css?v=1.0.1.114">
-  <meta name="app-version" content="2026.10.12.06">
+  <link rel="stylesheet" href="styles.css?v=1.0.1.115">
+  <meta name="app-version" content="2026.10.12.07">
   <title>Заказы · Склад</title>
 
 <script>
 (() => {
-  const VERSION = '2026.10.12.06';
+  const VERSION = '2026.10.12.07';
   const KEY = 'warehouse_orders_app_version';
   const previous = localStorage.getItem(KEY);
   if (previous && previous !== VERSION) {
@@ -113,7 +113,7 @@
           <div class="table-wrap"><table><thead><tr><th>ЗАКАЗ</th><th>КЛИЕНТ</th><th>СТАТУС</th><th>ДОСТАВКА</th><th>КОММЕНТАРИИ</th><th>СОЗДАН</th><th></th></tr></thead><tbody id="ordersBody"></tbody></table><div class="empty-state" id="emptyState"><div class="empty-icon">▤</div><b>Заказов пока нет</b><span>Добавьте номер заказа после сборки.</span><button class="secondary-button" id="emptyAddButton">＋ Добавить заказ</button></div></div>
           <div class="table-footer"><span id="listSummary">0 заказов</span><span>История сохраняется в карточке заказа</span></div>
         </section>
-        <footer class="page-footer"><span>Заказы · внутренняя система</span><span>Доступ по учётным записям сотрудников</span><span class="site-version">Версия 1.0.1.114</span></footer>
+        <footer class="page-footer"><span>Заказы · внутренняя система</span><span>Доступ по учётным записям сотрудников</span><span class="site-version">Версия 1.0.1.115</span></footer>
       </section>
     </main>
   </div>
@@ -122,6 +122,6 @@
   <div class="image-viewer" id="imageViewer" hidden role="dialog" aria-modal="true" aria-label="Просмотр фотографии"><button class="image-viewer-close" id="closeImageViewer" aria-label="Закрыть">×</button><img id="imageViewerImage" alt="Фото из комментария"></div>
   <button type="button" id="mentionCenterButton" class="mention-center-button" hidden aria-live="polite"><span class="mention-center-icon">＠</span><span id="mentionCenterLabel">Вас упомянули</span><b id="mentionCenterCount">0</b></button>
   <div class="toast-stack" id="toastStack" aria-live="polite"></div>
-  <script type="module" src="app.js?v=1.0.1.114"></script>
+  <script type="module" src="app.js?v=1.0.1.115"></script>
 </body>
 </html>

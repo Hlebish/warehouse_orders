@@ -1023,8 +1023,7 @@ function renderChatMessages(){
       const mine=m.authorId===signedInUser?.uid;
       const photos=Array.isArray(m.photos)?m.photos:[];
       if(m.source==='order-comment'){
-        const photoHtml=photos.length?'<div class="chat-photo-grid">'+photos.map(p=>'<a href="'+esc(p)+'" target="_blank" rel="noopener"><img src="'+esc(p)+'" alt="Фото комментария к заказу" loading="lazy"></a>').join('')+'</div>':'';
-        return chatDayDivider+'<button type="button" class="chat-order-comment" data-open-order-comment="'+esc(m.orderId)+'"><span class="chat-order-comment-label">Комментарий к заказу № '+esc(m.orderNumber)+'</span><span class="chat-order-comment-author">'+esc(m.authorName)+' · '+esc(m.client||'Заказ')+'</span><span class="chat-order-comment-text">'+esc(m.text)+'</span>'+photoHtml+'<span class="chat-order-comment-link">Открыть заказ ↗</span></button>';
+        return chatDayDivider+'<button type="button" class="chat-order-comment" data-open-order-comment="'+esc(m.orderId)+'"><span class="chat-order-comment-label">Комментарий к заказу № '+esc(m.orderNumber)+'</span><span class="chat-order-comment-author">'+esc(m.authorName)+' · '+esc(m.client||'Заказ')+'</span><span class="chat-order-comment-text">'+esc(m.text)+'</span><span class="chat-order-comment-link">Открыть заказ ↗</span></button>';
       }
       const likes=Array.isArray(m.likes)?m.likes:[];
       const liked=likes.includes(signedInUser?.uid);

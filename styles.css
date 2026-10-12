@@ -2373,3 +2373,6 @@ body.dark-theme .chat-message.chat-author-role-director{background:linear-gradie
  .chat-message-head{flex-wrap:wrap!important}
  .chat-message-head time{font-size:9px!important}
 }
+
+/* Defect and removed-order item markers. */
+.defect-article-badge,.removed-article-badge{display:inline-flex;align-items:center;margin:4px 6px 0 0;padding:3px 7px;border-radius:5px;font-size:10px;font-weight:800;letter-spacing:.03em;line-height:1.2}.defect-article-badge{background:#fee2e2;color:#b42318;border:1px solid #fecaca}.removed-article-badge{background:#f3f4f6;color:#5b6470;border:1px solid #d1d5db}.article-removed{opacity:.7}.article-removed .article-main>b{text-decoration:line-through}

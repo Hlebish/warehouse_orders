@@ -735,10 +735,6 @@ async function toggleArticleCollected(index){
     if(previousStatus!=='Собран')o.assembledAt=isoNow();
     o.status='Собран';
     o.assemblyInProgress=false;
-  }else if(previousStatus==='Собран'){
-    // Если снять отметку хотя бы с одной позиции, возвращаем заказ в «Создан».
-    o.status='Создан';
-    o.assembledAt='';
   }
 
   try{

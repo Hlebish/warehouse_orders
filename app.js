@@ -394,7 +394,7 @@ onMessage(messaging,payload=>{
     notify(message,orderId,target,target==='chat'?'chat':'orders');
   }
 });
-function stopCloud(){profileUnsubscribe?.();ordersUnsubscribe?.();chatUnsubscribe?.();chatBadgeUnsubscribe?.();notificationsUnsubscribe?.();profileUnsubscribe=ordersUnsubscribe=chatUnsubscribe=chatBadgeUnsubscribe=notificationsUnsubscribe=null;for(const stop of entryUnsubscribes.values())stop();entryUnsubscribes.clear();serverCache.clear();state.orders=[]}
+function stopCloud(){profileUnsubscribe?.();ordersUnsubscribe?.();chatUnsubscribe?.();chatBadgeUnsubscribe?.();notificationsUnsubscribe?.();profileUnsubscribe=ordersUnsubscribe=chatUnsubscribe=chatBadgeUnsubscribe=notificationsUnsubscribe=null;for(const stop of entryUnsubscribes.values())stop();entryUnsubscribes.clear();serverCache.clear();state.orders=[];state.notices=[];paintMentionCenter()}
 function watchOrders(){
  ordersUnsubscribe?.();
  ordersUnsubscribe=onSnapshot(collection(db,'orders'),snap=>{

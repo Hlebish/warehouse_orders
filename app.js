@@ -71,10 +71,9 @@ function watchChatBadge(){
   if(!signedInUser)return;
   const q=query(collection(db,'chatMessages'),orderBy('createdAt','desc'),limit(100));
   chatBadgeUnsubscribe=onSnapshot(q,snap=>{
-    chatUnread=snap.docs.some(d=>{
-      const m=d.data()||{};
-      return m.authorId!==signedInUser.uid && Array.isArray(m.readBy) && !m.readBy.includes(signedInUser.uid);
-    });
+    const messages=snap.docs.map(d=>d.data()||{});
+    knownChatPeople=[...new Map(messages.filter(m=>m.authorId&&m.authorName).map(m=>[m.authorId,{id:m.authorId,name:m.authorName}])).values()];
+    chatUnread=messages.some(m=>m.authorId!==signedInUser.uid && Array.isArray(m.readBy) && !m.readBy.includes(signedInUser.uid));
     paintChatBadge();
   },err=>console.error('Не удалось проверить непрочитанный чат',err));
 }
@@ -904,7 +903,7 @@ try{
 const photoBlobs=await readPhotos($('entryPhotos').files);const important=kind==='comment'&&$('entryImportant')?.checked===true;
 const entryId=crypto.randomUUID();
 const photos=await uploadPhotos(o.id,entryId,photoBlobs);
-o.entries.push({id:entryId,kind,article:kind==='defect'?article:'',...(kind==='defect'?{articleIndex}:{}),text,important,author:profileName||roles[state.role],createdAt:isoNow(),photos});await save();await writeAudit(kind==='defect'?'Добавлен дефект':'Добавлен комментарий',text,o.id,{entryId});closeModal();render();toast('Запись добавлена в историю заказа.');notify(`${kind==='defect'?'Дефект':'Комментарий'} к заказу № ${o.number}`,o.id);openOrder(o.id)
+o.entries.push({id:entryId,kind,article:kind==='defect'?article:'',...(kind==='defect'?{articleIndex}:{}),text,important,author:profileName||roles[state.role],createdAt:isoNow(),photos});await save();if(kind==='comment'){const tokens=[...text.matchAll(/(^|[\\s])@([\\p{L}\\p{N}_-]{2,})/gu)].map(x=>x[2].toLocaleLowerCase('ru'));const mentioned=[...new Map(knownChatPeople.map(p=>[p.id,p])).values()].filter(p=>p.id&&p.id!==signedInUser.uid&&tokens.includes(chatMentionToken(p.name).toLocaleLowerCase('ru')));await Promise.all(mentioned.map(p=>queuePush('Вас упомянули в комментарии к заказу № '+o.number,(profileName||roles[state.role])+': '+text.slice(0,160),signedInUser.uid,o.id,'site','replies',p.id)));}await writeAudit(kind==='defect'?'Добавлен дефект':'Добавлен комментарий',text,o.id,{entryId});closeModal();render();toast('Запись добавлена в историю заказа.');notify(`${kind==='defect'?'Дефект':'Комментарий'} к заказу № ${o.number}`,o.id);openOrder(o.id)
 }catch(e){toast(e.message)}
 finally{entrySending=false;if(sendButton){sendButton.disabled=false;sendButton.textContent=kind==='defect'?'Добавить дефект':'Отправить';}}}
 async function setStatus(status,text,kind='system'){const o=state.orders.find(x=>x.id===selectedId);if(!o||!signedInUser)return;if(!canEditOrder(o)){toast('После отгрузки заказ заблокирован для этой роли.');return;}if(hasPendingDefect(o)){toast('Пока есть нерассмотренный дефект, другие изменения заказа заблокированы.');return;}const previous=o.status;const previousTransferredAt=o.transferredAt;const previousResumedAt=o.resumedAt;const previousAssembledAt=o.assembledAt;const previousShippedAt=o.shippedAt;const previousAssemblyInProgress=o.assemblyInProgress;const now=isoNow();const entry={id:crypto.randomUUID(),kind,text,authorId:signedInUser.uid,author:profileName||roles[state.role],createdAt:now,photos:[]};const statusUpdate={status,updatedAt:now,updatedBy:signedInUser.uid,updatedByName:profileName||roles[state.role]};if(status==='Собран'){o.assembledAt=now;statusUpdate.assembledAt=now;}if(status==='Отгружен кладовщиком'){o.shippedAt=now;statusUpdate.shippedAt=now;}if(status==='Собран'||status==='Отгружен кладовщиком'){o.assemblyInProgress=false;statusUpdate.assemblyInProgress=false;}if(status==='Перенесен'){o.transferredAt=now;}if(previous==='Перенесен'&&status!=='Перенесен'){o.resumedAt=now;statusUpdate.resumedAt=now;}try{o.status=status;await updateDoc(doc(db,'orders',o.id),statusUpdate);await setDoc(doc(db,'orders',o.id,'entries',entry.id),entryToCloud(entry));o.entries.push(entry);serverCache.set(o.id,{...serverCache.get(o.id),...o});await writeAudit('Изменён статус заказа',text,o.id,{previousStatus:previous,newStatus:status});await queuePush(`Заказ № ${o.number}: ${status}`,text,signedInUser.uid,o.id);render();notify(`Заказ № ${o.number}: ${status}`,o.id);openOrder(o.id)}catch(err){o.status=previous;o.transferredAt=previousTransferredAt;o.resumedAt=previousResumedAt;o.assembledAt=previousAssembledAt;o.shippedAt=previousShippedAt;o.assemblyInProgress=previousAssemblyInProgress;console.error('Ошибка изменения статуса заказа',err);toast('Не удалось изменить статус: '+(err?.message||'нет доступа'));}}
@@ -928,6 +927,7 @@ async function toggleNotificationSetting(category){if(!signedInUser||!['chat','r
 async function toggleExtraPhoneNotifications(){if(!signedInUser)return;const previous=state.extraPhoneNotifications;const next=!previous;try{await updateDoc(doc(db,'users',signedInUser.uid),{extraPhoneNotifications:next});state.extraPhoneNotifications=next;toast(next?'Дополнительные уведомления на все устройства включены.':'Дополнительные уведомления на все устройства выключены.');showNotifications()}catch(err){console.error('Не удалось сохранить настройку дополнительных уведомлений на все устройства',err);state.extraPhoneNotifications=previous;toast('Не удалось сохранить настройку. Проверьте подключение и права доступа.');showNotifications()}}
 
 let chatMessages=[];
+let knownChatPeople=[];
 
 function startChatReply(messageId){
   const message=chatMessages.find(m=>m.id===messageId);

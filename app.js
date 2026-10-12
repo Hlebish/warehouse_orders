@@ -692,10 +692,12 @@ function openOrder(id){const o=state.orders.find(x=>x.id===id);if(!o)return;sele
 if((o.articles||[]).length){
   articlesHtml+='<div class="order-articles-list">'+o.articles.map((x,i)=>{
     const collected=x.collected===true;const itemDefects=(o.entries||[]).filter(e=>e.kind==='defect'&&!['Удалена из заказа','Отменён'].includes(e.decision)&&(Number.isInteger(e.articleIndex)?e.articleIndex===i:e.article===x.article));const removedByDefect=(o.entries||[]).some(e=>e.kind==='defect'&&e.decision==='Удалена из заказа'&&(Number.isInteger(e.articleIndex)?e.articleIndex===i:e.article===x.article));
-    const collectedControl=(state.role==='warehouse'||canManageUsers)&&!shipmentLocked
-      ?button(collected?'✓ Собрано':'☐ Собрано','toggle-collected:'+i,'small-button '+(collected?'good':'primary-soft'))
-      :'<button type="button" class="small-button role-action-locked" disabled aria-disabled="true" title="Отмечать сборку может кладовщик или администратор"><span class="role-action-ban" aria-hidden="true">🚫</span>'+(collected?'✓ Собрано':'☐ Собрано')+'</button>';
-    return '<div class="order-article-view '+(collected?'article-collected':'')+(removedByDefect?' article-removed':'')+'"><span class="article-main"><b>'+esc(x.article)+'</b>'+(itemDefects.length?'<span class="defect-article-badge">ДЕФЕКТ</span>':'')+(removedByDefect?'<span class="removed-article-badge">УДАЛЕНА ИЗ ЗАКАЗА</span>':'')+'<small>'+(collected?'Собрано':'Не собрано')+'</small></span><span style="display:flex;align-items:center;gap:8px"><span>'+(Number(x.quantity)||1)+' шт.</span>'+collectedControl+'<button type="button" class="small-button primary-soft" data-action="show-on-map" data-map-article="'+esc(String(x.article||''))+'">🗺️ На карте</button></span></div>';
+    const collectedControl=removedByDefect
+      ?'<span class="field-hint">Не участвует в сборке</span>'
+      :(state.role==='warehouse'||canManageUsers)&&!shipmentLocked
+        ?button(collected?'✓ Собрано':'☐ Собрано','toggle-collected:'+i,'small-button '+(collected?'good':'primary-soft'))
+        :'<button type="button" class="small-button role-action-locked" disabled aria-disabled="true" title="Отмечать сборку может кладовщик или администратор"><span class="role-action-ban" aria-hidden="true">🚫</span>'+(collected?'✓ Собрано':'☐ Собрано')+'</button>';
+    return '<div class="order-article-view '+(collected?'article-collected':'')+(removedByDefect?' article-removed':'')+'"><span class="article-main"><b>'+esc(x.article)+'</b>'+(itemDefects.length?'<span class="defect-article-badge">ДЕФЕКТ</span>':'')+(removedByDefect?'<span class="removed-article-badge">УДАЛЕНА ИЗ ЗАКАЗА</span>':'')+'<small>'+(removedByDefect?'Не отгружается':collected?'Собрано':'Не собрано')+'</small></span><span style="display:flex;align-items:center;gap:8px"><span>'+(Number(x.quantity)||1)+' шт.</span>'+collectedControl+'<button type="button" class="small-button primary-soft" data-action="show-on-map" data-map-article="'+esc(String(x.article||''))+'">🗺️ На карте</button></span></div>';
   }).join('')+'</div>';
 }else{
   articlesHtml+='<div class="danger-note">Артикулы не указаны.</div>';
@@ -713,11 +715,21 @@ function openEditMenu(){showModal('Редактировать заказ','<div 
 function editOrderInfo(){const o=state.orders.find(x=>x.id===selectedId);if(!o)return;if(!canEditOrder(o)){toast('После отгрузки или получения заказа клиентом редактирование доступно только администратору и директору.');return;}if(hasPendingDefect(o)){toast('Редактирование заблокировано до решения по дефекту.');return;}showModal('Редактировать данные заказа',`<form id="editOrderInfoForm"><div class="field"><label for="editOrderNumber">Номер заказа *</label><input id="editOrderNumber" required autocomplete="off" value="${esc(o.number)}"></div><div class="field"><label for="editClientName">Имя клиента *</label><input id="editClientName" required autocomplete="off" value="${esc(o.client)}"></div><div class="field"><label for="editDeliveryType">Вид доставки</label><select id="editDeliveryType"><option value="city"${(o.deliveryType||'city')==='city'?' selected':''}>Доставка по городу</option><option value="pickup"${o.deliveryType==='pickup'?' selected':''}>Самовывоз</option><option value="post"${o.deliveryType==='post'?' selected':''}>Доставка почтой</option></select></div><span class="field-hint">Изменения сохранятся в карточке заказа и будут видны всем сотрудникам.</span></form>`,[button('Назад','back-detail'),button('Сохранить изменения','save-order-info','primary-button')],'ДАННЫЕ ЗАКАЗА')}
 async function saveOrderInfo(){const o=state.orders.find(x=>x.id===selectedId);if(!o)return;if(!canEditOrder(o)){toast('После отгрузки или получения заказа клиентом редактировать заказ могут только администратор и директор.');return;}if(hasPendingDefect(o)){toast('Редактирование заблокировано до решения по дефекту.');return;}const number=$("editOrderNumber").value.trim(),client=$("editClientName").value.trim(),deliveryType=['city','pickup','post'].includes($("editDeliveryType")?.value)?$("editDeliveryType").value:'city';if(!number||!client){toast('Укажите номер заказа и имя клиента.');return}const duplicate=state.orders.find(x=>x.id!==o.id&&String(x.number).trim().toLowerCase()===number.toLowerCase());if(duplicate){toast('Карточка с таким номером уже существует.');return}const oldNumber=o.number,oldClient=o.client,oldDeliveryType=o.deliveryType||'city',now=isoNow(),updatedByName=profileName||roles[state.role]||'Сотрудник';try{await updateDoc(doc(db,'orders',o.id),{number,client,deliveryType,updatedAt:now,updatedBy:signedInUser.uid,updatedByName});o.number=number;o.client=client;o.deliveryType=deliveryType;o.updatedAt=now;o.updatedBy=signedInUser.uid;o.updatedByName=updatedByName;const entry={id:crypto.randomUUID(),kind:'system',text:`Данные заказа изменены: ${oldNumber} → ${number}; клиент: ${oldClient} → ${client}; доставка: ${oldDeliveryType==='pickup'?'Самовывоз':oldDeliveryType==='post'?'Доставка почтой':'Доставка по городу'} → ${deliveryType==='pickup'?'Самовывоз':deliveryType==='post'?'Доставка почтой':'Доставка по городу'}`,authorId:signedInUser.uid,author:updatedByName,createdAt:now,photos:[]};try{await setDoc(doc(db,'orders',o.id,'entries',entry.id),entryToCloud(entry));o.entries.push(entry)}catch(logErr){console.warn('Не удалось записать историю изменения данных заказа',logErr)}serverCache.set(o.id,{...(serverCache.get(o.id)||{}),...o,entries:[...(o.entries||[])]});pendingOrderData.delete(o.id);closeModal();render();toast('Данные заказа сохранены.');notify('Данные заказа изменены',o.id);openOrder(o.id)}catch(err){console.error('Не удалось сохранить данные заказа',err);toast('Не удалось сохранить данные заказа: '+(err?.code||err?.message||'нет доступа'));}}
 function editArticles(){const o=state.orders.find(x=>x.id===selectedId);if(!o)return;if(!canEditOrder(o)){toast('После отгрузки заказ заблокирован для этой роли.');return;}if(hasPendingDefect(o)){toast('Редактирование заблокировано до решения по дефекту.');return;}showModal(`Артикулы заказа № ${o.number}`,`<div class="field"><label>Состав заказа</label>${articlesEditorHtml(o.articles||[])}<span class="field-hint">Добавляйте новые позиции, меняйте количество или удаляйте ненужные.</span></div>`,[button('Назад','back-detail'),button('Сохранить артикулы','save-articles','primary-button')],'СОСТАВ ЗАКАЗА')}
+function isArticleRemovedByDefect(o,index,item){
+  return (o?.entries||[]).some(entry=>
+    entry.kind==='defect'&&entry.decision==='Удалена из заказа'&&
+    (Number.isInteger(entry.articleIndex)?entry.articleIndex===index:entry.article===item?.article)
+  );
+}
 async function toggleArticleCollected(index){
   const o=state.orders.find(x=>x.id===selectedId);
   if(!o||!(state.role==='warehouse'||canManageUsers)||!Number.isInteger(index))return;
   const item=o.articles?.[index];
   if(!item)return;
+  if(isArticleRemovedByDefect(o,index,item)){
+    toast('Эта позиция удалена из заказа и не участвует в сборке.');
+    return;
+  }
 
   const previousCollected=item.collected===true;
   const previousStatus=o.status;
@@ -726,11 +738,12 @@ async function toggleArticleCollected(index){
 
   item.collected=!previousCollected;
 
-  const articles=Array.isArray(o.articles)?o.articles.filter(x=>String(x?.article||'').trim()):[];
-  const allCollected=articles.length>0&&articles.every(x=>x.collected===true);
+  // Учитываем только позиции, которые действительно будут отгружаться.
+  const articles=(o.articles||[]).map((article,articleIndex)=>({article,articleIndex}))
+    .filter(({article,articleIndex})=>String(article?.article||'').trim()&&!isArticleRemovedByDefect(o,articleIndex,article));
+  const allCollected=articles.length>0&&articles.every(({article})=>article.collected===true);
 
-  // Как только все позиции отмечены собранными, заказ автоматически
-  // получает статус «Собран» независимо от того, запускали ли сборку кнопкой.
+  // Удалённые по дефекту позиции не должны мешать завершению сборки.
   if(allCollected){
     if(previousStatus!=='Собран')o.assembledAt=isoNow();
     o.status='Собран';

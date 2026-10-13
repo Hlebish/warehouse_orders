@@ -1060,7 +1060,13 @@ function renderChatMessages(){
       const roleBadge='<span class="chat-role-badge chat-role-'+roleMeta.tone+'" title="'+esc(roleMeta.label)+'"><span aria-hidden="true">'+roleMeta.icon+'</span>'+esc(roleMeta.label)+'</span>';
       return chatDayDivider+'<article class="chat-message chat-author-role-'+roleMeta.tone+' '+(mine?'mine':'')+'"><div class="chat-message-head"><span class="chat-author-line"><span class="chat-role-avatar chat-role-avatar-'+roleMeta.tone+'" aria-hidden="true">'+roleMeta.icon+'</span><b>'+esc(m.authorName||'Сотрудник')+'</b>'+roleBadge+'</span><time>'+esc(fmtDateTime(m.createdAt))+'</time></div>'+replyHtml+'<div class="chat-message-text">'+renderChatText(m.text)+'</div>'+photoHtml+'<div class="chat-message-actions">'+likeHtml+'<button type="button" class="chat-reply-button" data-action="reply-chat:'+esc(m.id)+'">↩ Ответить</button>'+receipt+'</div></article>';
     }).join('');
-    box.scrollTop=box.scrollHeight;
+    const scrollChatToBottom=()=>{box.scrollTop=box.scrollHeight;};
+    scrollChatToBottom();
+    requestAnimationFrame(scrollChatToBottom);
+    setTimeout(scrollChatToBottom,0);
+    box.querySelectorAll('img').forEach(img=>{
+      if(!img.complete)img.addEventListener('load',scrollChatToBottom,{once:true});
+    });
   }
 }
 

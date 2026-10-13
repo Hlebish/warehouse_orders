@@ -1084,7 +1084,8 @@ function renderChatMessages(){
   const queryText=chatFilterText.toLocaleLowerCase('ru');
   const activeChatFilter=$('chatFilter')?.value||chatFilterMode||'all';
   const orderCommentMessages=state.orders.flatMap(o=>(o.entries||[]).filter(e=>e.kind==='comment'&&String(e.text||'').trim()).map(e=>({id:'order-comment-'+o.id+'-'+e.id,source:'order-comment',orderId:o.id,orderNumber:o.number,client:o.client||'',authorName:e.author||'Сотрудник',text:e.text||'',createdAt:e.createdAt||o.createdAt,photos:Array.isArray(e.photos)?e.photos:[]})));
-  const combinedMessages=[...olderChatMessages,...chatMessages,...orderCommentMessages].sort((x,y)=>{const time=v=>v?.toMillis?v.toMillis():new Date(v||0).getTime();return time(x.createdAt)-time(y.createdAt)||String(x.id).localeCompare(String(y.id))});
+  // Keep ordinary chat messages prominent in the "all messages" view; order comments are shown after them.
+  const combinedMessages=[...olderChatMessages,...chatMessages,...orderCommentMessages].sort((x,y)=>{const xComment=x.source==='order-comment',yComment=y.source==='order-comment';if(xComment!==yComment)return xComment?1:-1;const time=v=>v?.toMillis?v.toMillis():new Date(v||0).getTime();return time(y.createdAt)-time(x.createdAt)||String(y.id).localeCompare(String(x.id))});
   const visibleMessages=combinedMessages.filter(m=>{
     const hay=(String(m.authorName||'')+' '+String(m.text||'')+' '+String(m.replyToText||'')).toLocaleLowerCase('ru');
     if(queryText&&!hay.includes(queryText))return false;
@@ -1117,7 +1118,7 @@ function renderChatMessages(){
       return chatDayDivider+'<article class="chat-message chat-author-role-'+roleMeta.tone+' '+(mine?'mine':'')+'"><div class="chat-message-head"><span class="chat-author-line"><span class="chat-role-avatar chat-role-avatar-'+roleMeta.tone+'" aria-hidden="true">'+roleMeta.icon+'</span><b>'+esc(m.authorName||'Сотрудник')+'</b>'+roleBadge+'</span><time>'+esc(fmtDateTime(m.createdAt))+'</time></div>'+replyHtml+'<div class="chat-message-text">'+renderChatText(m.text)+'</div>'+photoHtml+'<div class="chat-message-actions">'+likeHtml+'<button type="button" class="chat-reply-button" data-action="reply-chat:'+esc(m.id)+'">↩ Ответить</button>'+receipt+'</div></article>';
     }).join('');
     if(chatPendingScrollRestore){box.scrollTop=chatPendingScrollRestore.top+(box.scrollHeight-chatPendingScrollRestore.height);chatPendingScrollRestore=null;}
-    else if(wasAtBottom)box.scrollTop=box.scrollHeight;
+    else if(wasAtBottom)box.scrollTop=0;
     else box.scrollTop=previousScrollTop;
   }
 }

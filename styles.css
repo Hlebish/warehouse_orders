@@ -2407,3 +2407,11 @@ body.dark-theme .mention-center-button b{background:#16845b!important;color:#fff
 
 /* Compact pagination for large order lists. */
 .table-pagination{display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;padding:14px 10px;color:var(--muted,#687080);font-size:13px}.table-pagination button{min-height:34px}.table-pagination button:disabled{opacity:.45;cursor:not-allowed}@media(max-width:600px){.table-pagination{gap:8px}.table-pagination span{width:100%;text-align:center;order:-1}}
+
+/* Client autocomplete in create/edit order forms */
+.client-suggestion-wrap{position:relative}
+.client-suggestion-wrap .client-suggestions{top:calc(100% + 5px);bottom:auto;max-height:220px;overflow:auto}
+
+/* Keep order-comment mention suggestions anchored to the comment field. */
+.entry-mention-wrap{position:relative}
+.entry-mention-wrap .entry-mention-suggestions{top:calc(100% + 5px);bottom:auto;max-height:220px;overflow:auto;z-index:30}

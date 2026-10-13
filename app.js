@@ -1139,7 +1139,7 @@ function openChat(){
   const chatQuery=collection(db,'chatMessages'); // Include legacy messages without createdAt; sort all loaded messages client-side below.
   chatUnsubscribe=onSnapshot(chatQuery,snap=>{
     chatMessages=snap.docs.map(d=>{const data=d.data();return {id:d.id,...data,text:String(data.text??data.message??data.content??''),authorName:data.authorName??data.author??data.userName??'Сотрудник',createdAt:data.createdAt??data.timestamp??data.sentAt??data.date,photos:Array.isArray(data.photos)?data.photos:(Array.isArray(data.images)?data.images:[])};}).filter(m=>String(m.text||'').trim()||Array.isArray(m.photos)&&m.photos.length).sort((x,y)=>{const date=v=>v?.toMillis?v.toMillis():new Date(v||0).getTime();return date(x.createdAt)-date(y.createdAt)||String(x.id).localeCompare(String(y.id));});
-    if(!olderChatMessages.length){chatOldestCursor=snap.docs.at(-1)||null;if(!hasOlderChatMessages)hasOlderChatMessages=snap.docs.length===50;}
+    chatOldestCursor=null;hasOlderChatMessages=false; // The live snapshot already contains all messages, including legacy records.
     renderChatMessages();
     markChatMessagesRead(chatMessages);
   },err=>{

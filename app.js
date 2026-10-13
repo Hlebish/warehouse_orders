@@ -1082,15 +1082,16 @@ function renderChatMessages(){
   const wasAtBottom=box.scrollHeight-box.clientHeight-box.scrollTop<80;
   const previousScrollTop=box.scrollTop;
   const queryText=chatFilterText.toLocaleLowerCase('ru');
+  const activeChatFilter=$('chatFilter')?.value||chatFilterMode||'all';
   const orderCommentMessages=state.orders.flatMap(o=>(o.entries||[]).filter(e=>e.kind==='comment'&&String(e.text||'').trim()).map(e=>({id:'order-comment-'+o.id+'-'+e.id,source:'order-comment',orderId:o.id,orderNumber:o.number,client:o.client||'',authorName:e.author||'Сотрудник',text:e.text||'',createdAt:e.createdAt||o.createdAt,photos:Array.isArray(e.photos)?e.photos:[]})));
   const combinedMessages=[...olderChatMessages,...chatMessages,...orderCommentMessages].sort((x,y)=>{const time=v=>v?.toMillis?v.toMillis():new Date(v||0).getTime();return time(x.createdAt)-time(y.createdAt)||String(x.id).localeCompare(String(y.id))});
   const visibleMessages=combinedMessages.filter(m=>{
     const hay=(String(m.authorName||'')+' '+String(m.text||'')+' '+String(m.replyToText||'')).toLocaleLowerCase('ru');
     if(queryText&&!hay.includes(queryText))return false;
-    if(chatFilterMode==='mine'&&m.source==='order-comment')return false;
-    if(chatFilterMode==='mine'&&m.authorId!==signedInUser?.uid)return false;
-    if(chatFilterMode==='photos'&&!(Array.isArray(m.photos)&&m.photos.length))return false;
-    if(chatFilterMode==='replies'&&!m.replyToId)return false;
+    if(activeChatFilter==='mine'&&m.source==='order-comment')return false;
+    if(activeChatFilter==='mine'&&m.authorId!==signedInUser?.uid)return false;
+    if(activeChatFilter==='photos'&&!(Array.isArray(m.photos)&&m.photos.length))return false;
+    if(activeChatFilter==='replies'&&!m.replyToId)return false;
     return true;
   });
   if(!visibleMessages.length){

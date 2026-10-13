@@ -1029,7 +1029,7 @@ async function loadOlderChatMessages(){
   loadingOlderChatMessages=true;
   const box=$('chatMessages');
   try{
-    const olderQuery=query(collection(db,'chatMessages'),orderBy('createdAt','desc'),startAfter(chatOldestCursor),limit(100));
+    const olderQuery=query(collection(db,'chatMessages'),orderBy('createdAt','desc'),startAfter(chatOldestCursor),limit(50));
     const snap=await getDocs(olderQuery);
     if(!snap.empty){
       chatPendingScrollRestore={top:box.scrollTop,height:box.scrollHeight};
@@ -1037,7 +1037,7 @@ async function loadOlderChatMessages(){
       const loaded=snap.docs.map(d=>({id:d.id,...d.data()})).filter(m=>(m.text||Array.isArray(m.photos)&&m.photos.length)&&!known.has(m.id));
       olderChatMessages=[...olderChatMessages,...loaded];
       chatOldestCursor=snap.docs.at(-1);
-      hasOlderChatMessages=snap.docs.length===100;
+      hasOlderChatMessages=snap.docs.length===50;
       renderChatMessages();
     }else hasOlderChatMessages=false;
   }catch(err){console.error('Не удалось загрузить старые сообщения чата',err);toast('Не удалось загрузить старые сообщения. Проверьте соединение.');}
@@ -1094,10 +1094,10 @@ function openChat(){
   chatUnsubscribe?.();
   chatMessages=[];olderChatMessages=[];chatOldestCursor=null;hasOlderChatMessages=false;loadingOlderChatMessages=false;chatPendingScrollRestore=null;chatReplyTo=null;
   showModal('Общий чат','<div class="chat-shell"><div class="chat-toolbar"><label class="search-box"><span>⌕</span><input id="chatSearch" type="search" placeholder="Поиск по чату"></label><select id="chatFilter"><option value="all">Все сообщения</option><option value="mine">Мои</option><option value="replies">С ответами</option><option value="photos">С фото</option></select></div><div class="chat-messages" id="chatMessages"><div class="chat-empty">Загрузка сообщений…</div></div><form id="chatForm" class="chat-form"><div id="chatReplyPreview" class="chat-reply-preview" hidden></div><div class="chat-input-wrap"><textarea id="chatInput" maxlength="1000" rows="2" placeholder="Напишите сообщение… Используйте @ для упоминания (можно вставить фото из буфера)" autocomplete="off"></textarea><div id="chatMentionSuggestions" class="chat-mention-suggestions" hidden></div></div><div class="chat-attach-row"><label class="chat-attach-button">📎 Фото<input id="chatPhotoInput" type="file" accept="image/*" multiple hidden></label><span id="chatPhotoHint">До 5 фото, по 8 МБ</span></div><div id="chatUploadProgress" class="chat-upload-progress" hidden><div class="chat-upload-progress-track"><div id="chatUploadProgressBar" class="chat-upload-progress-bar"></div></div><span id="chatUploadProgressText">Загрузка…</span></div><div id="chatPhotoPreview" class="chat-photo-preview"></div></form></div>',[button('Закрыть','close'),button('Отправить','send-chat','primary-button')],'ОБЩИЙ ЧАТ');
-  const chatQuery=query(collection(db,'chatMessages'),orderBy('createdAt','desc'),limit(100));
+  const chatQuery=query(collection(db,'chatMessages'),orderBy('createdAt','desc'),limit(50));
   chatUnsubscribe=onSnapshot(chatQuery,snap=>{
     chatMessages=snap.docs.map(d=>({id:d.id,...d.data()})).filter(m=>m.text||Array.isArray(m.photos)&&m.photos.length).sort((x,y)=>{const tx=x.createdAt?.toMillis?x.createdAt.toMillis():new Date(x.createdAt||0).getTime();const ty=y.createdAt?.toMillis?y.createdAt.toMillis():new Date(y.createdAt||0).getTime();return tx-ty||String(x.id).localeCompare(String(y.id));});
-    if(!olderChatMessages.length){chatOldestCursor=snap.docs.at(-1)||null;if(!hasOlderChatMessages)hasOlderChatMessages=snap.docs.length===100;}
+    if(!olderChatMessages.length){chatOldestCursor=snap.docs.at(-1)||null;if(!hasOlderChatMessages)hasOlderChatMessages=snap.docs.length===50;}
     renderChatMessages();
     markChatMessagesRead(chatMessages);
   },err=>{

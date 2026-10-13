@@ -1125,7 +1125,7 @@ function sendChatMessage(){ $('chatForm')?.requestSubmit(); }
 function openChat(){
   if(!signedInUser)return;
   chatUnsubscribe?.();
-  chatMessages=[];olderChatMessages=[];chatOldestCursor=null;hasOlderChatMessages=false;loadingOlderChatMessages=false;chatPendingScrollRestore=null;chatReplyTo=null;
+  chatMessages=[];olderChatMessages=[];chatOldestCursor=null;hasOlderChatMessages=false;loadingOlderChatMessages=false;chatPendingScrollRestore=null;chatReplyTo=null;chatFilterText='';chatFilterMode='all';
   showModal('Общий чат','<div class="chat-shell"><div class="chat-toolbar"><label class="search-box"><span>⌕</span><input id="chatSearch" type="search" placeholder="Поиск по чату"></label><select id="chatFilter"><option value="all">Все сообщения</option><option value="mine">Мои</option><option value="replies">С ответами</option><option value="photos">С фото</option></select></div><div class="chat-messages" id="chatMessages"><div class="chat-empty">Загрузка сообщений…</div></div><form id="chatForm" class="chat-form"><div id="chatReplyPreview" class="chat-reply-preview" hidden></div><div class="chat-input-wrap"><textarea id="chatInput" maxlength="1000" rows="2" placeholder="Напишите сообщение… Используйте @ для упоминания (можно вставить фото из буфера)" autocomplete="off"></textarea><div id="chatMentionSuggestions" class="chat-mention-suggestions" hidden></div></div><div class="chat-attach-row"><label class="chat-attach-button">📎 Фото<input id="chatPhotoInput" type="file" accept="image/*" multiple hidden></label><span id="chatPhotoHint">До 5 фото, по 8 МБ</span></div><div id="chatUploadProgress" class="chat-upload-progress" hidden><div class="chat-upload-progress-track"><div id="chatUploadProgressBar" class="chat-upload-progress-bar"></div></div><span id="chatUploadProgressText">Загрузка…</span></div><div id="chatPhotoPreview" class="chat-photo-preview"></div></form></div>',[button('Закрыть','close'),button('Отправить','send-chat','primary-button')],'ОБЩИЙ ЧАТ');
   const chatQuery=query(collection(db,'chatMessages'),orderBy('createdAt','desc'),limit(50));
   chatUnsubscribe=onSnapshot(chatQuery,snap=>{
@@ -1141,7 +1141,7 @@ function openChat(){
   });
   const chatScrollBox=$('chatMessages');
   chatScrollBox?.addEventListener('scroll',()=>{if(chatScrollBox.scrollTop<60)loadOlderChatMessages();},{passive:true});
-  $('chatInput').addEventListener('input',chatMentionSuggestions);$('chatSearch')?.addEventListener('input',e=>{chatFilterText=e.target.value||'';renderChatMessages();});$('chatFilter')?.addEventListener('change',e=>{chatFilterMode=e.target.value||'all';renderChatMessages();});
+  $('chatInput').addEventListener('input',chatMentionSuggestions);$('chatSearch')?.addEventListener('input',e=>{chatFilterText=e.target.value||'';renderChatMessages();});const chatFilterSelect=$('chatFilter');if(chatFilterSelect){chatFilterSelect.value='all';chatFilterMode='all';chatFilterSelect.addEventListener('change',e=>{chatFilterMode=e.target.value||'all';renderChatMessages();});}
   $('chatInput').addEventListener('keyup',chatMentionSuggestions);
   let chatSending=false;
   $('chatForm').addEventListener('submit',async e=>{

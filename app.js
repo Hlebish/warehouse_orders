@@ -659,7 +659,7 @@ function openNewOrder(){if(!['warehouse','manager','chief_accountant','accountan
 const managerCreate=isManagerRole()&&!canManageUsers;
 const statusOptions=managerCreate?'<option value="Создан">Создан</option><option>Под вопросом</option>':'<option value="Создан">Создан</option><option>Собран</option><option>Под вопросом</option>'; 
 const statusHint=managerCreate?'Менеджер создаёт заказ со статусом «Создан». Кладовщик позже отметит его как «Собран».':'Можно сразу отметить заказ как «Собран», если он уже собран.';
-showModal('Добавить заказ',`<form id="newOrderForm"><div class="form-grid"><div class="field"><label for="orderNumber">Номер заказа *</label><input id="orderNumber" required placeholder="Например, ЗК-18472" autocomplete="off"></div><div class="field"><label for="clientName">Имя клиента *</label><input id="clientName" required placeholder="Имя или название компании"></div></div><div class="field"><label for="deliveryType">Вид доставки</label><select id="deliveryType"><option value="city">Доставка по городу</option><option value="post">Доставка почтой</option><option value="pickup">Самовывоз</option></select></div><div class="field"><label>Артикулы заказа</label>${articlesEditorHtml([{article:'',quantity:1}])}<span class="field-hint">Для каждого артикула укажите количество. Можно добавлять и удалять позиции.</span></div><div class="field"><label for="startStatus">Начальный статус</label><select id="startStatus">${statusOptions}</select><span class="field-hint">${statusHint}</span></div><div class="field"><label for="initialComment">Комментарий (необязательно)</label><textarea id="initialComment" placeholder="Короткая заметка по заказу"></textarea></div></form>`,[button('Отмена','close'),button('Создать карточку','create-order','primary-button')],'НОВЫЙ ЗАКАЗ')}
+showModal('Добавить заказ',`<form id="newOrderForm"><div class="form-grid"><div class="field"><label for="orderNumber">Номер заказа *</label><input id="orderNumber" required placeholder="Например, ЗК-18472" autocomplete="off"></div><div class="field client-suggestion-wrap"><label for="clientName">Имя клиента *</label><input id="clientName" required placeholder="Имя или название компании" autocomplete="off"><div id="clientNameSuggestions" class="chat-mention-suggestions client-suggestions" hidden></div></div></div><div class="field"><label for="deliveryType">Вид доставки</label><select id="deliveryType"><option value="city">Доставка по городу</option><option value="post">Доставка почтой</option><option value="pickup">Самовывоз</option></select></div><div class="field"><label>Артикулы заказа</label>${articlesEditorHtml([{article:'',quantity:1}])}<span class="field-hint">Для каждого артикула укажите количество. Можно добавлять и удалять позиции.</span></div><div class="field"><label for="startStatus">Начальный статус</label><select id="startStatus">${statusOptions}</select><span class="field-hint">${statusHint}</span></div><div class="field"><label for="initialComment">Комментарий (необязательно)</label><textarea id="initialComment" placeholder="Короткая заметка по заказу"></textarea></div></form>`,[button('Отмена','close'),button('Создать карточку','create-order','primary-button')],'НОВЫЙ ЗАКАЗ')}
 function returnedQuantityForArticle(o,article){
   const key=String(article||'').trim().toUpperCase();
   // Отменённые возвраты не должны уменьшать доступное к возврату количество.
@@ -726,7 +726,7 @@ let entries=(o.entries||[]).map(e=>{const decisionLabel=e.decision==='Подтв
 
 function openOrderActionCategory(category){const o=state.orders.find(x=>x.id===selectedId);if(o&&hasPendingDefect(o)){toast('Пока дефект не рассмотрен, другие действия с заказом недоступны.');return;}const isManager=isManagerRole()||canManageUsers;const warehouseActions=[...(state.role==='warehouse'||canManageUsers?[button('Отгружен кладовщиком','set-status:Отгружен кладовщиком','small-button shipped')]:[]),button('Под вопросом','set-status:Под вопросом','small-button warehouse-status-question'),button('Ожидает самовывоза','set-status:Ожидает самовывоза','small-button warehouse-status-pickup-waiting'),button('Клиент забрал самовывозом','set-status:Клиент забрал самовывозом','small-button warehouse-status-pickup-done')];const managerActions=[button('Создан','set-status:Создан','small-button manager-status-created'),button('На согласовании','set-status:На согласовании','small-button manager-status-approval'),button('Одобрен на отгрузку клиенту','set-status:Одобрен на отгрузку клиенту','small-button manager-status-ready'),button('Перенесен','set-status:Перенесен','small-button manager-status-transferred'),button('Отменён','set-status:Отменён','small-button manager-status-cancel'),button('Ожидает оплаты','set-status:Ожидает оплаты','small-button manager-status-payment')];const title=category==='warehouse'?'Действия кладовщика':'Действия менеджера';const list=category==='warehouse'?warehouseActions:managerActions;showModal(title,`<div class="order-action-menu"><div class="order-action-menu-hint">${category==='warehouse'?'Статусы сборки и выдачи заказа.':'Статусы согласования и работы менеджера.'}</div><div class="order-action-menu-list">${list.join('')}</div></div>`,[button('Назад к заказу','back-detail')],category==='warehouse'?'КЛАДОВЩИК':'МЕНЕДЖЕР')}
 function openEditMenu(){showModal('Редактировать заказ','<div class="field-hint">Выберите, что хотите изменить.</div>',[button('Редактировать данные','edit-order-info','small-button neutral-edit-button'),button('Редактировать артикулы','edit-articles','small-button neutral-edit-button'),button('Назад к заказу','back-detail','small-button')],'РЕДАКТИРОВАНИЕ ЗАКАЗА')}
-function editOrderInfo(){const o=state.orders.find(x=>x.id===selectedId);if(!o)return;if(!canEditOrder(o)){toast('После отгрузки или получения заказа клиентом редактирование доступно только администратору и директору.');return;}if(hasPendingDefect(o)){toast('Редактирование заблокировано до решения по дефекту.');return;}showModal('Редактировать данные заказа',`<form id="editOrderInfoForm"><div class="field"><label for="editOrderNumber">Номер заказа *</label><input id="editOrderNumber" required autocomplete="off" value="${esc(o.number)}"></div><div class="field"><label for="editClientName">Имя клиента *</label><input id="editClientName" required autocomplete="off" value="${esc(o.client)}"></div><div class="field"><label for="editDeliveryType">Вид доставки</label><select id="editDeliveryType"><option value="city"${(o.deliveryType||'city')==='city'?' selected':''}>Доставка по городу</option><option value="pickup"${o.deliveryType==='pickup'?' selected':''}>Самовывоз</option><option value="post"${o.deliveryType==='post'?' selected':''}>Доставка почтой</option></select></div><span class="field-hint">Изменения сохранятся в карточке заказа и будут видны всем сотрудникам.</span></form>`,[button('Назад','back-detail'),button('Сохранить изменения','save-order-info','primary-button')],'ДАННЫЕ ЗАКАЗА')}
+function editOrderInfo(){const o=state.orders.find(x=>x.id===selectedId);if(!o)return;if(!canEditOrder(o)){toast('После отгрузки или получения заказа клиентом редактирование доступно только администратору и директору.');return;}if(hasPendingDefect(o)){toast('Редактирование заблокировано до решения по дефекту.');return;}showModal('Редактировать данные заказа',`<form id="editOrderInfoForm"><div class="field"><label for="editOrderNumber">Номер заказа *</label><input id="editOrderNumber" required autocomplete="off" value="${esc(o.number)}"></div><div class="field client-suggestion-wrap"><label for="editClientName">Имя клиента *</label><input id="editClientName" required autocomplete="off" value="${esc(o.client)}"><div id="editClientNameSuggestions" class="chat-mention-suggestions client-suggestions" hidden></div></div><div class="field"><label for="editDeliveryType">Вид доставки</label><select id="editDeliveryType"><option value="city"${(o.deliveryType||'city')==='city'?' selected':''}>Доставка по городу</option><option value="pickup"${o.deliveryType==='pickup'?' selected':''}>Самовывоз</option><option value="post"${o.deliveryType==='post'?' selected':''}>Доставка почтой</option></select></div><span class="field-hint">Изменения сохранятся в карточке заказа и будут видны всем сотрудникам.</span></form>`,[button('Назад','back-detail'),button('Сохранить изменения','save-order-info','primary-button')],'ДАННЫЕ ЗАКАЗА')}
 async function saveOrderInfo(){const o=state.orders.find(x=>x.id===selectedId);if(!o)return;if(!canEditOrder(o)){toast('После отгрузки или получения заказа клиентом редактировать заказ могут только администратор и директор.');return;}if(hasPendingDefect(o)){toast('Редактирование заблокировано до решения по дефекту.');return;}const number=$("editOrderNumber").value.trim(),client=$("editClientName").value.trim(),deliveryType=['city','pickup','post'].includes($("editDeliveryType")?.value)?$("editDeliveryType").value:'city';if(!number||!client){toast('Укажите номер заказа и имя клиента.');return}const duplicate=state.orders.find(x=>x.id!==o.id&&String(x.number).trim().toLowerCase()===number.toLowerCase());if(duplicate){toast('Карточка с таким номером уже существует.');return}const oldNumber=o.number,oldClient=o.client,oldDeliveryType=o.deliveryType||'city',now=isoNow(),updatedByName=profileName||roles[state.role]||'Сотрудник';try{await updateDoc(doc(db,'orders',o.id),{number,client,deliveryType,updatedAt:now,updatedBy:signedInUser.uid,updatedByName});o.number=number;o.client=client;o.deliveryType=deliveryType;o.updatedAt=now;o.updatedBy=signedInUser.uid;o.updatedByName=updatedByName;const entry={id:crypto.randomUUID(),kind:'system',text:`Данные заказа изменены: ${oldNumber} → ${number}; клиент: ${oldClient} → ${client}; доставка: ${oldDeliveryType==='pickup'?'Самовывоз':oldDeliveryType==='post'?'Доставка почтой':'Доставка по городу'} → ${deliveryType==='pickup'?'Самовывоз':deliveryType==='post'?'Доставка почтой':'Доставка по городу'}`,authorId:signedInUser.uid,author:updatedByName,createdAt:now,photos:[]};try{await setDoc(doc(db,'orders',o.id,'entries',entry.id),entryToCloud(entry));o.entries.push(entry)}catch(logErr){console.warn('Не удалось записать историю изменения данных заказа',logErr)}serverCache.set(o.id,{...(serverCache.get(o.id)||{}),...o,entries:[...(o.entries||[])]});pendingOrderData.delete(o.id);closeModal();render();toast('Данные заказа сохранены.');notify('Данные заказа изменены',o.id);openOrder(o.id)}catch(err){console.error('Не удалось сохранить данные заказа',err);toast('Не удалось сохранить данные заказа: '+(err?.code||err?.message||'нет доступа'));}}
 function editArticles(){const o=state.orders.find(x=>x.id===selectedId);if(!o)return;if(!canEditOrder(o)){toast('После отгрузки заказ заблокирован для этой роли.');return;}if(hasPendingDefect(o)){toast('Редактирование заблокировано до решения по дефекту.');return;}showModal(`Артикулы заказа № ${o.number}`,`<div class="field"><label>Состав заказа</label>${articlesEditorHtml(o.articles||[])}<span class="field-hint">Добавляйте новые позиции, меняйте количество или удаляйте ненужные.</span></div>`,[button('Назад','back-detail'),button('Сохранить артикулы','save-articles','primary-button')],'СОСТАВ ЗАКАЗА')}
 function isArticleRemovedByDefect(o,index,item){
@@ -963,7 +963,7 @@ function chatMentionSuggestions(){
   const match=value.match(/(?:^|[\s])@([\p{L}\p{N}_-]*)$/u);
   if(!match){list.hidden=true;list.innerHTML='';return;}
   const needle=match[1].toLocaleLowerCase('ru');
-  const people=[...new Map(chatMessages.filter(m=>m.authorId&&m.authorName).map(m=>[m.authorId,{id:m.authorId,name:m.authorName}])).values()]
+  const people=[...new Map([...knownChatPeople,...chatMessages.filter(m=>m.authorId&&m.authorName).map(m=>({id:m.authorId,name:m.authorName}))].filter(p=>p.id&&p.name).map(p=>[p.id,p])).values()]
     .filter(p=>p.id!==signedInUser?.uid)
     .filter(p=>chatMentionToken(p.name).toLocaleLowerCase('ru').startsWith(needle))
     .slice(0,6);
@@ -971,14 +971,47 @@ function chatMentionSuggestions(){
   list.innerHTML=people.map(p=>'<button type="button" data-chat-mention="'+esc(chatMentionToken(p.name))+'">@'+esc(chatMentionToken(p.name))+' <small>'+esc(p.name)+'</small></button>').join('');
   list.hidden=false;
 }
+function clientNameSuggestions(inputId,listId){
+  const input=$(inputId),list=$(listId);
+  if(!input||!list)return;
+  const needle=input.value.trim().toLocaleLowerCase('ru');
+  if(!needle){list.hidden=true;list.innerHTML='';return;}
+  const counts=new Map();
+  state.orders.forEach(o=>{
+    const name=String(o.client||'').trim();
+    if(!name)return;
+    const key=name.toLocaleLowerCase('ru');
+    const entry=counts.get(key)||{name,count:0};
+    entry.count++;
+    if(name.length>entry.name.length)entry.name=name;
+    counts.set(key,entry);
+  });
+  const matches=[...counts.values()]
+    .filter(c=>c.name.toLocaleLowerCase('ru').includes(needle))
+    .sort((x,y)=>{
+      const xs=x.name.toLocaleLowerCase('ru').startsWith(needle)?1:0;
+      const ys=y.name.toLocaleLowerCase('ru').startsWith(needle)?1:0;
+      return ys-xs||y.count-x.count||x.name.localeCompare(y.name,'ru');
+    }).slice(0,8);
+  if(!matches.length){list.hidden=true;list.innerHTML='';return;}
+  list.innerHTML=matches.map(c=>'<button type="button" data-client-suggestion="'+esc(c.name)+'">'+esc(c.name)+' <small>Заказов: '+c.count+'</small></button>').join('');
+  list.hidden=false;
+}
+function chooseClientSuggestion(inputId,listId,name){
+  const input=$(inputId),list=$(listId);
+  if(!input)return;
+  input.value=name;
+  if(list){list.hidden=true;list.innerHTML='';}
+  input.focus();
+}
 function entryMentionSuggestions(){
   const input=$('entryText'),list=$('entryMentionSuggestions');
   if(!input||!list)return;
   const value=input.value.slice(0,input.selectionStart??input.value.length);
-  const match=value.match(/(?:^|[\\s])@([\\p{L}\\p{N}_-]*)$/u);
+  const match=value.match(/(?:^|[\s])@([\p{L}\p{N}_-]*)$/u);
   if(!match){list.hidden=true;list.innerHTML='';return;}
   const needle=match[1].toLocaleLowerCase('ru');
-  const people=[...new Map(chatMessages.filter(m=>m.authorId&&m.authorName).map(m=>[m.authorId,{id:m.authorId,name:m.authorName}])).values()]
+  const people=[...new Map([...knownChatPeople,...chatMessages.filter(m=>m.authorId&&m.authorName).map(m=>({id:m.authorId,name:m.authorName}))].filter(p=>p.id&&p.name).map(p=>[p.id,p])).values()]
     .filter(p=>p.id!==signedInUser?.uid)
     .filter(p=>chatMentionToken(p.name).toLocaleLowerCase('ru').startsWith(needle))
     .slice(0,6);
@@ -1479,8 +1512,28 @@ function backProfile(){closeModal();profileMenu()}
 async function toggleStaff(uid,active){if(!canManageUsers||uid===signedInUser.uid)return;try{await updateDoc(doc(db,'users',uid),{active});toast(active?'Доступ сотрудника включён.':'Доступ сотрудника отключён.');showStaff()}catch(err){console.error(err);toast('Не удалось изменить доступ сотрудника.')}}
 async function changeStaffRole(uid){if(!canManageUsers||uid===signedInUser.uid)return;const role=$(`staff-role-${uid}`)?.value;if(!roles[role])return;try{await updateDoc(doc(db,'users',uid),{role});toast(`Роль изменена: ${roles[role]}.`);showStaff()}catch(err){console.error(err);toast('Не удалось изменить роль. Проверьте права администратора и правила Firestore.')}}
 function backDetail(){if(selectedId)openOrder(selectedId);}
-document.addEventListener('input',e=>{if(e.target?.id==='entryText')entryMentionSuggestions();});
-document.addEventListener('keyup',e=>{if(e.target?.id==='entryText')entryMentionSuggestions();});
+document.addEventListener('input',e=>{
+  if(e.target?.id==='entryText')entryMentionSuggestions();
+  if(e.target?.id==='clientName')clientNameSuggestions('clientName','clientNameSuggestions');
+  if(e.target?.id==='editClientName')clientNameSuggestions('editClientName','editClientNameSuggestions');
+});
+document.addEventListener('focusin',e=>{
+  if(e.target?.id==='clientName')clientNameSuggestions('clientName','clientNameSuggestions');
+  if(e.target?.id==='editClientName')clientNameSuggestions('editClientName','editClientNameSuggestions');
+});
+
+document.addEventListener('keyup',e=>{
+  if(e.target?.id==='entryText')entryMentionSuggestions();
+  if(e.target?.id==='clientName')clientNameSuggestions('clientName','clientNameSuggestions');
+  if(e.target?.id==='editClientName')clientNameSuggestions('editClientName','editClientNameSuggestions');
+});
+document.addEventListener('focusout',e=>{
+  if(['clientName','editClientName'].includes(e.target?.id)){
+    const id=e.target.id==='clientName'?'clientNameSuggestions':'editClientNameSuggestions';
+    setTimeout(()=>{const list=$(id);if(list&&!list.contains(document.activeElement))list.hidden=true;},120);
+  }
+});
+
 document.addEventListener('click',e=>{
   const noticeCard=e.target.closest('[data-notice-id]');
   if(noticeCard){
@@ -1496,6 +1549,14 @@ document.addEventListener('click',e=>{
   }
   const statCard=e.target.closest('[data-stat-key]');
   if(statCard){e.preventDefault();openStatOrders(statCard.dataset.statKey||'');return;}
+  const clientSuggestion=e.target.closest('[data-client-suggestion]');
+  if(clientSuggestion){
+    e.preventDefault();
+    const value=clientSuggestion.dataset.clientSuggestion||'';
+    const isEdit=!!clientSuggestion.closest('#editOrderInfoForm');
+    chooseClientSuggestion(isEdit?'editClientName':'clientName',isEdit?'editClientNameSuggestions':'clientNameSuggestions',value);
+    return;
+  }
   const entryMention=e.target.closest('[data-entry-mention]');
   if(entryMention){e.preventDefault();insertEntryMention(entryMention.dataset.entryMention||'');return;}
   const mention=e.target.closest('[data-chat-mention]');

@@ -2403,3 +2403,7 @@ body.dark-theme .mention-center-button{
 }
 body.dark-theme .mention-center-icon{background:#263b30!important;color:#70d7a0!important}
 body.dark-theme .mention-center-button b{background:#16845b!important;color:#fff!important}
+
+
+/* Compact pagination for large order lists. */
+.table-pagination{display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;padding:14px 10px;color:var(--muted,#687080);font-size:13px}.table-pagination button{min-height:34px}.table-pagination button:disabled{opacity:.45;cursor:not-allowed}@media(max-width:600px){.table-pagination{gap:8px}.table-pagination span{width:100%;text-align:center;order:-1}}

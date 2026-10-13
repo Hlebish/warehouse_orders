@@ -1084,8 +1084,8 @@ function renderChatMessages(){
   const queryText=chatFilterText.toLocaleLowerCase('ru');
   const activeChatFilter=$('chatFilter')?.value||chatFilterMode||'all';
   const orderCommentMessages=state.orders.flatMap(o=>(o.entries||[]).filter(e=>e.kind==='comment'&&String(e.text||'').trim()).map(e=>({id:'order-comment-'+o.id+'-'+e.id,source:'order-comment',orderId:o.id,orderNumber:o.number,client:o.client||'',authorName:e.author||'Сотрудник',text:e.text||'',createdAt:e.createdAt||o.createdAt,photos:Array.isArray(e.photos)?e.photos:[]})));
-  // Keep ordinary chat messages prominent in the "all messages" view; order comments are shown after them.
-  const combinedMessages=[...olderChatMessages,...chatMessages,...orderCommentMessages].sort((x,y)=>{const xComment=x.source==='order-comment',yComment=y.source==='order-comment';if(xComment!==yComment)return xComment?1:-1;const time=v=>v?.toMillis?v.toMillis():new Date(v||0).getTime();return time(y.createdAt)-time(x.createdAt)||String(y.id).localeCompare(String(x.id))});
+  // Interleave ordinary chat messages and order comments by their actual send/create time.
+  const combinedMessages=[...olderChatMessages,...chatMessages,...orderCommentMessages].sort((x,y)=>{const time=v=>v?.toMillis?v.toMillis():new Date(v||0).getTime();return time(x.createdAt)-time(y.createdAt)||String(x.id).localeCompare(String(y.id))});
   const visibleMessages=combinedMessages.filter(m=>{
     const hay=(String(m.authorName||'')+' '+String(m.text||'')+' '+String(m.replyToText||'')).toLocaleLowerCase('ru');
     if(queryText&&!hay.includes(queryText))return false;

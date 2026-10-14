@@ -210,6 +210,21 @@ service cloud.firestore {
           && request.resource.data.updatedBy == request.auth.uid
           && request.resource.data.updatedByName is string)
 
+        // Все активные сотрудники могут менять состав заказа до отгрузки.
+        // Это соответствует интерфейсу: редактирование артикулов доступно всем ролям,
+        // но не позволяет этой веткой менять статус, клиента или другие поля заказа.
+        || (activeUser()
+          && resource.data.status != 'Отгружен кладовщиком'
+          && resource.data.status != 'Клиент забрал самовывозом'
+          && request.resource.data.status == resource.data.status
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['articles', 'updatedAt', 'updatedBy', 'updatedByName'])
+          && request.resource.data.articles is list
+          && request.resource.data.articles.size() <= 100
+          && request.resource.data.updatedAt is string
+          && request.resource.data.updatedBy == request.auth.uid
+          && request.resource.data.updatedByName is string)
+
         || (isManager()
           && resource.data.status != 'Отгружен кладовщиком'
           && resource.data.status != 'Клиент забрал самовывозом'

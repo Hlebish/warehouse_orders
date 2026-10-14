@@ -107,7 +107,7 @@ async function createNotificationHistory(data, eventId) {
   return count;
 }
 
-async function collectTokens(category='orders', recipientUserId='', authorId='') {
+async function collectTokens(category='orders', recipientUserId='', authorId='', forceAll=false) {
   // Direct notifications should never enumerate every employee's devices.
   const users = recipientUserId
     ? await db.collection('users').doc(recipientUserId).get().then(user =>
@@ -117,7 +117,7 @@ async function collectTokens(category='orders', recipientUserId='', authorId='')
   const eligibleUsers = users.filter(user => {
     const profile = user.data() || {};
     if (!recipientUserId && authorId && user.id === authorId && profile.extraPhoneNotifications !== true) return false;
-    return (profile.notificationSettings || {})[category] !== false;
+    return forceAll || (profile.notificationSettings || {})[category] !== false;
   });
 
   // Only read push-token subcollections for users who can receive this event.
@@ -269,7 +269,7 @@ exports.sendWarehousePush = onDocumentCreated({ document: 'pushQueue/{eventId}',
     : (orderId ? `${siteUrl}?order=${encodeURIComponent(orderId)}` : siteUrl);
 
   try {
-    const tokenDocs = await collectTokens(category, recipientUserId, String(data.authorId || ''));
+    const tokenDocs = await collectTokens(category, recipientUserId, String(data.authorId || ''), Boolean(data.buybackItemId));
 
     if (!tokenDocs.length) {
       await historyPromise;

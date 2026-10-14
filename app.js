@@ -148,6 +148,7 @@ async function writeAudit(action,details='',orderId='',meta={}){
 }
 async function save(){
  if(!signedInUser)return;
+ let saveStage='подготовка изменений';
  try{
  const currentIds=new Set(state.orders.map(o=>o.id));
  let batch=writeBatch(db),batchWrites=0;
@@ -177,7 +178,8 @@ async function save(){
      pendingWrites.add(o.id);
      pendingOrderData.set(o.id,{...o,number:next.number,client:next.client,status:next.status,articles:next.articles||[]});
      const orderRef=doc(db,'orders',o.id);
-     await addBatchWrite(b=>newOrder?b.set(orderRef,next):b.update(orderRef,next));
+     saveStage='обновление документа заказа '+(o.number||o.id);
+      await addBatchWrite(b=>newOrder?b.set(orderRef,next):b.update(orderRef,next));
 
      const normalizedArticles=normalizeArticles(o.articles||[]);
      const articleBody=normalizedArticles.length
@@ -196,7 +198,8 @@ async function save(){
    for(const e of o.entries||[]){
      const cloud=entryToCloud(e),old=oldEntries.get(e.id);
      if(!old||!equal(cloud,entryToCloud(old))){
-       await addBatchWrite(b=>b.set(doc(db,'orders',o.id,'entries',e.id),cloud));
+       saveStage='сохранение записи истории '+e.id+' заказа '+(o.number||o.id);
+        await addBatchWrite(b=>b.set(doc(db,'orders',o.id,'entries',e.id),cloud));
        if(!newOrder&&e.kind!=='viewed'&&e.kind!=='system'){
          const label=e.kind==='decision'?'Решение':e.kind==='defect'?'Дефект':e.kind==='question'?'Вопрос':'Комментарий';
          const body=e.kind==='decision'&&e.decision?`Решение: ${e.decision}. ${e.decisionText||e.text||''}`:e.text||label;
@@ -230,7 +233,7 @@ async function save(){
  }
  await flushBatch();
  }catch(err){
-  console.error('Ошибка сохранения заказа:',err);
+  console.error('Ошибка сохранения заказа на этапе «'+saveStage+'»: ',err);
   const code=String(err?.code||'').trim();
   const message=String(err?.message||'').trim();
   const details=code?code.replace(/^.*?\//,''):message;

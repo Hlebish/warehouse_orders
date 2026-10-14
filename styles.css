@@ -2488,3 +2488,12 @@ body.dark-theme .date-separator.current-date-separator td{background:#1c2118!imp
 /* Emphasize the client name in each shipment block. */
 .shipment-order-header .shipment-client-name{display:block;font-size:16px!important;font-weight:500;line-height:1.35;color:var(--text,#edf0ed);overflow-wrap:anywhere}
 body.dark-theme .shipment-order-header .shipment-client-name{font-size:16px!important;color:#edf0e9!important}
+
+
+/* Shipment order cards with optional collapsing for long article lists. */
+.shipment-order-card>summary.shipment-order-header{list-style:none;cursor:pointer}
+.shipment-order-card>summary.shipment-order-header::-webkit-details-marker{display:none}
+.shipment-order-card>summary.shipment-order-header:after{content:"⌄";flex:0 0 auto;margin-left:2px;color:var(--muted,#9ba49b);font-size:18px;line-height:1;transition:transform .16s ease}
+.shipment-order-card[open]>summary.shipment-order-header:after{transform:rotate(180deg)}
+.shipment-order-card:not([open])>summary.shipment-order-header{border-bottom:0}
+.shipment-order-card>summary.shipment-order-header:focus-visible{outline:2px solid var(--accent,#9fca5b);outline-offset:-3px}

@@ -2486,5 +2486,5 @@ body.dark-theme .date-separator.current-date-separator td{background:#1c2118!imp
 
 
 /* Emphasize the client name in each shipment block. */
-.shipment-order-header .shipment-client-name{display:block;font-size:16px!important;font-weight:800;line-height:1.35;color:var(--text,#edf0ed);overflow-wrap:anywhere}
+.shipment-order-header .shipment-client-name{display:block;font-size:16px!important;font-weight:500;line-height:1.35;color:var(--text,#edf0ed);overflow-wrap:anywhere}
 body.dark-theme .shipment-order-header .shipment-client-name{font-size:16px!important;color:#edf0e9!important}

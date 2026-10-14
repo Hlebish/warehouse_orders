@@ -40,6 +40,62 @@ const notificationParams=new URLSearchParams(location.search);
 pendingNotificationOrderId=notificationParams.get('order')||'';
 pendingNotificationChat=notificationParams.get('chat')==='1';
 const $=id=>document.getElementById(id), modal=$('modalBackdrop');
+let uiStateRestored=false,lastUiSave=0;
+function saveUiState(){
+  try{
+    const chatBox=$('chatMessages');
+    const modalOpen=!!(modal&&!modal.hidden);
+    const isChat=modalOpen&&$('modalTitle')?.textContent==='Общий чат';
+    const orderId=modalOpen&&modal.dataset.orderDetail?String(modal.dataset.orderDetail):'';
+    sessionStorage.setItem('warehouseUiState',JSON.stringify({
+      scrollX:window.scrollX||0,scrollY:window.scrollY||0,
+      activeFilter,search:$('searchInput')?.value||'',
+      dateFrom:$('dateFromFilter')?.value||'',dateTo:$('dateToFilter')?.value||'',
+      currentOrdersPage,modalType:isChat?'chat':orderId?'order':'',
+      orderId,chatScrollTop:chatBox?.scrollTop||0
+    }));
+  }catch{}
+}
+function restoreUiState(){
+  if(uiStateRestored)return;
+  uiStateRestored=true;
+  try{
+    const raw=sessionStorage.getItem('warehouseUiState');
+    if(!raw)return;
+    const saved=JSON.parse(raw);
+    if(saved.activeFilter)activeFilter=saved.activeFilter;
+    if($('searchInput')&&typeof saved.search==='string')$('searchInput').value=saved.search;
+    if($('dateFromFilter')&&typeof saved.dateFrom==='string')$('dateFromFilter').value=saved.dateFrom;
+    if($('dateToFilter')&&typeof saved.dateTo==='string')$('dateToFilter').value=saved.dateTo;
+    currentOrdersPage=Math.max(1,Number(saved.currentOrdersPage)||1);
+    render();
+    requestAnimationFrame(()=>requestAnimationFrame(()=>{
+      window.scrollTo(Number(saved.scrollX)||0,Number(saved.scrollY)||0);
+      if(saved.modalType==='order'&&saved.orderId&&state.orders.some(o=>o.id===saved.orderId)){
+        openOrder(saved.orderId);
+      }else if(saved.modalType==='chat'){
+        openChat();
+        if(Number(saved.chatScrollTop)>0){
+          const target=Number(saved.chatScrollTop);
+          const restoreChatScroll=()=>{const box=$('chatMessages');if(box)box.scrollTop=target;};
+          setTimeout(restoreChatScroll,500);
+        }
+      }
+    }));
+  }catch(err){console.warn('Не удалось восстановить состояние страницы',err);}
+}
+window.addEventListener('scroll',()=>{
+  const now=Date.now();
+  if(now-lastUiSave<150)return;
+  lastUiSave=now;saveUiState();
+},{passive:true});
+window.addEventListener('pagehide',saveUiState);
+window.addEventListener('beforeunload',saveUiState);
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')saveUiState();});
+document.addEventListener('input',saveUiState,true);
+document.addEventListener('change',saveUiState,true);
+document.addEventListener('click',()=>{setTimeout(saveUiState,0)},true);
+
 const savedTheme=localStorage.getItem('ampTheme')||'light';
 function applyTheme(theme){
   const next=theme==='dark'?'dark':'light';
@@ -421,7 +477,7 @@ if(wasFirstEntries&&selectedId===d.id&&!modal.hidden&&modal.dataset.orderDetail=
      if(pending && data.number===pending.number && data.client===pending.client && data.status===pending.status){pendingOrderData.delete(d.id);}
    }
    for(const o of [...state.orders])if(!remoteIds.has(o.id)&&!pendingWrites.has(o.id)){state.orders=state.orders.filter(x=>x.id!==o.id);entryUnsubscribes.get(o.id)?.();entryUnsubscribes.delete(o.id);serverCache.delete(o.id)}
-   initialCloudLoad=false;render();
+   initialCloudLoad=false;render();restoreUiState();
    // Keep the open order card in sync when another employee changes its status.
    if(openedOrderStatusChanged&&selectedId&&!modal.hidden&&modal.dataset.orderDetail===selectedId)openOrder(selectedId);
    if(pendingNotificationOrderId){const target=pendingNotificationOrderId;pendingNotificationOrderId='';history.replaceState({},'',location.pathname+location.hash);if(state.orders.some(o=>o.id===target))openOrder(target);}
@@ -429,45 +485,7 @@ if(wasFirstEntries&&selectedId===d.id&&!modal.hidden&&modal.dataset.orderDetail=
 }
 onAuthStateChanged(auth,user=>{
  stopCloud();signedInUser=user;initialCloudLoad=true;
- if(!user){function saveUiState(){
-  try{
-    sessionStorage.setItem('warehouseUiState',JSON.stringify({
-      scrollX:window.scrollX||0,
-      scrollY:window.scrollY||0,
-      activeFilter,
-      search:$('searchInput')?.value||'',
-      dateFrom:$('dateFromFilter')?.value||'',dateTo:$('dateToFilter')?.value||''
-    }));
-  }catch{}
-}
-function restoreUiState(){
-  try{
-    const raw=sessionStorage.getItem('warehouseUiState');
-    if(!raw)return;
-    const saved=JSON.parse(raw);
-    if(saved.activeFilter)activeFilter=saved.activeFilter;
-    if($('searchInput')&&typeof saved.search==='string')$('searchInput').value=saved.search;
-    if($('dateFromFilter')&&typeof saved.dateFrom==='string')$('dateFromFilter').value=saved.dateFrom;if($('dateToFilter')&&typeof saved.dateTo==='string')$('dateToFilter').value=saved.dateTo;
-    render();
-    requestAnimationFrame(()=>requestAnimationFrame(()=>{
-      window.scrollTo(Number(saved.scrollX)||0,Number(saved.scrollY)||0);
-    }));
-  }catch{}
-}
-let lastUiSave=0;
-window.addEventListener('scroll',()=>{
-  const now=Date.now();
-  if(now-lastUiSave<150)return;
-  lastUiSave=now;
-  saveUiState();
-},{passive:true});
-window.addEventListener('pagehide',saveUiState);
-window.addEventListener('beforeunload',saveUiState);
-window.addEventListener('pageshow',e=>{
-  if(e.persisted)requestAnimationFrame(restoreUiState);
-});
-
-showAuth();return}
+ if(!user){showAuth();return}
  showAuth('Проверяем доступ…');
  profileUnsubscribe=onSnapshot(doc(db,'users',user.uid),snap=>{
    if(!snap.exists()){showAuth('Учётная запись создана, но профиль не найден. Обратитесь к администратору.');$('authError').textContent=`UID: ${user.uid}`;return}

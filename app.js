@@ -1469,7 +1469,7 @@ async function openShipmentManifest(dateKey=localDateKey(new Date()),categoryFil
     html+='<div class="shipment-order-list">';
     for(const order of shippedOrders){
       const orderQuantity=order.shipmentArticles.reduce((sum,item)=>sum+(Number(item.quantity)||1),0);
-      html+='<section class="shipment-order-card"><header class="shipment-order-header"><div><strong>Заказ № '+esc(order.number||'—')+'</strong><span>'+esc(order.client||'Клиент не указан')+'</span></div><span class="shipment-order-count">'+orderQuantity+' шт.</span></header><div class="shipment-order-articles">';
+      html+='<section class="shipment-order-card"><header class="shipment-order-header"><div><strong class="shipment-client-name">'+esc(order.client||'Клиент не указан')+'</strong></div><span class="shipment-order-count">'+orderQuantity+' шт.</span></header><div class="shipment-order-articles">';
       for(const item of order.shipmentArticles){
         const checked=checkedArticles.has(String(item.article||'').trim().toUpperCase());
         const checkControl=(canManageUsers||state.role==='warehouse')

@@ -76,7 +76,7 @@
 
       <section class="content">
         <div class="demo-banner" id="demoBanner" hidden><span>◈</span><div><b>Облачная история заказов</b><small>Изменения синхронизируются между всеми сотрудниками.</small></div></div>
-        <div class="page-heading"><div><div class="eyebrow">ОБРАБОТКА И СОГЛАСОВАНИЕ</div><h1>Заказы</h1><p>Сборка, комментарии и решения менеджеров в одной истории.</p></div><button class="primary-button" id="newOrderButton"><span>＋</span> Добавить заказ</button></div>
+        <div class="page-heading"><div><div class="eyebrow">ОБРАБОТКА И СОГЛАСОВАНИЕ</div><h1>Заказы</h1><p>Сборка, комментарии и решения менеджеров в одной истории.</p></div></div>
 
         <div class="stats-grid">
           <article class="stat-card stat-card-clickable stat-created" role="button" tabindex="0" data-stat-key="Создан" aria-label="Открыть заказы со статусом Создан"><span class="stat-icon pale-blue" aria-hidden="true">＋</span><div class="stat-copy"><div class="stat-label">Создано</div><strong id="statCreated">0</strong><small>Со статусом «Создан»</small></div></article>
@@ -110,6 +110,7 @@
     <button type="button" data-menu-filter="Самовывоз">Самовывоз</button>
   </div>
 </div></div></div>
+          <div class="create-order-row"><div class="create-order-hint"><span class="create-order-spark">＋</span><span><b>Новый заказ</b><small>Создайте карточку для обработки и отслеживания</small></span></div><button class="primary-button create-order-button" id="newOrderButton" type="button"><span>＋</span> Создать заказ <span class="create-order-arrow">→</span></button></div>
           <div class="table-wrap"><table><thead><tr><th>ЗАКАЗ</th><th>КЛИЕНТ</th><th>СТАТУС</th><th>ДОСТАВКА</th><th>КОММЕНТАРИИ</th><th>СОЗДАН</th><th></th></tr></thead><tbody id="ordersBody"></tbody></table><div class="empty-state" id="emptyState"><div class="empty-icon">▤</div><b>Заказов пока нет</b><span>Добавьте номер заказа после сборки.</span><button class="secondary-button" id="emptyAddButton">＋ Добавить заказ</button></div></div>
           <div class="table-footer"><span id="listSummary">0 заказов</span><span>История сохраняется в карточке заказа</span></div><div class="table-pagination" id="ordersPagination" aria-label="Страницы заказов" hidden></div>
         </section>

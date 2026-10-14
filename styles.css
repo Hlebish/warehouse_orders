@@ -2422,3 +2422,19 @@ body.dark-theme .mention-center-button b{background:#16845b!important;color:#fff
 .timeline-reply-reference>b{display:block;margin-bottom:4px;font-size:.88em}
 .timeline-reply-reference>div{white-space:pre-wrap;opacity:.86}
 .timeline-item .timeline-top{flex-wrap:wrap}
+
+
+/* Clear primary action directly above the orders table */
+.create-order-row{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:15px 22px;background:linear-gradient(110deg,#f1f8f3 0%,#fbfdfb 72%);border-top:1px solid #e4eee7;border-bottom:1px solid #e4eee7}
+.create-order-hint{display:flex;align-items:center;gap:12px;min-width:0}
+.create-order-spark{display:grid;place-items:center;flex:0 0 42px;width:42px;height:42px;border-radius:13px;background:#dff2e6;color:#167653;font-size:24px;font-weight:600}
+.create-order-hint b,.create-order-hint small{display:block}
+.create-order-hint b{font-size:13px;color:#214b37;font-weight:800}
+.create-order-hint small{margin-top:3px;color:#708477;font-size:11px;line-height:1.4}
+.create-order-button{display:inline-flex;align-items:center;justify-content:center;gap:10px;min-height:48px;padding:0 22px!important;border:1px solid #116b49!important;border-radius:13px!important;background:linear-gradient(135deg,#238b60,#126b49)!important;color:#fff!important;font-size:13px!important;font-weight:800!important;letter-spacing:.01em;white-space:nowrap;box-shadow:0 7px 16px rgba(22,118,83,.22)!important;transition:transform .16s ease,box-shadow .16s ease,filter .16s ease}
+.create-order-button:hover{transform:translateY(-1px);filter:brightness(1.04);box-shadow:0 10px 22px rgba(22,118,83,.28)!important}
+.create-order-button:active{transform:translateY(0)}
+.create-order-button>span:first-child{font-size:20px;line-height:1}
+.create-order-arrow{font-size:17px;opacity:.8;margin-left:4px}
+@media(max-width:620px){.create-order-row{align-items:stretch;flex-direction:column;padding:13px;gap:12px}.create-order-hint{gap:10px}.create-order-spark{flex-basis:38px;width:38px;height:38px;border-radius:11px}.create-order-hint small{font-size:10px}.create-order-button{width:100%;min-height:49px;font-size:13px!important}}
+@media(prefers-reduced-motion:reduce){.create-order-button{transition:none}}

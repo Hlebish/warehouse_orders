@@ -297,6 +297,18 @@ service cloud.firestore {
             && request.resource.data.articleIndex is int
             && request.resource.data.text is string
             && request.resource.data.photos is list
+            && request.resource.data.photos.size() <= 5)
+
+          // Менеджерская группа может обновить системную запись при сохранении состава заказа.
+          || (hasManagerPermissions()
+            && resource.data.kind == 'system'
+            && request.resource.data.kind == 'system'
+            && request.resource.data.authorId == resource.data.authorId
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+              'article', 'text', 'important', 'authorName', 'createdAt', 'photos'
+            ])
+            && request.resource.data.text is string
+            && request.resource.data.photos is list
             && request.resource.data.photos.size() <= 5);
 
         allow delete: if canManageUsers();

@@ -46,6 +46,8 @@
       <nav class="nav" aria-label="Основная навигация">
         <button class="nav-item active" type="button" data-filter="all"><span class="nav-icon">▤</span><span>Все заказы</span></button>
         <button class="nav-item" type="button" data-action="returns"><span class="nav-icon">↩</span><span>Возвраты</span></button>
+        <button class="nav-item" id="buybackNavButton" type="button"><span class="nav-icon">⏳</span><span>Перекупной товар</span><span id="buybackNavAlert" class="buyback-nav-alert" hidden>!</span></button>
+
       </nav>
       <div class="sidebar-bottom">
         <button class="chat-sidebar-button" id="chatSidebarButton" type="button" aria-label="Открыть общий чат"><span>💬</span><span>Общий чат</span></button>
@@ -124,5 +126,6 @@
   <button type="button" id="mentionCenterButton" class="mention-center-button" hidden aria-live="polite"><span class="mention-center-icon">＠</span><span id="mentionCenterLabel">Вас упомянули</span><b id="mentionCenterCount">0</b></button>
   <div class="toast-stack" id="toastStack" aria-live="polite"></div>
   <script type="module" src="app.js?v=1.0.1.117"></script>
+  <script type="module" src="buyback.js?v=1.0.0"></script>
 </body>
 </html>

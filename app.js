@@ -826,7 +826,7 @@ async function saveArticles(){
  }catch(err){
    o.articles=previous;Object.assign(o,oldUpdated);
    console.error('Не удалось сохранить артикулы заказа № '+(o.number||o.id)+': ',err);
-   toast('Не удалось сохранить артикулы: '+(String(err?.code||'').replace(/^.*?\\//,'')||'проверьте доступ и соединение'));
+   toast('Не удалось сохранить артикулы: '+(String(err?.code||'').replace(/^.*?\//,'')||'проверьте доступ и соединение'));
  }
 }
 function addComment(){showModal('Добавить комментарий',`<form id="entryForm"><div class="field entry-mention-wrap"><label for="entryText">Сообщение *</label><textarea id="entryText" required placeholder="Напишите комментарий; используйте @ для упоминания" autocomplete="off"></textarea><div id="entryMentionSuggestions" class="chat-mention-suggestions entry-mention-suggestions" hidden></div></div><div class="field"><label class="important-message-option"><input id="entryImportant" type="checkbox"> <span>⚠ Сделать важным сообщением</span></label></div><div class="field"><label for="entryPhotos">Фото (необязательно)</label><div class="upload-box">Прикрепить фотографии<input id="entryPhotos" type="file" accept="image/*" multiple></div><span class="field-hint">Можно отправить обычный текст без артикула и фотографий.</span></div></form>`,[button('Назад','back-detail'),button('Отправить','save-entry','primary-button')],'КОММЕНТАРИЙ');modal.dataset.replyToEntryId='';$('entryKind')?.remove()}

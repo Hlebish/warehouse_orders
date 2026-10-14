@@ -10,6 +10,8 @@ service cloud.firestore {
     function isDirector() { return activeUser() && role() == 'director'; }
     function isWarehouse() { return activeUser() && role() == 'warehouse'; }
     function isManager() { return activeUser() && role() in ['manager', 'chief_accountant', 'accountant']; }
+    // Бухгалтеры и главный бухгалтер входят в ту же группу полномочий, что и менеджеры.
+    function hasManagerPermissions() { return isManager(); }
     function canManageUsers() { return activeUser() && (userDoc().data.admin == true || role() == 'director'); }
     function canViewDeletedOrders() { return activeUser() && (userDoc().data.admin == true || role() in ['director', 'chief_accountant']); }
     function chatLikes(data) { return data.keys().hasAll(['likes']) ? data.likes : []; }

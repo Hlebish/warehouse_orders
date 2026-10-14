@@ -1,4 +1,5 @@
 const { onDocumentCreated } = require('firebase-functions/v2/firestore');
+const { onSchedule } = require('firebase-functions/v2/scheduler');
 const { onRequest } = require('firebase-functions/v2/https');
 const { defineSecret } = require('firebase-functions/params');
 const { setGlobalOptions } = require('firebase-functions/v2/options');
@@ -399,5 +400,46 @@ exports.sendWarehousePush = onDocumentCreated({ document: 'pushQueue/{eventId}',
     });
 
     throw error;
+  }
+});
+
+
+// Ежедневная проверка сроков перекупного товара. Отправляем каждую контрольную отметку один раз.
+exports.checkBuybackDeadlines = onSchedule({
+  schedule: 'every day 09:00',
+  timeZone: 'Europe/Kyiv',
+  retryCount: 2
+}, async () => {
+  const snap = await db.collection('buybackItems').where('status', '==', 'active').get();
+  const now = new Date();
+  const milestones = {
+    3: { title: 'Перекупной товар залежался', body: article => `Артикул ${article}: товар находится на складе уже 3 дня. Проверьте дальнейшие действия.` },
+    6: { title: 'Внимание: подходит срок возврата', body: article => `Артикул ${article}: прошло 6 из 14 дней. Срок возврата приближается — пора принять решение.` },
+    10: { title: 'КРИТИЧЕСКИЙ СРОК ВОЗВРАТА', body: article => `Артикул ${article}: прошло 10 из 14 дней. До окончания срока осталось 4 дня — срочно проверьте возврат!` }
+  };
+  for (const itemDoc of snap.docs) {
+    const data = itemDoc.data() || {};
+    const received = new Date(String(data.receivedAt || '') + 'T00:00:00');
+    if (Number.isNaN(received.getTime())) continue;
+    const elapsed = Math.floor((Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()) - Date.UTC(received.getFullYear(), received.getMonth(), received.getDate())) / 86400000);
+    const sent = Array.isArray(data.sentMilestones) ? data.sentMilestones : [];
+    const due = Object.keys(milestones).map(Number).filter(day => elapsed >= day && !sent.includes(day));
+    for (const day of due) {
+      const milestone = milestones[day];
+      const eventId = 'buyback_' + itemDoc.id + '_' + day;
+      await db.collection('pushQueue').doc(eventId).set({
+        title: milestone.title,
+        body: milestone.body(String(data.article || 'без артикула')) + ' Количество: ' + String(data.quantity || 1) + '.',
+        authorId: 'system',
+        orderId: '',
+        target: 'site',
+        category: 'orders',
+        recipientUserId: '',
+        createdAt: new Date().toISOString(),
+        sentAt: null,
+        buybackItemId: itemDoc.id
+      }, { merge: true });
+      await itemDoc.ref.update({ sentMilestones: FieldValue.arrayUnion(day), updatedAt: FieldValue.serverTimestamp() });
+    }
   }
 });

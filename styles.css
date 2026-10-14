@@ -2483,3 +2483,8 @@ body.dark-theme .shipment-order-count{background:#2b3822;color:#b5d783}
 body.dark-theme .date-separator.transferred-date-separator td{background:#29251b!important;color:#e5c77b!important}
 body.dark-theme .date-separator.current-date-separator td{background:#1c2118!important;color:#e5e9e1!important}
 @media(prefers-reduced-motion:reduce){.transferred-order-row{scroll-behavior:auto}}
+
+
+/* Emphasize the client name in each shipment block. */
+.shipment-order-header .shipment-client-name{display:block;font-size:16px!important;font-weight:800;line-height:1.35;color:var(--text,#edf0ed);overflow-wrap:anywhere}
+body.dark-theme .shipment-order-header .shipment-client-name{font-size:16px!important;color:#edf0e9!important}

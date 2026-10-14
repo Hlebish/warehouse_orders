@@ -11,7 +11,7 @@ let currentUser = null, unsubscribe = null, items = [], selectedStatus = 'active
 
 const style = document.createElement('style');
 style.textContent = `
-.buyback-nav-alert{margin-left:auto;display:inline-grid;place-items:center;width:23px;height:23px;border-radius:50%;background:#c83e3e;color:white;font-weight:900;font-size:17px;box-shadow:0 0 0 4px #c83e3e18;animation:buybackPulse 1.5s infinite}
+.buyback-nav-alert[hidden]{display:none}.buyback-nav-alert{margin-left:auto;display:inline-grid;place-items:center;width:23px;height:23px;border-radius:50%;background:#c83e3e;color:white;font-weight:900;font-size:17px;box-shadow:0 0 0 4px #c83e3e18;animation:buybackPulse 1.5s infinite}
 @keyframes buybackPulse{50%{box-shadow:0 0 0 7px #c83e3e08}}
 .buyback-overlay{position:fixed;inset:0;background:#141c2a70;z-index:50;display:grid;place-items:center;padding:16px}
 .buyback-overlay[hidden]{display:none}

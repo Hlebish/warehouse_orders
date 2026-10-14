@@ -49,7 +49,7 @@ overlay.className='buyback-overlay';overlay.hidden=true;overlay.innerHTML=`
 document.body.append(overlay);
 const nav=$('buybackNavButton');
 const dateInput=$('buybackDate');
-dateInput.value=new Date().toLocaleDateString('en-CA');
+dateInput.value=(()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')})();
 function showToast(message){const stack=$('toastStack');if(stack){const el=document.createElement('div');el.className='toast';el.textContent=message;stack.append(el);setTimeout(()=>el.remove(),3500)}}
 function elapsedDays(date){const d=new Date(date+'T00:00:00');const n=new Date();return Math.floor((Date.UTC(n.getFullYear(),n.getMonth(),n.getDate())-Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()))/86400000)}
 function deadline(item){return new Date(new Date(item.receivedAt+'T00:00:00').getTime()+14*86400000)}

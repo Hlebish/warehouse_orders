@@ -259,16 +259,27 @@ service cloud.firestore {
           && request.resource.data.keys().hasOnly([
             'kind', 'article', 'text', 'important', 'authorId', 'authorName', 'createdAt',
             'photos', 'decision', 'decisionText', 'decidedBy',
-            'decidedByName', 'decidedAt', 'articleIndex'
+            'decidedByName', 'decidedAt', 'articleIndex',
+            'replyToEntryId', 'replyToAuthorId', 'replyToAuthorName', 'replyToText'
           ])
           && request.resource.data.authorId == request.auth.uid
+          && request.resource.data.authorName is string
           && request.resource.data.kind in [
             'comment', 'question', 'defect', 'decision', 'viewed', 'system', 'return'
           ]
           && request.resource.data.text is string
           && (!request.resource.data.keys().hasAny(['important']) || request.resource.data.important is bool)
           && request.resource.data.photos is list
-          && request.resource.data.photos.size() <= 5;
+          && request.resource.data.photos.size() <= 5
+          && (!request.resource.data.keys().hasAny([
+              'replyToEntryId', 'replyToAuthorId', 'replyToAuthorName', 'replyToText'
+            ])
+            || (request.resource.data.replyToEntryId is string
+              && request.resource.data.replyToAuthorId is string
+              && request.resource.data.replyToAuthorName is string
+              && request.resource.data.replyToText is string
+              && get(/databases/$(database)/documents/orders/$(orderId)/entries/$(request.resource.data.replyToEntryId)).data.authorId
+                == request.resource.data.replyToAuthorId));
 
         allow update: if (isManager() || canManageUsers() || isDirector())
           && resource.data.kind == 'defect'

@@ -803,8 +803,32 @@ async function toggleAssemblyProgress(){
     toast('Не удалось изменить сборку: '+(String(err?.code||'').replace(/^.*?\//,'')||'проверьте доступ и соединение'));
   }
 }
-async function saveArticles(){const o=state.orders.find(x=>x.id===selectedId);if(!o)return;if(!canEditOrder(o)){toast('После отгрузки заказ заблокирован для этой роли.');return;}if(hasPendingDefect(o)){toast('Редактирование заблокировано до решения по дефекту.');return;}const next=normalizeArticles(readArticles());
-const previous=normalizeArticles(o.articles||[]);if(articlesEqual(previous,next)){backDetail();return}o.articles=next;o.entries.push({id:crypto.randomUUID(),kind:'system',text:`Состав заказа изменён: ${next.length?next.map(x=>`${x.article} × ${x.quantity}`).join(', '):'артикулы удалены'}`,authorId:signedInUser.uid,author:profileName||roles[state.role],createdAt:isoNow(),photos:[]});await save();closeModal();render();toast('Артикулы заказа сохранены.');notify(`Артикулы заказа № ${o.number} изменены`,o.id);openOrder(o.id)}
+async function saveArticles(){
+ const o=state.orders.find(x=>x.id===selectedId);
+ if(!o||!signedInUser)return;
+ if(!canEditOrder(o)){toast('После отгрузки заказ заблокирован для этой роли.');return;}
+ if(hasPendingDefect(o)){toast('Редактирование заблокировано до решения по дефекту.');return;}
+ const next=normalizeArticles(readArticles()),previous=normalizeArticles(o.articles||[]);
+ if(articlesEqual(previous,next)){backDetail();return;}
+ const entry={id:crypto.randomUUID(),kind:'system',text:`Состав заказа изменён: ${next.length?next.map(x=>`${x.article} × ${x.quantity}`).join(', '):'артикулы удалены'}`,authorId:signedInUser.uid,author:profileName||roles[state.role],createdAt:isoNow(),photos:[]};
+ const now=isoNow(),oldUpdated={updatedAt:o.updatedAt,updatedBy:o.updatedBy,updatedByName:o.updatedByName};
+ const normalized=next.map(x=>({article:String(x.article||'').trim(),quantity:Math.max(1,Number(x.quantity)||1),collected:x.collected===true,shipmentChecked:x.shipmentChecked===true})).filter(x=>x.article);
+ try{
+   // Keep the write atomic, but update only fields permitted by the article-edit rule.
+   // The history record is created in the same batch as the order's article patch.
+   const batch=writeBatch(db);
+   batch.update(doc(db,'orders',o.id),{articles:normalized,updatedAt:now,updatedBy:signedInUser.uid,updatedByName:profileName||roles[state.role]});
+   batch.set(doc(db,'orders',o.id,'entries',entry.id),entryToCloud(entry));
+   await batch.commit();
+   o.articles=next;o.updatedAt=now;o.updatedBy=signedInUser.uid;o.updatedByName=profileName||roles[state.role];o.entries.push(entry);
+   serverCache.set(o.id,{...(serverCache.get(o.id)||o),...o,articles:normalized,entries:[...(o.entries||[])]});
+   closeModal();render();toast('Артикулы заказа сохранены.');notify(`Артикулы заказа № ${o.number} изменены`,o.id);openOrder(o.id);
+ }catch(err){
+   o.articles=previous;Object.assign(o,oldUpdated);
+   console.error('Не удалось сохранить артикулы заказа № '+(o.number||o.id)+': ',err);
+   toast('Не удалось сохранить артикулы: '+(String(err?.code||'').replace(/^.*?\\//,'')||'проверьте доступ и соединение'));
+ }
+}
 function addComment(){showModal('Добавить комментарий',`<form id="entryForm"><div class="field entry-mention-wrap"><label for="entryText">Сообщение *</label><textarea id="entryText" required placeholder="Напишите комментарий; используйте @ для упоминания" autocomplete="off"></textarea><div id="entryMentionSuggestions" class="chat-mention-suggestions entry-mention-suggestions" hidden></div></div><div class="field"><label class="important-message-option"><input id="entryImportant" type="checkbox"> <span>⚠ Сделать важным сообщением</span></label></div><div class="field"><label for="entryPhotos">Фото (необязательно)</label><div class="upload-box">Прикрепить фотографии<input id="entryPhotos" type="file" accept="image/*" multiple></div><span class="field-hint">Можно отправить обычный текст без артикула и фотографий.</span></div></form>`,[button('Назад','back-detail'),button('Отправить','save-entry','primary-button')],'КОММЕНТАРИЙ');modal.dataset.replyToEntryId='';$('entryKind')?.remove()}
 function replyToEntry(entryId){const o=state.orders.find(x=>x.id===selectedId),entry=o?.entries.find(x=>x.id===entryId);if(!o||!entry||entry.kind!=='comment'){toast('Не удалось найти комментарий для ответа.');return;}showModal('Ответ на комментарий',`<div class="timeline-reply-reference"><b>${esc(entry.author||'Сотрудник')}</b><div>${esc(String(entry.text||'').slice(0,500))}${String(entry.text||'').length>500?'…':''}</div></div><form id="entryForm"><div class="field entry-mention-wrap"><label for="entryText">Ваш ответ *</label><textarea id="entryText" required placeholder="Напишите ответ…" autocomplete="off"></textarea><div id="entryMentionSuggestions" class="chat-mention-suggestions entry-mention-suggestions" hidden></div></div><div class="field"><label for="entryPhotos">Фото (необязательно)</label><div class="upload-box">Прикрепить фотографии<input id="entryPhotos" type="file" accept="image/*" multiple></div></div></form>`,[button('Назад','back-detail'),button('Отправить ответ','save-entry','primary-button')],'ОТВЕТ НА КОММЕНТАРИЙ');modal.dataset.replyToEntryId=entry.id;}
 function addDefect(){const o=state.orders.find(x=>x.id===selectedId);if(!o)return;if(!canEditOrder(o)){toast('После отгрузки заказ заблокирован для этой роли.');return;}if(hasPendingDefect(o)){toast('У заказа уже есть нерассмотренный дефект.');return;}const options=(o.articles||[]).map((x,i)=>`<option value="${i}">${esc(x.article)} · ${Number(x.quantity)||1} шт. · позиция ${i+1}</option>`).join('');if(!options){toast('В заказе нет позиций для выбора дефекта.');return;}showModal('Добавить дефект',`<form id="entryForm"><input id="entryKind" type="hidden" value="defect"><div class="field"><label for="articleIndex">Позиция заказа *</label><select id="articleIndex" required><option value="">Выберите артикул из заказа</option>${options}</select></div><div class="field"><label for="entryText">Описание дефекта *</label><textarea id="entryText" required placeholder="Опишите, что не так с деталью"></textarea></div><div class="field"><label for="entryPhotos">Фото дефекта (необязательно)</label><div class="upload-box">Прикрепить фотографии<input id="entryPhotos" type="file" accept="image/*" multiple></div><span class="field-hint">Фото помогут оценить дефект.</span></div></form>`,[button('Назад','back-detail'),button('Добавить дефект','save-entry','primary-button')],'ДЕФЕКТ ДЕТАЛИ')}

@@ -58,7 +58,7 @@ function render(){
  const expired=active.filter(x=>elapsedDays(x.receivedAt)>=14).length;
  const critical=active.filter(x=>elapsedDays(x.receivedAt)>=10&&elapsedDays(x.receivedAt)<14).length;
  const warn=active.filter(x=>elapsedDays(x.receivedAt)>=6&&elapsedDays(x.receivedAt)<10).length;
- $('buybackNavAlert').hidden=active.length===0;
+ $('buybackNavAlert').hidden=!active.some(x=>elapsedDays(x.receivedAt)>=10);
  $('buybackSummary').innerHTML=`<span class="buyback-chip">В работе: <b>${active.length}</b></span><span class="buyback-chip">Срок подходит: <b>${warn}</b></span><span class="buyback-chip">Критично: <b>${critical}</b></span><span class="buyback-chip">Срок вышел: <b>${expired}</b></span>`;
  const visible=items.filter(x=>x.status===selectedStatus).sort((a,b)=>String(a.receivedAt).localeCompare(String(b.receivedAt)));
  if(!visible.length){$('buybackList').innerHTML='<div class="buyback-empty">Здесь пока нет записей.</div>';return}

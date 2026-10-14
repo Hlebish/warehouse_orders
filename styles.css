@@ -2415,3 +2415,10 @@ body.dark-theme .mention-center-button b{background:#16845b!important;color:#fff
 /* Keep order-comment mention suggestions anchored to the comment field. */
 .entry-mention-wrap{position:relative}
 .entry-mention-wrap .entry-mention-suggestions{top:calc(100% + 5px);bottom:auto;max-height:220px;overflow:auto;z-index:30}
+
+
+/* Replies to comments inside order history */
+.timeline-reply-reference{margin:8px 0;padding:9px 11px;border-left:3px solid var(--accent,#2f8068);border-radius:7px;background:rgba(47,128,104,.08);font-size:.92em;overflow-wrap:anywhere}
+.timeline-reply-reference>b{display:block;margin-bottom:4px;font-size:.88em}
+.timeline-reply-reference>div{white-space:pre-wrap;opacity:.86}
+.timeline-item .timeline-top{flex-wrap:wrap}

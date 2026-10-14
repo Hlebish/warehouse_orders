@@ -2449,3 +2449,27 @@ body.dark-theme .create-order-hint b{color:#e5e9e1!important}
 body.dark-theme .create-order-hint small{color:#9ba598!important}
 body.dark-theme .create-order-button{background:linear-gradient(135deg,#426b22,#31521a)!important;border-color:#4b702b!important;box-shadow:0 5px 14px rgba(0,0,0,.22)!important}
 body.dark-theme .create-order-button:hover{background:linear-gradient(135deg,#507d2a,#3a6020)!important;box-shadow:0 7px 18px rgba(0,0,0,.3)!important}
+
+
+/* Shipment manifest grouped into individual order/client blocks. */
+.shipment-order-list{display:grid;gap:12px;margin:12px 0}
+.shipment-order-card{overflow:hidden;border:1px solid var(--border,#343a40);border-radius:12px;background:var(--surface,#17191b)}
+.shipment-order-header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 15px;background:rgba(80,130,65,.09);border-bottom:1px solid var(--border,#343a40)}
+.shipment-order-header>div{display:grid;gap:4px;min-width:0}
+.shipment-order-header>div strong{font-size:13px;color:var(--text,#edf0ed)}
+.shipment-order-header>div span{font-size:12px;color:var(--muted,#9ba49b);overflow-wrap:anywhere}
+.shipment-order-count{flex:0 0 auto;padding:5px 9px;border-radius:999px;background:rgba(105,153,0,.16);color:var(--accent,#9fca5b);font-size:11px;font-weight:800}
+.shipment-order-articles{padding:0 12px}
+.shipment-order-articles .manifest-row{gap:12px;padding:11px 2px;border-bottom:1px solid var(--border,#343a40)}
+.shipment-order-articles .manifest-row:last-child{border-bottom:0}
+.shipment-order-articles .manifest-row>span:first-child{display:grid;gap:4px;min-width:0}
+.shipment-order-articles .manifest-row>span:first-child b{overflow-wrap:anywhere}
+.shipment-order-articles .manifest-row small{color:var(--muted,#9ba49b)}
+.shipment-order-article-actions{display:flex;align-items:center;justify-content:flex-end;gap:9px;flex-wrap:wrap}
+.shipment-order-article-actions>strong{white-space:nowrap}
+body.dark-theme .shipment-order-card{background:#17191a;border-color:#34383a}
+body.dark-theme .shipment-order-header{background:#20251e;border-bottom-color:#34383a}
+body.dark-theme .shipment-order-header>div strong{color:#edf0e9}
+body.dark-theme .shipment-order-header>div span,body.dark-theme .shipment-order-articles .manifest-row small{color:#a4aca0}
+body.dark-theme .shipment-order-count{background:#2b3822;color:#b5d783}
+@media(max-width:520px){.shipment-order-header{padding:11px 12px}.shipment-order-articles{padding:0 9px}.shipment-order-articles .manifest-row{align-items:flex-start}.shipment-order-article-actions{flex-direction:column;align-items:flex-end;gap:5px}.shipment-order-article-actions .small-button{font-size:10px;padding:6px 8px}}

@@ -45,8 +45,9 @@ function saveUiState(){
   try{
     const chatBox=$('chatMessages');
     const modalOpen=!!(modal&&!modal.hidden);
-    const isChat=modalOpen&&$('modalTitle')?.textContent==='Общий чат';
-    const orderId=modalOpen&&modal.dataset.orderDetail?String(modal.dataset.orderDetail):'';
+    const modalTitle=$('modalTitle')?.textContent||'';
+    const isChat=modalOpen&&modalTitle==='Общий чат';
+    const orderId=modalOpen&&modalTitle.includes('№')&&modal.dataset.orderDetail?String(modal.dataset.orderDetail):'';
     sessionStorage.setItem('warehouseUiState',JSON.stringify({
       scrollX:window.scrollX||0,scrollY:window.scrollY||0,
       activeFilter,search:$('searchInput')?.value||'',

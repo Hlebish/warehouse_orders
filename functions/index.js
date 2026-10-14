@@ -78,7 +78,7 @@ async function createNotificationHistory(data, eventId) {
     const profile = user.data() || {};
     if (!recipientUserId && user.id === authorId && profile.extraPhoneNotifications !== true) continue;
     const settings = profile.notificationSettings || {};
-    if (settings[category] === false) continue;
+    if (settings[category] === false && !data.buybackItemId) continue;
 
     const notificationRef = user.ref.collection('notifications').doc(eventId);
     batch.set(notificationRef, {

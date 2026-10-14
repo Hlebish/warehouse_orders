@@ -2473,3 +2473,13 @@ body.dark-theme .shipment-order-header>div strong{color:#edf0e9}
 body.dark-theme .shipment-order-header>div span,body.dark-theme .shipment-order-articles .manifest-row small{color:#a4aca0}
 body.dark-theme .shipment-order-count{background:#2b3822;color:#b5d783}
 @media(max-width:520px){.shipment-order-header{padding:11px 12px}.shipment-order-articles{padding:0 9px}.shipment-order-articles .manifest-row{align-items:flex-start}.shipment-order-article-actions{flex-direction:column;align-items:flex-end;gap:5px}.shipment-order-article-actions .small-button{font-size:10px;padding:6px 8px}}
+
+
+/* Visually separate transferred orders from the current day's workflow. */
+.date-separator.transferred-date-separator td{background:#29251b!important;border-top:2px solid #8a6b2e!important;color:#e5c77b!important}
+.date-separator.transferred-date-separator td span{font-weight:800;letter-spacing:.02em}
+.date-separator.current-date-separator td{background:rgba(105,153,0,.08)!important;border-top:2px solid rgba(105,153,0,.35)!important;color:var(--text,#edf0ed)!important}
+.transferred-order-row td:first-child{border-left:3px solid #8a6b2e}
+body.dark-theme .date-separator.transferred-date-separator td{background:#29251b!important;color:#e5c77b!important}
+body.dark-theme .date-separator.current-date-separator td{background:#1c2118!important;color:#e5e9e1!important}
+@media(prefers-reduced-motion:reduce){.transferred-order-row{scroll-behavior:auto}}

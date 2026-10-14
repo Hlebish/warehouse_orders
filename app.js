@@ -1469,7 +1469,8 @@ async function openShipmentManifest(dateKey=localDateKey(new Date()),categoryFil
     html+='<div class="shipment-order-list">';
     for(const order of shippedOrders){
       const orderQuantity=order.shipmentArticles.reduce((sum,item)=>sum+(Number(item.quantity)||1),0);
-      html+='<section class="shipment-order-card"><header class="shipment-order-header"><div><strong class="shipment-client-name">'+esc(order.client||'Клиент не указан')+'</strong></div><span class="shipment-order-count">'+orderQuantity+' шт.</span></header><div class="shipment-order-articles">';
+      const collapsed=order.shipmentArticles.length>3;
+      html+='<details class="shipment-order-card"'+(collapsed?'':' open')+'><summary class="shipment-order-header"><div><strong class="shipment-client-name">'+esc(order.client||'Клиент не указан')+'</strong></div><span class="shipment-order-count">'+orderQuantity+' шт.</span></summary><div class="shipment-order-articles">';
       for(const item of order.shipmentArticles){
         const checked=checkedArticles.has(String(item.article||'').trim().toUpperCase());
         const checkControl=(canManageUsers||state.role==='warehouse')
@@ -1477,7 +1478,7 @@ async function openShipmentManifest(dateKey=localDateKey(new Date()),categoryFil
           : '<span class="article-collected-state">'+(checked?'✓ Проверено':'☐ Не проверено')+'</span>';
         html+='<div class="manifest-row"><span><b>'+esc(item.article)+'</b><small>'+esc(shipmentPartType(item.article))+'</small></span><span class="shipment-order-article-actions"><strong>'+(Number(item.quantity)||1)+' шт.</strong>'+checkControl+'</span></div>';
       }
-      html+='</div></section>';
+      html+='</div></details>';
     }
     html+='</div>';
   }

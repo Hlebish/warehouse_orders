@@ -1,0 +1,28 @@
+name: Deploy testing preview
+
+on:
+  push:
+    branches:
+      - dev/warehouse-orders-testing
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  checks: write
+  pull-requests: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout testing branch
+        uses: actions/checkout@v4
+
+      - name: Deploy Firebase Hosting preview
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_SKLAD_18F38 }}
+          projectId: sklad-18f38
+          channelId: testing
+          expires: 30d

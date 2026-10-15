@@ -1471,85 +1471,95 @@ async function openShipmentDayOffset(days){
   const current=$('shipmentDate')?.value||localDateKey(new Date());
   await openShipmentManifest(shiftShipmentDate(current,days));
 }
-async function toggleShipmentItemChecked(dateKey,article){
+async function toggleShipmentItemChecked(dateKey,orderId,article){
   if(!(canManageUsers||state.role==='warehouse')){toast('Отметить проверку может только кладовщик или администратор.');return;}
-  const key=String(article||'').trim().toUpperCase();
-  if(!key)return;
+  const articleKey=String(article||'').trim().toUpperCase();
+  const orderKey=String(orderId||'').trim();
+  if(!articleKey||!orderKey)return;
   try{
     const ref=doc(db,'shipmentDays',dateKey);
     const snap=await getDoc(ref);
     const data=snap.exists()?snap.data():{};
-    const checked=new Set(Array.isArray(data.checkedArticles)?data.checkedArticles.map(x=>String(x).trim().toUpperCase()).filter(Boolean):[]);
+    let checked=new Set(Array.isArray(data.checkedOrderArticles)?data.checkedOrderArticles.map(String):[]);
+    if(!Array.isArray(data.checkedOrderArticles)){
+      const legacy=new Set(Array.isArray(data.checkedArticles)?data.checkedArticles.map(x=>String(x).trim().toUpperCase()):[]);
+      for(const order of state.orders.filter(o=>o.status==='Отгружен кладовщиком'&&shipmentOrderDateKey(o)===dateKey)){
+        for(const item of normalizeArticles(order.articles||[])){
+          if(legacy.has(String(item.article||'').trim().toUpperCase()))checked.add(String(order.id)+'::'+String(item.article||'').trim().toUpperCase());
+        }
+      }
+    }
+    const key=orderKey+'::'+articleKey;
     const nextChecked=!checked.has(key);
     if(nextChecked)checked.add(key);else checked.delete(key);
-    await setDoc(ref,{
-      date:dateKey,
-      checkedArticles:[...checked]
-    },{merge:true});
-    await writeAudit(
-      nextChecked?'Проверена позиция на отгрузке':'Снята проверка позиции на отгрузке',
-      'Дата: '+dateKey+'; артикул: '+key
-    );
-    openShipmentManifest(dateKey);
+    await setDoc(ref,{date:dateKey,checkedOrderArticles:[...checked]},{merge:true});
+    await writeAudit(nextChecked?'Проверена позиция на отгрузке':'Снята проверка позиции на отгрузке','Дата: '+dateKey+'; заказ: '+orderKey+'; артикул: '+articleKey);
+    openShipmentManifest(dateKey,'',$('shipmentSearch')?.value||'');
   }catch(err){
     console.error('Не удалось сохранить отметку проверки отгрузки',err);
     toast('Не удалось сохранить отметку проверки.');
   }
 }
-async function openShipmentManifest(dateKey=localDateKey(new Date()),categoryFilter=''){
+async function openShipmentManifest(dateKey=localDateKey(new Date()),categoryFilter='',searchQuery=''){
   await loadShipmentCategoryMap();
   let confirmation=null;
   try{const snap=await getDoc(doc(db,'shipmentDays',dateKey));if(snap.exists())confirmation=snap.data();}catch(err){console.warn(err);}
   const shipmentDaySnap=await getDoc(doc(db,'shipmentDays',dateKey)).catch(()=>null);
-  const checkedArticles=new Set(shipmentDaySnap?.exists()&&Array.isArray(shipmentDaySnap.data()?.checkedArticles)?shipmentDaySnap.data().checkedArticles.map(x=>String(x).trim().toUpperCase()).filter(Boolean):[]);
-  const allItems=shipmentItemsForDate(dateKey);
-  const sortMode=$('shipmentSort')?.value||'article';
-  const items=allItems.map(x=>({...x,checked:checkedArticles.has(String(x.article||'').trim().toUpperCase())}));
-  if(sortMode==='name')items.sort((a,b)=>a.type.localeCompare(b.type,'ru',{sensitivity:'base'})||a.article.localeCompare(b.article,'ru',{numeric:true,sensitivity:'base'}));
-  else items.sort((a,b)=>a.article.localeCompare(b.article,'ru',{numeric:true,sensitivity:'base'}));
-  let html='<div class="shipment-day-picker"><button type="button" class="shipment-day-nav" data-action="shipment-day-prev" aria-label="Предыдущий день">‹</button><div class="shipment-day-current"><label for="shipmentDate">День отгрузки</label><input id="shipmentDate" type="date" value="'+esc(dateKey)+'"></div><button type="button" class="shipment-day-nav" data-action="shipment-day-next" aria-label="Следующий день">›</button></div><div class="shipment-day-quick"><button type="button" class="small-button primary-soft" data-action="shipment-day-today">Сегодня</button><button type="button" class="small-button" data-action="shipment-day-prev">← Предыдущий</button><button type="button" class="small-button" data-action="shipment-day-next">Следующий →</button></div>';  html+='<div class="field" style="margin:0 0 10px"><label for="shipmentSort">Сортировка</label><select id="shipmentSort"><option value="article"'+(sortMode!=='name'?' selected':'')+'>По артикулу</option><option value="name"'+(sortMode==='name'?' selected':'')+'>По названию детали</option></select></div>';
-  const orderCount=new Set(items.flatMap(x=>x.orders)).size,itemCount=items.reduce((sum,x)=>sum+x.quantity,0);
-  html+='<p class="stat-modal-hint">Заказов: <b>'+orderCount+'</b> · деталей: <b>'+itemCount+'</b> · артикулов: <b>'+items.length+'</b>'+(categoryFilter?' · категория: <b>'+esc(categoryFilter)+'</b>':'')+'</p>';
+  const dayData=shipmentDaySnap?.exists()?shipmentDaySnap.data()||:{};
+  const checkedOrderArticles=new Set(Array.isArray(dayData.checkedOrderArticles)?dayData.checkedOrderArticles.map(String):[]);
+  const legacyCheckedArticles=new Set(Array.isArray(dayData.checkedArticles)?dayData.checkedArticles.map(x=>String(x).trim().toUpperCase()):[]);
+  const query=String(searchQuery||'').trim().toLocaleLowerCase('ru');
   const shippedOrders=state.orders.filter(o=>o.status==='Отгружен кладовщиком'&&shipmentOrderDateKey(o)===dateKey).map(o=>{
     const removedIndexes=new Set((o.entries||[]).filter(e=>e.kind==='defect'&&e.decision==='Удалена из заказа').map(e=>Number.isInteger(e.articleIndex)?e.articleIndex:-1));
     const articles=normalizeArticles(o.articles||[]).filter((item,index)=>{
       if(removedIndexes.has(index))return false;
       if(removedIndexes.has(-1)&&(o.entries||[]).some(e=>e.kind==='defect'&&e.decision==='Удалена из заказа'&&e.article===item.article))return false;
       return true;
-    }).sort((a,b)=>String(a.article).localeCompare(String(b.article),'ru',{numeric:true,sensitivity:'base'}));
-    return {...o,shipmentArticles:articles};
-  }).filter(o=>o.shipmentArticles.length).sort((a,b)=>String(a.number||'').localeCompare(String(b.number||''),'ru',{numeric:true,sensitivity:'base'})||String(a.client||'').localeCompare(String(b.client||''),'ru',{sensitivity:'base'}));
-  if(shippedOrders.length){
+    }).map(item=>{
+      const article=String(item.article||'').trim().toUpperCase();
+      const key=String(o.id)+'::'+article;
+      return {...item,articleKey:article,checked:checkedOrderArticles.has(key)||( !Array.isArray(dayData.checkedOrderArticles)&&legacyCheckedArticles.has(article))};
+    });
+    const isChecked=articles.length>0&&articles.every(item=>item.checked);
+    const clientMatch=(String(o.client||'')+' '+String(o.number||'')).toLocaleLowerCase('ru').includes(query);
+    const matchingArticles=query?articles.filter(item=>(String(item.article||'')+' '+shipmentPartType(item.article)).toLocaleLowerCase('ru').includes(query)):articles;
+    return {...o,shipmentArticles:articles,visibleArticles:(!query||clientMatch)?articles:matchingArticles,isShipmentChecked:isChecked,clientMatch};
+  }).filter(o=>o.shipmentArticles.length&&(!query||o.clientMatch||o.visibleArticles.length));
+  shippedOrders.sort((a,b)=>(a.isShipmentChecked===b.isShipmentChecked?0:a.isShipmentChecked?1:-1)||String(a.number||'').localeCompare(String(b.number||''),'ru',{numeric:true,sensitivity:'base'})||String(a.client||'').localeCompare(String(b.client||''),'ru',{sensitivity:'base'}));
+  const visibleOrders=shippedOrders;
+  const visibleItems=visibleOrders.reduce((sum,o)=>sum+o.visibleArticles.length,0);
+  const checkedCount=visibleOrders.filter(o=>o.isShipmentChecked).length;
+  let html='<div class="shipment-day-picker"><button type="button" class="shipment-day-nav" data-action="shipment-day-prev" aria-label="Предыдущий день">‹</button><div class="shipment-day-current"><label for="shipmentDate">День отгрузки</label><input id="shipmentDate" type="date" value="'+esc(dateKey)+'"></div><button type="button" class="shipment-day-nav" data-action="shipment-day-next" aria-label="Следующий день">›</button></div><div class="shipment-day-quick"><button type="button" class="small-button primary-soft" data-action="shipment-day-today">Сегодня</button><button type="button" class="small-button" data-action="shipment-day-prev">← Предыдущий</button><button type="button" class="small-button" data-action="shipment-day-next">Следующий →</button></div>';
+  html+='<div class="shipment-search-wrap"><label for="shipmentSearch">Поиск по отгрузке</label><input id="shipmentSearch" type="search" value="'+esc(searchQuery||'')+'" placeholder="Клиент, номер заказа, артикул или название детали" autocomplete="off"></div>';
+  const orderCount=new Set(visibleOrders.map(o=>o.id)).size,itemCount=visibleOrders.reduce((sum,o)=>sum+o.visibleArticles.reduce((s,item)=>s+(Number(item.quantity)||1),0),0);
+  html+='<p class="stat-modal-hint">Заказов: <b>'+orderCount+'</b> · позиций: <b>'+visibleItems+'</b> · проверено заказов: <b>'+checkedCount+'</b></p>';
+  if(visibleOrders.length){
     html+='<div class="shipment-order-list">';
-    for(const order of shippedOrders){
+    for(const order of visibleOrders){
       const orderQuantity=order.shipmentArticles.reduce((sum,item)=>sum+(Number(item.quantity)||1),0);
-      const collapsed=order.shipmentArticles.length>3;
-      html+='<details class="shipment-order-card"'+(collapsed?'':' open')+'><summary class="shipment-order-header"><div><strong class="shipment-client-name">'+esc(order.client||'Клиент не указан')+'</strong></div><span class="shipment-order-count">'+orderQuantity+' шт.</span></summary><div class="shipment-order-articles">';
-      for(const item of order.shipmentArticles){
-        const checked=checkedArticles.has(String(item.article||'').trim().toUpperCase());
+      const orderClass=order.isShipmentChecked?' shipment-order-complete':' shipment-order-pending';
+      html+='<details class="shipment-order-card'+orderClass+'"><summary class="shipment-order-header"><div><strong class="shipment-client-name">'+esc(order.client||'Клиент не указан')+'</strong><span>Заказ № '+esc(order.number||'—')+'</span></div><span class="shipment-order-count">'+orderQuantity+' шт.</span></summary><div class="shipment-order-articles">';
+      for(const item of order.visibleArticles){
         const checkControl=(canManageUsers||state.role==='warehouse')
-          ? '<button type="button" class="small-button '+(checked?'good':'primary-soft')+'" data-action="toggle-shipment-checked:'+dateKey+'|'+encodeURIComponent(item.article)+'">'+(checked?'✓ Проверено':'☐ Проверил кладовщик')+'</button>'
-          : '<span class="article-collected-state">'+(checked?'✓ Проверено':'☐ Не проверено')+'</span>';
+          ? '<button type="button" class="small-button '+(item.checked?'good':'primary-soft')+'" data-action="toggle-shipment-checked:'+dateKey+'|'+encodeURIComponent(order.id)+'|'+encodeURIComponent(item.article)+'">'+(item.checked?'✓ Проверено':'Проверить')+'</button>'
+          : '<span class="article-collected-state">'+(item.checked?'✓ Проверено':'Не проверено')+'</span>';
         html+='<div class="manifest-row"><span><b>'+esc(item.article)+'</b><small>'+esc(shipmentPartType(item.article))+'</small></span><span class="shipment-order-article-actions"><strong>'+(Number(item.quantity)||1)+' шт.</strong>'+checkControl+'</span></div>';
       }
       html+='</div></details>';
     }
     html+='</div>';
   }
-  if(!shippedOrders.length)html+='<div class="danger-note">На этот день нет заказов со статусом «Отгружен кладовщиком».</div>';
+  if(!visibleOrders.length)html+='<div class="danger-note">'+(query?'По вашему поиску ничего не найдено.':'На этот день нет заказов со статусом «Отгружен кладовщиком».')+'</div>';
   if(confirmation?.confirmed){
     html+='<div class="danger-note">✓ Список подтверждён: '+esc(confirmation.confirmedByName||'Сотрудник')+' · '+fmtDateTime(confirmation.confirmedAt)+'</div>';
-    if(canManageUsers||state.role==='warehouse'||state.role==='manager'){
-      html+=button('↶ Снять подтверждение','revoke-shipment:'+dateKey,'small-button danger');
-    }
+    if(canManageUsers||state.role==='warehouse'||state.role==='manager')html+=button('↶ Снять подтверждение','revoke-shipment:'+dateKey,'small-button danger');
   }else if(confirmation?.revokedAt){
     html+='<div class="danger-note shipment-revoked">↶ Подтверждение снято: '+esc(confirmation.revokedByName||'Сотрудник')+' · '+fmtDateTime(confirmation.revokedAt)+'</div>';
-    if(canManageUsers||state.role==='warehouse'||state.role==='manager'){
-      html+=button('✓ Подтвердить список снова','confirm-shipment:'+dateKey,'small-button good');
-    }
+    if(canManageUsers||state.role==='warehouse'||state.role==='manager')html+=button('✓ Подтвердить список снова','confirm-shipment:'+dateKey,'small-button good');
   }else if(canManageUsers||state.role==='warehouse'||state.role==='manager')html+=button('✓ Подтвердить список на отгрузку','confirm-shipment:'+dateKey,'small-button good');
   else html+='<div class="field-hint">Подтвердить список может кладовщик, менеджер или администратор.</div>';
-  showModal('Список деталей на отгрузку',html,[button('Показать день','shipment-date','small-button primary-soft'),button('Закрыть','close')],'ОТГРУЗКА ПО ДНЯМ');$('shipmentSort')?.addEventListener('change',()=>openShipmentManifest(dateKey));
+  showModal('Список деталей на отгрузку',html,[button('Показать день','shipment-date','small-button primary-soft'),button('Закрыть','close')],'ОТГРУЗКА ПО ДНЯМ');
+  $('shipmentSearch')?.addEventListener('input',e=>{const pos=e.target.selectionStart;openShipmentManifest(dateKey,'',e.target.value).then(()=>{const input=$('shipmentSearch');if(input){input.focus();input.setSelectionRange(pos,pos);}});});
 }
 async function confirmShipmentManifest(dateKey){
   if(!(canManageUsers||state.role==='warehouse'||state.role==='manager')){toast('У вас нет права подтверждать список.');return;}

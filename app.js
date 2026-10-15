@@ -1406,7 +1406,7 @@ async function generateDailyReport(dateKey){
     for(const o of state.orders)if(o.status==='Перенесен'&&reportDateMatches(o.transferredAt||o.updatedAt,dateKey)&&!transferredOrders.some(x=>x.id===o.id))transferredOrders.push(o);
     const cancelledOrders=state.orders.filter(o=>o.status==='Отменён'&&reportDateMatches(o.updatedAt,dateKey));
     const terminal=new Set(['Отгружен кладовщиком','Клиент забрал самовывозом','Отменён']);
-    const remaining=state.orders.filter(o=>{const createdDay=localDateKey(o.createdAt);return !terminal.has(o.status)&&(!createdDay||createdDay<=dateKey);});
+    const remaining=state.orders.filter(o=>!terminal.has(o.status));
     const defects=eventEntries.filter(x=>x.entry.kind==='defect');
     const returns=state.orders.flatMap(o=>(Array.isArray(o.returns)?o.returns:[]).filter(r=>r?.status!=='cancelled'&&reportDateMatches(r.createdAt,dateKey)).map(r=>({order:o,record:r})));
     const totalQty=orders=>orders.reduce((sum,o)=>sum+normalizeArticles(o.articles||[]).reduce((n,item)=>n+(Number(item.quantity)||1),0),0);

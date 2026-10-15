@@ -493,12 +493,13 @@ setPersistence(auth,browserLocalPersistence).then(()=>onAuthStateChanged(auth,us
  let cachedProfile=null;
  try{const raw=localStorage.getItem(profileCacheKey);if(raw){const parsed=JSON.parse(raw);if(parsed&&parsed.active===true&&roles[parsed.role])cachedProfile=parsed;}}catch{}
  if(cachedProfile){
+  // Keep the full-screen loader visible while Firebase validates the session and server profile.
   state.role=cachedProfile.role;canManageUsers=cachedProfile.admin===true||cachedProfile.role==='director';
   profileName=cachedProfile.displayName||user.email||roles[cachedProfile.role];
   state.notificationSettings={chat:cachedProfile.notificationSettings?.chat!==false,replies:cachedProfile.notificationSettings?.replies!==false,likes:cachedProfile.notificationSettings?.likes!==false,orders:cachedProfile.notificationSettings?.orders!==false};
   state.extraPhoneNotifications=cachedProfile.extraPhoneNotifications===true;
   $('userName').textContent=profileName;$('userRole').textContent=canManageUsers?`Администратор · ${roles[cachedProfile.role]}`:roles[cachedProfile.role];
-  hideAuth();
+  // The app is revealed only after the server profile is confirmed.
  }
  profileUnsubscribe=onSnapshot(doc(db,'users',user.uid),snap=>{
    if(!snap.exists()){showAuth('Учётная запись создана, но профиль не найден. Обратитесь к администратору.');$('authError').textContent=`UID: ${user.uid}`;return}

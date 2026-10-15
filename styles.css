@@ -2529,3 +2529,29 @@ body.dark-theme .shipment-order-header .shipment-client-name{font-size:16px!impo
 body.dark-theme .shipment-order-pending td{background:#1d3427!important;border-bottom-color:#2e4b38!important}body.dark-theme .shipment-order-pending:hover td{background:#244331!important}body.dark-theme .shipment-order-pending .order-number,body.dark-theme .shipment-order-pending .client-name{color:#9de2b4!important}
 body.dark-theme .shipment-order-verified td{background:#252729!important;color:#858b90!important;border-bottom-color:#383b3e!important}body.dark-theme .shipment-order-verified .order-number,body.dark-theme .shipment-order-verified .client-name{color:#90969b!important}body.dark-theme .shipment-check-summary{background:#1d3024;border-color:#355540}body.dark-theme .shipment-check-summary b{color:#a5dfb6}body.dark-theme .shipment-check-summary span,body.dark-theme .shipment-check-summary p{color:#a6b9ac}body.dark-theme .shipment-quantity-input{background:#1c211e;color:#eee;border-color:#48594e}
 @media(max-width:620px){.order-row-actions{gap:3px}.order-row-actions .small-button{padding:6px 7px;font-size:9px}.shipment-check-item{align-items:flex-start;flex-direction:column}.shipment-check-item label{width:100%;justify-content:flex-start}.shipment-quantity-input{width:82px}}
+
+/* Shipment manifest: keep footer actions inside narrow phone screens. */
+.modal:has(.shipment-day-picker) .modal-foot{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+  align-items:stretch;
+  gap:8px;
+}
+.modal:has(.shipment-day-picker) .modal-foot .small-button{
+  width:100%;
+  min-width:0;
+  min-height:42px;
+  padding:8px 6px;
+  white-space:normal;
+  overflow-wrap:anywhere;
+  line-height:1.25;
+}
+@media(max-width:520px){
+  .modal:has(.shipment-day-picker) .modal-foot{
+    padding:10px 12px max(14px,env(safe-area-inset-bottom));
+    gap:7px;
+  }
+  .modal:has(.shipment-day-picker) .modal-foot .small-button{
+    font-size:11px;
+  }
+}

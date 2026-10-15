@@ -7,10 +7,12 @@
   <meta name="description" content="Заказы, дефекты и согласование отгрузки в одном месте">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="./app-icon.svg" type="image/svg+xml">
-  <meta name="app-version" content="2026.10.15.07">
+  <meta name="app-version" content="2026.10.15.08">
   <title>Заказы · Склад</title>
   <style>
     [hidden]{display:none!important}
+    /* Keep the resume loader fully opaque while Chrome restores a background tab. */
+    html:not(.app-booted) #siteLoader{opacity:1!important;visibility:visible!important;transition:none!important}
     html:not(.app-booted),html:not(.app-booted) body{background:#0a111d!important}
     html:not(.app-booted) body > :not(#siteLoader){visibility:hidden!important}
     #siteLoader{position:fixed;inset:0;z-index:20000;display:flex;align-items:center;justify-content:center;padding:24px;background:radial-gradient(ellipse at 50% 38%,#153b3b 0%,#101e30 52%,#0a111d 100%);color:#f1f7f4;opacity:1;visibility:visible;transition:opacity .24s ease,visibility .24s ease;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
@@ -22,7 +24,7 @@
     @keyframes siteLoaderSpin{to{transform:rotate(360deg)}}
     @media(prefers-reduced-motion:reduce){#siteLoader .loader-spinner{animation-duration:2s}#siteLoader{transition:none}}
   </style>
-  <link rel="stylesheet" href="styles.css?v=1.0.1.124">
+  <link rel="stylesheet" href="styles.css?v=1.0.1.125">
 
 <script>
 (() => {
@@ -135,7 +137,7 @@
   <div class="image-viewer" id="imageViewer" hidden role="dialog" aria-modal="true" aria-label="Просмотр фотографии"><button class="image-viewer-close" id="closeImageViewer" aria-label="Закрыть">×</button><img id="imageViewerImage" alt="Фото из комментария"></div>
   <button type="button" id="mentionCenterButton" class="mention-center-button" hidden aria-live="polite"><span class="mention-center-icon">＠</span><span id="mentionCenterLabel">Вас упомянули</span><b id="mentionCenterCount">0</b></button>
   <div class="toast-stack" id="toastStack" aria-live="polite"></div>
-  <script type="module" src="app.js?v=1.0.1.124"></script>
+  <script type="module" src="app.js?v=1.0.1.125"></script>
   <script type="module" src="buyback.js?v=1.0.2"></script>
 </body>
 </html>

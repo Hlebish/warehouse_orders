@@ -636,21 +636,32 @@ async function cancelReturnAction(orderId,returnId){
     toast('Не удалось отменить возврат: '+String(err?.code||'ошибка').replace(/^.*?\//,''));
   }
 }
+let transferredInsightsExpanded=false;
 function renderWorkInsights(){
   const box=$('workInsights');if(!box)return;
-  const now=Date.now(),items=[];
-  const add=(tone,title,text,orderId='')=>items.push({tone,title,text,orderId});
+  const now=Date.now();
   const transferred=state.orders.filter(o=>o.status==='Перенесен');
   const defects=state.orders.filter(o=>o.status==='Под вопросом'||o.status==='Дефект');
   const approval=state.orders.filter(o=>o.status==='На согласовании');
   const oldCreated=state.orders.filter(o=>o.status==='Создан'&&now-(asDate(o.createdAt)?.getTime()||now)>24*60*60*1000);
-  transferred.slice(0,2).forEach(o=>add('violet','Перенесённый заказ № '+o.number,'Проверьте, не пора ли вернуть его в работу.',o.id));
-  defects.slice(0,2).forEach(o=>add('red','Нужна проверка заказа № '+o.number,'Есть вопрос или нерассмотренный дефект.',o.id));
-  approval.slice(0,2).forEach(o=>add('amber','Ждёт согласования № '+o.number,'Заказ ожидает решения менеджера.',o.id));
-  oldCreated.slice(0,2).forEach(o=>add('blue','Заказ № '+o.number+' задержался','Статус «Создан» держится больше суток.',o.id));
+  const add=(tone,title,text,orderId='')=>({tone,title,text,orderId});
+  const transferredItems=transferred.map(o=>add('violet','Перенесённый заказ № '+o.number,'Проверьте, не пора ли вернуть его в работу.',o.id));
+  const otherItems=[
+    ...defects.slice(0,2).map(o=>add('red','Нужна проверка заказа № '+o.number,'Есть вопрос или нерассмотренный дефект.',o.id)),
+    ...approval.slice(0,2).map(o=>add('amber','Ждёт согласования № '+o.number,'Заказ ожидает решения менеджера.',o.id)),
+    ...oldCreated.slice(0,2).map(o=>add('blue','Заказ № '+o.number+' задержался','Статус «Создан» держится больше суток.',o.id))
+  ];
+  const visibleTransferred=transferredInsightsExpanded?transferredItems:transferredItems.slice(0,2);
+  const items=[...visibleTransferred,...otherItems];
   if(!items.length){box.hidden=true;box.innerHTML='';return;}
   box.hidden=false;
-  box.innerHTML='<div class="insights-head"><div><b>🧠 Требует внимания</b><span>Автоматические подсказки по текущим заказам</span></div><button type="button" class="insights-count">'+items.length+'</button></div><div class="insights-list">'+items.slice(0,6).map(x=>'<button type="button" class="insight-item insight-'+x.tone+'" '+(x.orderId?'data-open="'+esc(x.orderId)+'"':'')+'><span class="insight-dot"></span><span><b>'+esc(x.title)+'</b><small>'+esc(x.text)+'</small></span><span class="insight-arrow">›</span></button>').join('')+'</div>';
+  const toggleLabel=transferredInsightsExpanded?'Свернуть список перенесённых заказов':'Показать все перенесённые заказы';
+  const toggleIcon=transferredInsightsExpanded?'⌃':'⌄';
+  box.innerHTML='<div class="insights-head"><div><b>🧠 Требует внимания</b><span>Автоматические подсказки по текущим заказам</span></div><span class="insights-total">'+(transferred.length+defects.length+approval.length+oldCreated.length)+'</span></div>'+
+    (transferred.length?'<button type="button" class="insights-expand" aria-expanded="'+transferredInsightsExpanded+'" aria-label="'+toggleLabel+'"><span><b>Перенесённые заказы</b><small>'+transferred.length+' '+plural(transferred.length,'заказ','заказа','заказов')+'</small></span><span class="insights-expand-action">'+(transferredInsightsExpanded?'Свернуть':'Показать')+' '+toggleIcon+'</span></button>':'')+
+    '<div class="insights-list">'+items.map(x=>'<button type="button" class="insight-item insight-'+x.tone+'" '+(x.orderId?'data-open="'+esc(x.orderId)+'"':'')+'><span class="insight-dot"></span><span><b>'+esc(x.title)+'</b><small>'+esc(x.text)+'</small></span><span class="insight-arrow">›</span></button>').join('')+'</div>';
+  const expandButton=box.querySelector('.insights-expand');
+  if(expandButton)expandButton.addEventListener('click',()=>{transferredInsightsExpanded=!transferredInsightsExpanded;renderWorkInsights();});
 }
 function notificationTone(n){
   const cat=n.category||(n.target==='chat'?'chat':'orders');

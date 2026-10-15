@@ -1405,8 +1405,8 @@ async function generateDailyReport(dateKey){
     const transferredOrders=[...new Map(transferredEvents.map(x=>[x.order.id,x.order])).values()];
     for(const o of state.orders)if(o.status==='Перенесен'&&reportDateMatches(o.transferredAt||o.updatedAt,dateKey)&&!transferredOrders.some(x=>x.id===o.id))transferredOrders.push(o);
     const cancelledOrders=state.orders.filter(o=>o.status==='Отменён'&&reportDateMatches(o.updatedAt,dateKey));
-    const terminal=new Set(['Отгружен кладовщиком','Клиент забрал самовывозом','Отменён']);
-    const remaining=state.orders.filter(o=>!terminal.has(o.status));
+    const terminal=new Set(['Отгружен кладовщиком','Клиент забрал самовывозом','Отменён','Возврат']);
+    const remaining=state.orders.filter(o=>!terminal.has(o.status)&&!(Array.isArray(o.returns)&&o.returns.some(r=>r?.status!=='cancelled')));
     const defects=eventEntries.filter(x=>x.entry.kind==='defect');
     const returns=state.orders.flatMap(o=>(Array.isArray(o.returns)?o.returns:[]).filter(r=>r?.status!=='cancelled'&&reportDateMatches(r.createdAt,dateKey)).map(r=>({order:o,record:r})));
     const totalQty=orders=>orders.reduce((sum,o)=>{const removed=new Set((o.entries||[]).filter(e=>e.kind==='defect'&&e.decision==='Удалена из заказа').map(e=>Number.isInteger(e.articleIndex)?e.articleIndex:-1));const items=normalizeArticles(o.articles||[]).filter((item,i)=>!removed.has(i)&&!(removed.has(-1)&&(o.entries||[]).some(e=>e.kind==='defect'&&e.decision==='Удалена из заказа'&&e.article===item.article)));return sum+items.reduce((n,item)=>n+(Number(item.quantity)||1),0);},0);

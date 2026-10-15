@@ -2508,3 +2508,43 @@ body.dark-theme .shipment-order-header .shipment-client-name{font-size:16px!impo
 .insights-expand-action{flex:0 0 auto;color:#a9d977;font-size:12px;font-weight:700}
 .insights-expand:hover{background:#242424}
 .insights-list{padding-top:9px}
+
+/* Shipment window and workspace shortcuts: dark-theme friendly, touch-sized controls. */
+.top-actions{gap:8px}
+.top-history-button{
+  display:inline-flex;align-items:center;justify-content:center;gap:7px;
+  min-height:42px;padding:0 13px;border:1px solid #3b4938;border-radius:11px;
+  background:#20251e;color:#e4eddb;font-size:12px;font-weight:750;
+  white-space:nowrap;transition:background .15s,border-color .15s,transform .15s
+}
+.top-history-button:hover{background:#2b3525;border-color:#75964f;color:#f4ffe8;transform:translateY(-1px)}
+.top-history-button:focus-visible{outline:2px solid #9fca5b;outline-offset:2px}
+.shipment-search-wrap{display:grid;gap:6px;margin:2px 0 12px}
+.shipment-search-wrap label{font-size:12px;font-weight:750;color:var(--text,#e9eee7)}
+.shipment-search-wrap input{width:100%;min-width:0;min-height:44px;padding:10px 12px;border:1px solid var(--border,#394039);border-radius:11px;background:var(--surface,#1a1d1b);color:var(--text,#edf0ed);font:inherit;font-size:13px;outline:none}
+.shipment-search-wrap input:focus{border-color:#8bb65b;box-shadow:0 0 0 3px rgba(139,182,91,.14)}
+.shipment-order-card.shipment-order-pending{border-color:#3a3e3b;background:#181a19}
+.shipment-order-card.shipment-order-pending>.shipment-order-header{background:#222523;border-bottom-color:#383d39}
+.shipment-order-card.shipment-order-pending .shipment-order-count{background:#303430;color:#d0d6cc}
+.shipment-order-card.shipment-order-complete{border:2px solid #78b85c;box-shadow:0 0 0 1px rgba(120,184,92,.12),0 5px 18px rgba(73,130,49,.09)}
+.shipment-order-card.shipment-order-complete>.shipment-order-header{background:linear-gradient(110deg,rgba(87,145,59,.24),rgba(87,145,59,.10));border-bottom-color:rgba(120,184,92,.4)}
+.shipment-order-card.shipment-order-complete .shipment-order-count{background:#35552b;color:#d8f7c4}
+.shipment-order-card.shipment-order-complete>.shipment-order-header:after{color:#9fda7d}
+body:not(.dark-theme) .shipment-order-card.shipment-order-pending{background:#fff;border-color:#d8ddd7}
+body:not(.dark-theme) .shipment-order-card.shipment-order-pending>.shipment-order-header{background:#f1f3f0;border-bottom-color:#d8ddd7}
+body:not(.dark-theme) .shipment-order-card.shipment-order-complete{border-color:#4f9c45;box-shadow:0 4px 16px rgba(55,125,46,.10)}
+body:not(.dark-theme) .shipment-order-card.shipment-order-complete>.shipment-order-header{background:#e8f5e3}
+body:not(.dark-theme) .shipment-order-card.shipment-order-complete .shipment-order-header .shipment-client-name{color:#245d24!important}
+@media(max-width:650px){
+  .topbar{align-items:flex-start}
+  .top-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:6px;max-width:70%}
+  .top-history-button,.top-history-button:first-child,.top-history-button:nth-child(2){font-size:11px;min-height:40px;padding:0 9px}
+  .top-history-button:first-child::after,.top-history-button:nth-child(2)::after{content:none}
+}
+@media(max-width:420px){
+  .top-actions{max-width:74%;gap:5px}
+  .top-history-button,.top-history-button:first-child,.top-history-button:nth-child(2){font-size:10px;min-height:38px;padding:0 7px;border-radius:9px}
+  .shipment-day-quick{display:grid;grid-template-columns:1fr 1fr}
+  .shipment-day-quick .small-button{min-height:40px;font-size:11px!important}
+  .shipment-day-quick .small-button:first-child{grid-column:1/-1}
+}

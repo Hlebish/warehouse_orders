@@ -2508,3 +2508,24 @@ body.dark-theme .shipment-order-header .shipment-client-name{font-size:16px!impo
 .insights-expand-action{flex:0 0 auto;color:#a9d977;font-size:12px;font-weight:700}
 .insights-expand:hover{background:#242424}
 .insights-list{padding-top:9px}
+
+
+/* Проверка отгрузки заказов */
+.shipment-order-pending td{background:#f0fbf3!important;border-bottom-color:#d8eddf!important}
+.shipment-order-pending:hover td{background:#e5f7eb!important}
+.shipment-order-pending .order-number,.shipment-order-pending .client-name{color:#167247!important;font-weight:800}
+.shipment-order-verified td{background:#f1f2f3!important;color:#8a9198!important;border-bottom-color:#e6e8ea!important}
+.shipment-order-verified .order-number,.shipment-order-verified .client-name{color:#858d94!important}
+.shipment-order-verified .client-sub{color:#a0a6ab!important}
+.order-row-actions{display:flex;align-items:center;justify-content:flex-end;gap:5px;white-space:nowrap}
+.shipment-check-action{background:#d9f4e2!important;border:1px solid #b6e4c5!important;color:#176d43!important;font-weight:800!important}
+.shipment-check-done{background:#e7e9eb!important;border:1px solid #d6d9dc!important;color:#7e858b!important}
+.shipment-check-summary{display:grid;gap:5px;margin-bottom:12px;padding:12px;border:1px solid #d9eadf;border-radius:12px;background:#f3fbf5}
+.shipment-check-summary b{font-size:14px;color:#205f3d}.shipment-check-summary span{font-size:11px;color:#4b7960}.shipment-check-summary p{margin:3px 0 0;font-size:11px;line-height:1.5;color:#63796b}
+.shipment-check-list{display:grid;gap:7px}.shipment-check-item{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--surface,#fff)}
+.shipment-check-article{display:grid;gap:4px;min-width:0}.shipment-check-article b{font-size:11px;overflow-wrap:anywhere}.shipment-check-article small{font-size:10px;color:var(--muted,#7a8790)}
+.shipment-check-item label{display:flex;align-items:center;gap:5px;white-space:nowrap;font-size:10px;color:var(--muted,#68747d)}.shipment-quantity-input{width:68px;height:34px;border:1px solid #cbd9d0;border-radius:8px;padding:0 7px;background:#fff;color:#26372d;font-size:13px;font-weight:700}
+.shipment-check-footer-note{margin-top:11px;padding-top:9px;border-top:1px solid var(--line);font-size:10px;color:var(--muted,#7a8790)}
+body.dark-theme .shipment-order-pending td{background:#1d3427!important;border-bottom-color:#2e4b38!important}body.dark-theme .shipment-order-pending:hover td{background:#244331!important}body.dark-theme .shipment-order-pending .order-number,body.dark-theme .shipment-order-pending .client-name{color:#9de2b4!important}
+body.dark-theme .shipment-order-verified td{background:#252729!important;color:#858b90!important;border-bottom-color:#383b3e!important}body.dark-theme .shipment-order-verified .order-number,body.dark-theme .shipment-order-verified .client-name{color:#90969b!important}body.dark-theme .shipment-check-summary{background:#1d3024;border-color:#355540}body.dark-theme .shipment-check-summary b{color:#a5dfb6}body.dark-theme .shipment-check-summary span,body.dark-theme .shipment-check-summary p{color:#a6b9ac}body.dark-theme .shipment-quantity-input{background:#1c211e;color:#eee;border-color:#48594e}
+@media(max-width:620px){.order-row-actions{gap:3px}.order-row-actions .small-button{padding:6px 7px;font-size:9px}.shipment-check-item{align-items:flex-start;flex-direction:column}.shipment-check-item label{width:100%;justify-content:flex-start}.shipment-quantity-input{width:82px}}

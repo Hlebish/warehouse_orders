@@ -1409,7 +1409,7 @@ async function generateDailyReport(dateKey){
     const remaining=state.orders.filter(o=>!terminal.has(o.status));
     const defects=eventEntries.filter(x=>x.entry.kind==='defect');
     const returns=state.orders.flatMap(o=>(Array.isArray(o.returns)?o.returns:[]).filter(r=>r?.status!=='cancelled'&&reportDateMatches(r.createdAt,dateKey)).map(r=>({order:o,record:r})));
-    const totalQty=orders=>orders.reduce((sum,o)=>sum+normalizeArticles(o.articles||[]).reduce((n,item)=>n+(Number(item.quantity)||1),0),0);
+    const totalQty=orders=>orders.reduce((sum,o)=>{const removed=new Set((o.entries||[]).filter(e=>e.kind==='defect'&&e.decision==='Удалена из заказа').map(e=>Number.isInteger(e.articleIndex)?e.articleIndex:-1));const items=normalizeArticles(o.articles||[]).filter((item,i)=>!removed.has(i)&&!(removed.has(-1)&&(o.entries||[]).some(e=>e.kind==='defect'&&e.decision==='Удалена из заказа'&&e.article===item.article)));return sum+items.reduce((n,item)=>n+(Number(item.quantity)||1),0);},0);
     let shipmentDay={};
     try{const snap=await getDoc(doc(db,'shipmentDays',dateKey));if(snap.exists())shipmentDay=snap.data()||{};}catch(err){console.warn('Не удалось загрузить отметки проверки отгрузки',err);}
     const shippedForManifest=state.orders.filter(o=>o.status==='Отгружен кладовщиком'&&shipmentOrderDateKey(o)===dateKey).flatMap(o=>{

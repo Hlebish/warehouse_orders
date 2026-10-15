@@ -24,7 +24,7 @@
     @keyframes siteLoaderSpin{to{transform:rotate(360deg)}}
     @media(prefers-reduced-motion:reduce){#siteLoader .loader-spinner{animation-duration:2s}#siteLoader{transition:none}}
   </style>
-  <link rel="stylesheet" href="styles.css?v=1.0.1.128">
+  <link rel="stylesheet" href="styles.css?v=1.0.1.129">
 
 <script>
 (() => {
@@ -74,6 +74,7 @@
         <div class="breadcrumbs">Рабочее пространство <span>/</span> <b>Заказы</b></div>
         <div class="top-actions">
           <button class="top-history-button" id="shipmentManifestButton" data-action="shipment-manifest" type="button" title="Список деталей на отгрузку">📦 Отгрузка</button>
+          <button class="top-history-button" id="dailyReportButton" data-action="daily-report" type="button" title="Печатный отчёт за выбранный день">🖨️ Отчёт</button>
           <button class="top-history-button" id="siteHistoryButton" data-action="site-history" type="button" title="История действий по сайту">🕘 История</button>
           <button class="top-history-button" id="analyticsButton" data-action="analytics" type="button" title="Статистика работы склада">📊 Статистика</button>
           <span class="top-divider"></span>
@@ -128,7 +129,7 @@
           <div class="table-wrap"><table><thead><tr><th>ЗАКАЗ</th><th>КЛИЕНТ</th><th>СТАТУС</th><th>ДОСТАВКА</th><th>КОММЕНТАРИИ</th><th>СОЗДАН</th><th></th></tr></thead><tbody id="ordersBody"></tbody></table><div class="empty-state" id="emptyState"><div class="empty-icon">▤</div><b>Заказов пока нет</b><span>Добавьте номер заказа после сборки.</span><button class="secondary-button" id="emptyAddButton">＋ Добавить заказ</button></div></div>
           <div class="table-footer"><span id="listSummary">0 заказов</span><span>История сохраняется в карточке заказа</span></div><div class="table-pagination" id="ordersPagination" aria-label="Страницы заказов" hidden></div>
         </section>
-        <footer class="page-footer"><span>Заказы · внутренняя система</span><span>Доступ по учётным записям сотрудников</span><span class="site-version">Версия 1.0.1.128</span></footer>
+        <footer class="page-footer"><span>Заказы · внутренняя система</span><span>Доступ по учётным записям сотрудников</span><span class="site-version">Версия 1.0.1.129</span></footer>
       </section>
     </main>
   </div>
@@ -137,7 +138,7 @@
   <div class="image-viewer" id="imageViewer" hidden role="dialog" aria-modal="true" aria-label="Просмотр фотографии"><button class="image-viewer-close" id="closeImageViewer" aria-label="Закрыть">×</button><img id="imageViewerImage" alt="Фото из комментария"></div>
   <button type="button" id="mentionCenterButton" class="mention-center-button" hidden aria-live="polite"><span class="mention-center-icon">＠</span><span id="mentionCenterLabel">Вас упомянули</span><b id="mentionCenterCount">0</b></button>
   <div class="toast-stack" id="toastStack" aria-live="polite"></div>
-  <script type="module" src="app.js?v=1.0.1.128"></script>
+  <script type="module" src="app.js?v=1.0.1.129"></script>
   <script type="module" src="buyback.js?v=1.0.2"></script>
 </body>
 </html>

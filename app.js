@@ -130,7 +130,7 @@ function watchChatBadge(){
   const q=query(collection(db,'chatMessages'),orderBy('createdAt','desc'),limit(100));
   chatBadgeUnsubscribe=onSnapshot(q,snap=>{
     const messages=snap.docs.map(d=>d.data()||{});
-    knownChatPeople=[...new Map(messages.filter(m=>m.authorId&&m.authorName).map(m=>[m.authorId,{id:m.authorId,name:m.authorName}])).values()];
+    knownChatPeople=[...new Map(messages.filter(m=>m.authorId&&m.authorName).map(m=>[m.authorId,{id:m.authorId,name:chatDisplayName(m.authorName)}])).values()];
     chatUnread=messages.some(m=>m.authorId!==signedInUser.uid && Array.isArray(m.readBy) && !m.readBy.includes(signedInUser.uid));
     paintChatBadge();
   },err=>console.error('Не удалось проверить непрочитанный чат',err));
@@ -1023,6 +1023,13 @@ function cancelChatReply(){
   if(preview){preview.hidden=true;preview.innerHTML='';}
 }
 
+function chatDisplayName(value){
+  const name=String(value||'Сотрудник').trim();
+  const normalized=name.toLocaleLowerCase('ru').replace(/\\s+/g,' ');
+  if(normalized==='глеб тест'||normalized==='gleb test')return 'Test';
+  if(normalized==='глеб бурячок'||normalized==='gleb боричок'||normalized==='gleb boryachok')return 'Глеб';
+  return name;
+}
 function chatMentionToken(name){
   return String(name||'').trim().split(/\s+/)[0].replace(/[^\p{L}\p{N}_-]/gu,'');
 }
@@ -1038,7 +1045,7 @@ function chatMentionSuggestions(){
   const match=value.match(/(?:^|[\s])@([\p{L}\p{N}_-]*)$/u);
   if(!match){list.hidden=true;list.innerHTML='';return;}
   const needle=match[1].toLocaleLowerCase('ru');
-  const people=[...new Map([...knownChatPeople,...chatMessages.filter(m=>m.authorId&&m.authorName).map(m=>({id:m.authorId,name:m.authorName}))].filter(p=>p.id&&p.name).map(p=>[p.id,p])).values()]
+  const people=[...new Map([...knownChatPeople,...chatMessages.filter(m=>m.authorId&&m.authorName).map(m=>({id:m.authorId,name:chatDisplayName(m.authorName)}))].filter(p=>p.id&&p.name).map(p=>[p.id,p])).values()]
     .filter(p=>p.id!==signedInUser?.uid)
     .filter(p=>chatMentionToken(p.name).toLocaleLowerCase('ru').startsWith(needle))
     .slice(0,6);
@@ -1190,7 +1197,7 @@ function renderChatMessages(){
       const likeHtml='<button type="button" class="chat-like-button '+(liked?'active':'')+'" data-action="toggle-chat-like:'+esc(m.id)+'" aria-label="Нравится">👍 <span>'+likes.length+'</span></button>'; const readBy=Array.isArray(m.readBy)?m.readBy:[]; const receipt=mine?'<span class="chat-read-receipt" title="'+(readBy.some(id=>id!==signedInUser?.uid)?'Прочитано':'Отправлено')+'">'+(readBy.some(id=>id!==signedInUser?.uid)?'✓✓':'✓')+'</span>':'';
       const roleMeta=({admin:{label:'Администратор',icon:'⚙',tone:'admin'},administrator:{label:'Администратор',icon:'⚙',tone:'admin'},warehouse:{label:'Кладовщик',icon:'▦',tone:'warehouse'},manager:{label:'Менеджер',icon:'↗',tone:'manager'},chief_accountant:{label:'Главный бухгалтер',icon:'₽',tone:'chief-accountant'},accountant:{label:'Бухгалтер',icon:'▤',tone:'accountant'},director:{label:'Директор',icon:'♛',tone:'director'}})[m.authorRole]||{label:'Сотрудник',icon:'•',tone:'unknown'};
       const roleBadge='<span class="chat-role-badge chat-role-'+roleMeta.tone+'" title="'+esc(roleMeta.label)+'"><span aria-hidden="true">'+roleMeta.icon+'</span>'+esc(roleMeta.label)+'</span>';
-      return chatDayDivider+'<article class="chat-message chat-author-role-'+roleMeta.tone+' '+(mine?'mine':'')+'"><div class="chat-message-head"><span class="chat-author-line"><span class="chat-role-avatar chat-role-avatar-'+roleMeta.tone+'" aria-hidden="true">'+roleMeta.icon+'</span><b>'+esc(m.authorName||'Сотрудник')+'</b>'+roleBadge+'</span><time>'+esc(fmtDateTime(m.createdAt))+'</time></div>'+replyHtml+'<div class="chat-message-text">'+renderChatText(m.text)+'</div>'+photoHtml+'<div class="chat-message-actions">'+likeHtml+'<button type="button" class="chat-reply-button" data-action="reply-chat:'+esc(m.id)+'">↩ Ответить</button>'+receipt+'</div></article>';
+      return chatDayDivider+'<article class="chat-message chat-author-role-'+roleMeta.tone+' '+(mine?'mine':'')+'"><div class="chat-message-head"><span class="chat-author-line"><span class="chat-role-avatar chat-role-avatar-'+roleMeta.tone+'" aria-hidden="true">'+roleMeta.icon+'</span><b>'+esc(chatDisplayName(m.authorName))+'</b>'+roleBadge+'</span><time>'+esc(fmtDateTime(m.createdAt))+'</time></div>'+replyHtml+'<div class="chat-message-text">'+renderChatText(m.text)+'</div>'+photoHtml+'<div class="chat-message-actions">'+likeHtml+'<button type="button" class="chat-reply-button" data-action="reply-chat:'+esc(m.id)+'">↩ Ответить</button>'+receipt+'</div></article>';
     }).join('');
     if(chatPendingScrollRestore){box.scrollTop=chatPendingScrollRestore.top+(box.scrollHeight-chatPendingScrollRestore.height);chatPendingScrollRestore=null;}
     else if(wasAtBottom){
@@ -1286,7 +1293,7 @@ function openChat(){
       });
       if(chatReplyTo){await queuePush(profileName,text||'📷 Фото',signedInUser.uid,'','chat','replies',chatReplyTo.authorId);}else{await queuePush(profileName,text||'📷 Фото',signedInUser.uid,'','chat','chat');}
       const mentionedTokens=[...text.matchAll(/(^|[\s])@([\p{L}\p{N}_-]{2,})/gu)].map(x=>x[2].toLocaleLowerCase('ru'));
-      const mentionedUsers=[...new Map(chatMessages.map(m=>[m.authorId,{id:m.authorId,name:m.authorName}])).values()]
+      const mentionedUsers=[...new Map(chatMessages.map(m=>[m.authorId,{id:m.authorId,name:chatDisplayName(m.authorName)}])).values()]
         .filter(p=>p.id&&p.id!==signedInUser.uid&&mentionedTokens.includes(chatMentionToken(p.name).toLocaleLowerCase('ru')));
       for(const person of mentionedUsers){
         await queuePush(profileName,text||'📷 Фото',signedInUser.uid,'','chat','replies',person.id);

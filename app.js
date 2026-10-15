@@ -1093,7 +1093,7 @@ function entryMentionSuggestions(){
   const match=value.match(/(?:^|[\s])@([\p{L}\p{N}_-]*)$/u);
   if(!match){list.hidden=true;list.innerHTML='';return;}
   const needle=match[1].toLocaleLowerCase('ru');
-  const people=[...new Map([...knownChatPeople,...chatMessages.filter(m=>m.authorId&&m.authorName).map(m=>({id:m.authorId,name:m.authorName}))].filter(p=>p.id&&p.name).map(p=>[p.id,p])).values()]
+  const people=[...new Map([...knownChatPeople,...chatMessages.filter(m=>m.authorId&&m.authorName).map(m=>({id:m.authorId,name:chatDisplayName(m.authorName)}))].filter(p=>p.id&&p.name).map(p=>[p.id,p])).values()]
     .filter(p=>p.id!==signedInUser?.uid)
     .filter(p=>chatMentionToken(p.name).toLocaleLowerCase('ru').startsWith(needle))
     .slice(0,6);

@@ -351,7 +351,7 @@ service cloud.firestore {
     match /buybackItems/{itemId} {
       allow read: if activeUser();
       allow create: if activeUser()
-        && request.resource.data.keys().hasOnly(['article','quantity','receivedAt','createdAt','createdBy','createdByName','status','sentMilestones','updatedAt'])
+        && request.resource.data.keys().hasOnly(['article','quantity','receivedAt','createdAt','createdOn','createdBy','createdByName','status','soldAt','cancelledAt','returnedAt','sentMilestones','updatedAt'])
         && request.resource.data.article is string
         && request.resource.data.article.size() > 0
         && request.resource.data.quantity is number
@@ -362,7 +362,7 @@ service cloud.firestore {
         && request.resource.data.status == 'active'
         && request.resource.data.sentMilestones is list;
       allow update: if activeUser()
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['article','quantity','receivedAt','status','sentMilestones','updatedAt'])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['article','quantity','receivedAt','status','soldAt','cancelledAt','returnedAt','sentMilestones','updatedAt'])
         && request.resource.data.article is string
         && request.resource.data.quantity is number
         && request.resource.data.quantity >= 1

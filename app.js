@@ -177,6 +177,28 @@ let authRevealTimer=null;
 function finishInitialLoading(){if(authRevealTimer!==null){clearTimeout(authRevealTimer);authRevealTimer=null;}document.documentElement.classList.add('app-booted');const loader=$('siteLoader');if(loader){loader.classList.add('site-loader-hidden');setTimeout(()=>{if(loader.classList.contains('site-loader-hidden'))loader.hidden=true;},260);}}
 function showAuth(message='Войдите с рабочей учётной записью.'){ $('authGate').hidden=false;document.querySelector('.app-shell').hidden=true;$('authMessage').textContent=message;const loader=$('siteLoader');if(loader&&!loader.hidden&&!loader.classList.contains('site-loader-hidden')){if(authRevealTimer!==null)clearTimeout(authRevealTimer);authRevealTimer=setTimeout(()=>{authRevealTimer=null;if(!$('authGate').hidden&&document.querySelector('.app-shell').hidden)finishInitialLoading();},1800);}else{finishInitialLoading();} }
 function hideAuth(){ finishInitialLoading();$('authGate').hidden=true;document.querySelector('.app-shell').hidden=false }
+let resumeLoaderTimer=null;
+document.addEventListener('visibilitychange',()=>{
+  const loader=$('siteLoader');
+  if(!loader)return;
+  if(document.visibilityState==='hidden'){
+    if(resumeLoaderTimer!==null){clearTimeout(resumeLoaderTimer);resumeLoaderTimer=null;}
+    document.documentElement.classList.remove('app-booted');
+    loader.hidden=false;
+    loader.classList.remove('site-loader-hidden');
+  }else{
+    if(resumeLoaderTimer!==null)clearTimeout(resumeLoaderTimer);
+    resumeLoaderTimer=setTimeout(()=>{resumeLoaderTimer=null;finishInitialLoading();},900);
+  }
+});
+window.addEventListener('pageshow',event=>{
+  if(event.persisted){
+    const loader=$('siteLoader');
+    if(loader){document.documentElement.classList.remove('app-booted');loader.hidden=false;loader.classList.remove('site-loader-hidden');}
+    if(resumeLoaderTimer!==null)clearTimeout(resumeLoaderTimer);
+    resumeLoaderTimer=setTimeout(()=>{resumeLoaderTimer=null;finishInitialLoading();},900);
+  }
+});
 function entryToCloud(e){
   const out={
     kind:e.kind,

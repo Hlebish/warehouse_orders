@@ -8,12 +8,12 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="./app-icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="styles.css?v=1.0.1.116">
-  <meta name="app-version" content="2026.10.15.01">
+  <meta name="app-version" content="2026.10.15.02">
   <title>Заказы · Склад</title>
 
 <script>
 (() => {
-  const VERSION = '2026.10.14.02';
+  const VERSION = '2026.10.15.02';
   const KEY = 'warehouse_orders_app_version';
   const previous = localStorage.getItem(KEY);
   if (previous && previous !== VERSION) {
@@ -39,7 +39,7 @@
       <div class="auth-error" id="authError" role="alert"></div>
     </form>
   </section>
-  <div class="app-shell">
+  <div class="app-shell" hidden>
   <div class="sidebar-backdrop" id="sidebarBackdrop" hidden></div>
   <aside class="sidebar" id="sidebar">
       <a class="brand" href="#"><img class="brand-mark brand-logo" src="amp-logo.png" alt="AMP Automobile Parts"><span>Склад<span class="brand-sub">Заказы и качество</span></span></a>
@@ -125,7 +125,7 @@
   <div class="image-viewer" id="imageViewer" hidden role="dialog" aria-modal="true" aria-label="Просмотр фотографии"><button class="image-viewer-close" id="closeImageViewer" aria-label="Закрыть">×</button><img id="imageViewerImage" alt="Фото из комментария"></div>
   <button type="button" id="mentionCenterButton" class="mention-center-button" hidden aria-live="polite"><span class="mention-center-icon">＠</span><span id="mentionCenterLabel">Вас упомянули</span><b id="mentionCenterCount">0</b></button>
   <div class="toast-stack" id="toastStack" aria-live="polite"></div>
-  <script type="module" src="app.js?v=1.0.1.118"></script>
+  <script type="module" src="app.js?v=1.0.1.119"></script>
   <script type="module" src="buyback.js?v=1.0.2"></script>
 </body>
 </html>

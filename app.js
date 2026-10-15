@@ -173,8 +173,9 @@ async function markNotificationsRead(){
   await markNotificationItemsRead(unread,true);
 }
 
-function showAuth(message='Войдите с рабочей учётной записью.'){ $('authGate').hidden=false;document.querySelector('.app-shell').hidden=true;$('authMessage').textContent=message }
-function hideAuth(){ $('authGate').hidden=true;document.querySelector('.app-shell').hidden=false }
+function finishInitialLoading(){const loader=$('siteLoader');if(loader){loader.classList.add('site-loader-hidden');setTimeout(()=>{if(loader.classList.contains('site-loader-hidden'))loader.hidden=true;},260);}}
+function showAuth(message='Войдите с рабочей учётной записью.'){ finishInitialLoading();$('authGate').hidden=false;document.querySelector('.app-shell').hidden=true;$('authMessage').textContent=message }
+function hideAuth(){ finishInitialLoading();$('authGate').hidden=true;document.querySelector('.app-shell').hidden=false }
 function entryToCloud(e){
   const out={
     kind:e.kind,

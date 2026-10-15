@@ -498,7 +498,7 @@ setPersistence(auth,browserLocalPersistence).then(()=>onAuthStateChanged(auth,us
   state.extraPhoneNotifications=cachedProfile.extraPhoneNotifications===true;
   $('userName').textContent=profileName;$('userRole').textContent=canManageUsers?`Администратор · ${roles[cachedProfile.role]}`:roles[cachedProfile.role];
   hideAuth();
- }else{showAuth('Проверяем доступ…');}
+ }
  profileUnsubscribe=onSnapshot(doc(db,'users',user.uid),snap=>{
    if(!snap.exists()){showAuth('Учётная запись создана, но профиль не найден. Обратитесь к администратору.');$('authError').textContent=`UID: ${user.uid}`;return}
    const profile=snap.data();if(profile.active!==true||!roles[profile.role]){try{localStorage.removeItem(profileCacheKey)}catch{}showAuth('Доступ отключён или роль не назначена. Обратитесь к администратору.');return}

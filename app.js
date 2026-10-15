@@ -1407,13 +1407,18 @@ async function generateDailyReport(dateKey){
     const buybackRelevant=buybackItems.filter(item=>{
       const status=buybackStatus(item);
       const createdToday=buybackDate(item.createdOn,item.createdAt,item.receivedAt);
-      const changedToday=buybackDate(item.soldAt,item.cancelledAt,item.returnedAt);
-      const onStock=['','active'].includes(status);
       const sold=/sold|продан|отгружен|забрал/i.test(status);
       const cancelled=/cancel|отмен/i.test(status);
-      return onStock||createdToday||((sold||cancelled)&&changedToday);
+      const returned=/return|возврат|вернул/i.test(status);
+      // Для новых записей используем только отдельные даты событий.
+      // Старые записи могли быть закрыты до появления этих полей — для них updatedAt служит временным резервом.
+      const soldToday=item.soldAt?buybackDate(item.soldAt):(!item.soldAt&&sold&&buybackDate(item.updatedAt));
+      const cancelledToday=item.cancelledAt?buybackDate(item.cancelledAt):(!item.cancelledAt&&cancelled&&buybackDate(item.updatedAt));
+      const returnedToday=item.returnedAt?buybackDate(item.returnedAt):(!item.returnedAt&&returned&&buybackDate(item.updatedAt));
+      const onStock=['','active'].includes(status);
+      return onStock||createdToday||soldToday||cancelledToday||returnedToday;
     });
-    const buybackRows=buybackRelevant.slice().sort((a,b)=>String(a.status||'active').localeCompare(String(b.status||'active'))||String(a.article||'').localeCompare(String(b.article||''))).map(item=>{const status=buybackStatus(item);const eventDate=/sold|продан|отгружен/i.test(status)?item.soldAt:/cancel|отмен/i.test(status)?item.cancelledAt:/return|возврат|вернул/i.test(status)?item.returnedAt:item.createdOn||item.receivedAt;return [esc(item.article||'—'),esc(item.quantity??'—'),esc(buybackStatusLabel(item)),esc(item.receivedAt||'—'),esc(eventDate||'—'),esc(item.createdByName||'—')];});
+    const buybackRows=buybackRelevant.slice().sort((a,b)=>String(a.status||'active').localeCompare(String(b.status||'active'))||String(a.article||'').localeCompare(String(b.article||''))).map(item=>{const status=buybackStatus(item);const eventDate=/sold|продан|отгружен/i.test(status)?(item.soldAt||item.updatedAt):/cancel|отмен/i.test(status)?(item.cancelledAt||item.updatedAt):/return|возврат|вернул/i.test(status)?(item.returnedAt||item.updatedAt):(item.createdOn||item.createdAt||item.receivedAt);return [esc(item.article||'—'),esc(item.quantity??'—'),esc(buybackStatusLabel(item)),esc(item.receivedAt||'—'),esc(eventDate?fmtDateTime(eventDate):'—'),esc(item.createdByName||'—')];});
     const eventEntries=state.orders.flatMap(o=>(Array.isArray(o.entries)?o.entries:[]).filter(e=>reportDateMatches(e.createdAt,dateKey)).map(e=>({order:o,entry:e})));
     const eventByOrder=re=>eventEntries.filter(x=>re.test(reportEntryText(x.order,x.entry)));
     const shippedEvents=eventByOrder(/отгруженн|отгрузил/i);

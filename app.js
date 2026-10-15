@@ -177,31 +177,8 @@ let authRevealTimer=null;
 function finishInitialLoading(){if(authRevealTimer!==null){clearTimeout(authRevealTimer);authRevealTimer=null;}document.documentElement.classList.add('app-booted');const loader=$('siteLoader');if(loader){loader.classList.add('site-loader-hidden');setTimeout(()=>{if(loader.classList.contains('site-loader-hidden'))loader.hidden=true;},260);}}
 function showAuth(message='Войдите с рабочей учётной записью.'){ $('authGate').hidden=false;document.querySelector('.app-shell').hidden=true;$('authMessage').textContent=message;const loader=$('siteLoader');if(loader&&!loader.hidden&&!loader.classList.contains('site-loader-hidden')){if(authRevealTimer!==null)clearTimeout(authRevealTimer);authRevealTimer=setTimeout(()=>{authRevealTimer=null;if(!$('authGate').hidden&&document.querySelector('.app-shell').hidden)finishInitialLoading();},1800);}else{finishInitialLoading();} }
 function hideAuth(){ finishInitialLoading();$('authGate').hidden=true;document.querySelector('.app-shell').hidden=false }
-let resumeLoaderTimer=null;
-function prepareResumeLoader(){
-  const loader=$('siteLoader');
-  if(!loader)return;
-  if(resumeLoaderTimer!==null){clearTimeout(resumeLoaderTimer);resumeLoaderTimer=null;}
-  document.documentElement.classList.remove('app-booted');
-  loader.hidden=false;
-  loader.classList.remove('site-loader-hidden');
-  void loader.offsetHeight;
-  void document.documentElement.offsetHeight;
-}
-function scheduleResumeLoaderDismissal(){
-  if(resumeLoaderTimer!==null)clearTimeout(resumeLoaderTimer);
-  resumeLoaderTimer=setTimeout(()=>{resumeLoaderTimer=null;finishInitialLoading();},900);
-}
-document.addEventListener('visibilitychange',()=>{
-  if(document.visibilityState==='hidden')prepareResumeLoader();
-  else scheduleResumeLoaderDismissal();
-});
-window.addEventListener('pagehide',prepareResumeLoader,{capture:true});
-document.addEventListener('freeze',prepareResumeLoader);
-window.addEventListener('pageshow',event=>{
-  if(event.persisted)prepareResumeLoader();
-  if(event.persisted||document.visibilityState==='visible')scheduleResumeLoaderDismissal();
-});
+// Keep the existing screen and state when returning to an already-open app.
+// The startup loader is reserved for a fresh page launch only.
 function entryToCloud(e){
   const out={
     kind:e.kind,

@@ -84,13 +84,13 @@ $('buybackForm').addEventListener('submit',async e=>{
  const article=$('buybackArticle').value.trim(),quantity=Number($('buybackQuantity').value),receivedAt=$('buybackDate').value;
  if(!article||!Number.isInteger(quantity)||quantity<1||!receivedAt){showToast('Проверьте артикул, количество и дату.');return}
  const submit=$('buybackForm').querySelector('button[type="submit"]');submit.disabled=true;
- try{await addDoc(collection(db,'buybackItems'),{article,quantity,receivedAt,createdAt:serverTimestamp(),createdBy:currentUser.uid,createdByName:currentUser.displayName||currentUser.email||'Сотрудник',status:'active',sentMilestones:[],updatedAt:serverTimestamp()});$('buybackArticle').value='';$('buybackQuantity').value='1';showToast('Перекупной товар добавлен. Отсчёт 14 дней начат.');selectedStatus='active'}
+ try{await addDoc(collection(db,'buybackItems'),{article,quantity,receivedAt,createdAt:serverTimestamp(),createdBy:currentUser.uid,createdByName:currentUser.displayName||currentUser.email||'Сотрудник',status:'active',soldAt:null,cancelledAt:null,returnedAt:null,createdOn: new Date().toISOString().slice(0,10),sentMilestones:[],updatedAt:serverTimestamp()});$('buybackArticle').value='';$('buybackQuantity').value='1';showToast('Перекупной товар добавлен. Отсчёт 14 дней начат.');selectedStatus='active'}
  catch(err){console.error(err);showToast('Не удалось добавить товар: '+(err.code||'проверьте доступ'))}
  finally{submit.disabled=false}
 });
 overlay.addEventListener('click',async e=>{
  const btn=e.target.closest('[data-set-status]');if(!btn)return;
- try{await updateDoc(doc(db,'buybackItems',btn.dataset.id),{status:btn.dataset.setStatus,updatedAt:serverTimestamp()});showToast('Статус перекупного товара обновлён.')}
+ try{const nextStatus=btn.dataset.setStatus;const eventDate=new Date().toISOString().slice(0,10);const patch={status:nextStatus,updatedAt:serverTimestamp()};if(nextStatus==='sold')patch.soldAt=eventDate;else if(nextStatus==='cancelled')patch.cancelledAt=eventDate;else if(nextStatus==='returned')patch.returnedAt=eventDate;else if(nextStatus==='active'){patch.soldAt=null;patch.cancelledAt=null;patch.returnedAt=null}await updateDoc(doc(db,'buybackItems',btn.dataset.id),patch);showToast('Статус перекупного товара обновлён.')}
  catch(err){console.error(err);showToast('Не удалось изменить статус.')}
 });
 onAuthStateChanged(auth,user=>{

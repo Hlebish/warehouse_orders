@@ -487,10 +487,22 @@ if(wasFirstEntries&&selectedId===d.id&&!modal.hidden&&modal.dataset.orderDetail=
 setPersistence(auth,browserLocalPersistence).then(()=>onAuthStateChanged(auth,user=>{
  stopCloud();signedInUser=user;initialCloudLoad=true;
  if(!user){showAuth();return}
- showAuth('Проверяем доступ…');
+ // Reuse the last verified profile for immediate display on mobile resume/reload.
+ const profileCacheKey='warehouse_orders_profile_'+user.uid;
+ let cachedProfile=null;
+ try{const raw=localStorage.getItem(profileCacheKey);if(raw){const parsed=JSON.parse(raw);if(parsed&&parsed.active===true&&roles[parsed.role])cachedProfile=parsed;}}catch{}
+ if(cachedProfile){
+  state.role=cachedProfile.role;canManageUsers=cachedProfile.admin===true||cachedProfile.role==='director';
+  profileName=cachedProfile.displayName||user.email||roles[cachedProfile.role];
+  state.notificationSettings={chat:cachedProfile.notificationSettings?.chat!==false,replies:cachedProfile.notificationSettings?.replies!==false,likes:cachedProfile.notificationSettings?.likes!==false,orders:cachedProfile.notificationSettings?.orders!==false};
+  state.extraPhoneNotifications=cachedProfile.extraPhoneNotifications===true;
+  $('userName').textContent=profileName;$('userRole').textContent=canManageUsers?`Администратор · ${roles[cachedProfile.role]}`:roles[cachedProfile.role];
+  hideAuth();
+ }else{showAuth('Проверяем доступ…');}
  profileUnsubscribe=onSnapshot(doc(db,'users',user.uid),snap=>{
    if(!snap.exists()){showAuth('Учётная запись создана, но профиль не найден. Обратитесь к администратору.');$('authError').textContent=`UID: ${user.uid}`;return}
-   const profile=snap.data();if(profile.active!==true||!roles[profile.role]){showAuth('Доступ отключён или роль не назначена. Обратитесь к администратору.');return}
+   const profile=snap.data();if(profile.active!==true||!roles[profile.role]){try{localStorage.removeItem(profileCacheKey)}catch{}showAuth('Доступ отключён или роль не назначена. Обратитесь к администратору.');return}
+   try{localStorage.setItem(profileCacheKey,JSON.stringify(profile))}catch{}
    state.role=profile.role;canManageUsers=profile.admin===true||profile.role==='director';profileName=profile.displayName||user.email||roles[profile.role];state.notificationSettings={chat:profile.notificationSettings?.chat!==false,replies:profile.notificationSettings?.replies!==false,likes:profile.notificationSettings?.likes!==false,orders:profile.notificationSettings?.orders!==false};state.extraPhoneNotifications=profile.extraPhoneNotifications===true;$('userName').textContent=profileName;$('userRole').textContent=canManageUsers?`Администратор · ${roles[profile.role]}`:roles[profile.role];hideAuth();watchOrders();watchNotifications();watchChatBadge();render();syncPushToken(false);if(window.AndroidWarehouse?.requestNativePushToken){window.AndroidWarehouse.requestNativePushToken();}if(pendingNotificationChat){pendingNotificationChat=false;history.replaceState({},'',location.pathname+location.hash);setTimeout(()=>openChat(),0);}
  },err=>{console.error(err);showAuth('Не удалось проверить профиль сотрудника. Проверьте правила доступа Firestore.')});
 })).catch(err=>{console.error('Не удалось сохранить вход на этом устройстве',err);showAuth('Браузер не разрешил сохранить вход. Проверьте настройки приватности и хранения данных.');});

@@ -1549,7 +1549,7 @@ async function openShipmentManifest(dateKey=localDateKey(new Date()),categoryFil
     html+='<div class="shipment-order-list">';
     for(const order of shippedOrders){
       const orderQuantity=order.shipmentArticles.reduce((sum,item)=>sum+(Number(item.quantity)||1),0);
-      const collapsed=order.shipmentArticles.length>3;
+      const collapsed=true;
       html+='<details class="shipment-order-card"'+(collapsed?'':' open')+'><summary class="shipment-order-header"><div><strong class="shipment-client-name">'+esc(order.client||'Клиент не указан')+'</strong></div><span class="shipment-order-count">'+orderQuantity+' шт.</span></summary><div class="shipment-order-articles">';
       for(const item of order.shipmentArticles){
         const checked=checkedArticles.has(String(item.article||'').trim().toUpperCase());

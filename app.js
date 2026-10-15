@@ -174,7 +174,7 @@ async function markNotificationsRead(){
 }
 
 let authRevealTimer=null;
-function finishInitialLoading(){if(authRevealTimer!==null){clearTimeout(authRevealTimer);authRevealTimer=null;}const loader=$('siteLoader');if(loader){loader.classList.add('site-loader-hidden');setTimeout(()=>{if(loader.classList.contains('site-loader-hidden'))loader.hidden=true;},260);}}
+function finishInitialLoading(){if(authRevealTimer!==null){clearTimeout(authRevealTimer);authRevealTimer=null;}document.documentElement.classList.add('app-booted');const loader=$('siteLoader');if(loader){loader.classList.add('site-loader-hidden');setTimeout(()=>{if(loader.classList.contains('site-loader-hidden'))loader.hidden=true;},260);}}
 function showAuth(message='Войдите с рабочей учётной записью.'){ $('authGate').hidden=false;document.querySelector('.app-shell').hidden=true;$('authMessage').textContent=message;const loader=$('siteLoader');if(loader&&!loader.hidden&&!loader.classList.contains('site-loader-hidden')){if(authRevealTimer!==null)clearTimeout(authRevealTimer);authRevealTimer=setTimeout(()=>{authRevealTimer=null;if(!$('authGate').hidden&&document.querySelector('.app-shell').hidden)finishInitialLoading();},1800);}else{finishInitialLoading();} }
 function hideAuth(){ finishInitialLoading();$('authGate').hidden=true;document.querySelector('.app-shell').hidden=false }
 function entryToCloud(e){

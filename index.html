@@ -7,7 +7,7 @@
   <meta name="description" content="Заказы, дефекты и согласование отгрузки в одном месте">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="./app-icon.svg" type="image/svg+xml">
-  <meta name="app-version" content="2026.10.16.08">
+  <meta name="app-version" content="2026.10.16.09">
   <title>Заказы · Склад</title>
   <style>
     [hidden]{display:none!important}
@@ -28,7 +28,7 @@
 
 <script>
 (() => {
-  const VERSION = '2026.10.16.08';
+  const VERSION = '2026.10.16.09';
   const KEY = 'warehouse_orders_app_version';
   try { localStorage.setItem(KEY, VERSION); } catch {}
 })();
@@ -131,7 +131,7 @@
           <div class="table-wrap"><table><thead><tr><th>ЗАКАЗ</th><th>КЛИЕНТ</th><th>СТАТУС</th><th>ДОСТАВКА</th><th>КОММЕНТАРИИ</th><th>СОЗДАН</th><th></th></tr></thead><tbody id="ordersBody"></tbody></table><div class="empty-state" id="emptyState"><div class="empty-icon">▤</div><b>Заказов пока нет</b><span>Добавьте номер заказа после сборки.</span><button class="secondary-button" id="emptyAddButton">＋ Добавить заказ</button></div></div>
           <div class="table-footer"><span id="listSummary">0 заказов</span><span>История сохраняется в карточке заказа</span></div><div class="table-pagination" id="ordersPagination" aria-label="Страницы заказов" hidden></div>
         </section>
-        <footer class="page-footer"><span>Заказы · внутренняя система</span><span>Доступ по учётным записям сотрудников</span><span class="site-version">Версия 1.0.1.137</span></footer>
+        <footer class="page-footer"><span>Заказы · внутренняя система</span><span>Доступ по учётным записям сотрудников</span><span class="site-version">Версия 1.0.1.138</span></footer>
       </section>
     </main>
   </div>
@@ -141,7 +141,7 @@
   <button type="button" id="mentionCenterButton" class="mention-center-button" hidden aria-live="polite"><span class="mention-center-icon">＠</span><span id="mentionCenterLabel">Вас упомянули</span><b id="mentionCenterCount">0</b></button>
   <div class="toast-stack" id="toastStack" aria-live="polite"></div>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <script type="module" src="app.js?v=1.0.1.137"></script>
+  <script type="module" src="app.js?v=1.0.1.138"></script>
   <script type="module" src="buyback.js?v=1.0.2"></script>
 </body>
 </html>

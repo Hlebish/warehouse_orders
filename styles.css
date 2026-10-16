@@ -2703,3 +2703,10 @@ body.dark-theme .client-suggestions[hidden]{display:none!important}
   .directory-modal:not(.products-directory-modal) .directory-table tbody td:last-child{grid-column:1/-1;display:flex;gap:6px;flex-wrap:wrap;padding-top:5px}
   .directory-modal:not(.products-directory-modal) .directory-table td button{font-size:11px;min-height:32px;padding:6px 9px}
 }
+
+
+/* Defects must stand out immediately in order lists and in-page alerts. */
+.status-defect{background:#ff2020!important;color:#fff!important;border:1px solid #ff2020!important;font-weight:900!important;box-shadow:0 0 0 1px #ff2020,0 0 12px rgba(255,32,32,.45)!important}
+.status-defect:before{background:#fff!important}
+.toast.defect-toast{background:#e50914!important;color:#fff!important;border:1px solid #ff5962!important;box-shadow:0 8px 28px rgba(229,9,20,.38)!important;font-weight:900!important;cursor:pointer}
+.toast.defect-toast:before{content:'⚠ ';}

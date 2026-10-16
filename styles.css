@@ -2559,3 +2559,98 @@ body:not(.dark-theme) .shipment-order-card.shipment-order-complete .shipment-ord
 .article-suggestions[hidden]{display:none!important}.article-suggestions button{display:flex;width:100%;justify-content:space-between;gap:10px;text-align:left;padding:8px 10px;border:0;border-radius:6px;background:transparent;color:var(--text,#202630);cursor:pointer}.article-suggestions button:hover{background:var(--soft,#eef6f1)}.article-suggestions small{color:var(--muted,#7b8981);font-size:10px}
 body.dark-theme .client-directory-row,body.dark-theme .client-create-form input,body.dark-theme .article-suggestions{background:#151a20;color:#edf0ed;border-color:#343a40}
 @media(max-width:520px){.client-directory-row{align-items:flex-start;flex-direction:column}.client-create-form{flex-direction:column}.article-suggestions{right:40px}}
+
+
+/* Dark theme: modal forms and autocomplete must match the black/olive palette. */
+@media (prefers-color-scheme: dark) {
+  html, body, .main-area { background:#090909 !important; color:#f2f2f2; color-scheme:dark; }
+}
+html[data-theme="dark"], body[data-theme="dark"] { color-scheme:dark; }
+.modal-backdrop { background:rgba(0,0,0,.76) !important; }
+.modal {
+  background:#141414 !important;
+  color:#f1f1f1 !important;
+  border:1px solid #303030;
+  box-shadow:0 24px 70px rgba(0,0,0,.7) !important;
+}
+.modal-head,.modal-foot { border-color:#303030 !important; }
+.modal-head h2,.modal-body h1,.modal-body h2,.modal-body h3 { color:#f5f5f5 !important; }
+.modal-head .eyebrow,.eyebrow { color:#669900; }
+.close-button { color:#bdbdbd !important; }
+.field label,.field-label { color:#d3d3d3 !important; }
+.field input,.field textarea,.field select,
+.modal input,.modal textarea,.modal select {
+  background:#1e1e1e !important;
+  color:#f5f5f5 !important;
+  border-color:#3b3b3b !important;
+  caret-color:#8fc400;
+  color-scheme:dark;
+}
+.field input::placeholder,.field textarea::placeholder,
+.modal input::placeholder,.modal textarea::placeholder { color:#888 !important; opacity:1; }
+.field input:focus,.field textarea:focus,.field select:focus,
+.modal input:focus,.modal textarea:focus,.modal select:focus {
+  border-color:#669900 !important;
+  box-shadow:0 0 0 3px rgba(102,153,0,.2) !important;
+}
+.field-hint,.field small { color:#999 !important; }
+.modal .small-button,.modal .secondary-button {
+  background:#202020 !important; color:#ddd !important; border-color:#3b3b3b !important;
+}
+.modal .primary-button,.modal .modal-foot button:last-child {
+  background:#669900; color:#fff; border-color:#669900;
+}
+.modal .upload-box,.modal .timeline-item,.modal .notice-item {
+  background:#1b1b1b !important; border-color:#363636 !important; color:#ddd !important;
+}
+.modal [class*="suggest"], .modal [class*="autocomplete"], .modal [role="listbox"] {
+  color:#e8e8e8;
+}
+.modal [class*="suggest"] [class*="item"],
+.modal [class*="suggest"] button,
+.modal [class*="autocomplete"] [class*="item"],
+.modal [role="option"] {
+  background:#171b20 !important;
+  color:#e7eaf0 !important;
+  border-color:#30363d !important;
+}
+.modal [class*="suggest"] [class*="item"]:hover,
+.modal [class*="suggest"] button:hover,
+.modal [role="option"]:hover,
+.modal [role="option"][aria-selected="true"] {
+  background:#283019 !important;
+  color:#fff !important;
+}
+.modal .modal-body { overscroll-behavior:contain; -webkit-overflow-scrolling:touch; }
+@media (max-width:760px) {
+  .modal-backdrop {
+    display:flex !important;
+    align-items:flex-start !important;
+    justify-content:center !important;
+    padding: max(8px, env(safe-area-inset-top)) 8px max(8px, env(safe-area-inset-bottom)) !important;
+    overflow:hidden !important;
+  }
+  .modal {
+    width:100% !important;
+    max-height:calc(var(--visible-vh, 100dvh) - 16px) !important;
+    margin:0 !important;
+    border-radius:18px !important;
+    display:flex !important;
+    flex-direction:column !important;
+    min-height:0 !important;
+  }
+  .modal-head { flex:0 0 auto; padding:16px 18px 13px !important; }
+  .modal-body {
+    flex:1 1 auto !important;
+    min-height:0 !important;
+    overflow-y:auto !important;
+    padding:16px 18px !important;
+    scroll-padding-bottom:150px;
+  }
+  .modal-foot {
+    flex:0 0 auto;
+    padding:10px 18px max(12px, env(safe-area-inset-bottom)) !important;
+    background:#141414;
+  }
+  .modal input,.modal textarea,.modal select { font-size:16px !important; }
+}

@@ -2633,3 +2633,36 @@ body.dark-theme .directory-modal .directory-toolbar button{min-height:42px}
   .directory-modal .directory-table th{font-size:12px;padding:12px}
   .directory-modal .directory-table td{font-size:13px;padding:12px}
 }
+
+
+/* Dark theme for live autocomplete popups inside order forms (not only directories). */
+body.dark-theme .article-suggestions,
+body.dark-theme .client-suggestions{
+  background:#171a18!important;
+  color:#edf0e9!important;
+  border:1px solid #3b433b!important;
+  box-shadow:0 16px 36px rgba(0,0,0,.58)!important;
+  scrollbar-color:#4b554a #171a18;
+}
+body.dark-theme .article-suggestion,
+body.dark-theme .client-suggestion{
+  background:#191d1a!important;
+  color:#e9eee5!important;
+  border-bottom:1px solid #303730!important;
+  padding:12px 14px;
+  min-height:54px;
+}
+body.dark-theme .article-suggestion b,
+body.dark-theme .client-suggestion b{color:#f2f5ee!important;font-size:13px}
+body.dark-theme .article-suggestion small,
+body.dark-theme .client-suggestion small{color:#a4afa0!important;font-size:11px;line-height:1.4}
+body.dark-theme .article-suggestion:hover,
+body.dark-theme .client-suggestion:hover,
+body.dark-theme .article-suggestion:focus-visible,
+body.dark-theme .client-suggestion:focus-visible{
+  background:#293326!important;
+  outline:1px solid #5d852d;
+  outline-offset:-1px;
+}
+body.dark-theme .article-suggestions[hidden],
+body.dark-theme .client-suggestions[hidden]{display:none!important}

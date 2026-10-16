@@ -1053,6 +1053,13 @@ function clientNameSuggestions(inputId,listId){
   list.innerHTML=matches.map(c=>'<button type="button" data-client-suggestion="'+esc(c.name)+'">'+esc(c.name)+' <small>'+(c.registered?'Справочник · ':'')+'Заказов: '+c.count+'</small></button>').join('');
   list.hidden=false;
 }
+function chooseClientSuggestion(inputId,listId,name){
+  const input=$(inputId),list=$(listId);
+  if(!input)return;
+  input.value=name;
+  if(list){list.hidden=true;list.innerHTML='';}
+  input.focus();
+}
 function showClients(){
   const counts=new Map();
   [...managedClients.map(c=>({name:c.name,registered:true,id:c.id})),...state.orders.map(o=>({name:String(o.client||'').trim(),registered:false}))].forEach(c=>{

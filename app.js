@@ -1054,7 +1054,6 @@ function clientNameSuggestions(inputId,listId){
   list.hidden=false;
 }
 function showClients(){
-  if(!canManageUsers)return;
   const counts=new Map();
   [...managedClients.map(c=>({name:c.name,registered:true,id:c.id})),...state.orders.map(o=>({name:String(o.client||'').trim(),registered:false}))].forEach(c=>{
     if(!c.name)return;const key=c.name.toLocaleLowerCase('ru').replace(/\s+/g,' ');
@@ -1062,7 +1061,9 @@ function showClients(){
     if(c.name.length>v.name.length)v.name=c.name;if(c.registered){v.registered=true;v.id=c.id;}counts.set(key,v);
   });
   const rows=[...counts.values()].sort((a,b)=>a.name.localeCompare(b.name,'ru',{sensitivity:'base'})).map(c=>'<div class="client-directory-row"><div><b>'+esc(c.name)+'</b><small>'+(c.registered?'В справочнике':'Только в истории заказов')+' · заказов: '+c.count+'</small></div>'+(c.registered?button('Удалить','delete-client:'+encodeURIComponent(c.id),'small-button danger'):button('Добавить в справочник','register-client:'+encodeURIComponent(c.name),'small-button primary-soft'))+'</div>').join('');
-  showModal('Клиенты','<p class="field-hint">Собраны все имена из истории заказов. Похожие записи с разным регистром объединяются в списке; удаление из справочника не меняет старые заказы.</p><form id="clientCreateForm" class="client-create-form"><input id="newClientName" placeholder="Имя клиента или компании" maxlength="160" required><button class="primary-button" type="submit">＋ Добавить</button></form><div class="client-directory">'+(rows||'<p class="field-hint">Клиентов пока нет.</p>')+'</div><div class="client-import-box"><b>Артикулы</b><p class="field-hint">Импортируй Excel со склада: коды из catalog_number и номера из original_number попадут в подсказки артикула.</p><input id="articleImportFile" type="file" accept=".xlsx,.xls,.csv"><button class="secondary-button" type="button" data-action="import-article-catalog">Импортировать артикулы из Excel</button><small id="articleImportStatus" aria-live="polite"></small></div>',[button('Закрыть','close')],'СПРАВОЧНИК');
+  const adminControls=canManageUsers?'<form id="clientCreateForm" class="client-create-form"><input id="newClientName" placeholder="Имя клиента или компании" maxlength="160" required><button class="primary-button" type="submit">＋ Добавить</button></form><div class="client-import-box"><b>Артикулы</b><p class="field-hint">Импортируй Excel со склада: коды из catalog_number и номера из original_number попадут в подсказки артикула.</p><input id="articleImportFile" type="file" accept=".xlsx,.xls,.csv"><button class="secondary-button" type="button" data-action="import-article-catalog">Импортировать артикулы из Excel</button><small id="articleImportStatus" aria-live="polite"></small></div>':'';
+  const displayRows=[...counts.values()].sort((a,b)=>a.name.localeCompare(b.name,'ru',{sensitivity:'base'})).map(c=>'<div class="client-directory-row"><div><b>'+esc(c.name)+'</b><small>'+(c.registered?'В справочнике':'Только в истории заказов')+' · заказов: '+c.count+'</small></div>'+(canManageUsers?(c.registered?button('Удалить','delete-client:'+encodeURIComponent(c.id),'small-button danger'):button('Добавить в справочник','register-client:'+encodeURIComponent(c.name),'small-button primary-soft')):'')+'</div>').join('');
+  showModal('Клиенты','<p class="field-hint">Собраны все имена из истории заказов. Похожие записи с разным регистром объединяются в списке; удаление из справочника не меняет старые заказы.</p>'+adminControls+'<div class="client-directory">'+(displayRows||'<p class="field-hint">Клиентов пока нет.</p>')+'</div>',[button('Закрыть','close')],'СПРАВОЧНИК');
 }
 async function addClient(name){
   if(!canManageUsers)return;name=String(name||'').trim().replace(/\s+/g,' ');if(!name)return;

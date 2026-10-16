@@ -764,6 +764,10 @@ function directoryActions(){
   document.querySelectorAll('.directory-modal').forEach(x=>x.classList.remove('directory-modal'));
 }
 async function openClientsDirectory(){
+  try{
+    const current=await getDocs(query(collection(db,'clients'),orderBy('name')));
+    clients=current.docs.map(d=>({id:d.id,...d.data()}));
+  }catch(err){console.warn('Не удалось обновить список клиентов перед открытием',err);}
   const known=new Set(clients.map(c=>String(c.name||'').trim().toLocaleLowerCase('ru')).filter(Boolean));
   const historic=new Map();
   (state.orders||[]).forEach(o=>{const name=String(o.client||'').trim(),key=name.toLocaleLowerCase('ru');if(name&&!known.has(key)&&!historic.has(key))historic.set(key,name);});
@@ -777,6 +781,7 @@ async function openClientsDirectory(){
       }
     }catch(err){console.warn('Не удалось автоматически добавить клиентов из истории заказов',err);}
   }
+  try{const current=await getDocs(query(collection(db,'clients'),orderBy('name')));clients=current.docs.map(d=>({id:d.id,...d.data()}));}catch{}
   const rows=clients.map(c=>'<tr><td><b>'+esc(c.name||'')+'</b></td><td>'+esc(c.phone||'—')+'</td><td>'+esc(c.email||'—')+'</td><td>'+esc(c.comment||'—')+'</td><td><button class="small-button primary-soft" data-action="edit-client:'+esc(c.id)+'">Изменить</button> <button class="small-button danger" data-action="delete-client:'+esc(c.id)+'">Удалить</button></td></tr>').join('');
   showModal('Клиенты','<div class="directory-toolbar"><label class="search-box"><span>⌕</span><input id="directoryClientSearch" placeholder="Поиск клиента"></label><button class="primary-button" data-action="new-client">＋ Добавить клиента</button><button class="secondary-button" data-action="import-clients">⇧ Excel</button></div><div class="directory-table-wrap"><table class="directory-table"><thead><tr><th>Клиент</th><th>Телефон</th><th>Почта</th><th>Комментарий</th><th></th></tr></thead><tbody id="clientsDirectoryBody">'+(rows||'<tr><td colspan="5" class="directory-empty">Клиентов пока нет</td></tr>')+'</tbody></table></div><input id="clientsExcelInput" type="file" accept=".xlsx,.xls" hidden> <p class="field-hint">В справочник автоматически добавляются клиенты, встречавшиеся в истории заказов. Excel: колонки «Имя/Клиент», «Телефон», «Почта», «Комментарий».</p>',[button('Закрыть','close')],'СПРАВОЧНИК КЛИЕНТОВ');
   modal.querySelector('.modal')?.classList.add('directory-modal');
@@ -837,7 +842,7 @@ async function importProductsExcel(file){
       if(!sheet)throw new Error('В книге нет листов.');
       const rows=window.XLSX.utils.sheet_to_json(sheet,{defval:''});
       if(!rows.length)throw new Error('Первый лист пустой или не содержит строк данных.');
-      const normalize=s=>String(s??'').trim().toLocaleLowerCase('ru').replace(/[\\s_-]+/g,'');
+      const normalize=s=>String(s??'').trim().toLocaleLowerCase('ru').replace(/[\s_-]+/g,'');
       const map=new Map();
       for(const row of rows){
         const keys=Object.keys(row),get=(...names)=>{const wanted=names.map(normalize);const k=keys.find(x=>wanted.includes(normalize(x)));return k===undefined?'':String(row[k]??'').trim();};

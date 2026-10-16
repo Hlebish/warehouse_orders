@@ -427,14 +427,16 @@ service cloud.firestore {
       // Отметки проверки отгрузки хранятся отдельно от заказов.
       // Они не меняют статус заказа и доступны только кладовщику/администратору.
       allow create: if (isWarehouse() || canManageUsers())
-        && request.resource.data.keys().hasOnly(['date','checkedArticles'])
+        && request.resource.data.keys().hasOnly(['date','checkedArticles','checkedOrderArticles'])
         && request.resource.data.date == dateKey
-        && request.resource.data.checkedArticles is list;
+        && ((!request.resource.data.keys().hasAny(['checkedArticles'])) || request.resource.data.checkedArticles is list)
+        && ((!request.resource.data.keys().hasAny(['checkedOrderArticles'])) || request.resource.data.checkedOrderArticles is list);
 
       allow update: if (isWarehouse() || canManageUsers())
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['checkedArticles'])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['checkedArticles','checkedOrderArticles'])
         && request.resource.data.date == dateKey
-        && request.resource.data.checkedArticles is list;
+        && ((!request.resource.data.keys().hasAny(['checkedArticles'])) || request.resource.data.checkedArticles is list)
+        && ((!request.resource.data.keys().hasAny(['checkedOrderArticles'])) || request.resource.data.checkedOrderArticles is list);
 
       // Подтвердить список могут кладовщик, менеджер и администратор.
       allow create: if (isWarehouse() || isManager() || canManageUsers())

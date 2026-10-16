@@ -2710,3 +2710,7 @@ body.dark-theme .client-suggestions[hidden]{display:none!important}
 .status-defect:before{background:#fff!important}
 .toast.defect-toast{background:#e50914!important;color:#fff!important;border:1px solid #ff5962!important;box-shadow:0 8px 28px rgba(229,9,20,.38)!important;font-weight:900!important;cursor:pointer}
 .toast.defect-toast:before{content:'⚠ ';}
+
+/* Make buyback category filters visibly interactive */
+.buyback-chip[data-status],#buybackSummary [data-summary-status]{cursor:pointer!important;}
+.buyback-chip[data-status]:hover,#buybackSummary [data-summary-status]:hover{filter:brightness(1.12);}

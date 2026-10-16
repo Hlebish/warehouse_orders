@@ -1877,6 +1877,7 @@ document.addEventListener('input',e=>{
   if(e.target?.id==='entryText')entryMentionSuggestions();
   if(e.target?.id==='clientName')clientNameSuggestions('clientName','clientNameSuggestions');
   if(e.target?.id==='editClientName')clientNameSuggestions('editClientName','editClientNameSuggestions');
+  if(e.target?.classList?.contains('order-article-input'))articleSuggestions(e.target);
 });
 document.addEventListener('focusin',e=>{
   if(e.target?.id==='clientName')clientNameSuggestions('clientName','clientNameSuggestions');

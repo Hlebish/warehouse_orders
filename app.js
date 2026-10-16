@@ -1483,6 +1483,39 @@ async function generateDailyReport(dateKey,endDateKey=dateKey){
     const dateLabel=esc(dateKey===endDateKey?dateFormatter.format(new Date(dateKey+'T12:00:00')):dateFormatter.format(new Date(dateKey+'T12:00:00'))+' — '+dateFormatter.format(new Date(endDateKey+'T12:00:00')));
     const sections=[];
     if(periodIsMonth){
+      const periodMetrics=(fromKey,toKey)=>{
+        const periodCreated=state.orders.filter(o=>reportDateMatches(o.createdAt,fromKey,toKey));
+        const periodEntries=state.orders.flatMap(o=>(Array.isArray(o.entries)?o.entries:[]).filter(e=>reportDateMatches(e.createdAt,fromKey,toKey)).map(e=>({order:o,entry:e})));
+        const periodEvents=regex=>periodEntries.filter(x=>regex.test(reportEntryText(x.order,x.entry)));
+        const periodShippedEvents=periodEvents(/отгруженн|отгрузил/i);
+        const periodPickupEvents=periodEvents(/клиент забрал заказ самовывозом|забрал.*самовывоз/i);
+        const periodTransferredEvents=periodEvents(/заказ перенесен|перенесён заказ|перенесен/i);
+        const uniqueEventOrders=events=>[...new Map(events.map(x=>[x.order.id,x.order])).values()];
+        const periodShipped=uniqueEventOrders(periodShippedEvents);
+        for(const o of state.orders)if(o.status==='Отгружен кладовщиком'&&reportDateMatches(o.shippedAt||o.updatedAt,fromKey,toKey)&&!periodShipped.some(x=>x.id===o.id))periodShipped.push(o);
+        const periodPickup=uniqueEventOrders(periodPickupEvents);
+        for(const o of state.orders)if(o.status==='Клиент забрал самовывозом'&&reportDateMatches(o.updatedAt,fromKey,toKey)&&!periodPickup.some(x=>x.id===o.id))periodPickup.push(o);
+        const periodTransferred=uniqueEventOrders(periodTransferredEvents);
+        for(const o of state.orders)if(o.status==='Перенесен'&&reportDateMatches(o.transferredAt||o.updatedAt,fromKey,toKey)&&!periodTransferred.some(x=>x.id===o.id))periodTransferred.push(o);
+        const periodCancelled=state.orders.filter(o=>o.status==='Отменён'&&reportDateMatches(o.updatedAt,fromKey,toKey));
+        const periodDefects=periodEntries.filter(x=>x.entry.kind==='defect');
+        const periodReturns=state.orders.flatMap(o=>(Array.isArray(o.returns)?o.returns:[]).filter(r=>r?.status!=='cancelled'&&reportDateMatches(r.createdAt,fromKey,toKey)).map(record=>({order:o,record})));
+        const involvedIds=new Set([...periodCreated,...periodShipped,...periodPickup,...periodTransferred,...periodCancelled,...periodDefects.map(x=>x.order),...periodReturns.map(x=>x.order)].map(o=>o.id));
+        const problematicIds=new Set([...periodDefects.map(x=>x.order.id),...periodReturns.map(x=>x.order.id)]);
+        return {created:periodCreated.length,shipped:periodShipped.length,pickup:periodPickup.length,cancelled:periodCancelled.length,problematic:problematicIds.size,involved:involvedIds.size,problemShare:involvedIds.size?problematicIds.size/involvedIds.size*100:0};
+      };
+      const selectedStart=new Date(dateKey+'T12:00:00');
+      const selectedEnd=new Date(endDateKey+'T12:00:00');
+      const selectedDays=Math.max(1,Math.round((selectedEnd-selectedStart)/86400000)+1);
+      const isFullCalendarMonth=selectedStart.getDate()===1&&selectedEnd.getDate()===new Date(selectedEnd.getFullYear(),selectedEnd.getMonth()+1,0).getDate();
+      let previousStart,previousEnd;
+      if(isFullCalendarMonth){previousStart=new Date(selectedStart.getFullYear(),selectedStart.getMonth()-1,1,12);previousEnd=new Date(selectedStart.getFullYear(),selectedStart.getMonth(),0,12);}
+      else{previousEnd=new Date(selectedStart);previousEnd.setDate(previousEnd.getDate()-1);previousStart=new Date(previousEnd);previousStart.setDate(previousStart.getDate()-selectedDays+1);}
+      const previousStartKey=localDateKey(previousStart),previousEndKey=localDateKey(previousEnd);
+      const currentMetrics=periodMetrics(dateKey,endDateKey),previousMetrics=periodMetrics(previousStartKey,previousEndKey);
+      const comparisonLabel=isFullCalendarMonth?'к предыдущему календарному месяцу':'к предыдущему периоду такой же длины';
+      const countComparison=(current,previous)=>{const diff=current-previous;const pct=previous?Math.round(diff/previous*100):current===0?'0':'—';return '<span class="comparison-delta '+(diff>0?'up':diff<0?'down':'flat')+'">'+(diff>0?'+':'')+diff+(pct==='—'?' ('+(current>0?'новые значения':'нет базы')+')':' ('+(pct>0?'+':'')+pct+'%)')+'</span>';};
+      const percentagePointComparison=(current,previous)=>{const diff=Math.round((current-previous)*10)/10;return '<span class="comparison-delta '+(diff>0?'up':diff<0?'down':'flat')+'">'+(diff>0?'+':'')+diff+' п. п.</span>';};
       const weekBuckets=[];
       const startDate=new Date(dateKey+'T12:00:00');
       const finishDate=new Date(endDateKey+'T12:00:00');
@@ -1514,10 +1547,16 @@ async function generateDailyReport(dateKey,endDateKey=dateKey){
       const defectsPer100=shippedOrders.length?Math.round(defects.length/shippedOrders.length*1000)/10:0;
       const returnsPer100=fulfilledOrders?Math.round(returns.length/fulfilledOrders*1000)/10:0;
       const peakWeek=weekBuckets.reduce((best,w)=>!best||(w.shipped+w.pickup)>(best.shipped+best.pickup)?w:best,null);
+      const peakCreatedWeek=weekBuckets.reduce((best,w)=>!best||w.created>best.created?w:best,null);
+      const avgFulfilledPerWeek=weekBuckets.length?Math.round(fulfilledOrders/weekBuckets.length*10)/10:0;
+      const problemShare=currentMetrics.involved?Math.round(currentMetrics.problemShare*10)/10:0;
+      const previousProblemShare=previousMetrics.involved?Math.round(previousMetrics.problemShare*10)/10:0;
       sections.push('<section class="report-hero"><div class="eyebrow">WAREHOUSE · MONTHLY PERFORMANCE</div><h2>Итоги месяца</h2><p class="muted">Период: '+dateLabel+' · Сформирован: '+esc(fmtDateTime(new Date()))+'</p><div class="summary"><div class="kpi"><b>'+created.length+'</b>создано за период</div><div class="kpi"><b>'+shippedOrders.length+'</b>отгрузок</div><div class="kpi"><b>'+shippedQty+'</b>деталей отгружено</div><div class="kpi"><b>'+pickupOrders.length+'</b>самовывозов</div><div class="kpi"><b>'+uniqueClients(shippedOrders)+'</b>клиентов в отгрузках</div><div class="kpi"><b>'+transferredOrders.length+'</b>переносов</div><div class="kpi"><b>'+cancelledOrders.length+'</b>отмен</div><div class="kpi"><b>'+defects.length+'</b>записей о дефектах</div><div class="kpi"><b>'+returns.length+'</b>возвратов</div><div class="kpi"><b>'+defectOrders+'</b>заказов с дефектами</div></div></section>');
       sections.push('<h2>Средние показатели</h2><p class="section-note">Средние значения рассчитаны на календарный день выбранного периода. Показатели качества на 100 заказов — ориентировочные соотношения событий и выполненных заказов за период, не когортная статистика.</p><div class="summary"><div class="kpi"><b>'+avg(created.length)+'</b>новых заказов в день</div><div class="kpi"><b>'+avg(fulfilledOrders)+'</b>выполненных заказов в день</div><div class="kpi"><b>'+avg(cancelledOrders.length)+'</b>отмен в день</div><div class="kpi"><b>'+avg(shippedQty,shippedOrders.length)+'</b>деталей на одну отгрузку</div><div class="kpi"><b>'+avg(fulfilledQty,fulfilledOrders)+'</b>деталей на выполненный заказ</div><div class="kpi"><b>'+pickupShare+'%</b>выполнений через самовывоз</div><div class="kpi"><b>'+defectsPer100+'</b>событий дефекта на 100 отгрузок</div><div class="kpi"><b>'+returnsPer100+'</b>возвратных записей на 100 выполнений</div></div><p class="section-note">Самый активный период по отгрузкам и самовывозам: '+(peakWeek?esc(peakWeek.label)+' ('+(peakWeek.shipped+peakWeek.pickup)+' выполнений)':'нет данных')+'.</p>');
       sections.push('<h2>Динамика по неделям</h2><p class="section-note">Количество событий по неделям месяца. Данные показаны в сравнительном виде; шкала общая для всех серий.</p><div class="chart-legend"><span><i class="legend-created"></i>Создано</span><span><i class="legend-shipped"></i>Отгружено</span><span><i class="legend-pickup"></i>Самовывоз</span><span><i class="legend-cancelled"></i>Отменено</span></div>'+chartRows);
       sections.push('<h2>Перекупной товар на складе</h2><div class="summary"><div class="kpi"><b>'+buybackOnStock.length+'</b>перекупных позиций</div><div class="kpi"><b>'+buybackUnits+'</b>единиц перекупного товара</div></div><p class="section-note">Это состояние склада на момент формирования отчёта, а не исторический остаток на конец выбранного периода.</p>');
+      sections.push('<h2>Сравнение с предыдущим периодом</h2><p class="section-note">Сравнение '+esc(fmtDate(previousStart)+' — '+fmtDate(previousEnd))+' '+esc(comparisonLabel)+'. Проценты показывают изменение количества; для доли проблемных заказов используется разница в процентных пунктах.</p><div class="summary"><div class="kpi"><b>'+currentMetrics.created+'</b>новых заказов<br>'+countComparison(currentMetrics.created,previousMetrics.created)+'</div><div class="kpi"><b>'+currentMetrics.shipped+'</b>отгрузок<br>'+countComparison(currentMetrics.shipped,previousMetrics.shipped)+'</div><div class="kpi"><b>'+currentMetrics.pickup+'</b>самовывозов<br>'+countComparison(currentMetrics.pickup,previousMetrics.pickup)+'</div><div class="kpi"><b>'+currentMetrics.cancelled+'</b>отмен<br>'+countComparison(currentMetrics.cancelled,previousMetrics.cancelled)+'</div><div class="kpi"><b>'+currentMetrics.problematic+'</b>проблемных заказов<br>'+countComparison(currentMetrics.problematic,previousMetrics.problematic)+'</div><div class="kpi"><b>'+problemShare+'%</b>доля проблемных заказов<br>'+percentagePointComparison(problemShare,previousProblemShare)+'</div></div><p class="section-note">Проблемным считается уникальный заказ, в котором за период зарегистрирован хотя бы один дефект или возврат. Доля рассчитана среди уникальных заказов, затронутых событиями периода (создание, отгрузка, самовывоз, перенос, отмена, дефект или возврат).</p>');
+      sections.push('<h2>Пиковая нагрузка</h2><div class="summary"><div class="kpi"><b>'+avgFulfilledPerWeek+'</b>выполнений в среднем за неделю</div><div class="kpi"><b>'+(peakWeek?peakWeek.shipped+peakWeek.pickup:0)+'</b>максимум отгрузок и самовывозов за неделю</div><div class="kpi"><b>'+(peakCreatedWeek?peakCreatedWeek.created:0)+'</b>максимум новых заказов за неделю</div></div><p class="section-note">Пиковая неделя по выполнению: '+(peakWeek?esc(peakWeek.label)+' ('+esc(peakWeek.range)+')':'нет данных')+'. Пиковая неделя по созданию заказов: '+(peakCreatedWeek?esc(peakCreatedWeek.label)+' ('+esc(peakCreatedWeek.range)+')':'нет данных')+'.</p>');
       sections.push('<h2>Контроль качества и операций</h2><div class="summary"><div class="kpi"><b>'+defects.length+'</b>событий дефекта за период</div><div class="kpi"><b>'+defectOrders+'</b>заказов затронуто дефектами</div><div class="kpi"><b>'+returns.length+'</b>возвратных записей</div><div class="kpi"><b>'+returnUnits+'</b>единиц в возвратах</div></div><p class="section-note">Подробные построчные таблицы заказов, дефектов и возвратов скрыты в месячном отчёте, чтобы документ оставался компактным. Для разбора конкретной операции используйте карточку заказа и историю.</p>');
       sections.push('<div class="signatures"><div class="sign">Кладовщик: __________________________</div><div class="sign">Проверил: __________________________</div></div>');
     }else{

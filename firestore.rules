@@ -168,13 +168,21 @@ service cloud.firestore {
         && (!request.resource.data.keys().hasAny(['source']) || request.resource.data.source in ['order-history','excel','manual'])
         && (!request.resource.data.keys().hasAny(['historyCount']) || request.resource.data.historyCount is number);
       allow update: if activeUser()
-        && request.resource.data.keys().hasOnly(['name','phone','email','address','comment','createdAt','createdBy','updatedAt','updatedBy','source','historyCount','hiddenFromDirectory'])
-        && request.resource.data.name is string
-        && request.resource.data.name.size() > 0
-        && request.resource.data.updatedBy == request.auth.uid
-        && (!request.resource.data.keys().hasAny(['source']) || request.resource.data.source in ['order-history','excel','manual'])
-        && (!request.resource.data.keys().hasAny(['historyCount']) || request.resource.data.historyCount is number);
-      // Keep destructive client actions limited to management roles.
+        && (
+          // Any active user may hide a client from the directory without changing
+          // its identity or historical order references.
+          (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['hiddenFromDirectory','updatedAt','updatedBy'])
+            && request.resource.data.hiddenFromDirectory == true
+            && request.resource.data.updatedBy == request.auth.uid)
+          ||
+          (request.resource.data.keys().hasOnly(['name','phone','email','address','comment','createdAt','createdBy','updatedAt','updatedBy','source','historyCount','hiddenFromDirectory'])
+            && request.resource.data.name is string
+            && request.resource.data.name.size() > 0
+            && request.resource.data.updatedBy == request.auth.uid
+            && (!request.resource.data.keys().hasAny(['source']) || request.resource.data.source in ['order-history','excel','manual'])
+            && (!request.resource.data.keys().hasAny(['historyCount']) || request.resource.data.historyCount is number))
+        );
+      // Physical deletion remains restricted to management roles.
       allow delete: if isManager() || canManageUsers();
     }
 

@@ -152,7 +152,7 @@ overlay.addEventListener('click',async e=>{
     if(nextStatus==='active'){patch.soldAt=null;patch.cancelledAt=null;patch.returnedAt=null}
     await updateDoc(doc(db,'buybackItems',item.id),patch);showToast('Статус перекупного товара обновлён.');
   }
- catch(err){console.error(err);showToast('Не удалось изменить статус.')}
+  }catch(err){console.error(err);showToast('Не удалось изменить статус.')}
 });
 onAuthStateChanged(auth,user=>{
  currentUser=user;

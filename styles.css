@@ -2548,3 +2548,13 @@ body:not(.dark-theme) .shipment-order-card.shipment-order-complete .shipment-ord
   .shipment-day-quick .small-button{min-height:40px;font-size:11px!important}
   .shipment-day-quick .small-button:first-child{grid-column:1/-1}
 }
+
+/* Client directory and article autocomplete */
+.article-suggestion-wrap{position:relative}
+.article-suggestions,.client-suggestions{position:absolute;z-index:80;left:0;right:0;top:calc(100% + 5px);max-height:min(280px,42vh);overflow:auto;background:#171b20;color:#f1f3f5;border:1px solid #343b43;border-radius:12px;box-shadow:0 14px 35px rgba(0,0,0,.42)}
+.article-suggestion,.client-suggestion{width:100%;display:flex;justify-content:space-between;align-items:flex-start;gap:12px;text-align:left;padding:12px 14px;border:0;border-bottom:1px solid #2b3138;background:transparent;color:inherit;font:inherit;cursor:pointer}
+.article-suggestion:hover,.client-suggestion:hover{background:#29321b}
+.article-suggestion small,.client-suggestion small{color:#9da7a0;white-space:nowrap;font-size:11px}
+.article-suggestion-empty{padding:12px;color:#a5aab0;font-size:13px}
+.client-directory{display:grid;gap:14px}.client-create-form{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px}.client-create-form input,.client-edit-name,.client-search input{min-width:0;width:100%;padding:12px;border:1px solid var(--line,#343b43);border-radius:10px;background:var(--surface-2,#1c2024);color:var(--text,#f4f4f4);font:inherit}.client-tools{display:flex;flex-wrap:wrap;gap:8px}.client-file-label{display:inline-flex;align-items:center;justify-content:center;cursor:pointer}.client-import-status{font-size:13px;color:var(--muted,#9da7a0)}.client-directory-list{display:grid;gap:8px;max-height:45vh;overflow:auto}.client-record{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;padding:10px;border:1px solid var(--line,#343b43);border-radius:12px;background:var(--surface-2,#1c2024)}.client-record-actions{display:flex;gap:6px}.client-record-actions button{white-space:nowrap}.client-search{margin:0}
+@media(max-width:600px){.client-create-form{grid-template-columns:1fr}.client-record{grid-template-columns:1fr}.client-record-actions button{flex:1}.article-suggestions{max-height:34vh}.client-tools>*{flex:1 1 42%}}

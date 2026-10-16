@@ -812,7 +812,21 @@ async function saveClient(id){
 async function deleteClient(id){
   const c=clients.find(x=>x.id===id);if(!c)return;
   if(!confirm('Удалить клиента «'+c.name+'»?'))return;
-  try{await deleteDoc(doc(db,'clients',id));toast('Клиент удалён.');openClientsDirectory();}catch(err){toast('Не удалось удалить клиента: '+(err?.message||'нет доступа'))}
+  // Historical-only rows are synthetic and have no Firestore document.
+  if(String(id).startsWith('history:')){
+    const key=String(c.name||'').trim().toLocaleLowerCase('ru');
+    clients=clients.filter(x=>String(x.id)!==String(id));
+    const body=$('clientsDirectoryBody');
+    if(body){const q=String($('directoryClientSearch')?.value||'').toLocaleLowerCase('ru');const list=clients.filter(x=>(String(x.name||'')+' '+String(x.phone||'')+' '+String(x.address||'')).toLocaleLowerCase('ru').includes(q));body.innerHTML=list.length?list.map(x=>'<tr><td><b>'+esc(x.name||'')+'</b></td><td>'+esc(x.phone||'—')+'</td><td>'+esc(x.address||'—')+'</td><td>'+esc(x.comment||'—')+'</td><td><button class="small-button primary-soft" data-action="edit-client:'+esc(x.id)+'">Изменить</button> <button class="small-button danger" data-action="delete-client:'+esc(x.id)+'">Удалить</button></td></tr>').join(''):'<tr><td colspan="5" class="directory-empty">Ничего не найдено</td></tr>';}
+    toast('Клиент скрыт из справочника. Он может снова появиться, если останется в истории заказов.');
+    return;
+  }
+  try{
+    await deleteDoc(doc(db,'clients',id));
+    clients=clients.filter(x=>String(x.id)!==String(id));
+    toast('Клиент удалён.');
+    await openClientsDirectory();
+  }catch(err){console.error('Ошибка удаления клиента',err);toast('Не удалось удалить клиента: '+(err?.code||err?.message||'нет доступа'))}
 }
 function importClientsExcel(file){
   if(!file||!window.XLSX)return;

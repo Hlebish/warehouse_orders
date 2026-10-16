@@ -508,7 +508,7 @@ setPersistence(auth,browserLocalPersistence).then(()=>onAuthStateChanged(auth,us
    if(!snap.exists()){showAuth('Учётная запись создана, но профиль не найден. Обратитесь к администратору.');$('authError').textContent=`UID: ${user.uid}`;return}
    const profile=snap.data();if(profile.active!==true||!roles[profile.role]){try{localStorage.removeItem(profileCacheKey)}catch{}showAuth('Доступ отключён или роль не назначена. Обратитесь к администратору.');return}
    try{localStorage.setItem(profileCacheKey,JSON.stringify(profile))}catch{}
-   state.role=profile.role;canManageUsers=profile.admin===true||profile.role==='director';profileName=profile.displayName||user.email||roles[profile.role];state.notificationSettings={chat:profile.notificationSettings?.chat!==false,replies:profile.notificationSettings?.replies!==false,likes:profile.notificationSettings?.likes!==false,orders:profile.notificationSettings?.orders!==false};state.extraPhoneNotifications=profile.extraPhoneNotifications===true;$('userName').textContent=profileName;$('userRole').textContent=canManageUsers?`Администратор · ${roles[profile.role]}`:roles[profile.role];hideAuth();watchOrders();watchNotifications();watchChatBadge();render();syncPushToken(false);if(window.AndroidWarehouse?.requestNativePushToken){window.AndroidWarehouse.requestNativePushToken();}if(pendingNotificationChat){pendingNotificationChat=false;history.replaceState({},'',location.pathname+location.hash);setTimeout(()=>openChat(),0);}
+   state.role=profile.role;canManageUsers=profile.admin===true||profile.role==='director';profileName=profile.displayName||user.email||roles[profile.role];state.notificationSettings={chat:profile.notificationSettings?.chat!==false,replies:profile.notificationSettings?.replies!==false,likes:profile.notificationSettings?.likes!==false,orders:profile.notificationSettings?.orders!==false};state.extraPhoneNotifications=profile.extraPhoneNotifications===true;$('userName').textContent=profileName;$('userRole').textContent=canManageUsers?`Администратор · ${roles[profile.role]}`:roles[profile.role];hideAuth();watchOrders();watchNotifications();watchChatBadge();watchClients();loadProductsCatalog();render();syncPushToken(false);if(window.AndroidWarehouse?.requestNativePushToken){window.AndroidWarehouse.requestNativePushToken();}if(pendingNotificationChat){pendingNotificationChat=false;history.replaceState({},'',location.pathname+location.hash);setTimeout(()=>openChat(),0);}
  },err=>{console.error(err);showAuth('Не удалось проверить профиль сотрудника. Проверьте правила доступа Firestore.')});
 })).catch(err=>{console.error('Не удалось сохранить вход на этом устройстве',err);showAuth('Браузер не разрешил сохранить вход. Проверьте настройки приватности и хранения данных.');});
  $('loginForm').addEventListener('submit',async e=>{e.preventDefault();$('authError').textContent='';try{await signInWithEmailAndPassword(auth,$('loginEmail').value.trim(),$('loginPassword').value)}catch(err){$('authError').textContent=err.code==='auth/invalid-credential'?'Неверная почта или пароль.':err.code==='auth/too-many-requests'?'Слишком много попыток. Попробуйте позже.':'Не удалось войти. Проверьте почту и пароль.'}});
@@ -672,7 +672,7 @@ function closeModal(fromPop=false){
   }
 }
 function button(label,action,cls='small-button'){return `<button class="${cls}" data-action="${action}">${label}</button>`}
-function articleRowHtml(item={article:'',quantity:1,collected:false}){return `<div class="order-article-row"><input class="order-article-input" value="${esc(item.article||'')}" placeholder="Артикул" autocomplete="off"><input class="order-article-qty" type="number" min="1" step="1" value="${Math.max(1,Number(item.quantity)||1)}" aria-label="Количество"><button type="button" class="small-button danger article-remove" data-action="remove-order-article" title="Удалить">×</button></div>`}
+function articleRowHtml(item={article:'',quantity:1,collected:false}){return `<div class="order-article-row"><input class="order-article-input" value="${esc(item.article||'')}" placeholder="Артикул" autocomplete="off"><div class="article-suggestions" hidden></div><input class="order-article-qty" type="number" min="1" step="1" value="${Math.max(1,Number(item.quantity)||1)}" aria-label="Количество"><button type="button" class="small-button danger article-remove" data-action="remove-order-article" title="Удалить">×</button></div>`}
 function articlesEditorHtml(items=[]){return `<div class="article-editor" id="orderArticlesEditor"><div class="article-editor-head"><span>Артикул</span><span>Количество</span><span></span></div><div id="orderArticlesRows">${items.map(articleRowHtml).join('')}</div><button type="button" class="secondary-button article-add" data-action="add-order-article">＋ Добавить артикул</button></div>`}
 function readArticles(){return [...document.querySelectorAll('#orderArticlesRows .order-article-row')].map(row=>({article:row.querySelector('.order-article-input')?.value.trim()||'',quantity:Math.max(1,Number(row.querySelector('.order-article-qty')?.value)||1)})).filter(x=>x.article)}
 function normalizeArticles(items=[]){return items.map(x=>({article:String(x.article||'').trim(),quantity:Math.max(1,Number(x.quantity)||1),collected:x.collected===true,shipmentChecked:x.shipmentChecked===true})).filter(x=>x.article)}
@@ -684,7 +684,174 @@ const managerCreate=isManagerRole()&&!canManageUsers;
 const statusOptions=managerCreate?'<option value="Создан">Создан</option><option>Под вопросом</option>':'<option value="Создан">Создан</option><option>Собран</option><option>Под вопросом</option>'; 
 const statusHint=managerCreate?'Менеджер создаёт заказ со статусом «Создан». Кладовщик позже отметит его как «Собран».':'Можно сразу отметить заказ как «Собран», если он уже собран.';
 showModal('Добавить заказ',`<form id="newOrderForm"><div class="form-grid"><div class="field"><label for="orderNumber">Номер заказа *</label><input id="orderNumber" required placeholder="Например, ЗК-18472" autocomplete="off"></div><div class="field client-suggestion-wrap"><label for="clientName">Имя клиента *</label><input id="clientName" required placeholder="Имя или название компании" autocomplete="off"><div id="clientNameSuggestions" class="chat-mention-suggestions client-suggestions" hidden></div></div></div><div class="field"><label for="deliveryType">Вид доставки</label><select id="deliveryType"><option value="city">Доставка по городу</option><option value="post">Доставка почтой</option><option value="pickup">Самовывоз</option></select></div><div class="field"><label>Артикулы заказа</label>${articlesEditorHtml([{article:'',quantity:1}])}<span class="field-hint">Для каждого артикула укажите количество. Можно добавлять и удалять позиции.</span></div><div class="field"><label for="startStatus">Начальный статус</label><select id="startStatus">${statusOptions}</select><span class="field-hint">${statusHint}</span></div><div class="field"><label for="initialComment">Комментарий (необязательно)</label><textarea id="initialComment" placeholder="Короткая заметка по заказу"></textarea></div></form>`,[button('Отмена','close'),button('Создать карточку','create-order','primary-button')],'НОВЫЙ ЗАКАЗ')}
-function returnedQuantityForArticle(o,article){
+
+/* ===== Справочники клиентов и артикулов ===== */
+let clients=[], productsCatalog=[], clientsUnsubscribe=null, productsLoaded=false;
+
+function watchClients(){
+  clientsUnsubscribe?.();
+  if(!signedInUser)return;
+  clientsUnsubscribe=onSnapshot(query(collection(db,'clients'),orderBy('name')),snap=>{
+    clients=snap.docs.map(d=>({id:d.id,...d.data()}));
+  },err=>console.warn('Не удалось загрузить клиентов',err));
+}
+
+async function loadProductsCatalog(){
+  if(productsLoaded||!signedInUser)return;
+  try{
+    const cached=sessionStorage.getItem('warehouse_products_cache');
+    if(cached){
+      const parsed=JSON.parse(cached);
+      if(Array.isArray(parsed)&&parsed.length){productsCatalog=parsed;productsLoaded=true;return;}
+    }
+  }catch{}
+  try{
+    const snap=await getDocs(collection(db,'products'));
+    const chunks=snap.docs.filter(d=>d.id.startsWith('chunk-')).sort((a,b)=>a.id.localeCompare(b.id));
+    productsCatalog=chunks.flatMap(d=>Array.isArray(d.data()?.items)?d.data().items:[]);
+    productsLoaded=true;
+    try{sessionStorage.setItem('warehouse_products_cache',JSON.stringify(productsCatalog));}catch{}
+  }catch(err){console.warn('Не удалось загрузить базу артикулов',err);}
+}
+
+function productSearch(text){
+  const q=String(text||'').trim().toLocaleLowerCase('ru');
+  if(q.length<2)return [];
+  const exact=[], starts=[], other=[];
+  for(const p of productsCatalog){
+    const a=String(p.a||'').toLocaleLowerCase('ru'), o=String(p.o||'').toLocaleLowerCase('ru');
+    if(a===q||o.split(',').map(x=>x.trim().toLocaleLowerCase('ru')).includes(q)) exact.push(p);
+    else if(a.startsWith(q)||o.split(',').some(x=>x.trim().toLocaleLowerCase('ru').startsWith(q))) starts.push(p);
+    else if((p.n||'').toLocaleLowerCase('ru').includes(q)||(p.b||'').toLocaleLowerCase('ru').includes(q)) other.push(p);
+  }
+  return [...exact,...starts,...other].slice(0,8);
+}
+
+function clientSearch(text){
+  const q=String(text||'').trim().toLocaleLowerCase('ru');
+  if(q.length<1)return [];
+  return clients.filter(c=>String(c.name||'').toLocaleLowerCase('ru').includes(q)||String(c.phone||'').toLocaleLowerCase('ru').includes(q)).slice(0,8);
+}
+
+function showClientSuggestions(inputId,boxId){
+  const input=$(inputId),box=$(boxId);if(!input||!box)return;
+  const items=clientSearch(input.value);
+  if(!items.length){box.hidden=true;box.innerHTML='';return;}
+  box.innerHTML=items.map(c=>'<button type="button" class="client-suggestion" data-client-suggestion="'+esc(c.id)+'"><b>'+esc(c.name)+'</b><small>'+esc(c.phone||c.email||'')+'</small></button>').join('');
+  box.hidden=false;
+}
+function chooseClientSuggestion(inputId,boxId,id){
+  const c=clients.find(x=>x.id===id);if(!c)return;
+  const input=$(inputId);if(input){input.value=c.name||'';input.dataset.clientId=c.id;}
+  const box=$(boxId);if(box)box.hidden=true;
+}
+function showArticleSuggestions(input){
+  const row=input?.closest('.order-article-row');if(!row)return;
+  let box=row.querySelector('.article-suggestions');
+  if(!box){box=document.createElement('div');box.className='article-suggestions';row.appendChild(box);}
+  const items=productSearch(input.value);
+  if(!items.length){box.hidden=true;box.innerHTML='';return;}
+  box.innerHTML=items.map(p=>'<button type="button" class="article-suggestion" data-product-article="'+esc(p.a)+'"><b>'+esc(p.a)+'</b><small>'+esc([p.m,p.b,p.n].filter(Boolean).join(' · ').slice(0,180))+'</small></button>').join('');
+  box.hidden=false;
+}
+function chooseArticleSuggestion(button){
+  const row=button.closest('.order-article-row'),input=row?.querySelector('.order-article-input');if(!input)return;
+  input.value=button.dataset.productArticle||'';input.focus();
+  row.querySelector('.article-suggestions')?.remove();
+}
+
+function directoryActions(){
+  document.querySelectorAll('.directory-modal').forEach(x=>x.classList.remove('directory-modal'));
+}
+function openClientsDirectory(){
+  const rows=clients.map(c=>'<tr><td><b>'+esc(c.name||'')+'</b></td><td>'+esc(c.phone||'—')+'</td><td>'+esc(c.email||'—')+'</td><td>'+esc(c.comment||'—')+'</td><td><button class="small-button primary-soft" data-action="edit-client:'+esc(c.id)+'">Изменить</button> <button class="small-button danger" data-action="delete-client:'+esc(c.id)+'">Удалить</button></td></tr>').join('');
+  showModal('Клиенты','<div class="directory-toolbar"><label class="search-box"><span>⌕</span><input id="directoryClientSearch" placeholder="Поиск клиента"></label><button class="primary-button" data-action="new-client">＋ Добавить клиента</button><button class="secondary-button" data-action="import-clients">⇧ Excel</button></div><div class="directory-table-wrap"><table class="directory-table"><thead><tr><th>Клиент</th><th>Телефон</th><th>Почта</th><th>Комментарий</th><th></th></tr></thead><tbody id="clientsDirectoryBody">'+(rows||'<tr><td colspan="5" class="directory-empty">Клиентов пока нет</td></tr>')+'</tbody></table></div><input id="clientsExcelInput" type="file" accept=".xlsx,.xls" hidden> <p class="field-hint">Excel: колонки «Имя/Клиент», «Телефон», «Почта», «Комментарий».</p>',[button('Закрыть','close')],'СПРАВОЧНИК КЛИЕНТОВ');
+  modal.querySelector('.modal')?.classList.add('directory-modal');
+  setTimeout(()=>{$('directoryClientSearch')?.addEventListener('input',e=>filterClientDirectory(e.target.value));},0);
+}
+function filterClientDirectory(text){
+  const q=String(text||'').toLocaleLowerCase('ru');
+  const body=$('clientsDirectoryBody');if(!body)return;
+  const list=clients.filter(c=>(String(c.name||'')+' '+String(c.phone||'')+' '+String(c.email||'')).toLocaleLowerCase('ru').includes(q));
+  body.innerHTML=list.length?list.map(c=>'<tr><td><b>'+esc(c.name||'')+'</b></td><td>'+esc(c.phone||'—')+'</td><td>'+esc(c.email||'—')+'</td><td>'+esc(c.comment||'—')+'</td><td><button class="small-button primary-soft" data-action="edit-client:'+esc(c.id)+'">Изменить</button> <button class="small-button danger" data-action="delete-client:'+esc(c.id)+'">Удалить</button></td></tr>').join(''):'<tr><td colspan="5" class="directory-empty">Ничего не найдено</td></tr>';
+}
+function openClientForm(id=''){
+  const c=clients.find(x=>x.id===id)||{};
+  showModal(id?'Изменить клиента':'Добавить клиента','<form id="clientForm"><div class="form-grid"><div class="field"><label>Имя / название *</label><input id="clientFormName" required value="'+esc(c.name||'')+'"></div><div class="field"><label>Телефон</label><input id="clientFormPhone" value="'+esc(c.phone||'')+'"></div></div><div class="form-grid"><div class="field"><label>Почта</label><input id="clientFormEmail" type="email" value="'+esc(c.email||'')+'"></div><div class="field"><label>Комментарий</label><input id="clientFormComment" value="'+esc(c.comment||'')+'"></div></div></form>',[button('Отмена','close'),button(id?'Сохранить':'Добавить','save-client:'+esc(id),'primary-button')],'КЛИЕНТ');
+}
+async function saveClient(id){
+  const name=$('clientFormName')?.value.trim();if(!name){toast('Укажите имя клиента.');return}
+  const data={name,phone:$('clientFormPhone')?.value.trim()||'',email:$('clientFormEmail')?.value.trim()||'',comment:$('clientFormComment')?.value.trim()||'',updatedAt:isoNow(),updatedBy:signedInUser.uid};
+  try{
+    if(id)await updateDoc(doc(db,'clients',id),data);
+    else await setDoc(doc(db,'clients',crypto.randomUUID()),{...data,createdAt:isoNow(),createdBy:signedInUser.uid});
+    closeModal();setTimeout(openClientsDirectory,0);toast(id?'Клиент изменён.':'Клиент добавлен.');
+  }catch(err){console.error(err);toast('Не удалось сохранить клиента: '+(err?.message||'нет доступа'))}
+}
+async function deleteClient(id){
+  const c=clients.find(x=>x.id===id);if(!c)return;
+  if(!confirm('Удалить клиента «'+c.name+'»?'))return;
+  try{await deleteDoc(doc(db,'clients',id));toast('Клиент удалён.');openClientsDirectory();}catch(err){toast('Не удалось удалить клиента: '+(err?.message||'нет доступа'))}
+}
+function importClientsExcel(file){
+  if(!file||!window.XLSX)return;
+  const reader=new FileReader();
+  reader.onload=async e=>{
+    try{
+      const wb=window.XLSX.read(new Uint8Array(e.target.result),{type:'array'}),rows=window.XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''});
+      const batchSize=450;let count=0,batch=writeBatch(db),n=0;
+      const key=(row,names)=>{const k=Object.keys(row).find(x=>names.includes(String(x).trim().toLocaleLowerCase('ru')));return k?String(row[k]??'').trim():''};
+      for(const row of rows){
+        const name=key(row,['имя','клиент','клиент фио','name','client']);if(!name)continue;
+        const data={name,phone:key(row,['телефон','phone','тел']),email:key(row,['почта','email','e-mail']),comment:key(row,['комментарий','comment','примечание']),createdAt:isoNow(),createdBy:signedInUser.uid,updatedAt:isoNow(),updatedBy:signedInUser.uid};
+        batch.set(doc(db,'clients',crypto.randomUUID()),data);n++;count++;
+        if(n>=batchSize){await batch.commit();batch=writeBatch(db);n=0;}
+      }
+      if(n)await batch.commit();
+      toast('Импортировано клиентов: '+count);openClientsDirectory();
+    }catch(err){console.error(err);toast('Ошибка Excel: '+(err?.message||'не удалось прочитать файл'))}
+  };
+  reader.readAsArrayBuffer(file);
+}
+async function importProductsExcel(file){
+  if(!file||!window.XLSX)return;
+  const reader=new FileReader();
+  reader.onload=async e=>{
+    try{
+      const wb=window.XLSX.read(new Uint8Array(e.target.result),{type:'array'}),rows=window.XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''});
+      const map=new Map();
+      for(const row of rows){
+        const get=k=>String(row[k]??'').trim();
+        const a=get('catalog_number');if(!a||map.has(a.toLocaleLowerCase('ru')))continue;
+        map.set(a.toLocaleLowerCase('ru'),{a,m:get('manufacturer_parts'),n:get('name'),o:get('original_number'),b:get('marks')});
+      }
+      const items=[...map.values()],chunks=[];
+      for(let i=0;i<items.length;i+=2000)chunks.push(items.slice(i,i+2000));
+      const batch=writeBatch(db);
+      for(let i=1;i<=8;i++)batch.delete(doc(db,'products','chunk-'+i));
+      batch.set(doc(db,'products','meta'),{count:items.length,updatedAt:isoNow(),updatedBy:signedInUser.uid});
+      await batch.commit();
+      for(let i=0;i<chunks.length;i++)await setDoc(doc(db,'products','chunk-'+(i+1)),{items:chunks[i],count:chunks[i].length,updatedAt:isoNow(),updatedBy:signedInUser.uid});
+      productsCatalog=items;productsLoaded=true;try{sessionStorage.setItem('warehouse_products_cache',JSON.stringify(items));}catch{}
+      toast('База артикулов обновлена: '+items.length+' позиций.');openProductsDirectory();
+    }catch(err){console.error(err);toast('Не удалось импортировать базу: '+(err?.message||'ошибка Excel'))}
+  };
+  reader.readAsArrayBuffer(file);
+}
+function openProductsDirectory(){
+  loadProductsCatalog().then(()=>{
+    showModal('База артикулов','<div class="directory-toolbar"><label class="search-box"><span>⌕</span><input id="directoryProductSearch" placeholder="Артикул, кросс-номер, марка"></label><button class="primary-button" data-action="import-products">⇧ Загрузить Excel</button></div><div class="directory-table-wrap"><table class="directory-table"><thead><tr><th>Артикул</th><th>Производитель</th><th>Марка</th><th>Наименование</th><th>Кросс-номера</th></tr></thead><tbody id="productsDirectoryBody"></tbody></table></div><input id="productsExcelInput" type="file" accept=".xlsx,.xls" hidden><p class="field-hint">В каталоге '+productsCatalog.length+' уникальных позиций. База используется для подсказок при создании и редактировании заказа.</p>',[button('Закрыть','close')],'КАТАЛОГ АРТИКУЛОВ');
+    modal.querySelector('.modal')?.classList.add('directory-modal');renderProductDirectory('');
+    setTimeout(()=>{$('directoryProductSearch')?.addEventListener('input',e=>renderProductDirectory(e.target.value));},0);
+  });
+}
+function renderProductDirectory(text){
+  const body=$('productsDirectoryBody');if(!body)return;
+  const q=String(text||'').toLocaleLowerCase('ru');
+  const list=!q?productsCatalog.slice(0,100):productsCatalog.filter(p=>(String(p.a)+' '+String(p.m)+' '+String(p.b)+' '+String(p.n)+' '+String(p.o)).toLocaleLowerCase('ru').includes(q)).slice(0,100);
+  body.innerHTML=list.length?list.map(p=>'<tr><td><b>'+esc(p.a)+'</b></td><td>'+esc(p.m||'—')+'</td><td>'+esc(p.b||'—')+'</td><td>'+esc(p.n||'—')+'</td><td>'+esc(p.o||'—')+'</td></tr>').join(''):'<tr><td colspan="5" class="directory-empty">Ничего не найдено</td></tr>';
+}
+\nfunction returnedQuantityForArticle(o,article){
   const key=String(article||'').trim().toUpperCase();
   // Отменённые возвраты не должны уменьшать доступное к возврату количество.
   return (Array.isArray(o?.returns)?o.returns:[]).filter(r=>r?.status!=='cancelled').reduce((sum,r)=>sum+(Array.isArray(r.items)?r.items.filter(x=>String(x.article||'').trim().toUpperCase()===key).reduce((n,x)=>n+(Number(x.quantity)||0),0):0),0);
@@ -1871,7 +2038,7 @@ document.addEventListener('click',e=>{
   if(mention){e.preventDefault();insertChatMention(mention.dataset.chatMention||'');return;}
   const like=e.target.closest('[data-action^="toggle-chat-like:"]');
   if(like){e.preventDefault();toggleChatLike(like.dataset.action.split(':').slice(1).join(':'));return;}
-const notice=e.target.closest('[data-open-notification]');if(notice){const id=notice.dataset.openNotification,target=notice.dataset.notificationTarget;if(target==='chat'){closeModal();openChat();}else if(id)openOrder(id);return}const open=e.target.closest('[data-open]');if(open){e.preventDefault();openOrder(open.dataset.open);return}const nav=e.target.closest('.nav-item');if(nav){if(nav.dataset.action==='returns'){closeSidebar(true);history.replaceState({},'',location.pathname+location.search);showReturns();return;}if(nav.dataset.filter){activeFilter=nav.dataset.filter;render();closeSidebar();return;}}if(e.target===$('sidebarBackdrop')){closeSidebar();return}if(e.target===$('imageViewer')||e.target===$('closeImageViewer')){$('imageViewer').hidden=true;$('imageViewerImage').removeAttribute('src');return}const act=e.target.closest('[data-action]')?.dataset.action;if(act){if(act==='close')closeModal();else if(act==='send-chat')sendChatMessage();else if(act==='create-order')saveOrder();else if(act==='add-order-article'){const rows=$('orderArticlesRows');if(rows)rows.insertAdjacentHTML('beforeend',articleRowHtml());}else if(act==='remove-order-article'){e.target.closest('.order-article-row')?.remove();}else if(act.startsWith('toggle-collected:')){toggleArticleCollected(Number(act.slice(17)));}else if(act==='open-edit-menu')openEditMenu();else if(act==='edit-articles')editArticles();else if(act==='edit-order-info')editOrderInfo();else if(act==='open-warehouse-actions')openOrderActionCategory('warehouse');else if(act==='open-manager-actions')openOrderActionCategory('manager');else if(act==='save-order-info')saveOrderInfo();else if(act==='save-articles')saveArticles();else if(act==='add-comment')addComment();else if(act.startsWith('reply-entry:'))replyToEntry(act.slice('reply-entry:'.length));else if(act==='add-defect')addDefect();else if(act==='open-return')openReturnForm();else if(act==='save-return')saveReturn();else if(act.startsWith('cancel-return:')){const parts=act.split(':');cancelReturnAction(parts[1],parts.slice(2).join(':'));}else if(act.startsWith('open-return-order:')){openOrder(act.slice('open-return-order:'.length));}else if(act==='back-detail')backDetail();else if(act==='save-entry')saveEntry();else if(act==='toggle-assembly'){toggleAssemblyProgress();}else if(act==='set-assembled'){setStatus('Собран','Кладовщик отметил заказ как собран.');}else if(act==='set-shipped'){setStatus('Отгружен кладовщиком','Кладовщик отметил заказ как отгруженный.');}else if(act.startsWith('toggle-shipment-checked:')){const raw=act.slice(24),parts=raw.split('|');if(parts.length>=3){const dateKey=parts[0],orderId=decodeURIComponent(parts[1]),article=decodeURIComponent(parts.slice(2).join('|'));toggleShipmentItemChecked(dateKey,orderId,article);}}else if(act.startsWith('set-status:')){const status=act.slice(11);setStatus(status,`Статус заказа изменён на «${status}».`)}else if(act==='show-on-map'){let article=e.target.closest('[data-map-article]')?.dataset.mapArticle||'';article=article.trim().split(/\s+/)[0];if(article)window.open('https://hlebish.github.io/warehouse-map/?article='+encodeURIComponent(article),'warehouseMap')}else if(act==='set-created'){setStatus('Создан','Кладовщик вернул заказ в статус «Создан».');}else if(act==='set-pickup-waiting'){if(isManagerRole()||canManageUsers){setStatus('Ожидает самовывоза','Менеджер отметил заказ как ожидающий самовывоза.');}}else if(act==='set-pickup-done'){if(isManagerRole()||canManageUsers){setStatus('Клиент забрал самовывозом','Клиент забрал заказ самовывозом.');}}else if(act==='set-transferred'){if(isManagerRole()||canManageUsers){setStatus('Перенесен','Заказ перенесен.');}}else if(act==='set-approval')setStatus('На согласовании','Начал согласование заказа с клиентом.');else if(act==='approve-order')approveOrder();else if(act==='confirm-approve')confirmApprove();else if(act==='cancel-order')cancelOrder();else if(act==='confirm-cancel')confirmCancel();else if(act==='mark-seen')markViewed();else if(act==='delete-order')deleteOrder();else if(act==='confirm-delete')confirmDelete();else if(act.startsWith('delete-entry:'))deleteEntry(act.split(':')[1]);else if(act.startsWith('confirm-delete-entry:'))confirmDeleteEntry(act.split(':')[1]);else if(act==='confirm-defect-cancel')confirmDefectCancel();else if(act==='sign-out'){closeModal();signOut(auth)}else if(act==='open-staff')showStaff();else if(act==='new-staff')newStaff();else if(act==='create-staff')createStaff();else if(act==='back-profile')backProfile();else if(act==='change-password')changePassword();else if(act==='save-password')savePassword();else if(act==='set-login-password')setLoginPassword();else if(act==='save-login-password')saveLoginPassword();else if(act==='deleted-orders')showDeletedOrders();else if(act==='site-history')showAuditLog();else if(act==='analytics')showWarehouseAnalytics();else if(act==='returns')showReturns();else if(act==='returns-date'){showReturns($('returnsDateFrom')?.value||'', $('returnsDateTo')?.value||'');}else if(act==='shipment-manifest')openShipmentManifest();else if(act==='daily-report')openDailyReport();else if(act==='print-daily-report'){const mode=$('reportPeriodMode')?.value||'day';if(mode==='month'){const month=$('monthlyReportMonth')?.value||'';if(!/^\d{4}-\d{2}$/.test(month)){toast('Выберите месяц отчёта.');return;}const [year,monthNumber]=month.split('-').map(Number);const start=month+'-01',end=localDateKey(new Date(year,monthNumber,0));generateDailyReport(start,end);}else{const day=$('dailyReportDate')?.value||localDateKey(new Date());generateDailyReport(day,day);}}else if(act==='shipment-date'){openShipmentManifest($('shipmentDate')?.value||localDateKey(new Date()));}else if(act==='shipment-day-prev'){openShipmentDayOffset(-1);}else if(act==='shipment-day-next'){openShipmentDayOffset(1);}else if(act==='shipment-day-today'){openShipmentManifest(localDateKey(new Date()));}else if(act.startsWith('confirm-shipment:'))confirmShipmentManifest(act.slice(17));else if(act.startsWith('revoke-shipment:'))revokeShipmentManifest(act.slice(16));else if(act==='toggle-theme'){applyTheme(document.body.classList.contains('dark-theme')?'light':'dark');profileMenu();}else if(act==='toggle-chat-indicator'){if(signedInUser){const key='warehouse_chat_indicator_'+signedInUser.uid;localStorage.setItem(key,chatUnreadIndicatorMode()==='bell'?'dot':'bell');paintChatBadge();profileMenu();toast(chatUnreadIndicatorMode()==='bell'?'Индикатор чата изменён на колокольчик.':'Индикатор чата изменён на жёлтую точку.');}}else if(act.startsWith('view-deleted-order:'))showDeletedOrder(act.slice('view-deleted-order:'.length));else if(act.startsWith('save-role:'))changeStaffRole(act.slice('save-role:'.length));else if(act.startsWith('toggle-user:')){const[,uid,mode]=act.split(':');toggleStaff(uid,mode==='on')}else if(act==='enable-notifications'){enablePush()}else if(act==='disable-notifications'){disablePush()}else if(act==='toggle-extra-phone-notifications'){toggleExtraPhoneNotifications()}else if(act==='mark-notifications-read'){markNotificationsRead()}else if(act.startsWith('toggle-notification:')){toggleNotificationSetting(act.slice('toggle-notification:'.length))}else if(act.startsWith('reply-chat:')){startChatReply(act.slice('reply-chat:'.length))}else if(act==='cancel-chat-reply'){cancelChatReply()}else if(act.startsWith('defect-confirm:'))decideDefect(act.split(':')[1],'Подтверждён');else if(act.startsWith('defect-remove:'))decideDefect(act.split(':')[1],'Удалена из заказа');else if(act.startsWith('edit-defect:'))editDefect(act.split(':')[1]);else if(act==='confirm-defect-remove')confirmDefectRemove();else if(act==='save-defect-edit')saveDefectEdit();else if(act.startsWith('defect-cancel:')){pendingDefectId=act.split(':')[1];decideDefect(pendingDefectId,'Отменён')}return}/* Backdrop clicks intentionally do not close the modal; use the × button. */const photo=e.target.closest('[data-photo]');if(photo){$('imageViewerImage').src=photo.dataset.photo;$('imageViewer').hidden=false}});
+const notice=e.target.closest('[data-open-notification]');if(notice){const id=notice.dataset.openNotification,target=notice.dataset.notificationTarget;if(target==='chat'){closeModal();openChat();}else if(id)openOrder(id);return}const open=e.target.closest('[data-open]');if(open){e.preventDefault();openOrder(open.dataset.open);return}const nav=e.target.closest('.nav-item');if(nav){if(nav.dataset.action==='returns'){closeSidebar(true);history.replaceState({},'',location.pathname+location.search);showReturns();return;}if(nav.dataset.action==='clients'){closeSidebar();openClientsDirectory();return;}if(nav.dataset.action==='products'){closeSidebar();openProductsDirectory();return;}if(nav.dataset.filter){activeFilter=nav.dataset.filter;render();closeSidebar();return;}}if(e.target===$('sidebarBackdrop')){closeSidebar();return}if(e.target===$('imageViewer')||e.target===$('closeImageViewer')){$('imageViewer').hidden=true;$('imageViewerImage').removeAttribute('src');return}const act=e.target.closest('[data-action]')?.dataset.action;if(act){if(act==='close')closeModal();else if(act==='send-chat')sendChatMessage();else if(act==='create-order')saveOrder();else if(act==='add-order-article'){const rows=$('orderArticlesRows');if(rows)rows.insertAdjacentHTML('beforeend',articleRowHtml());}else if(act==='remove-order-article'){e.target.closest('.order-article-row')?.remove();}else if(act==='new-client'){openClientForm();}else if(act.startsWith('edit-client:')){openClientForm(act.slice(12));}else if(act.startsWith('delete-client:')){deleteClient(act.slice(14));}else if(act.startsWith('save-client:')){saveClient(act.slice(12));}else if(act==='import-clients'){$('clientsExcelInput')?.click();}else if(act==='import-products'){$('productsExcelInput')?.click();}else if(act==='clients'){openClientsDirectory();}else if(act==='products'){openProductsDirectory();}else if(act.startsWith('toggle-collected:')){toggleArticleCollected(Number(act.slice(17)));}else if(act==='open-edit-menu')openEditMenu();else if(act==='edit-articles')editArticles();else if(act==='edit-order-info')editOrderInfo();else if(act==='open-warehouse-actions')openOrderActionCategory('warehouse');else if(act==='open-manager-actions')openOrderActionCategory('manager');else if(act==='save-order-info')saveOrderInfo();else if(act==='save-articles')saveArticles();else if(act==='add-comment')addComment();else if(act.startsWith('reply-entry:'))replyToEntry(act.slice('reply-entry:'.length));else if(act==='add-defect')addDefect();else if(act==='open-return')openReturnForm();else if(act==='save-return')saveReturn();else if(act.startsWith('cancel-return:')){const parts=act.split(':');cancelReturnAction(parts[1],parts.slice(2).join(':'));}else if(act.startsWith('open-return-order:')){openOrder(act.slice('open-return-order:'.length));}else if(act==='back-detail')backDetail();else if(act==='save-entry')saveEntry();else if(act==='toggle-assembly'){toggleAssemblyProgress();}else if(act==='set-assembled'){setStatus('Собран','Кладовщик отметил заказ как собран.');}else if(act==='set-shipped'){setStatus('Отгружен кладовщиком','Кладовщик отметил заказ как отгруженный.');}else if(act.startsWith('toggle-shipment-checked:')){const raw=act.slice(24),parts=raw.split('|');if(parts.length>=3){const dateKey=parts[0],orderId=decodeURIComponent(parts[1]),article=decodeURIComponent(parts.slice(2).join('|'));toggleShipmentItemChecked(dateKey,orderId,article);}}else if(act.startsWith('set-status:')){const status=act.slice(11);setStatus(status,`Статус заказа изменён на «${status}».`)}else if(act==='show-on-map'){let article=e.target.closest('[data-map-article]')?.dataset.mapArticle||'';article=article.trim().split(/\s+/)[0];if(article)window.open('https://hlebish.github.io/warehouse-map/?article='+encodeURIComponent(article),'warehouseMap')}else if(act==='set-created'){setStatus('Создан','Кладовщик вернул заказ в статус «Создан».');}else if(act==='set-pickup-waiting'){if(isManagerRole()||canManageUsers){setStatus('Ожидает самовывоза','Менеджер отметил заказ как ожидающий самовывоза.');}}else if(act==='set-pickup-done'){if(isManagerRole()||canManageUsers){setStatus('Клиент забрал самовывозом','Клиент забрал заказ самовывозом.');}}else if(act==='set-transferred'){if(isManagerRole()||canManageUsers){setStatus('Перенесен','Заказ перенесен.');}}else if(act==='set-approval')setStatus('На согласовании','Начал согласование заказа с клиентом.');else if(act==='approve-order')approveOrder();else if(act==='confirm-approve')confirmApprove();else if(act==='cancel-order')cancelOrder();else if(act==='confirm-cancel')confirmCancel();else if(act==='mark-seen')markViewed();else if(act==='delete-order')deleteOrder();else if(act==='confirm-delete')confirmDelete();else if(act.startsWith('delete-entry:'))deleteEntry(act.split(':')[1]);else if(act.startsWith('confirm-delete-entry:'))confirmDeleteEntry(act.split(':')[1]);else if(act==='confirm-defect-cancel')confirmDefectCancel();else if(act==='sign-out'){closeModal();signOut(auth)}else if(act==='open-staff')showStaff();else if(act==='new-staff')newStaff();else if(act==='create-staff')createStaff();else if(act==='back-profile')backProfile();else if(act==='change-password')changePassword();else if(act==='save-password')savePassword();else if(act==='set-login-password')setLoginPassword();else if(act==='save-login-password')saveLoginPassword();else if(act==='deleted-orders')showDeletedOrders();else if(act==='site-history')showAuditLog();else if(act==='analytics')showWarehouseAnalytics();else if(act==='returns')showReturns();else if(act==='returns-date'){showReturns($('returnsDateFrom')?.value||'', $('returnsDateTo')?.value||'');}else if(act==='shipment-manifest')openShipmentManifest();else if(act==='daily-report')openDailyReport();else if(act==='print-daily-report'){const mode=$('reportPeriodMode')?.value||'day';if(mode==='month'){const month=$('monthlyReportMonth')?.value||'';if(!/^\d{4}-\d{2}$/.test(month)){toast('Выберите месяц отчёта.');return;}const [year,monthNumber]=month.split('-').map(Number);const start=month+'-01',end=localDateKey(new Date(year,monthNumber,0));generateDailyReport(start,end);}else{const day=$('dailyReportDate')?.value||localDateKey(new Date());generateDailyReport(day,day);}}else if(act==='shipment-date'){openShipmentManifest($('shipmentDate')?.value||localDateKey(new Date()));}else if(act==='shipment-day-prev'){openShipmentDayOffset(-1);}else if(act==='shipment-day-next'){openShipmentDayOffset(1);}else if(act==='shipment-day-today'){openShipmentManifest(localDateKey(new Date()));}else if(act.startsWith('confirm-shipment:'))confirmShipmentManifest(act.slice(17));else if(act.startsWith('revoke-shipment:'))revokeShipmentManifest(act.slice(16));else if(act==='toggle-theme'){applyTheme(document.body.classList.contains('dark-theme')?'light':'dark');profileMenu();}else if(act==='toggle-chat-indicator'){if(signedInUser){const key='warehouse_chat_indicator_'+signedInUser.uid;localStorage.setItem(key,chatUnreadIndicatorMode()==='bell'?'dot':'bell');paintChatBadge();profileMenu();toast(chatUnreadIndicatorMode()==='bell'?'Индикатор чата изменён на колокольчик.':'Индикатор чата изменён на жёлтую точку.');}}else if(act.startsWith('view-deleted-order:'))showDeletedOrder(act.slice('view-deleted-order:'.length));else if(act.startsWith('save-role:'))changeStaffRole(act.slice('save-role:'.length));else if(act.startsWith('toggle-user:')){const[,uid,mode]=act.split(':');toggleStaff(uid,mode==='on')}else if(act==='enable-notifications'){enablePush()}else if(act==='disable-notifications'){disablePush()}else if(act==='toggle-extra-phone-notifications'){toggleExtraPhoneNotifications()}else if(act==='mark-notifications-read'){markNotificationsRead()}else if(act.startsWith('toggle-notification:')){toggleNotificationSetting(act.slice('toggle-notification:'.length))}else if(act.startsWith('reply-chat:')){startChatReply(act.slice('reply-chat:'.length))}else if(act==='cancel-chat-reply'){cancelChatReply()}else if(act.startsWith('defect-confirm:'))decideDefect(act.split(':')[1],'Подтверждён');else if(act.startsWith('defect-remove:'))decideDefect(act.split(':')[1],'Удалена из заказа');else if(act.startsWith('edit-defect:'))editDefect(act.split(':')[1]);else if(act==='confirm-defect-remove')confirmDefectRemove();else if(act==='save-defect-edit')saveDefectEdit();else if(act.startsWith('defect-cancel:')){pendingDefectId=act.split(':')[1];decideDefect(pendingDefectId,'Отменён')}return}/* Backdrop clicks intentionally do not close the modal; use the × button. */const photo=e.target.closest('[data-photo]');if(photo){$('imageViewerImage').src=photo.dataset.photo;$('imageViewer').hidden=false}});
 let sidebarHistoryEntry=false,handlingSidebarPop=false;function closeSidebar(fromPop=false){$('sidebar').classList.remove('open');$('sidebarBackdrop').hidden=true;if(sidebarHistoryEntry&&!fromPop){handlingSidebarPop=true;history.back()}sidebarHistoryEntry=false}
 function openSidebar(){if($('sidebar').classList.contains('open')){closeSidebar();return}$('sidebar').classList.add('open');$('sidebarBackdrop').hidden=false;history.pushState({mobileSidebar:true},'','#menu');sidebarHistoryEntry=true}
 window.addEventListener('popstate',()=>{

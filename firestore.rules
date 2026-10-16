@@ -158,16 +158,23 @@ service cloud.firestore {
 
     match /clients/{clientId} {
       allow read: if activeUser();
+      // Supports both legacy email records and the current address field,
+      // plus metadata used for importing historical clients from orders.
       allow create: if activeUser()
-        && request.resource.data.keys().hasOnly(['name','phone','email','comment','createdAt','createdBy','updatedAt','updatedBy'])
+        && request.resource.data.keys().hasOnly(['name','phone','email','address','comment','createdAt','createdBy','updatedAt','updatedBy','source','historyCount'])
         && request.resource.data.name is string
         && request.resource.data.name.size() > 0
-        && request.resource.data.createdBy == request.auth.uid;
+        && request.resource.data.createdBy == request.auth.uid
+        && (!request.resource.data.keys().hasAny(['source']) || request.resource.data.source in ['order-history','excel','manual'])
+        && (!request.resource.data.keys().hasAny(['historyCount']) || request.resource.data.historyCount is number);
       allow update: if activeUser()
-        && request.resource.data.keys().hasOnly(['name','phone','email','comment','createdAt','createdBy','updatedAt','updatedBy'])
+        && request.resource.data.keys().hasOnly(['name','phone','email','address','comment','createdAt','createdBy','updatedAt','updatedBy','source','historyCount'])
         && request.resource.data.name is string
         && request.resource.data.name.size() > 0
-        && request.resource.data.updatedBy == request.auth.uid;
+        && request.resource.data.updatedBy == request.auth.uid
+        && (!request.resource.data.keys().hasAny(['source']) || request.resource.data.source in ['order-history','excel','manual'])
+        && (!request.resource.data.keys().hasAny(['historyCount']) || request.resource.data.historyCount is number);
+      // Keep destructive client actions limited to management roles.
       allow delete: if isManager() || canManageUsers();
     }
 

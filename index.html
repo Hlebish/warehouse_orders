@@ -24,7 +24,7 @@
     @keyframes siteLoaderSpin{to{transform:rotate(360deg)}}
     @media(prefers-reduced-motion:reduce){#siteLoader .loader-spinner{animation-duration:2s}#siteLoader{transition:none}}
   </style>
-  <link rel="stylesheet" href="styles.css?v=1.0.1.135">
+  <link rel="stylesheet" href="styles.css?v=1.0.1.138">
 
 <script>
 (() => {
@@ -59,6 +59,7 @@
         <button class="nav-item active" type="button" data-filter="all"><span class="nav-icon">▤</span><span>Все заказы</span></button>
         <button class="nav-item" type="button" data-action="returns"><span class="nav-icon">↩</span><span>Возвраты</span></button>
         <button class="nav-item" id="buybackNavButton" type="button"><span class="nav-icon">⏳</span><span>Перекупной товар</span><span id="buybackNavAlert" class="buyback-nav-alert" hidden>!</span></button>
+        <button class="nav-item" id="clientsNavButton" type="button" data-action="clients"><span class="nav-icon">♙</span><span>Клиенты</span></button>
 
       </nav>
       <div class="sidebar-bottom">
@@ -138,7 +139,8 @@
   <div class="image-viewer" id="imageViewer" hidden role="dialog" aria-modal="true" aria-label="Просмотр фотографии"><button class="image-viewer-close" id="closeImageViewer" aria-label="Закрыть">×</button><img id="imageViewerImage" alt="Фото из комментария"></div>
   <button type="button" id="mentionCenterButton" class="mention-center-button" hidden aria-live="polite"><span class="mention-center-icon">＠</span><span id="mentionCenterLabel">Вас упомянули</span><b id="mentionCenterCount">0</b></button>
   <div class="toast-stack" id="toastStack" aria-live="polite"></div>
-  <script type="module" src="app.js?v=1.0.1.135"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script type="module" src="app.js?v=1.0.1.138"></script>
   <script type="module" src="buyback.js?v=1.0.2"></script>
 </body>
 </html>

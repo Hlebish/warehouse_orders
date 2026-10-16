@@ -851,7 +851,8 @@ function renderProductDirectory(text){
   const list=!q?productsCatalog.slice(0,100):productsCatalog.filter(p=>(String(p.a)+' '+String(p.m)+' '+String(p.b)+' '+String(p.n)+' '+String(p.o)).toLocaleLowerCase('ru').includes(q)).slice(0,100);
   body.innerHTML=list.length?list.map(p=>'<tr><td><b>'+esc(p.a)+'</b></td><td>'+esc(p.m||'—')+'</td><td>'+esc(p.b||'—')+'</td><td>'+esc(p.n||'—')+'</td><td>'+esc(p.o||'—')+'</td></tr>').join(''):'<tr><td colspan="5" class="directory-empty">Ничего не найдено</td></tr>';
 }
-\nfunction returnedQuantityForArticle(o,article){
+
+function returnedQuantityForArticle(o,article){
   const key=String(article||'').trim().toUpperCase();
   // Отменённые возвраты не должны уменьшать доступное к возврату количество.
   return (Array.isArray(o?.returns)?o.returns:[]).filter(r=>r?.status!=='cancelled').reduce((sum,r)=>sum+(Array.isArray(r.items)?r.items.filter(x=>String(x.article||'').trim().toUpperCase()===key).reduce((n,x)=>n+(Number(x.quantity)||0),0):0),0);

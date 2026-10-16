@@ -432,5 +432,33 @@ service cloud.firestore {
       
       allow delete: if canManageUsers();
     }
+
+    match /clients/{clientId} {
+      allow read: if activeUser();
+      allow create: if canManageUsers()
+        && request.resource.data.keys().hasOnly(['name','normalized','createdAt','createdBy'])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.normalized is string
+        && request.resource.data.createdBy == request.auth.uid;
+      allow update: if canManageUsers()
+        && request.resource.data.keys().hasOnly(['name','normalized','createdAt','createdBy','updatedAt','updatedBy'])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.normalized is string
+        && request.resource.data.updatedBy == request.auth.uid;
+      allow delete: if canManageUsers();
+    }
+
+    match /articleCatalog/{articleId} {
+      allow read: if activeUser();
+      allow create, update: if canManageUsers()
+        && request.resource.data.keys().hasOnly(['article','normalized','source','updatedAt','updatedBy'])
+        && request.resource.data.article is string
+        && request.resource.data.article.size() > 0
+        && request.resource.data.normalized is string
+        && request.resource.data.updatedBy == request.auth.uid;
+      allow delete: if canManageUsers();
+    }
   }
 }

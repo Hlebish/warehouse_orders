@@ -2548,3 +2548,29 @@ body:not(.dark-theme) .shipment-order-card.shipment-order-complete .shipment-ord
   .shipment-day-quick .small-button{min-height:40px;font-size:11px!important}
   .shipment-day-quick .small-button:first-child{grid-column:1/-1}
 }
+
+/* Справочники клиентов и артикулов */
+.directory-modal{width:min(980px,100%);}
+.directory-toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+.directory-toolbar .search-box{flex:1 1 260px;width:auto}
+.directory-table-wrap{max-height:58vh;overflow:auto;border:1px solid var(--line);border-radius:9px}
+.directory-table{width:100%;min-width:620px;border-collapse:collapse}
+.directory-table th,.directory-table td{padding:9px 11px;height:auto}
+.directory-table th{position:sticky;top:0;background:#fafbfc;z-index:1}
+.directory-empty{padding:30px;text-align:center;color:#929aa5;font-size:11px}
+.article-suggest-wrap{position:relative}
+.article-suggestions,.client-suggestions{position:absolute;left:0;right:0;top:calc(100% + 3px);z-index:50;background:#fff;border:1px solid #dfe4ea;border-radius:8px;box-shadow:0 12px 28px #17202f1c;overflow:hidden;max-height:260px}
+.article-suggestion,.client-suggestion{display:flex;flex-direction:column;gap:2px;width:100%;padding:9px 10px;border:0;border-bottom:1px solid #f0f1f3;background:#fff;text-align:left;color:#36404c}
+.article-suggestion:last-child,.client-suggestion:last-child{border-bottom:0}
+.article-suggestion:hover,.client-suggestion:hover{background:#f4f7fb}
+.article-suggestion b,.client-suggestion b{font-size:11px}
+.article-suggestion small,.client-suggestion small{font-size:9px;color:#8c96a3}
+.order-article-row{position:relative}
+.article-editor-head{display:grid;grid-template-columns:minmax(0,1fr) 90px 32px;gap:8px}
+.article-editor-head span{font-size:10px;color:#89929e;font-weight:700}
+@media(max-width:650px){
+  .directory-modal{width:100%}
+  .directory-table-wrap{max-height:62vh}
+  .directory-toolbar{align-items:stretch}
+  .directory-toolbar button{flex:1 1 auto}
+}

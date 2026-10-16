@@ -110,10 +110,12 @@ function watchNotifications(){
   notificationsUnsubscribe?.();
   if(!signedInUser)return;
   let knownNoticeIds=new Set(state.notices.map(n=>n.id));
+  let initialSnapshot=true;
   const q=query(collection(db,'users',signedInUser.uid,'notifications'),orderBy('createdAt','desc'),limit(100));
   notificationsUnsubscribe=onSnapshot(q,snap=>{
     const next=snap.docs.map(d=>({id:d.id,...d.data(),at:d.data().createdAt||d.data().at||isoNow()}));
-    if(knownNoticeIds.size){next.filter(n=>!knownNoticeIds.has(n.id)&&isMentionNotice(n)&&!n.read).forEach(showMentionToast)}
+    if(!initialSnapshot){next.filter(n=>!knownNoticeIds.has(n.id)&&isMentionNotice(n)&&!n.read).forEach(showMentionToast)}
+    initialSnapshot=false;
     knownNoticeIds=new Set(next.map(n=>n.id));state.notices=next;paintNotices();paintMentionCenter();
   },err=>console.error('Не удалось загрузить историю уведомлений',err));
 }

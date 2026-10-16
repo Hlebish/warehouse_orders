@@ -763,9 +763,22 @@ function chooseArticleSuggestion(button){
 function directoryActions(){
   document.querySelectorAll('.directory-modal').forEach(x=>x.classList.remove('directory-modal'));
 }
-function openClientsDirectory(){
+async function openClientsDirectory(){
+  const known=new Set(clients.map(c=>String(c.name||'').trim().toLocaleLowerCase('ru')).filter(Boolean));
+  const historic=new Map();
+  (state.orders||[]).forEach(o=>{const name=String(o.client||'').trim(),key=name.toLocaleLowerCase('ru');if(name&&!known.has(key)&&!historic.has(key))historic.set(key,name);});
+  if(historic.size&&signedInUser){
+    try{
+      const entries=[...historic.values()];
+      for(let i=0;i<entries.length;i+=400){
+        const batch=writeBatch(db);
+        entries.slice(i,i+400).forEach(name=>batch.set(doc(db,'clients',crypto.randomUUID()),{name,phone:'',email:'',comment:'',createdAt:isoNow(),createdBy:signedInUser.uid,source:'order-history'}));
+        await batch.commit();
+      }
+    }catch(err){console.warn('Не удалось автоматически добавить клиентов из истории заказов',err);}
+  }
   const rows=clients.map(c=>'<tr><td><b>'+esc(c.name||'')+'</b></td><td>'+esc(c.phone||'—')+'</td><td>'+esc(c.email||'—')+'</td><td>'+esc(c.comment||'—')+'</td><td><button class="small-button primary-soft" data-action="edit-client:'+esc(c.id)+'">Изменить</button> <button class="small-button danger" data-action="delete-client:'+esc(c.id)+'">Удалить</button></td></tr>').join('');
-  showModal('Клиенты','<div class="directory-toolbar"><label class="search-box"><span>⌕</span><input id="directoryClientSearch" placeholder="Поиск клиента"></label><button class="primary-button" data-action="new-client">＋ Добавить клиента</button><button class="secondary-button" data-action="import-clients">⇧ Excel</button></div><div class="directory-table-wrap"><table class="directory-table"><thead><tr><th>Клиент</th><th>Телефон</th><th>Почта</th><th>Комментарий</th><th></th></tr></thead><tbody id="clientsDirectoryBody">'+(rows||'<tr><td colspan="5" class="directory-empty">Клиентов пока нет</td></tr>')+'</tbody></table></div><input id="clientsExcelInput" type="file" accept=".xlsx,.xls" hidden> <p class="field-hint">Excel: колонки «Имя/Клиент», «Телефон», «Почта», «Комментарий».</p>',[button('Закрыть','close')],'СПРАВОЧНИК КЛИЕНТОВ');
+  showModal('Клиенты','<div class="directory-toolbar"><label class="search-box"><span>⌕</span><input id="directoryClientSearch" placeholder="Поиск клиента"></label><button class="primary-button" data-action="new-client">＋ Добавить клиента</button><button class="secondary-button" data-action="import-clients">⇧ Excel</button></div><div class="directory-table-wrap"><table class="directory-table"><thead><tr><th>Клиент</th><th>Телефон</th><th>Почта</th><th>Комментарий</th><th></th></tr></thead><tbody id="clientsDirectoryBody">'+(rows||'<tr><td colspan="5" class="directory-empty">Клиентов пока нет</td></tr>')+'</tbody></table></div><input id="clientsExcelInput" type="file" accept=".xlsx,.xls" hidden> <p class="field-hint">В справочник автоматически добавляются клиенты, встречавшиеся в истории заказов. Excel: колонки «Имя/Клиент», «Телефон», «Почта», «Комментарий».</p>',[button('Закрыть','close')],'СПРАВОЧНИК КЛИЕНТОВ');
   modal.querySelector('.modal')?.classList.add('directory-modal');
   setTimeout(()=>{$('directoryClientSearch')?.addEventListener('input',e=>filterClientDirectory(e.target.value));},0);
 }
@@ -814,27 +827,37 @@ function importClientsExcel(file){
   reader.readAsArrayBuffer(file);
 }
 async function importProductsExcel(file){
-  if(!file||!window.XLSX)return;
+  if(!file)return;
+  if(!window.XLSX){toast('Не удалось загрузить модуль Excel. Обновите страницу и попробуйте снова.');return;}
   const reader=new FileReader();
+  reader.onerror=()=>toast('Не удалось прочитать выбранный Excel-файл.');
   reader.onload=async e=>{
     try{
-      const wb=window.XLSX.read(new Uint8Array(e.target.result),{type:'array'}),rows=window.XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''});
+      const wb=window.XLSX.read(new Uint8Array(e.target.result),{type:'array'}),sheet=wb.Sheets[wb.SheetNames[0]];
+      if(!sheet)throw new Error('В книге нет листов.');
+      const rows=window.XLSX.utils.sheet_to_json(sheet,{defval:''});
+      if(!rows.length)throw new Error('Первый лист пустой или не содержит строк данных.');
+      const normalize=s=>String(s??'').trim().toLocaleLowerCase('ru').replace(/[\\s_-]+/g,'');
       const map=new Map();
       for(const row of rows){
-        const get=k=>String(row[k]??'').trim();
-        const a=get('catalog_number');if(!a||map.has(a.toLocaleLowerCase('ru')))continue;
-        map.set(a.toLocaleLowerCase('ru'),{a,m:get('manufacturer_parts'),n:get('name'),o:get('original_number'),b:get('marks')});
+        const keys=Object.keys(row),get=(...names)=>{const wanted=names.map(normalize);const k=keys.find(x=>wanted.includes(normalize(x)));return k===undefined?'':String(row[k]??'').trim();};
+        const a=get('catalog_number','catalog number','Артикул','Каталожный номер','Номер детали','article','артикул товара');
+        if(!a||map.has(a.toLocaleLowerCase('ru')))continue;
+        map.set(a.toLocaleLowerCase('ru'),{a,m:get('manufacturer_parts','manufacturer parts','Производитель','Бренд','Производитель детали'),n:get('name','Наименование','Название','Описание'),o:get('original_number','original number','Оригинальный номер','Кросс-номер','Кросс номера'),b:get('marks','Марки','Марка','Модель автомобиля','Применяемость')});
       }
-      const items=[...map.values()],chunks=[];
-      for(let i=0;i<items.length;i+=2000)chunks.push(items.slice(i,i+2000));
-      const batch=writeBatch(db);
-      for(let i=1;i<=8;i++)batch.set(doc(db,'products','chunk-'+i),{items:[],count:0,updatedAt:isoNow(),updatedBy:signedInUser.uid});
-      batch.set(doc(db,'products','meta'),{count:items.length,updatedAt:isoNow(),updatedBy:signedInUser.uid});
-      await batch.commit();
-      for(let i=0;i<chunks.length;i++)await setDoc(doc(db,'products','chunk-'+(i+1)),{items:chunks[i],count:chunks[i].length,updatedAt:isoNow(),updatedBy:signedInUser.uid});
+      const items=[...map.values()];
+      if(!items.length)throw new Error('Не найдены артикулы. Проверьте колонку catalog_number или «Артикул» в первой строке.');
+      const chunks=[];
+      for(let i=0;i<items.length;i+=1000)chunks.push(items.slice(i,i+1000));
+      const stamp=isoNow();
+      for(let i=0;i<chunks.length;i++)await setDoc(doc(db,'products','chunk-'+(i+1)),{items:chunks[i],count:chunks[i].length,updatedAt:stamp,updatedBy:signedInUser.uid});
+      const oldSnap=await getDocs(collection(db,'products')),keep=new Set(chunks.map((_,i)=>'chunk-'+(i+1))),cleanup=writeBatch(db);
+      oldSnap.docs.filter(d=>d.id.startsWith('chunk-')&&!keep.has(d.id)).forEach(d=>cleanup.delete(d.ref));
+      cleanup.set(doc(db,'products','meta'),{count:items.length,updatedAt:stamp,updatedBy:signedInUser.uid});
+      await cleanup.commit();
       productsCatalog=items;productsLoaded=true;try{sessionStorage.setItem('warehouse_products_cache',JSON.stringify(items));}catch{}
       toast('База артикулов обновлена: '+items.length+' позиций.');openProductsDirectory();
-    }catch(err){console.error(err);toast('Не удалось импортировать базу: '+(err?.message||'ошибка Excel'))}
+    }catch(err){console.error('Ошибка импорта базы артикулов',err);toast('Не удалось импортировать базу: '+(err?.message||err?.code||'ошибка Excel'))}
   };
   reader.readAsArrayBuffer(file);
 }
@@ -1988,6 +2011,16 @@ function backProfile(){closeModal();profileMenu()}
 async function toggleStaff(uid,active){if(!canManageUsers||uid===signedInUser.uid)return;try{await updateDoc(doc(db,'users',uid),{active});toast(active?'Доступ сотрудника включён.':'Доступ сотрудника отключён.');showStaff()}catch(err){console.error(err);toast('Не удалось изменить доступ сотрудника.')}}
 async function changeStaffRole(uid){if(!canManageUsers||uid===signedInUser.uid)return;const role=$(`staff-role-${uid}`)?.value;if(!roles[role])return;try{await updateDoc(doc(db,'users',uid),{role});toast(`Роль изменена: ${roles[role]}.`);showStaff()}catch(err){console.error(err);toast('Не удалось изменить роль. Проверьте права администратора и правила Firestore.')}}
 function backDetail(){if(selectedId)openOrder(selectedId);}
+document.addEventListener('change',e=>{
+  if(e.target?.id==='clientsExcelInput'){
+    const file=e.target.files?.[0];if(file)importClientsExcel(file);
+    e.target.value='';
+  }
+  if(e.target?.id==='productsExcelInput'){
+    const file=e.target.files?.[0];if(file)importProductsExcel(file);
+    e.target.value='';
+  }
+});
 document.addEventListener('input',e=>{
   if(e.target?.id==='entryText')entryMentionSuggestions();
   if(e.target?.id==='clientName')clientNameSuggestions('clientName','clientNameSuggestions');

@@ -782,7 +782,7 @@ async function openClientsDirectory(){
     }catch(err){console.warn('Не удалось автоматически добавить клиентов из истории заказов',err);}
   }
   try{const current=await getDocs(query(collection(db,'clients'),orderBy('name')));clients=current.docs.map(d=>({id:d.id,...d.data()}));}catch{}
-  const rows=clients.map(c=>'<tr><td><b>'+esc(c.name||'')+'</b></td><td>'+esc(c.phone||'—')+'</td><td>'+esc(c.email||'—')+'</td><td>'+esc(c.comment||'—')+'</td><td><button class="small-button primary-soft" data-action="edit-client:'+esc(c.id)+'">Изменить</button> <button class="small-button danger" data-action="delete-client:'+esc(c.id)+'">Удалить</button></td></tr>').join('');
+  const rows=clients.map(c=>'<tr><td><b>'+esc(c.name||'')+'</b></td><td>'+esc(c.phone||'—')+'</td><td>'+esc(c.address||'—')+'</td><td>'+esc(c.comment||'—')+'</td><td><button class="small-button primary-soft" data-action="edit-client:'+esc(c.id)+'">Изменить</button> <button class="small-button danger" data-action="delete-client:'+esc(c.id)+'">Удалить</button></td></tr>').join('');
   showModal('Клиенты','<div class="directory-toolbar"><label class="search-box"><span>⌕</span><input id="directoryClientSearch" placeholder="Поиск клиента"></label><button class="primary-button" data-action="new-client">＋ Добавить клиента</button><button class="secondary-button" data-action="import-clients">⇧ Excel</button></div><div class="directory-table-wrap"><table class="directory-table"><thead><tr><th>Клиент</th><th>Телефон</th><th>Почта</th><th>Комментарий</th><th></th></tr></thead><tbody id="clientsDirectoryBody">'+(rows||'<tr><td colspan="5" class="directory-empty">Клиентов пока нет</td></tr>')+'</tbody></table></div><input id="clientsExcelInput" type="file" accept=".xlsx,.xls" hidden> <p class="field-hint">В справочник автоматически добавляются клиенты, встречавшиеся в истории заказов. Excel: колонки «Имя/Клиент», «Телефон», «Почта», «Комментарий».</p>',[button('Закрыть','close')],'СПРАВОЧНИК КЛИЕНТОВ');
   modal.querySelector('.modal')?.classList.add('directory-modal');
   setTimeout(()=>{$('directoryClientSearch')?.addEventListener('input',e=>filterClientDirectory(e.target.value));},0);
@@ -790,16 +790,16 @@ async function openClientsDirectory(){
 function filterClientDirectory(text){
   const q=String(text||'').toLocaleLowerCase('ru');
   const body=$('clientsDirectoryBody');if(!body)return;
-  const list=clients.filter(c=>(String(c.name||'')+' '+String(c.phone||'')+' '+String(c.email||'')).toLocaleLowerCase('ru').includes(q));
-  body.innerHTML=list.length?list.map(c=>'<tr><td><b>'+esc(c.name||'')+'</b></td><td>'+esc(c.phone||'—')+'</td><td>'+esc(c.email||'—')+'</td><td>'+esc(c.comment||'—')+'</td><td><button class="small-button primary-soft" data-action="edit-client:'+esc(c.id)+'">Изменить</button> <button class="small-button danger" data-action="delete-client:'+esc(c.id)+'">Удалить</button></td></tr>').join(''):'<tr><td colspan="5" class="directory-empty">Ничего не найдено</td></tr>';
+  const list=clients.filter(c=>(String(c.name||'')+' '+String(c.phone||'')+' '+String(c.address||'')).toLocaleLowerCase('ru').includes(q));
+  body.innerHTML=list.length?list.map(c=>'<tr><td><b>'+esc(c.name||'')+'</b></td><td>'+esc(c.phone||'—')+'</td><td>'+esc(c.address||'—')+'</td><td>'+esc(c.comment||'—')+'</td><td><button class="small-button primary-soft" data-action="edit-client:'+esc(c.id)+'">Изменить</button> <button class="small-button danger" data-action="delete-client:'+esc(c.id)+'">Удалить</button></td></tr>').join(''):'<tr><td colspan="5" class="directory-empty">Ничего не найдено</td></tr>';
 }
 function openClientForm(id=''){
   const c=clients.find(x=>x.id===id)||{};
-  showModal(id?'Изменить клиента':'Добавить клиента','<form id="clientForm"><div class="form-grid"><div class="field"><label>Имя / название *</label><input id="clientFormName" required value="'+esc(c.name||'')+'"></div><div class="field"><label>Телефон</label><input id="clientFormPhone" value="'+esc(c.phone||'')+'"></div></div><div class="form-grid"><div class="field"><label>Почта</label><input id="clientFormEmail" type="email" value="'+esc(c.email||'')+'"></div><div class="field"><label>Комментарий</label><input id="clientFormComment" value="'+esc(c.comment||'')+'"></div></div></form>',[button('Отмена','close'),button(id?'Сохранить':'Добавить','save-client:'+esc(id),'primary-button')],'КЛИЕНТ');
+  showModal(id?'Изменить клиента':'Добавить клиента','<form id="clientForm"><div class="form-grid"><div class="field"><label>Имя / название *</label><input id="clientFormName" required value="'+esc(c.name||'')+'"></div><div class="field"><label>Телефон</label><input id="clientFormPhone" value="'+esc(c.phone||'')+'"></div></div><div class="form-grid"><div class="field"><label>Адрес</label><input id="clientFormAddress" value="'+esc(c.address||'')+'"></div><div class="field"><label>Комментарий</label><input id="clientFormComment" value="'+esc(c.comment||'')+'"></div></div></form>',[button('Отмена','close'),button(id?'Сохранить':'Добавить','save-client:'+esc(id),'primary-button')],'КЛИЕНТ');
 }
 async function saveClient(id){
   const name=$('clientFormName')?.value.trim();if(!name){toast('Укажите имя клиента.');return}
-  const data={name,phone:$('clientFormPhone')?.value.trim()||'',email:$('clientFormEmail')?.value.trim()||'',comment:$('clientFormComment')?.value.trim()||'',updatedAt:isoNow(),updatedBy:signedInUser.uid};
+  const data={name,phone:$('clientFormPhone')?.value.trim()||'',address:$('clientFormAddress')?.value.trim()||'',comment:$('clientFormComment')?.value.trim()||'',updatedAt:isoNow(),updatedBy:signedInUser.uid};
   try{
     if(id)await updateDoc(doc(db,'clients',id),data);
     else await setDoc(doc(db,'clients',crypto.randomUUID()),{...data,createdAt:isoNow(),createdBy:signedInUser.uid});
@@ -821,7 +821,7 @@ function importClientsExcel(file){
       const key=(row,names)=>{const k=Object.keys(row).find(x=>names.includes(String(x).trim().toLocaleLowerCase('ru')));return k?String(row[k]??'').trim():''};
       for(const row of rows){
         const name=key(row,['имя','клиент','клиент фио','name','client']);if(!name)continue;
-        const data={name,phone:key(row,['телефон','phone','тел']),email:key(row,['почта','email','e-mail']),comment:key(row,['комментарий','comment','примечание']),createdAt:isoNow(),createdBy:signedInUser.uid,updatedAt:isoNow(),updatedBy:signedInUser.uid};
+        const data={name,phone:key(row,['телефон','phone','тел']),email:key(row,['адрес','address','адрес клиента']),comment:key(row,['комментарий','comment','примечание']),createdAt:isoNow(),createdBy:signedInUser.uid,updatedAt:isoNow(),updatedBy:signedInUser.uid};
         batch.set(doc(db,'clients',crypto.randomUUID()),data);n++;count++;
         if(n>=batchSize){await batch.commit();batch=writeBatch(db);n=0;}
       }
@@ -1229,13 +1229,21 @@ function clientNameSuggestions(inputId,listId){
   const needle=input.value.trim().toLocaleLowerCase('ru');
   if(!needle){list.hidden=true;list.innerHTML='';return;}
   const counts=new Map();
-  state.orders.forEach(o=>{
+  (state.orders||[]).forEach(o=>{
     const name=String(o.client||'').trim();
-    if(!name)return;
+    if(!name||/подробное описание|тестовый клиент|^тест\\b/i.test(name))return;
     const key=name.toLocaleLowerCase('ru');
     const entry=counts.get(key)||{name,count:0};
     entry.count++;
     if(name.length>entry.name.length)entry.name=name;
+    counts.set(key,entry);
+  });
+  clients.forEach(c=>{
+    const name=String(c.name||'').trim();
+    if(!name||/подробное описание|тестовый клиент|^тест\\b/i.test(name))return;
+    const key=name.toLocaleLowerCase('ru');
+    const entry=counts.get(key)||{name,count:0};
+    entry.client=c;
     counts.set(key,entry);
   });
   const matches=[...counts.values()]
@@ -1246,7 +1254,7 @@ function clientNameSuggestions(inputId,listId){
       return ys-xs||y.count-x.count||x.name.localeCompare(y.name,'ru');
     }).slice(0,8);
   if(!matches.length){list.hidden=true;list.innerHTML='';return;}
-  list.innerHTML=matches.map(c=>'<button type="button" data-order-client-suggestion="'+esc(c.name)+'">'+esc(c.name)+' <small>Заказов: '+c.count+'</small></button>').join('');
+  list.innerHTML=matches.map(c=>'<button type="button" class="client-suggestion" data-order-client-suggestion="'+esc(c.name)+'"><b>'+esc(c.name)+'</b><small>'+(c.count?'Заказов: '+c.count:'Клиент из справочника')+'</small></button>').join('');
   list.hidden=false;
 }
 function chooseOrderClientSuggestion(inputId,listId,name){

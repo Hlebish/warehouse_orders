@@ -92,10 +92,10 @@ function render(){
  const critical=active.filter(x=>elapsedDays(x.receivedAt)>=10&&elapsedDays(x.receivedAt)<14).length;
  const warn=active.filter(x=>elapsedDays(x.receivedAt)>=6&&elapsedDays(x.receivedAt)<10).length;
  $('buybackNavAlert').hidden=!active.some(x=>elapsedDays(x.receivedAt)>=10);
- $('buybackSummary').innerHTML=`<span class="buyback-chip" data-summary-status="active">В работе: <b>${active.length}</b></span><span class="buyback-chip">Срок подходит: <b>${warn}</b></span><span class="buyback-chip">Критично: <b>${critical}</b></span><span class="buyback-chip" data-summary-status="expired">Просрочено: <b>${expiredItems.length}</b></span>`;
+ $('buybackSummary').innerHTML=`<span class="buyback-chip" data-summary-status="active">В работе: <b>${active.length}</b></span><span class="buyback-chip" data-summary-status="approaching" role="button" tabindex="0">Срок подходит: <b>${warn}</b></span><span class="buyback-chip" data-summary-status="critical" role="button" tabindex="0">Критично: <b>${critical}</b></span><span class="buyback-chip" data-summary-status="expired">Просрочено: <b>${expiredItems.length}</b></span>`;
  const visible=items.filter(x=>{
    const isExpired=x.status==='expired'||(x.status==='active'&&elapsedDays(x.receivedAt)>=14);
-   return selectedStatus==='expired'?isExpired:(selectedStatus==='active'?!isExpired&&x.status==='active':x.status===selectedStatus);
+   return selectedStatus==='expired'?isExpired:selectedStatus==='approaching'?!isExpired&&x.status==='active'&&elapsedDays(x.receivedAt)>=6&&elapsedDays(x.receivedAt)<10:selectedStatus==='critical'?!isExpired&&x.status==='active'&&elapsedDays(x.receivedAt)>=10&&elapsedDays(x.receivedAt)<14:(selectedStatus==='active'?!isExpired&&x.status==='active':x.status===selectedStatus);
  }).sort((a,b)=>String(a.receivedAt).localeCompare(String(b.receivedAt)));
  if(!visible.length){$('buybackList').innerHTML='<div class="buyback-empty">Здесь пока нет записей.</div>';return}
  $('buybackList').innerHTML=visible.map(item=>{
@@ -107,7 +107,7 @@ function render(){
   const actions=(item.status==='active'||isExpired)?'<button class="primary" data-set-status="returned" data-id="'+item.id+'">Возвращён</button><button class="primary" data-set-status="sold" data-id="'+item.id+'">Продан</button><button data-set-status="cancelled" data-id="'+item.id+'">Отменить</button>':'<button data-set-status="active" data-id="'+item.id+'">Вернуть в работу</button>';
   return `<article class="buyback-card ${cls}"><div><div class="buyback-article">${escapeHtml(item.article)} <span style="font-weight:500;color:#8a94a1">× ${item.quantity}</span></div><div class="buyback-meta">Принят: ${escapeHtml(item.receivedAt)} · Прошло дней: <b>${Math.max(0,days)}</b> · ${isExpired?'Просрочено на '+Math.max(0,days-14)+' дн.':item.status==='active'?'Осталось дней: '+Math.max(0,left):'14-дневный срок остановлен'}</div><div class="buyback-progress"><span style="width:${bar}%"></span></div><div class="buyback-status">${status}</div></div><div class="buyback-actions">${actions}${(item.status==='active'||isExpired)?'<button data-set-status="returned" data-id="'+item.id+'" data-partial="true">По количеству…</button>':''}</div></article>`;
  }).join('');
- $('buybackSummary').querySelectorAll('[data-summary-status]').forEach(btn=>btn.addEventListener('click',()=>{selectedStatus=btn.dataset.summaryStatus;render()}));
+ $('buybackSummary').querySelectorAll('[data-summary-status]').forEach(btn=>{const activate=()=>{selectedStatus=btn.dataset.summaryStatus;render()};btn.addEventListener('click',activate);btn.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();activate()}})});
 }
 function escapeHtml(value){return String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function open(){overlay.hidden=false;nav?.classList.add('active');}

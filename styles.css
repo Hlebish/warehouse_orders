@@ -2574,3 +2574,62 @@ body:not(.dark-theme) .shipment-order-card.shipment-order-complete .shipment-ord
   .directory-toolbar{align-items:stretch}
   .directory-toolbar button{flex:1 1 auto}
 }
+
+
+/* Directory modals: polished dark theme and more readable, roomier tables. */
+body.dark-theme .directory-modal{
+  width:min(1180px,calc(100vw - 40px));
+  max-width:1180px;
+  background:#151716;
+  color:#edf0e9;
+  border:1px solid #353a35;
+  box-shadow:0 24px 80px #0009;
+}
+body.dark-theme .directory-modal .modal-head,
+body.dark-theme .directory-modal .modal-foot{border-color:#303530}
+body.dark-theme .directory-modal .modal-head h2{color:#f0f3ed}
+body.dark-theme .directory-modal .directory-toolbar .search-box,
+body.dark-theme .directory-modal .directory-toolbar input,
+body.dark-theme .directory-modal .directory-toolbar select{
+  background:#1b1e1c!important;color:#edf0e9!important;border-color:#3a403b!important;
+}
+body.dark-theme .directory-modal .directory-toolbar input::placeholder{color:#8f988e}
+body.dark-theme .directory-table-wrap{border-color:#3a403b;border-radius:12px;background:#141615}
+body.dark-theme .directory-table{min-width:760px;color:#e8ece5}
+body.dark-theme .directory-table th{
+  background:#252a25!important;color:#cdd7c5!important;border-bottom:1px solid #414940;
+  font-size:13px;font-weight:800;letter-spacing:.015em;padding:15px 16px;
+}
+body.dark-theme .directory-table td{
+  background:#171a18;color:#e4e9e1;border-bottom:1px solid #2c312d;
+  font-size:14px;line-height:1.45;padding:14px 16px;
+}
+body.dark-theme .directory-table tbody tr:nth-child(even) td{background:#1b1e1c}
+body.dark-theme .directory-table tbody tr:hover td{background:#242a22}
+body.dark-theme .directory-empty{background:#171a18;color:#a8b0a4;font-size:13px;padding:38px 20px}
+body.dark-theme .directory-modal .close-button,
+body.dark-theme .directory-modal .secondary-button{background:#202421;color:#e6ebe2;border-color:#3b423b}
+body.dark-theme .directory-modal .article-suggestions,
+body.dark-theme .directory-modal .client-suggestions{
+  background:#1a1e1b;border-color:#3d463d;box-shadow:0 14px 32px #0008;
+}
+body.dark-theme .directory-modal .article-suggestion,
+body.dark-theme .directory-modal .client-suggestion{
+  background:#1a1e1b;color:#edf0e9;border-bottom-color:#303630;padding:12px 14px;
+}
+body.dark-theme .directory-modal .article-suggestion:hover,
+body.dark-theme .directory-modal .client-suggestion:hover{background:#293126}
+body.dark-theme .directory-modal .article-suggestion small,
+body.dark-theme .directory-modal .client-suggestion small{color:#a3ad9d;font-size:11px}
+body.dark-theme .directory-modal .directory-toolbar .primary-button,
+body.dark-theme .directory-modal .directory-toolbar button{min-height:42px}
+.directory-modal .directory-table-wrap{max-height:64vh}
+.directory-modal .directory-table td button{font-size:12px;min-height:32px;padding:6px 10px}
+.directory-modal .directory-table td input{min-height:38px;font-size:14px}
+.directory-modal .directory-table th,.directory-modal .directory-table td{vertical-align:middle}
+@media(max-width:650px){
+  body.dark-theme .directory-modal{width:calc(100vw - 16px);max-width:none}
+  .directory-modal .directory-table-wrap{max-height:60vh}
+  .directory-modal .directory-table th{font-size:12px;padding:12px}
+  .directory-modal .directory-table td{font-size:13px;padding:12px}
+}

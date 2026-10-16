@@ -156,6 +156,41 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    match /clients/{clientId} {
+      allow read: if activeUser();
+      allow create: if activeUser()
+        && request.resource.data.keys().hasOnly(['name','phone','email','comment','createdAt','createdBy','updatedAt','updatedBy'])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.createdBy == request.auth.uid;
+      allow update: if activeUser()
+        && request.resource.data.keys().hasOnly(['name','phone','email','comment','createdAt','createdBy','updatedAt','updatedBy'])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.updatedBy == request.auth.uid;
+      allow delete: if isManager() || canManageUsers();
+    }
+
+    match /products/{productId} {
+      allow read: if activeUser();
+      allow create, update: if activeUser()
+        && (
+          (productId == 'meta'
+            && request.resource.data.keys().hasOnly(['count','updatedAt','updatedBy'])
+            && request.resource.data.count is number
+            && request.resource.data.updatedAt is string
+            && request.resource.data.updatedBy == request.auth.uid)
+          ||
+          (productId != 'meta'
+            && request.resource.data.keys().hasOnly(['items','count','updatedAt','updatedBy'])
+            && request.resource.data.items is list
+            && request.resource.data.count is number
+            && request.resource.data.updatedAt is string
+            && request.resource.data.updatedBy == request.auth.uid)
+        );
+      allow delete: if canManageUsers();
+    }
+
     match /orders/{orderId} {
       allow read: if activeUser();
 

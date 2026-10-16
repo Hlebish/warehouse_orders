@@ -1909,6 +1909,7 @@ async function toggleShipmentItemChecked(dateKey,orderId,article){
   }
 }
 async function openShipmentManifest(dateKey=localDateKey(new Date()),categoryFilter='',searchQuery=''){
+  const expandedOrderIds=new Set([...document.querySelectorAll('.shipment-order-card[open]')].map(el=>el.dataset.orderId).filter(Boolean));
   await loadShipmentCategoryMap();
   let confirmation=null;
   try{const snap=await getDoc(doc(db,'shipmentDays',dateKey));if(snap.exists())confirmation=snap.data();}catch(err){console.warn(err);}
@@ -1946,7 +1947,7 @@ async function openShipmentManifest(dateKey=localDateKey(new Date()),categoryFil
     for(const order of visibleOrders){
       const orderQuantity=order.shipmentArticles.reduce((sum,item)=>sum+(Number(item.quantity)||1),0);
       const orderClass=order.isShipmentChecked?' shipment-order-complete':' shipment-order-pending';
-      html+='<details class="shipment-order-card'+orderClass+'"><summary class="shipment-order-header"><div><strong class="shipment-client-name">'+esc(order.client||'Клиент не указан')+'</strong><span>Заказ № '+esc(order.number||'—')+'</span></div><span class="shipment-order-count">'+orderQuantity+' шт.</span></summary><div class="shipment-order-articles">';
+      html+='<details data-order-id="'+esc(order.id)+'" class="shipment-order-card'+orderClass+'"'+(expandedOrderIds.has(String(order.id))?' open':'')+'><summary class="shipment-order-header"><div><strong class="shipment-client-name">'+esc(order.client||'Клиент не указан')+'</strong><span>Заказ № '+esc(order.number||'—')+'</span></div><span class="shipment-order-count">'+orderQuantity+' шт.</span></summary><div class="shipment-order-articles">';
       for(const item of order.visibleArticles){
         const checkControl=(canManageUsers||state.role==='warehouse')
           ? '<button type="button" class="small-button '+(item.checked?'good':'primary-soft')+'" data-action="toggle-shipment-checked:'+dateKey+'|'+encodeURIComponent(order.id)+'|'+encodeURIComponent(item.article)+'">'+(item.checked?'✓ Проверено':'Проверить')+'</button>'

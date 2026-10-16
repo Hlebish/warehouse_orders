@@ -2548,3 +2548,14 @@ body:not(.dark-theme) .shipment-order-card.shipment-order-complete .shipment-ord
   .shipment-day-quick .small-button{min-height:40px;font-size:11px!important}
   .shipment-day-quick .small-button:first-child{grid-column:1/-1}
 }
+
+/* Client directory and incremental article autocomplete */
+.client-directory{display:grid;gap:7px;max-height:44vh;overflow:auto;margin-top:12px}
+.client-directory-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border:1px solid var(--line,#dfe5e1);border-radius:10px;background:var(--surface,#fff)}
+.client-directory-row>div{display:grid;gap:4px;min-width:0}.client-directory-row b{overflow-wrap:anywhere}.client-directory-row small,.client-import-box small{color:var(--muted,#7d8983);font-size:11px}
+.client-create-form{display:flex;gap:8px}.client-create-form input{flex:1;min-width:0;border:1px solid var(--line,#dfe5e1);border-radius:8px;padding:10px;background:var(--surface,#fff);color:var(--text,#202630)}
+.client-import-box{display:grid;gap:8px;margin-top:16px;padding:12px;border:1px dashed var(--line,#dfe5e1);border-radius:10px}
+.order-article-row{position:relative}.article-suggestions{position:absolute;z-index:1000;left:0;right:146px;top:calc(100% + 3px);max-height:220px;overflow:auto;border:1px solid var(--line,#dce3de);border-radius:9px;background:var(--surface,#fff);box-shadow:0 8px 25px #0002;padding:4px}
+.article-suggestions[hidden]{display:none!important}.article-suggestions button{display:flex;width:100%;justify-content:space-between;gap:10px;text-align:left;padding:8px 10px;border:0;border-radius:6px;background:transparent;color:var(--text,#202630);cursor:pointer}.article-suggestions button:hover{background:var(--soft,#eef6f1)}.article-suggestions small{color:var(--muted,#7b8981);font-size:10px}
+body.dark-theme .client-directory-row,body.dark-theme .client-create-form input,body.dark-theme .article-suggestions{background:#151a20;color:#edf0ed;border-color:#343a40}
+@media(max-width:520px){.client-directory-row{align-items:flex-start;flex-direction:column}.client-create-form{flex-direction:column}.article-suggestions{right:40px}}

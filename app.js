@@ -784,7 +784,7 @@ async function openClientsDirectory(){
   try{const current=await getDocs(query(collection(db,'clients'),orderBy('name')));clients=current.docs.map(d=>({id:d.id,...d.data()}));}catch{}
   const displayed=new Set(clients.map(c=>String(c.name||'').trim().toLocaleLowerCase('ru')));
   historic.forEach((name,key)=>{if(!displayed.has(key))clients.push({id:'history:'+key,name,phone:'',address:'',comment:'Из истории заказов',source:'order-history'});});
-  clients=clients.filter(c=>! /подробное описание|тестовый клиент|^тест\\b/i.test(String(c.name||''))).sort((a,b)=>String(a.name||'').localeCompare(String(b.name||''),'ru'));
+  clients=clients.filter(c=>!c.hiddenFromDirectory&&! /подробное описание|тестовый клиент|^тест\\b/i.test(String(c.name||''))).sort((a,b)=>String(a.name||'').localeCompare(String(b.name||''),'ru'));
   const rows=clients.map(c=>'<tr><td><b>'+esc(c.name||'')+'</b></td><td>'+esc(c.phone||'—')+'</td><td>'+esc(c.address||'—')+'</td><td>'+esc(c.comment||'—')+'</td><td><button class="small-button primary-soft" data-action="edit-client:'+esc(c.id)+'">Изменить</button> <button class="small-button danger" data-action="delete-client:'+esc(c.id)+'">Удалить</button></td></tr>').join('');
   showModal('Клиенты','<div class="directory-toolbar"><label class="search-box"><span>⌕</span><input id="directoryClientSearch" placeholder="Поиск клиента"></label><button class="primary-button" data-action="new-client">＋ Добавить клиента</button><button class="secondary-button" data-action="import-clients">⇧ Excel</button></div><div class="directory-table-wrap"><table class="directory-table"><thead><tr><th>Клиент</th><th>Телефон</th><th>Адрес</th><th>Комментарий</th><th></th></tr></thead><tbody id="clientsDirectoryBody">'+(rows||'<tr><td colspan="5" class="directory-empty">Клиентов пока нет</td></tr>')+'</tbody></table></div><input id="clientsExcelInput" type="file" accept=".xlsx,.xls" hidden> <p class="field-hint">В справочник автоматически добавляются клиенты, встречавшиеся в истории заказов. Excel: колонки «Имя/Клиент», «Телефон», «Почта», «Комментарий».</p>',[button('Закрыть','close')],'СПРАВОЧНИК КЛИЕНТОВ');
   modal.querySelector('.modal')?.classList.add('directory-modal');
@@ -822,9 +822,11 @@ async function deleteClient(id){
     return;
   }
   try{
-    await deleteDoc(doc(db,'clients',id));
+    // Mark the record as hidden instead of physically deleting it: old orders can
+    // otherwise recreate the same client in the directory immediately.
+    await updateDoc(doc(db,'clients',id),{hiddenFromDirectory:true,updatedAt:isoNow(),updatedBy:signedInUser.uid});
     clients=clients.filter(x=>String(x.id)!==String(id));
-    toast('Клиент удалён.');
+    toast('Клиент удалён из справочника.');
     await openClientsDirectory();
   }catch(err){console.error('Ошибка удаления клиента',err);toast('Не удалось удалить клиента: '+(err?.code||err?.message||'нет доступа'))}
 }

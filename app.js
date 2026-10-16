@@ -1218,10 +1218,10 @@ function clientNameSuggestions(inputId,listId){
       return ys-xs||y.count-x.count||x.name.localeCompare(y.name,'ru');
     }).slice(0,8);
   if(!matches.length){list.hidden=true;list.innerHTML='';return;}
-  list.innerHTML=matches.map(c=>'<button type="button" data-client-suggestion="'+esc(c.name)+'">'+esc(c.name)+' <small>Заказов: '+c.count+'</small></button>').join('');
+  list.innerHTML=matches.map(c=>'<button type="button" data-order-client-suggestion="'+esc(c.name)+'">'+esc(c.name)+' <small>Заказов: '+c.count+'</small></button>').join('');
   list.hidden=false;
 }
-function chooseClientSuggestion(inputId,listId,name){
+function chooseOrderClientSuggestion(inputId,listId,name){
   const input=$(inputId),list=$(listId);
   if(!input)return;
   input.value=name;
@@ -2025,12 +2025,20 @@ document.addEventListener('click',e=>{
   }
   const statCard=e.target.closest('[data-stat-key]');
   if(statCard){e.preventDefault();openStatOrders(statCard.dataset.statKey||'');return;}
-  const clientSuggestion=e.target.closest('[data-client-suggestion]');
+  const clientSuggestion=e.target.closest('.client-suggestion[data-client-suggestion]');
   if(clientSuggestion){
     e.preventDefault();
-    const value=clientSuggestion.dataset.clientSuggestion||'';
+    const id=clientSuggestion.dataset.clientSuggestion||'';
     const isEdit=!!clientSuggestion.closest('#editOrderInfoForm');
-    chooseClientSuggestion(isEdit?'editClientName':'clientName',isEdit?'editClientNameSuggestions':'clientNameSuggestions',value);
+    chooseClientSuggestion(isEdit?'editClientName':'clientName',isEdit?'editClientNameSuggestions':'clientNameSuggestions',id);
+    return;
+  }
+  const orderClientSuggestion=e.target.closest('[data-order-client-suggestion]');
+  if(orderClientSuggestion){
+    e.preventDefault();
+    const value=orderClientSuggestion.dataset.orderClientSuggestion||'';
+    const isEdit=!!orderClientSuggestion.closest('#editOrderInfoForm');
+    chooseOrderClientSuggestion(isEdit?'editClientName':'clientName',isEdit?'editClientNameSuggestions':'clientNameSuggestions',value);
     return;
   }
   const entryMention=e.target.closest('[data-entry-mention]');

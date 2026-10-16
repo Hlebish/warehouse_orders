@@ -679,7 +679,7 @@ function normalizeArticles(items=[]){return items.map(x=>({article:String(x.arti
 const hasPendingDefect=o=>Array.isArray(o?.entries)&&o.entries.some(e=>e.kind==='defect'&&!e.decision);
 function articlesEqual(a=[],b=[]){return JSON.stringify(normalizeArticles(a).map(x=>({article:x.article,quantity:x.quantity})))===JSON.stringify(normalizeArticles(b).map(x=>({article:x.article,quantity:x.quantity})))}
 function articlesContentEqual(a=[],b=[]){return JSON.stringify((a||[]).map(x=>({article:String(x.article||'').trim(),quantity:Math.max(1,Number(x.quantity)||1)})).filter(x=>x.article))===JSON.stringify((b||[]).map(x=>({article:String(x.article||'').trim(),quantity:Math.max(1,Number(x.quantity)||1)})).filter(x=>x.article))}
-function openNewOrder(){if(!['warehouse','manager','chief_accountant','accountant'].includes(state.role)&&!canManageUsers){toast('Создавать карточки может только кладовщик, менеджер или администратор.');return}
+function openNewOrder(){loadProductsCatalog();if(!['warehouse','manager','chief_accountant','accountant'].includes(state.role)&&!canManageUsers){toast('Создавать карточки может только кладовщик, менеджер или администратор.');return}
 const managerCreate=isManagerRole()&&!canManageUsers;
 const statusOptions=managerCreate?'<option value="Создан">Создан</option><option>Под вопросом</option>':'<option value="Создан">Создан</option><option>Собран</option><option>Под вопросом</option>'; 
 const statusHint=managerCreate?'Менеджер создаёт заказ со статусом «Создан». Кладовщик позже отметит его как «Собран».':'Можно сразу отметить заказ как «Собран», если он уже собран.';

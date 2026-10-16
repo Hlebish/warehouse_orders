@@ -705,7 +705,7 @@ function showArticleSuggestions(input){
   }).slice(0,12);
   box.innerHTML=items.length?items.map(x=>'<button type="button" class="article-suggestion" role="option" data-article-suggestion="'+esc(x.article)+'"><span>'+esc(x.article)+'</span><small>'+esc(x.source)+'</small></button>').join(''):'<div class="article-suggestion-empty">Совпадений пока нет</div>';
   box.hidden=false;
-  loadArticleCatalog().then(()=>{if(document.activeElement===input)showArticleSuggestions(input)});
+  if(!articleCatalogCache)loadArticleCatalog().then(()=>{if(document.activeElement===input)showArticleSuggestions(input)});
 }
 function closeSuggestions(except=null){document.querySelectorAll('.article-suggestions,.client-suggestions').forEach(box=>{if(box!==except){box.hidden=true;box.innerHTML=''}})}
 async function loadClients(){

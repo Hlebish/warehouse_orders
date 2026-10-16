@@ -674,8 +674,8 @@ function closeModal(fromPop=false){
 function button(label,action,cls='small-button'){return `<button class="${cls}" data-action="${action}">${label}</button>`}
 
 let articleCatalogCache=null, articleCatalogPromise=null, clientsCache=null;
-const normKey=value=>String(value||'').trim().replace(/\\s+/g,' ').toLocaleLowerCase('ru');
-function clientNameFromOrder(o){return String(o?.client||o?.clientName||'').trim().replace(/\\s+/g,' ')}
+const normKey=value=>String(value||'').trim().replace(/\s+/g,' ').toLocaleLowerCase('ru');
+function clientNameFromOrder(o){return String(o?.client||o?.clientName||'').trim().replace(/\s+/g,' ')}
 async function loadArticleCatalog(force=false){
   if(articleCatalogCache&&!force)return articleCatalogCache;
   if(articleCatalogPromise&&!force)return articleCatalogPromise;
@@ -749,15 +749,15 @@ async function renderClientDirectory(){
   }catch(err){console.error('Не удалось загрузить справочник клиентов',err);list.innerHTML='<div class="field-hint">Не удалось загрузить справочник. Проверьте права Firestore.</div>'}
 }
 async function addClientRecord(name){
-  const clean=String(name||'').trim().replace(/\\s+/g,' ');if(!clean)throw new Error('Введите имя клиента.');
+  const clean=String(name||'').trim().replace(/\s+/g,' ');if(!clean)throw new Error('Введите имя клиента.');
   const clients=await loadClients();const duplicate=clients.find(c=>normKey(c.name)===normKey(clean));
   if(duplicate)throw new Error('Такой клиент уже есть в справочнике.');
-  const id=normKey(clean).replace(/[^\\p{L}\\p{N}]+/gu,'-').replace(/^-|-$/g,'').slice(0,90)+'-'+Date.now().toString(36);
+  const id=normKey(clean).replace(/[^\p{L}\p{N}]+/gu,'-').replace(/^-|-$/g,'').slice(0,90)+'-'+Date.now().toString(36);
   await setDoc(doc(db,'clients',id),{name:clean,normalized:normKey(clean),createdAt:serverTimestamp(),createdBy:signedInUser?.uid||''});
   clientsCache=null;await loadClients();await renderClientDirectory();toast('Клиент добавлен.');
 }
 async function saveClientRecord(id,name){
-  const clean=String(name||'').trim().replace(/\\s+/g,' ');if(!clean)throw new Error('Название клиента не может быть пустым.');
+  const clean=String(name||'').trim().replace(/\s+/g,' ');if(!clean)throw new Error('Название клиента не может быть пустым.');
   const clients=await loadClients();if(clients.some(c=>c.id!==id&&normKey(c.name)===normKey(clean)))throw new Error('Клиент с таким названием уже есть.');
   await updateDoc(doc(db,'clients',id),{name:clean,normalized:normKey(clean),updatedAt:serverTimestamp(),updatedBy:signedInUser?.uid||''});
   clientsCache=null;await loadClients();await renderClientDirectory();toast('Название клиента сохранено.');
@@ -770,7 +770,7 @@ async function deleteClientRecord(id){
 function csvCell(value){return '"'+String(value??'').replace(/"/g,'""')+'"'}
 function exportClientsCsv(){
   const rows=[['Клиент'],...(clientsCache||[]).map(c=>[c.name])];
-  const csv='\\ufeff'+rows.map(r=>r.map(csvCell).join(';')).join('\\r\\n');
+  const csv='\ufeff'+rows.map(r=>r.map(csvCell).join(';')).join('\r\n');
   const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));const a=document.createElement('a');a.href=url;a.download='clients.csv';a.click();URL.revokeObjectURL(url);
 }
 
@@ -781,7 +781,7 @@ async function importArticleCatalogFile(){
  try{
   const wb=XLSX.read(await file.arrayBuffer(),{type:'array'}),rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:'',raw:false});
   if(!rows.length)throw new Error('В файле нет строк с данными.');
-  const key=s=>String(s||'').toLocaleLowerCase('ru').replace(/[\\s_./-]+/g,'').replace(/[^\\p{L}\\p{N}]/gu,'');
+  const key=s=>String(s||'').toLocaleLowerCase('ru').replace(/[\s_./-]+/g,'').replace(/[^\p{L}\p{N}]/gu,'');
   const pick=(row,keys)=>{for(const k of Object.keys(row)){if(keys.includes(key(k))&&String(row[k]||'').trim())return String(row[k]).trim()}return ''};
   const records=new Map();
   rows.forEach(row=>{
@@ -792,7 +792,7 @@ async function importArticleCatalogFile(){
   if(!records.size)throw new Error('Не найдены столбцы с артикулами. Проверьте заголовки Excel.');
   let added=0;const existing=await loadArticleCatalog();const known=new Set(existing.map(x=>normKey(x.article)));
   const batchRecords=[...records.values()].filter(a=>!known.has(normKey(a)));
-  for(let i=0;i<batchRecords.length;i+=400){const batch=writeBatch(db);batchRecords.slice(i,i+400).forEach(article=>{const id=normKey(article).replace(/[^\\p{L}\\p{N}]+/gu,'-').slice(0,90)+'-'+Math.random().toString(36).slice(2,8);batch.set(doc(db,'articleCatalog',id),{article,normalized:normKey(article),source:file.name,updatedAt:serverTimestamp(),updatedBy:signedInUser?.uid||''})});await batch.commit();added+=Math.min(400,batchRecords.length-i);}
+  for(let i=0;i<batchRecords.length;i+=400){const batch=writeBatch(db);batchRecords.slice(i,i+400).forEach(article=>{const id=normKey(article).replace(/[^\p{L}\p{N}]+/gu,'-').slice(0,90)+'-'+Math.random().toString(36).slice(2,8);batch.set(doc(db,'articleCatalog',id),{article,normalized:normKey(article),source:file.name,updatedAt:serverTimestamp(),updatedBy:signedInUser?.uid||''})});await batch.commit();added+=Math.min(400,batchRecords.length-i);}
   articleCatalogCache=null;await loadArticleCatalog(true);if(status)status.textContent='Импортировано новых артикулов: '+added+'. Уже существовало: '+(records.size-added)+'.';
  }catch(err){console.error('Ошибка импорта артикулов',err);if(status)status.textContent='Ошибка импорта: '+(err.message||err.code||'не удалось прочитать файл')}
 }
@@ -803,14 +803,18 @@ async function importClientsFile(){
   if(!window.XLSX){if(status)status.textContent='Не загрузился модуль чтения Excel. Проверьте интернет и обновите страницу.';return}
   try{
     const data=await file.arrayBuffer(),wb=XLSX.read(data,{type:'array'}),sheet=wb.Sheets[wb.SheetNames[0]],rows=XLSX.utils.sheet_to_json(sheet,{header:1,defval:''});
-    const values=rows.flat().map(v=>String(v||'').trim()).filter(Boolean);
-    const names=values.filter((v,i)=>i>0||!['клиент','имя клиента','название клиента','клиент/компания','name','client'].includes(normKey(v)));
+    if(!rows.length)throw new Error('В файле нет строк с данными.');
+    const header=rows[0].map(v=>normKey(v));const candidates=['клиент','имя клиента','название клиента','клиент/компания','name','client','customer','company','название'];
+    let column=header.findIndex(h=>candidates.includes(h));
+    if(column<0){const nonEmpty=rows[0].map((v,i)=>({v,i})).filter(x=>String(x.v||'').trim());if(nonEmpty.length===1)column=nonEmpty[0].i;else column=0;}
+    const hasHeader=header.some(h=>candidates.includes(h));
+    const names=rows.slice(hasHeader?1:0).map(row=>String(row[column]||'').trim()).filter(Boolean);
     if(!names.length)throw new Error('В файле не найдены имена клиентов.');
     const existing=await loadClients(),map=new Map(existing.map(c=>[normKey(c.name),c.name]));
     let added=0,skipped=0;
-    for(const raw of names){const name=raw.replace(/\\s+/g,' ');if(!name||['клиент','имя клиента','название клиента','клиент/компания','name','client'].includes(normKey(name))||map.has(normKey(name))){skipped++;continue}map.set(normKey(name),name);added++;}
+    for(const raw of names){const name=raw.replace(/\s+/g,' ');if(!name||['клиент','имя клиента','название клиента','клиент/компания','name','client'].includes(normKey(name))||map.has(normKey(name))){skipped++;continue}map.set(normKey(name),name);added++;}
     const batchSize=400;const newNames=[...map.entries()].filter(([key])=>!existing.some(c=>normKey(c.name)===key)).map(([,name])=>name);
-    for(let i=0;i<newNames.length;i+=batchSize){const batch=writeBatch(db);newNames.slice(i,i+batchSize).forEach(name=>{const id=normKey(name).replace(/[^\\p{L}\\p{N}]+/gu,'-').replace(/^-|-$/g,'').slice(0,90)+'-'+Math.random().toString(36).slice(2,8);batch.set(doc(db,'clients',id),{name,normalized:normKey(name),createdAt:serverTimestamp(),createdBy:signedInUser?.uid||''})});await batch.commit();}
+    for(let i=0;i<newNames.length;i+=batchSize){const batch=writeBatch(db);newNames.slice(i,i+batchSize).forEach(name=>{const id=normKey(name).replace(/[^\p{L}\p{N}]+/gu,'-').replace(/^-|-$/g,'').slice(0,90)+'-'+Math.random().toString(36).slice(2,8);batch.set(doc(db,'clients',id),{name,normalized:normKey(name),createdAt:serverTimestamp(),createdBy:signedInUser?.uid||''})});await batch.commit();}
     clientsCache=null;await loadClients();await renderClientDirectory();if(status)status.textContent='Импорт завершён. Добавлено: '+added+', пропущено (дубликаты/пустые): '+skipped+'.';
   }catch(err){console.error('Ошибка импорта клиентов',err);if(status)status.textContent='Ошибка импорта: '+(err.message||err.code||'не удалось прочитать файл');}
 }
@@ -1142,7 +1146,7 @@ function cancelChatReply(){
 
 function chatDisplayName(value){
   const name=String(value||'Сотрудник').trim();
-  const normalized=name.toLocaleLowerCase('ru').replace(/\\s+/g,' ');
+  const normalized=name.toLocaleLowerCase('ru').replace(/\s+/g,' ');
   if(normalized==='глеб тест'||normalized==='gleb test')return 'Test';
   if(normalized==='глеб бурячок'||normalized==='gleb боричок'||normalized==='gleb boryachok')return 'Глеб';
   return name;

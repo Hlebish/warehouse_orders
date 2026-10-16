@@ -172,8 +172,7 @@ service cloud.firestore {
           // Any active user may hide a client from the directory without changing
           // its identity or historical order references.
           (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['hiddenFromDirectory','updatedAt','updatedBy'])
-            && request.resource.data.hiddenFromDirectory == true
-            && request.resource.data.updatedBy == request.auth.uid)
+            && request.resource.data.hiddenFromDirectory == true)
           ||
           (request.resource.data.keys().hasOnly(['name','phone','email','address','comment','createdAt','createdBy','updatedAt','updatedBy','source','historyCount','hiddenFromDirectory'])
             && request.resource.data.name is string

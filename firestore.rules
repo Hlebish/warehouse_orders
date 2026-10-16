@@ -408,7 +408,7 @@ service cloud.firestore {
         && request.resource.data.receivedAt is string
         && request.resource.data.createdBy == request.auth.uid
         && request.resource.data.createdByName is string
-        && request.resource.data.status == 'active'
+        && request.resource.data.status in ['active','returned','sold','cancelled','expired']
         && request.resource.data.sentMilestones is list;
       allow update: if activeUser()
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['article','quantity','receivedAt','status','soldAt','cancelledAt','returnedAt','sentMilestones','updatedAt'])
@@ -416,7 +416,7 @@ service cloud.firestore {
         && request.resource.data.quantity is number
         && request.resource.data.quantity >= 1
         && request.resource.data.receivedAt is string
-        && request.resource.data.status in ['active','returned','sold','cancelled']
+        && request.resource.data.status in ['active','returned','sold','cancelled','expired']
         && request.resource.data.sentMilestones is list;
       allow delete: if canManageUsers();
     }

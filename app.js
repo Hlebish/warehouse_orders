@@ -119,7 +119,7 @@ function watchNotifications(){
     knownNoticeIds=new Set(next.map(n=>n.id));state.notices=next;paintNotices();paintMentionCenter();
   },err=>console.error('Не удалось загрузить историю уведомлений',err));
 }
-function isMentionNotice(n){const t=String(n?.title||'').toLocaleLowerCase('ru');return t.includes('упомянули вас')||t.includes('вас упомянули')||n?.isMention===true}
+function isMentionNotice(n){const t=String(n?.title||'').toLocaleLowerCase('ru');return t.includes('упомянули вас')||t.includes('вас упомянули')||n?.isMention===true||n?.category==='mention'||(n?.category==='replies'&&n?.target==='chat'&&n?.isReply!==true)}
 function unreadMentionNotices(){return state.notices.filter(n=>!n.read&&isMentionNotice(n))}
 function paintMentionCenter(){const b=$('mentionCenterButton'),c=$('mentionCenterCount'),l=$('mentionCenterLabel');if(!b||!c||!l)return;const n=unreadMentionNotices().length;c.textContent=String(n);b.hidden=n===0;l.textContent=n===1?'Вас упомянули':`У вас ${n} новых упоминания`}
 const shownMentionNoticeIds=new Set();
@@ -456,7 +456,7 @@ onMessage(messaging,payload=>{
     if((eventId&&recentPushEvents.has(`event:${eventId}`))||recentPushEvents.has(`msg:${signature}`))return;
     if(eventId)recentPushEvents.set(`event:${eventId}`,now);
     recentPushEvents.set(`msg:${signature}`,now);
-    if(String(n.title||'').toLocaleLowerCase('ru').includes('упомянули вас')||String(n.title||'').toLocaleLowerCase('ru').includes('вас упомянули')){showForegroundPushNotification(n);showMentionToast(n)}
+    if(String(n.category||'')==='mention'||String(n.category||'')==='replies'||String(n.title||'').toLocaleLowerCase('ru').includes('упомянули вас')||String(n.title||'').toLocaleLowerCase('ru').includes('вас упомянули')){showForegroundPushNotification(n);if(String(n.category||'')==='mention'||(String(n.category||'')==='replies'&&String(n.target||'')==='chat'&&!n.isReply)||String(n.title||'').toLocaleLowerCase('ru').includes('упомянули вас')||String(n.title||'').toLocaleLowerCase('ru').includes('вас упомянули'))showMentionToast({...n,title:'Вас упомянули'})}
     notify(message,orderId,target,target==='chat'?'chat':'orders');
   }
 });

@@ -886,10 +886,18 @@ async function importProductsExcel(file){
   reader.readAsArrayBuffer(file);
 }
 function openProductsDirectory(){
+  showModal('База артикулов','<div class="directory-toolbar products-directory-toolbar"><label class="search-box"><span>⌕</span><input id="directoryProductSearch" placeholder="Артикул, кросс-номер, марка"></label><button class="primary-button" data-action="import-products">⇧ Загрузить Excel</button></div><div class="directory-table-wrap products-directory-wrap"><table class="directory-table products-directory-table"><thead><tr><th>Артикул</th><th>Производитель</th><th>Марка</th><th>Наименование</th><th>Кросс-номера</th></tr></thead><tbody id="productsDirectoryBody"><tr><td colspan="5" class="directory-empty">Загружаю базу артикулов…</td></tr></tbody></table></div><input id="productsExcelInput" type="file" accept=".xlsx,.xls" hidden><p class="field-hint" id="productsDirectoryHint">Подготавливаем каталог…</p>',[button('Закрыть','close')],'КАТАЛОГ АРТИКУЛОВ');
+  modal.querySelector('.modal')?.classList.add('directory-modal','products-directory-modal');
+  $('directoryProductSearch')?.addEventListener('input',e=>renderProductDirectory(e.target.value));
   loadProductsCatalog().then(()=>{
-    showModal('База артикулов','<div class="directory-toolbar"><label class="search-box"><span>⌕</span><input id="directoryProductSearch" placeholder="Артикул, кросс-номер, марка"></label><button class="primary-button" data-action="import-products">⇧ Загрузить Excel</button></div><div class="directory-table-wrap"><table class="directory-table"><thead><tr><th>Артикул</th><th>Производитель</th><th>Марка</th><th>Наименование</th><th>Кросс-номера</th></tr></thead><tbody id="productsDirectoryBody"></tbody></table></div><input id="productsExcelInput" type="file" accept=".xlsx,.xls" hidden><p class="field-hint">В каталоге '+productsCatalog.length+' уникальных позиций. База используется для подсказок при создании и редактировании заказа.</p>',[button('Закрыть','close')],'КАТАЛОГ АРТИКУЛОВ');
-    modal.querySelector('.modal')?.classList.add('directory-modal');renderProductDirectory('');
-    setTimeout(()=>{$('directoryProductSearch')?.addEventListener('input',e=>renderProductDirectory(e.target.value));},0);
+    const hint=$('productsDirectoryHint');
+    if(hint)hint.textContent='В каталоге '+productsCatalog.length+' уникальных позиций. База используется для подсказок при создании и редактировании заказа.';
+    renderProductDirectory($('directoryProductSearch')?.value||'');
+  }).catch(err=>{
+    console.error('Не удалось открыть базу артикулов',err);
+    const body=$('productsDirectoryBody');
+    if(body)body.innerHTML='<tr><td colspan="5" class="directory-empty">Не удалось загрузить каталог. Проверь подключение и права доступа, затем закрой и открой вкладку снова.</td></tr>';
+    const hint=$('productsDirectoryHint');if(hint)hint.textContent='Ошибка загрузки базы артикулов.';
   });
 }
 function renderProductDirectory(text){

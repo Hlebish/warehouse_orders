@@ -2666,3 +2666,40 @@ body.dark-theme .client-suggestion:focus-visible{
 }
 body.dark-theme .article-suggestions[hidden],
 body.dark-theme .client-suggestions[hidden]{display:none!important}
+
+/* Mobile directory layouts: keep the catalog opening responsive and clients compact. */
+.directory-modal .modal-body{min-width:0;overflow-x:hidden}
+.directory-modal .directory-toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.directory-modal .directory-toolbar .search-box{flex:1 1 220px;min-width:0}
+.directory-modal .directory-toolbar .search-box input{width:100%;min-width:0}
+.directory-modal .directory-table-wrap{width:100%;max-width:100%;overflow:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+.products-directory-table{min-width:760px}
+@media(max-width:650px){
+  body.dark-theme .directory-modal{width:calc(100vw - 12px)!important;max-width:calc(100vw - 12px)!important;max-height:calc(100dvh - 20px)!important;margin:0 auto;border-radius:14px}
+  .directory-modal .modal-head{padding:14px 16px!important}
+  .directory-modal .modal-head h2{font-size:20px}
+  .directory-modal .modal-body{padding:12px!important;overflow-y:auto;min-height:0}
+  .directory-modal .directory-toolbar{gap:7px;margin-bottom:10px}
+  .directory-modal .directory-toolbar .search-box{flex:1 1 100%;width:100%}
+  .directory-modal .directory-toolbar .primary-button,
+  .directory-modal .directory-toolbar .secondary-button{flex:1 1 auto;min-width:0;min-height:38px;padding:8px 10px;font-size:12px}
+  .directory-modal .directory-table-wrap{max-height:52dvh;border-radius:8px}
+  .directory-modal .directory-table{font-size:12px}
+  .directory-modal .directory-table th,.directory-modal .directory-table td{padding:8px 9px;white-space:normal;overflow-wrap:anywhere}
+  .directory-modal .directory-table td b{overflow-wrap:anywhere}
+  .directory-modal .field-hint{font-size:11px;line-height:1.45;margin-top:10px}
+  /* Client rows become compact cards instead of a five-column table. */
+  .directory-modal:not(.products-directory-modal) .directory-table-wrap{max-height:52dvh;overflow:visible}
+  .directory-modal:not(.products-directory-modal) .directory-table,
+  .directory-modal:not(.products-directory-modal) .directory-table tbody{display:block;width:100%;min-width:0}
+  .directory-modal:not(.products-directory-modal) .directory-table thead{display:none}
+  .directory-modal:not(.products-directory-modal) .directory-table tbody tr{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:5px 10px;padding:10px;margin:0 0 8px;border:1px solid #343a34;border-radius:9px;background:#191d1a}
+  .directory-modal:not(.products-directory-modal) .directory-table tbody td{display:block;min-width:0;padding:2px 0;border:0;font-size:12px;line-height:1.35;overflow-wrap:anywhere}
+  .directory-modal:not(.products-directory-modal) .directory-table tbody td:first-child{grid-column:1/-1;font-size:14px;padding-bottom:4px}
+  .directory-modal:not(.products-directory-modal) .directory-table tbody td:nth-child(2)::before{content:"Телефон: ";color:#929b91}
+  .directory-modal:not(.products-directory-modal) .directory-table tbody td:nth-child(3)::before{content:"Адрес: ";color:#929b91}
+  .directory-modal:not(.products-directory-modal) .directory-table tbody td:nth-child(4){grid-column:1/-1}
+  .directory-modal:not(.products-directory-modal) .directory-table tbody td:nth-child(4)::before{content:"Комментарий: ";color:#929b91}
+  .directory-modal:not(.products-directory-modal) .directory-table tbody td:last-child{grid-column:1/-1;display:flex;gap:6px;flex-wrap:wrap;padding-top:5px}
+  .directory-modal:not(.products-directory-modal) .directory-table td button{font-size:11px;min-height:32px;padding:6px 9px}
+}

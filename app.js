@@ -828,7 +828,7 @@ async function importProductsExcel(file){
       const items=[...map.values()],chunks=[];
       for(let i=0;i<items.length;i+=2000)chunks.push(items.slice(i,i+2000));
       const batch=writeBatch(db);
-      for(let i=1;i<=8;i++)batch.delete(doc(db,'products','chunk-'+i));
+      for(let i=1;i<=8;i++)batch.set(doc(db,'products','chunk-'+i),{items:[],count:0,updatedAt:isoNow(),updatedBy:signedInUser.uid});
       batch.set(doc(db,'products','meta'),{count:items.length,updatedAt:isoNow(),updatedBy:signedInUser.uid});
       await batch.commit();
       for(let i=0;i<chunks.length;i++)await setDoc(doc(db,'products','chunk-'+(i+1)),{items:chunks[i],count:chunks[i].length,updatedAt:isoNow(),updatedBy:signedInUser.uid});

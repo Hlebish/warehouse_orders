@@ -1247,33 +1247,21 @@ function clientNameSuggestions(inputId,listId){
   if(!input||!list)return;
   const needle=input.value.trim().toLocaleLowerCase('ru');
   if(!needle){list.hidden=true;list.innerHTML='';return;}
-  const counts=new Map();
-  (state.orders||[]).forEach(o=>{
-    const name=String(o.client||'').trim();
-    if(!name||/подробное описание|тестовый клиент|^тест\\b/i.test(name))return;
-    const key=name.toLocaleLowerCase('ru');
-    const entry=counts.get(key)||{name,count:0};
-    entry.count++;
-    if(name.length>entry.name.length)entry.name=name;
-    counts.set(key,entry);
-  });
-  clients.forEach(c=>{
-    const name=String(c.name||'').trim();
-    if(!name||/подробное описание|тестовый клиент|^тест\\b/i.test(name))return;
-    const key=name.toLocaleLowerCase('ru');
-    const entry=counts.get(key)||{name,count:0};
-    entry.client=c;
-    counts.set(key,entry);
-  });
-  const matches=[...counts.values()]
+  // The client directory is the single source of truth for autocomplete.
+  // Never infer suggestions from historical orders.
+  const matches=(clients||[])
+    .filter(c=>!c.hiddenFromDirectory)
+    .map(c=>({name:String(c.name||'').trim(),client:c}))
+    .filter(c=>c.name&&!/подробное описание|тестовый клиент|^тест\\b/i.test(c.name))
     .filter(c=>c.name.toLocaleLowerCase('ru').includes(needle))
-    .sort((x,y)=>{
-      const xs=x.name.toLocaleLowerCase('ru').startsWith(needle)?1:0;
-      const ys=y.name.toLocaleLowerCase('ru').startsWith(needle)?1:0;
-      return ys-xs||y.count-x.count||x.name.localeCompare(y.name,'ru');
-    }).slice(0,8);
+    .sort((a,b)=>{
+      const x=a.name.toLocaleLowerCase('ru'),y=b.name.toLocaleLowerCase('ru');
+      const xs=x.startsWith(needle)?1:0,ys=y.startsWith(needle)?1:0;
+      return ys-xs||x.localeCompare(y,'ru');
+    })
+    .slice(0,8);
   if(!matches.length){list.hidden=true;list.innerHTML='';return;}
-  list.innerHTML=matches.map(c=>'<button type="button" class="client-suggestion" data-order-client-suggestion="'+esc(c.name)+'"><b>'+esc(c.name)+'</b><small>'+(c.count?'Заказов: '+c.count:'Клиент из справочника')+'</small></button>').join('');
+  list.innerHTML=matches.map(c=>'<button type="button" class="client-suggestion" data-order-client-suggestion="'+esc(c.name)+'"><b>'+esc(c.name)+'</b><small>'+(c.client.phone?esc(c.client.phone):'Клиент из справочника')+'</small></button>').join('');
   list.hidden=false;
 }
 function chooseOrderClientSuggestion(inputId,listId,name){

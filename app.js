@@ -672,7 +672,126 @@ function closeModal(fromPop=false){
   }
 }
 function button(label,action,cls='small-button'){return `<button class="${cls}" data-action="${action}">${label}</button>`}
-function articleRowHtml(item={article:'',quantity:1,collected:false}){return `<div class="order-article-row"><input class="order-article-input" value="${esc(item.article||'')}" placeholder="Артикул" autocomplete="off"><input class="order-article-qty" type="number" min="1" step="1" value="${Math.max(1,Number(item.quantity)||1)}" aria-label="Количество"><button type="button" class="small-button danger article-remove" data-action="remove-order-article" title="Удалить">×</button></div>`}
+
+let articleCatalogCache=null, articleCatalogPromise=null, clientsCache=null;
+const normKey=value=>String(value||'').trim().replace(/\\s+/g,' ').toLocaleLowerCase('ru');
+function clientNameFromOrder(o){return String(o?.client||o?.clientName||'').trim().replace(/\\s+/g,' ')}
+async function loadArticleCatalog(force=false){
+  if(articleCatalogCache&&!force)return articleCatalogCache;
+  if(articleCatalogPromise&&!force)return articleCatalogPromise;
+  articleCatalogPromise=getDocs(collection(db,'articleCatalog')).then(snap=>{
+    articleCatalogCache=snap.docs.map(d=>({id:d.id,...d.data()})).filter(x=>x.article).slice(0,30000);
+    return articleCatalogCache;
+  }).catch(err=>{console.warn('Не удалось загрузить справочник артикулов',err);return articleCatalogCache||[]}).finally(()=>{articleCatalogPromise=null});
+  return articleCatalogPromise;
+}
+function showArticleSuggestions(input){
+  const row=input.closest('.order-article-row'), box=row?.querySelector('.article-suggestions');
+  if(!box)return;
+  const needle=String(input.value||'').trim().toLocaleLowerCase('ru');
+  if(!needle){box.hidden=true;box.innerHTML='';return}
+  const found=new Map();
+  (state.orders||[]).forEach(o=>(Array.isArray(o.articles)?o.articles:[]).forEach(a=>{
+    const code=String(a?.article||a||'').trim();if(code&&code.toLocaleLowerCase('ru').includes(needle))found.set(normKey(code),{article:code,source:'История'});
+  }));
+  (articleCatalogCache||[]).forEach(a=>{
+    const code=String(a.article||'').trim();if(code&&code.toLocaleLowerCase('ru').includes(needle)){
+      const old=found.get(normKey(code));found.set(normKey(code),{article:code,source:old?'Справочник · история':'Справочник'});
+    }
+  });
+  const items=[...found.values()].sort((a,b)=>{
+    const ap=a.article.toLocaleLowerCase('ru').startsWith(needle)?0:1,bp=b.article.toLocaleLowerCase('ru').startsWith(needle)?0:1;
+    return ap-bp||a.article.localeCompare(b.article,'ru',{numeric:true,sensitivity:'base'});
+  }).slice(0,12);
+  box.innerHTML=items.length?items.map(x=>'<button type="button" class="article-suggestion" role="option" data-article-suggestion="'+esc(x.article)+'"><span>'+esc(x.article)+'</span><small>'+esc(x.source)+'</small></button>').join(''):'<div class="article-suggestion-empty">Совпадений пока нет</div>';
+  box.hidden=false;
+  loadArticleCatalog().then(()=>{if(document.activeElement===input)showArticleSuggestions(input)});
+}
+function closeSuggestions(except=null){document.querySelectorAll('.article-suggestions,.client-suggestions').forEach(box=>{if(box!==except){box.hidden=true;box.innerHTML=''}})}
+async function loadClients(){
+  if(clientsCache)return clientsCache;
+  const snap=await getDocs(collection(db,'clients'));
+  clientsCache=snap.docs.map(d=>({id:d.id,...d.data()})).filter(x=>x.name).sort((a,b)=>a.name.localeCompare(b.name,'ru',{sensitivity:'base'}));
+  return clientsCache;
+}
+function allClientNames(){
+  const map=new Map();
+  (state.orders||[]).forEach(o=>{const name=clientNameFromOrder(o);if(name&&!map.has(normKey(name)))map.set(normKey(name),{name,source:'История заказов'});});
+  (clientsCache||[]).forEach(c=>{const name=String(c.name||'').trim();if(name)map.set(normKey(name),{name,source:'Справочник'});});
+  return [...map.values()].sort((a,b)=>a.name.localeCompare(b.name,'ru',{sensitivity:'base'}));
+}
+function showClientSuggestions(input){
+  const box=document.getElementById(input.id==='editClientName'?'editClientNameSuggestions':'clientNameSuggestions');
+  if(!box)return;
+  const needle=normKey(input.value);
+  if(!needle){box.hidden=true;box.innerHTML='';return}
+  const items=allClientNames().filter(x=>normKey(x.name).includes(needle)).sort((a,b)=>
+    (normKey(a.name).startsWith(needle)?0:1)-(normKey(b.name).startsWith(needle)?0:1)||a.name.localeCompare(b.name,'ru')).slice(0,8);
+  box.innerHTML=items.map(x=>'<button type="button" class="client-suggestion" data-client-suggestion="'+esc(x.name)+'"><span>'+esc(x.name)+'</span><small>'+esc(x.source)+'</small></button>').join('');
+  box.hidden=!items.length;
+}
+function chooseClientName(value){
+  const input=document.activeElement?.matches('#clientName,#editClientName')?document.activeElement:null;
+  if(input){input.value=value;const box=document.getElementById(input.id==='editClientName'?'editClientNameSuggestions':'clientNameSuggestions');if(box)box.hidden=true;input.dispatchEvent(new Event('change',{bubbles:true}));}
+}
+function openClientsDirectory(){
+  if(!canManageUsers){toast('Управлять справочником клиентов может только администратор или директор.');return}
+  showModal('Клиенты', '<div class="client-directory"><p class="field-hint">Единый справочник клиентов. Можно добавлять, исправлять, удалять записи и импортировать Excel. История заказов при удалении записи не меняется.</p><form id="clientCreateForm" class="client-create-form"><input id="newClientName" required maxlength="160" placeholder="Имя клиента или компании"><button class="primary-button" type="submit">＋ Добавить клиента</button></form><div class="client-tools"><button type="button" class="secondary-button" data-action="export-clients">Экспорт CSV</button><label class="secondary-button client-file-label">Загрузить Excel<input id="clientExcelFile" type="file" accept=".xlsx,.xls,.csv" hidden></label><button type="button" class="secondary-button" data-action="import-clients">Импортировать файл</button></div><div class="client-import-status" id="clientImportStatus" aria-live="polite"></div><label class="field client-search"><span>Поиск клиента</span><input id="clientSearchInput" placeholder="Начните вводить название"></label><div id="clientDirectoryList" class="client-directory-list"><div class="field-hint">Загрузка справочника…</div></div></div>',[button('Закрыть','close')],'СПРАВОЧНИК');
+  void renderClientDirectory();
+}
+async function renderClientDirectory(){
+  const list=document.getElementById('clientDirectoryList');if(!list)return;
+  try{
+    const clients=await loadClients();if(!document.getElementById('clientDirectoryList'))return;
+    const q=normKey(document.getElementById('clientSearchInput')?.value);
+    const visible=clients.filter(c=>!q||normKey(c.name).includes(q));
+    list.innerHTML=visible.length?visible.map(c=>'<div class="client-record" data-client-id="'+esc(c.id)+'"><input class="client-edit-name" value="'+esc(c.name)+'" maxlength="160" aria-label="Название клиента"><div class="client-record-actions"><button type="button" class="small-button" data-action="save-client:'+esc(c.id)+'">Сохранить</button><button type="button" class="small-button danger" data-action="delete-client:'+esc(c.id)+'">Удалить</button></div></div>').join(''):'<div class="field-hint">Клиенты не найдены.</div>';
+  }catch(err){console.error('Не удалось загрузить справочник клиентов',err);list.innerHTML='<div class="field-hint">Не удалось загрузить справочник. Проверьте права Firestore.</div>'}
+}
+async function addClientRecord(name){
+  const clean=String(name||'').trim().replace(/\\s+/g,' ');if(!clean)throw new Error('Введите имя клиента.');
+  const clients=await loadClients();const duplicate=clients.find(c=>normKey(c.name)===normKey(clean));
+  if(duplicate)throw new Error('Такой клиент уже есть в справочнике.');
+  const id=normKey(clean).replace(/[^\\p{L}\\p{N}]+/gu,'-').replace(/^-|-$/g,'').slice(0,90)+'-'+Date.now().toString(36);
+  await setDoc(doc(db,'clients',id),{name:clean,normalized:normKey(clean),createdAt:serverTimestamp(),createdBy:signedInUser?.uid||''});
+  clientsCache=null;await loadClients();await renderClientDirectory();toast('Клиент добавлен.');
+}
+async function saveClientRecord(id,name){
+  const clean=String(name||'').trim().replace(/\\s+/g,' ');if(!clean)throw new Error('Название клиента не может быть пустым.');
+  const clients=await loadClients();if(clients.some(c=>c.id!==id&&normKey(c.name)===normKey(clean)))throw new Error('Клиент с таким названием уже есть.');
+  await updateDoc(doc(db,'clients',id),{name:clean,normalized:normKey(clean),updatedAt:serverTimestamp(),updatedBy:signedInUser?.uid||''});
+  clientsCache=null;await loadClients();await renderClientDirectory();toast('Название клиента сохранено.');
+}
+async function deleteClientRecord(id){
+  const clients=await loadClients(),client=clients.find(c=>c.id===id);if(!client)return;
+  if(!confirm('Удалить «'+client.name+'» из справочника? Старые заказы останутся без изменений.'))return;
+  await deleteDoc(doc(db,'clients',id));clientsCache=null;await loadClients();await renderClientDirectory();toast('Клиент удалён из справочника.');
+}
+function csvCell(value){return '"'+String(value??'').replace(/"/g,'""')+'"'}
+function exportClientsCsv(){
+  const rows=[['Клиент'],...(clientsCache||[]).map(c=>[c.name])];
+  const csv='\\ufeff'+rows.map(r=>r.map(csvCell).join(';')).join('\\r\\n');
+  const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));const a=document.createElement('a');a.href=url;a.download='clients.csv';a.click();URL.revokeObjectURL(url);
+}
+async function importClientsFile(){
+  const file=document.getElementById('clientExcelFile')?.files?.[0];const status=document.getElementById('clientImportStatus');
+  if(!file){if(status)status.textContent='Сначала выберите Excel или CSV-файл.';return}
+  if(!window.XLSX){if(status)status.textContent='Не загрузился модуль чтения Excel. Проверьте интернет и обновите страницу.';return}
+  try{
+    const data=await file.arrayBuffer(),wb=XLSX.read(data,{type:'array'}),sheet=wb.Sheets[wb.SheetNames[0]],rows=XLSX.utils.sheet_to_json(sheet,{header:1,defval:''});
+    const values=rows.flat().map(v=>String(v||'').trim()).filter(Boolean);
+    const names=values.filter((v,i)=>i>0||!['клиент','имя клиента','название клиента','клиент/компания','name','client'].includes(normKey(v)));
+    if(!names.length)throw new Error('В файле не найдены имена клиентов.');
+    const existing=await loadClients(),map=new Map(existing.map(c=>[normKey(c.name),c.name]));
+    let added=0,skipped=0;
+    for(const raw of names){const name=raw.replace(/\\s+/g,' ');if(!name||['клиент','имя клиента','название клиента','клиент/компания','name','client'].includes(normKey(name))||map.has(normKey(name))){skipped++;continue}map.set(normKey(name),name);added++;}
+    const batchSize=400;const newNames=[...map.entries()].filter(([key])=>!existing.some(c=>normKey(c.name)===key)).map(([,name])=>name);
+    for(let i=0;i<newNames.length;i+=batchSize){const batch=writeBatch(db);newNames.slice(i,i+batchSize).forEach(name=>{const id=normKey(name).replace(/[^\\p{L}\\p{N}]+/gu,'-').replace(/^-|-$/g,'').slice(0,90)+'-'+Math.random().toString(36).slice(2,8);batch.set(doc(db,'clients',id),{name,normalized:normKey(name),createdAt:serverTimestamp(),createdBy:signedInUser?.uid||''})});await batch.commit();}
+    clientsCache=null;await loadClients();await renderClientDirectory();if(status)status.textContent='Импорт завершён. Добавлено: '+added+', пропущено (дубликаты/пустые): '+skipped+'.';
+  }catch(err){console.error('Ошибка импорта клиентов',err);if(status)status.textContent='Ошибка импорта: '+(err.message||err.code||'не удалось прочитать файл');}
+}
+
+function articleRowHtml(item={article:'',quantity:1,collected:false}){return `<div class="order-article-row article-suggestion-wrap"><input class="order-article-input" value="${esc(item.article||'')}" placeholder="Артикул" autocomplete="off" aria-autocomplete="list"><div class="article-suggestions" role="listbox" hidden></div><input class="order-article-qty" type="number" min="1" step="1" value="${Math.max(1,Number(item.quantity)||1)}" aria-label="Количество"><button type="button" class="small-button danger article-remove" data-action="remove-order-article" title="Удалить">×</button></div>`}
 function articlesEditorHtml(items=[]){return `<div class="article-editor" id="orderArticlesEditor"><div class="article-editor-head"><span>Артикул</span><span>Количество</span><span></span></div><div id="orderArticlesRows">${items.map(articleRowHtml).join('')}</div><button type="button" class="secondary-button article-add" data-action="add-order-article">＋ Добавить артикул</button></div>`}
 function readArticles(){return [...document.querySelectorAll('#orderArticlesRows .order-article-row')].map(row=>({article:row.querySelector('.order-article-input')?.value.trim()||'',quantity:Math.max(1,Number(row.querySelector('.order-article-qty')?.value)||1)})).filter(x=>x.article)}
 function normalizeArticles(items=[]){return items.map(x=>({article:String(x.article||'').trim(),quantity:Math.max(1,Number(x.quantity)||1),collected:x.collected===true,shipmentChecked:x.shipmentChecked===true})).filter(x=>x.article)}

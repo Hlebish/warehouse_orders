@@ -1372,27 +1372,31 @@ function shipmentPartType(article){
 const shipmentCategoryOrder=['Левое крыло','Правое крыло','Капот','Передний бампер','Задний бампер','Решётка бампера','Решётка радиатора','Бампер','Абсорбер бампера','Усилитель бампера','Панель','Молдинг','Накладка/спойлер бампера','Спойлер','Подкрылок','Крепление/кронштейн','Заглушка','Зеркало','Фара','Фонарь','Стекло фары','Стекло','Дверь','Крышка багажника','Порог','Арка','Фильтр','Подвеска','Тормоза','Рулевое','Охлаждение/кондиционер','Двигатель','Трансмиссия','Топливная система','Выхлоп','Электрика','Свет/сигнализация','Стеклоочистители','Салон','Прочее'];
 
 function openDailyReport(){
-  const today=localDateKey(new Date());
+  const today=localDateKey(new Date()),month=today.slice(0,7);
   showModal('Печатный отчёт склада',
-    '<p class="stat-modal-hint">Выберите дату. В отчёте будут отдельно показаны заказы, созданные в этот день, и события, которые удалось определить по истории заказа и датам статусов.</p><div class="field"><label for="dailyReportDate">Дата отчёта</label><input id="dailyReportDate" type="date" value="'+esc(today)+'"></div><div class="field-hint">Печатная форма включает сводку, отгрузки, самовывоз, остатки, переносы, отмены, дефекты/возвраты и отметки проверки деталей.</div>',
+    '<p class="stat-modal-hint">Можно сформировать отчёт за отдельный день или за весь месяц — с первого по последнее число.</p><div class="field"><label for="reportPeriodMode">Период отчёта</label><select id="reportPeriodMode"><option value="day">За день</option><option value="month">За месяц</option></select></div><div class="field" id="dailyReportDateField"><label for="dailyReportDate">Дата отчёта</label><input id="dailyReportDate" type="date" value="'+esc(today)+'"></div><div class="field" id="monthlyReportDateField" hidden><label for="monthlyReportMonth">Месяц отчёта</label><input id="monthlyReportMonth" type="month" value="'+esc(month)+'"></div><div class="field-hint">Печатная форма включает сводку, отгрузки, самовывоз, остатки, переносы, отмены, дефекты/возвраты, перекупной товар и отметки проверки деталей.</div>',
     [button('Закрыть','close'),button('Сформировать и печатать','print-daily-report','small-button primary-button')],
-    'ОТЧЁТ ЗА ДЕНЬ');
+    'ПЕЧАТНЫЙ ОТЧЁТ');
+  const mode=$('reportPeriodMode'),dayField=$('dailyReportDateField'),monthField=$('monthlyReportDateField');
+  mode?.addEventListener('change',()=>{const monthly=mode.value==='month';if(dayField)dayField.hidden=monthly;if(monthField)monthField.hidden=!monthly;});
 }
-function reportDateMatches(value,dateKey){return localDateKey(value)===dateKey;}
+function reportDateMatches(value,dateKey,endDateKey=dateKey){const key=localDateKey(value);return !!key&&key>=dateKey&&key<=endDateKey;}
 function reportEntryText(order,entry){return String(entry?.text||entry?.decisionText||'').trim();}
 function reportTable(headers,rows){
-  if(!rows.length)return '<p class="empty">Нет записей за выбранный день.</p>';
+  if(!rows.length)return '<p class="empty">Нет записей за выбранный период.</p>';
   return '<div class="table-wrap"><table><thead><tr>'+headers.map(x=>'<th>'+esc(x)+'</th>').join('')+'</tr></thead><tbody>'+rows.map(row=>'<tr>'+row.map(x=>'<td>'+String(x??'—')+'</td>').join('')+'</tr>').join('')+'</tbody></table></div>';
 }
-async function generateDailyReport(dateKey){
-  if(!dateKey){toast('Выберите дату отчёта.');return;}
+async function generateDailyReport(dateKey,endDateKey=dateKey){
+  if(!dateKey||!endDateKey||endDateKey<dateKey){toast('Выберите корректный период отчёта.');return;}
+  const periodIsMonth=dateKey!==endDateKey;
+  const periodTitle=periodIsMonth?'за период':'за день';
   const win=window.open('','_blank');
   if(!win){toast('Браузер заблокировал окно печати. Разрешите всплывающие окна для сайта и повторите.');return;}
   win.document.open();
   win.document.write('<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>Отчёт склада '+esc(dateKey)+'</title><style>body{font:12px Arial,sans-serif;color:#182230;margin:24px}h1{font-size:23px;margin:0 0 5px}h2{font-size:16px;margin:24px 0 8px;border-bottom:1px solid #bbb;padding-bottom:5px}.muted,.empty{color:#5e6876}.summary{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:16px 0}.kpi{border:1px solid #cbd1d8;padding:9px}.kpi b{display:block;font-size:20px;margin-bottom:4px}.table-wrap{width:100%;overflow:visible}table{width:100%;border-collapse:collapse;margin:8px 0 16px;font-size:10px}th,td{border:1px solid #cbd1d8;padding:5px 6px;text-align:left;vertical-align:top;overflow-wrap:anywhere}th{background:#f0f2f5}.signatures{display:grid;grid-template-columns:1fr 1fr;gap:50px;margin-top:40px}.sign{border-top:1px solid #333;padding-top:7px}.section-note{font-size:10px;color:#555}.empty{padding:10px 0}@page{size:auto;margin:12mm}@media print{body{margin:0}.no-print{display:none}tr{break-inside:avoid;page-break-inside:avoid}h2{break-after:avoid;page-break-after:avoid}.report-subsection{break-inside:avoid;page-break-inside:avoid}h3{break-after:avoid;page-break-after:avoid}}@media screen{body{max-width:1100px;margin:28px auto}.no-print{position:sticky;top:0;background:#fff;padding:10px 0;border-bottom:1px solid #ddd;margin-bottom:14px}.no-print button{padding:9px 15px;cursor:pointer}}</style></head><body><div class="no-print"><button onclick="window.print()">Печать</button> <button onclick="window.close()">Закрыть</button></div><p>Формирую отчёт…</p></body></html>');
   win.document.close();
   try{
-    const created=state.orders.filter(o=>reportDateMatches(o.createdAt,dateKey));
+    const created=state.orders.filter(o=>reportDateMatches(o.createdAt,dateKey,endDateKey));
     let buybackItems=[];
     try{
       const buybackSnap=await getDocs(collection(db,'buybackItems'));
@@ -1403,7 +1407,7 @@ async function generateDailyReport(dateKey){
     const buybackStatusLabel=item=>{const status=String(item.status||'').trim();if(!status||status.toLowerCase()==='active')return 'На складе';if(/sold|продан|отгружен|забрал/i.test(status))return 'Продан / отгружен';if(/cancel|отмен/i.test(status))return 'Отменён';if(/return|возврат|вернул|returned/i.test(status))return 'Возвращён';return status;};
     const buybackStatus=item=>String(item.status||'active').trim().toLowerCase();
     const buybackOnStock=buybackItems.filter(item=>['','active'].includes(buybackStatus(item)));
-    const buybackDate=(...values)=>values.some(value=>value&&reportDateMatches(value,dateKey));
+    const buybackDate=(...values)=>values.some(value=>value&&reportDateMatches(value,dateKey,endDateKey));
     const buybackRelevant=buybackItems.filter(item=>{
       const status=buybackStatus(item);
       const createdToday=buybackDate(item.createdOn,item.createdAt,item.receivedAt);
@@ -1420,26 +1424,38 @@ async function generateDailyReport(dateKey){
     });
     const buybackDaysOnStock=(item,status)=>{const received=String(item.receivedAt||'').slice(0,10);if(!/^\d{4}-\d{2}-\d{2}$/.test(received))return '—';const sold=/sold|продан|отгружен|забрал/i.test(status);const cancelled=/cancel|отмен/i.test(status);const returned=/return|возврат|вернул/i.test(status);const closed=sold||cancelled||returned;const endValue=closed?(sold?(item.soldAt||item.updatedAt):cancelled?(item.cancelledAt||item.updatedAt):(item.returnedAt||item.updatedAt)):localDateKey(new Date());const end=String(endValue||'').slice(0,10);if(!/^\d{4}-\d{2}-\d{2}$/.test(end))return '—';const elapsed=Math.floor((Date.parse(end+'T00:00:00Z')-Date.parse(received+'T00:00:00Z'))/86400000);return Number.isFinite(elapsed)?Math.max(0,elapsed):'—';};
     const buybackRows=buybackRelevant.slice().sort((a,b)=>String(a.status||'active').localeCompare(String(b.status||'active'))||String(a.article||'').localeCompare(String(b.article||''))).map(item=>{const status=buybackStatus(item);const eventDate=/sold|продан|отгружен/i.test(status)?(item.soldAt||item.updatedAt):/cancel|отмен/i.test(status)?(item.cancelledAt||item.updatedAt):/return|возврат|вернул/i.test(status)?(item.returnedAt||item.updatedAt):(item.createdOn||item.createdAt||item.receivedAt);return [esc(item.article||'—'),esc(item.quantity??'—'),esc(buybackStatusLabel(item)),esc(item.receivedAt||'—'),esc(buybackDaysOnStock(item,status)),esc(eventDate?fmtDateTime(eventDate):'—'),esc(item.createdByName||'—')];});
-    const eventEntries=state.orders.flatMap(o=>(Array.isArray(o.entries)?o.entries:[]).filter(e=>reportDateMatches(e.createdAt,dateKey)).map(e=>({order:o,entry:e})));
+    const eventEntries=state.orders.flatMap(o=>(Array.isArray(o.entries)?o.entries:[]).filter(e=>reportDateMatches(e.createdAt,dateKey,endDateKey)).map(e=>({order:o,entry:e})));
     const eventByOrder=re=>eventEntries.filter(x=>re.test(reportEntryText(x.order,x.entry)));
     const shippedEvents=eventByOrder(/отгруженн|отгрузил/i);
     const pickupEvents=eventByOrder(/клиент забрал заказ самовывозом|забрал.*самовывоз/i);
     const transferredEvents=eventByOrder(/заказ перенесен|перенесён заказ|перенесен/i);
     const shippedOrders=[...new Map(shippedEvents.map(x=>[x.order.id,x.order])).values()];
-    for(const o of state.orders)if(o.status==='Отгружен кладовщиком'&&reportDateMatches(o.shippedAt||o.updatedAt,dateKey)&&!shippedOrders.some(x=>x.id===o.id))shippedOrders.push(o);
+    for(const o of state.orders)if(o.status==='Отгружен кладовщиком'&&reportDateMatches(o.shippedAt||o.updatedAt,dateKey,endDateKey)&&!shippedOrders.some(x=>x.id===o.id))shippedOrders.push(o);
     const pickupOrders=[...new Map(pickupEvents.map(x=>[x.order.id,x.order])).values()];
-    for(const o of state.orders)if(o.status==='Клиент забрал самовывозом'&&reportDateMatches(o.updatedAt,dateKey)&&!pickupOrders.some(x=>x.id===o.id))pickupOrders.push(o);
+    for(const o of state.orders)if(o.status==='Клиент забрал самовывозом'&&reportDateMatches(o.updatedAt,dateKey,endDateKey)&&!pickupOrders.some(x=>x.id===o.id))pickupOrders.push(o);
     const transferredOrders=[...new Map(transferredEvents.map(x=>[x.order.id,x.order])).values()];
-    for(const o of state.orders)if(o.status==='Перенесен'&&reportDateMatches(o.transferredAt||o.updatedAt,dateKey)&&!transferredOrders.some(x=>x.id===o.id))transferredOrders.push(o);
+    for(const o of state.orders)if(o.status==='Перенесен'&&reportDateMatches(o.transferredAt||o.updatedAt,dateKey,endDateKey)&&!transferredOrders.some(x=>x.id===o.id))transferredOrders.push(o);
     const cancelledOrders=state.orders.filter(o=>o.status==='Отменён'&&reportDateMatches(o.updatedAt,dateKey));
     const terminal=new Set(['Отгружен кладовщиком','Клиент забрал самовывозом','Отменён','Возврат']);
     const remaining=state.orders.filter(o=>!terminal.has(o.status)&&!(Array.isArray(o.returns)&&o.returns.some(r=>r?.status!=='cancelled')));
     const defects=eventEntries.filter(x=>x.entry.kind==='defect');
-    const returns=state.orders.flatMap(o=>(Array.isArray(o.returns)?o.returns:[]).filter(r=>r?.status!=='cancelled'&&reportDateMatches(r.createdAt,dateKey)).map(r=>({order:o,record:r})));
+    const returns=state.orders.flatMap(o=>(Array.isArray(o.returns)?o.returns:[]).filter(r=>r?.status!=='cancelled'&&reportDateMatches(r.createdAt,dateKey,endDateKey)).map(r=>({order:o,record:r})));
     const totalQty=orders=>orders.reduce((sum,o)=>{const removed=new Set((o.entries||[]).filter(e=>e.kind==='defect'&&e.decision==='Удалена из заказа').map(e=>Number.isInteger(e.articleIndex)?e.articleIndex:-1));const items=normalizeArticles(o.articles||[]).filter((item,i)=>!removed.has(i)&&!(removed.has(-1)&&(o.entries||[]).some(e=>e.kind==='defect'&&e.decision==='Удалена из заказа'&&e.article===item.article)));return sum+items.reduce((n,item)=>n+(Number(item.quantity)||1),0);},0);
-    let shipmentDay={};
-    try{const snap=await getDoc(doc(db,'shipmentDays',dateKey));if(snap.exists())shipmentDay=snap.data()||{};}catch(err){console.warn('Не удалось загрузить отметки проверки отгрузки',err);}
-    const shippedForManifest=state.orders.filter(o=>o.status==='Отгружен кладовщиком'&&shipmentOrderDateKey(o)===dateKey).flatMap(o=>{
+    let shipmentDay={checkedOrderArticles:[],checkedArticles:[]};
+    try{
+      const cursor=new Date(dateKey+'T12:00:00');
+      const endCursor=new Date(endDateKey+'T12:00:00');
+      const checkedOrderArticles=new Set(),checkedArticles=new Set();
+      for(const day=new Date(cursor);day<=endCursor;day.setDate(day.getDate()+1)){
+        const key=localDateKey(day),snap=await getDoc(doc(db,'shipmentDays',key));
+        if(!snap.exists())continue;
+        const data=snap.data()||{};
+        (Array.isArray(data.checkedOrderArticles)?data.checkedOrderArticles:[]).forEach(x=>checkedOrderArticles.add(String(x)));
+        (Array.isArray(data.checkedArticles)?data.checkedArticles:[]).forEach(x=>checkedArticles.add(String(x)));
+      }
+      shipmentDay={checkedOrderArticles:[...checkedOrderArticles],checkedArticles:[...checkedArticles]};
+    }catch(err){console.warn('Не удалось загрузить отметки проверки отгрузки за период',err);}
+    const shippedForManifest=state.orders.filter(o=>o.status==='Отгружен кладовщиком'&&shipmentOrderDateKey(o)>=dateKey&&shipmentOrderDateKey(o)<=endDateKey).flatMap(o=>{
       const removed=new Set((o.entries||[]).filter(e=>e.kind==='defect'&&e.decision==='Удалена из заказа').map(e=>Number.isInteger(e.articleIndex)?e.articleIndex:-1));
       return normalizeArticles(o.articles||[]).filter((item,i)=>!removed.has(i)&&!(removed.has(-1)&&(o.entries||[]).some(e=>e.kind==='defect'&&e.decision==='Удалена из заказа'&&e.article===item.article))).map(item=>({order:o,item,key:String(o.id)+'::'+String(item.article||'').trim().toUpperCase()}));
     });
@@ -1463,20 +1479,21 @@ async function generateDailyReport(dateKey){
     const createdRows=created.map(o=>[esc(o.number||'—'),esc(o.client||'—'),esc(o.status||'—'),esc(fmtDateTime(o.createdAt)),esc(totalQty([o]))]);
     const defectRows=defects.map(({order,entry})=>[esc(order.number||'—'),esc(order.client||'—'),esc(entry.article||'—'),esc(reportEntryText(order,entry)),esc(entry.author||'—'),esc(fmtDateTime(entry.createdAt))]);
     const returnRows=returns.map(({order,record})=>[esc(order.number||'—'),esc(order.client||'—'),esc((record.items||[]).map(i=>String(i.article||'')+' × '+(Number(i.quantity)||0)).join(', ')||'—'),esc(record.reason||'—'),esc(record.author||'—')]);
-    const dateLabel=esc(new Intl.DateTimeFormat('ru-RU',{day:'2-digit',month:'long',year:'numeric'}).format(new Date(dateKey+'T12:00:00')));
+    const dateFormatter=new Intl.DateTimeFormat('ru-RU',{day:'2-digit',month:'long',year:'numeric'});
+    const dateLabel=esc(dateKey===endDateKey?dateFormatter.format(new Date(dateKey+'T12:00:00')):dateFormatter.format(new Date(dateKey+'T12:00:00'))+' — '+dateFormatter.format(new Date(endDateKey+'T12:00:00')));
     const sections=[];
-    sections.push('<h2>1. Сводка за день</h2><div class="summary"><div class="kpi"><b>'+shippedOrders.length+'</b>отгруженных заказов</div><div class="kpi"><b>'+totalQty(shippedOrders)+'</b>деталей в отгруженных заказах</div><div class="kpi"><b>'+pickupOrders.length+'</b>самовывозов</div><div class="kpi"><b>'+created.length+'</b>заказов создано</div><div class="kpi"><b>'+uniqueClients(shippedOrders)+'</b>клиентов в отгрузках</div><div class="kpi"><b>'+transferredOrders.length+'</b>переносов за день</div><div class="kpi"><b>'+cancelledOrders.length+'</b>отмен по текущей дате изменения</div><div class="kpi"><b>'+remaining.length+'</b>незакрытых заказов сейчас</div></div><p class="section-note">События определяются по записям истории заказа и сохранённым датам статусов. Если событие не записывалось отдельно, оно может не попасть в исторический счётчик.</p>');
+    sections.push('<h2>1. Сводка '+periodTitle+'</h2><div class="summary"><div class="kpi"><b>'+shippedOrders.length+'</b>отгруженных заказов</div><div class="kpi"><b>'+totalQty(shippedOrders)+'</b>деталей в отгруженных заказах</div><div class="kpi"><b>'+pickupOrders.length+'</b>самовывозов</div><div class="kpi"><b>'+created.length+'</b>заказов создано</div><div class="kpi"><b>'+uniqueClients(shippedOrders)+'</b>клиентов в отгрузках</div><div class="kpi"><b>'+transferredOrders.length+'</b>переносов за день</div><div class="kpi"><b>'+cancelledOrders.length+'</b>отмен по текущей дате изменения</div><div class="kpi"><b>'+remaining.length+'</b>незакрытых заказов сейчас</div></div><p class="section-note">События определяются по записям истории заказа и сохранённым датам статусов. Если событие не записывалось отдельно, оно может не попасть в исторический счётчик.</p>');
     sections.push('<h2>2. Заказы, созданные '+dateLabel+'</h2>'+reportTable(['Номер заказа','Клиент','Текущий статус','Создан','Кол-во деталей'],createdRows));
     sections.push('<h2>3. Отгрузка кладовщиком</h2><p><b>Заказов:</b> '+shippedOrders.length+' · <b>клиентов:</b> '+uniqueClients(shippedOrders)+' · <b>деталей:</b> '+totalQty(shippedOrders)+'</p>'+reportTable(['Номер заказа','Клиент','Кто отгрузил*','Время','Кол-во деталей'],shipmentRows)+'<p class="section-note">*Сотрудник указан по записи события, если она сохранилась; иначе используется последнее сохранённое имя обновившего заказ.</p>');
     sections.push('<h2>4. Самовывоз — клиент забрал заказ</h2><p><b>Заказов:</b> '+pickupOrders.length+' · <b>клиентов:</b> '+uniqueClients(pickupOrders)+' · <b>деталей:</b> '+totalQty(pickupOrders)+'</p>'+reportTable(['Номер заказа','Клиент','Вид доставки','Время события'],pickupRows));
-    sections.push('<h2>5. Заказы, перенесённые за день</h2>'+reportTable(['Номер заказа','Клиент','Время события','Запись / причина'],transferredRows));
+    sections.push('<h2>5. Заказы, перенесённые за выбранный период</h2>'+reportTable(['Номер заказа','Клиент','Время события','Запись / причина'],transferredRows));
     sections.push('<h2>6. Отменённые заказы</h2>'+reportTable(['Номер заказа','Клиент','Дата изменения','Причина отмены'],cancelledRows));
     sections.push('<h2>7. Незакрытые заказы на момент формирования отчёта</h2><p class="section-note">Это текущий остаток по базе на момент печати, а не исторический снимок на конец выбранного дня.</p>'+reportTable(['Номер заказа','Клиент','Текущий статус','Доставка','Кол-во деталей'],remainingRows));
-    sections.push('<h2>8. Дефекты и возвраты за день</h2><div class="report-subsection"><h3>Дефекты</h3>'+reportTable(['Номер заказа','Клиент','Артикул','Описание / решение','Автор','Дата'],defectRows)+'</div><div class="report-subsection"><h3>Возвраты</h3>'+reportTable(['Номер заказа','Клиент','Детали','Причина','Автор'],returnRows)+'</div>');
+    sections.push('<h2>8. Дефекты и возвраты за выбранный период</h2><div class="report-subsection"><h3>Дефекты</h3>'+reportTable(['Номер заказа','Клиент','Артикул','Описание / решение','Автор','Дата'],defectRows)+'</div><div class="report-subsection"><h3>Возвраты</h3>'+reportTable(['Номер заказа','Клиент','Детали','Причина','Автор'],returnRows)+'</div>');
     sections.push('<h2>9. Перекупной товар</h2><p><b>Всего позиций:</b> '+buybackRelevant.length+' · <b>на складе сейчас:</b> '+buybackOnStock.length+' · <b>единиц на складе:</b> '+buybackOnStock.reduce((sum,item)=>sum+(Number(item.quantity)||0),0)+'</p><p class="section-note">Показаны товары, оставшиеся на складе на момент печати, добавленные в выбранный день, а также проданные или отменённые в выбранный день. Старые отменённые и проданные записи не включаются.</p>'+reportTable(['Артикул','Количество','Статус','Дата поступления','Дней на складе','Дата события / добавления','Кто добавил'],buybackRows));
     sections.push('<h2>10. Проверка списка отгрузки</h2><p><b>Заказов в списке:</b> '+new Set(shippedForManifest.map(x=>x.order.id)).size+' · <b>позиций:</b> '+shippedForManifest.length+' · <b>проверено позиций:</b> '+checkedCount+' · <b>не проверено:</b> '+Math.max(0,shippedForManifest.length-checkedCount)+'</p><p class="section-note">Позиция считается проверенной по отметкам вкладки «Отгрузка» для выбранной даты.</p>'+reportTable(['Номер заказа','Клиент','Артикул','Количество','Проверка'],shippedForManifest.map(x=>[esc(x.order.number||'—'),esc(x.order.client||'—'),esc(x.item.article||'—'),esc(x.item.quantity||1),esc(checked.has(x.key)?'Проверено':'Не проверено')])));
     sections.push('<div class="signatures"><div class="sign">Кладовщик: __________________________</div><div class="sign">Проверил: __________________________</div></div>');
-    const reportHtml='<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>Отчёт склада '+dateLabel+'</title><style>body{font:12px Arial,sans-serif;color:#182230;margin:24px}h1{font-size:23px;margin:0 0 5px}h2{font-size:16px;margin:24px 0 8px;border-bottom:1px solid #bbb;padding-bottom:5px}h3{font-size:13px;margin:14px 0 6px;break-after:avoid;page-break-after:avoid}.report-subsection{break-inside:avoid;page-break-inside:avoid}.muted,.empty{color:#5e6876}.summary{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:16px 0}.kpi{border:1px solid #cbd1d8;padding:9px}.kpi b{display:block;font-size:20px;margin-bottom:4px}.table-wrap{width:100%;overflow:visible}table{width:100%;border-collapse:collapse;margin:8px 0 16px;font-size:10px}th,td{border:1px solid #cbd1d8;padding:5px 6px;text-align:left;vertical-align:top;overflow-wrap:anywhere}th{background:#f0f2f5}.signatures{display:grid;grid-template-columns:1fr 1fr;gap:50px;margin-top:40px}.sign{border-top:1px solid #333;padding-top:7px}.section-note{font-size:10px;color:#555}.empty{padding:10px 0}@page{size:auto;margin:12mm}@media print{body{margin:0}.no-print{display:none}tr{break-inside:avoid}h2{break-after:avoid}}@media screen{body{max-width:1100px;margin:28px auto}.no-print{position:sticky;top:0;background:#fff;padding:10px 0;border-bottom:1px solid #ddd;margin-bottom:14px}.no-print button{padding:9px 15px;cursor:pointer}}</style></head><body><div class="no-print"><button onclick="window.print()">Печать</button> <button onclick="window.close()">Закрыть</button></div><h1>Дневной отчёт склада</h1><p><b>Дата:</b> '+dateLabel+'</p><p class="muted">Сформирован: '+esc(fmtDateTime(new Date()))+' · Warehouse Orders</p>'+sections.join('')+'</body></html>';
+    const reportHtml='<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>Отчёт склада '+dateLabel+'</title><style>body{font:12px Arial,sans-serif;color:#182230;margin:24px}h1{font-size:23px;margin:0 0 5px}h2{font-size:16px;margin:24px 0 8px;border-bottom:1px solid #bbb;padding-bottom:5px}h3{font-size:13px;margin:14px 0 6px;break-after:avoid;page-break-after:avoid}.report-subsection{break-inside:avoid;page-break-inside:avoid}.muted,.empty{color:#5e6876}.summary{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:16px 0}.kpi{border:1px solid #cbd1d8;padding:9px}.kpi b{display:block;font-size:20px;margin-bottom:4px}.table-wrap{width:100%;overflow:visible}table{width:100%;border-collapse:collapse;margin:8px 0 16px;font-size:10px}th,td{border:1px solid #cbd1d8;padding:5px 6px;text-align:left;vertical-align:top;overflow-wrap:anywhere}th{background:#f0f2f5}.signatures{display:grid;grid-template-columns:1fr 1fr;gap:50px;margin-top:40px}.sign{border-top:1px solid #333;padding-top:7px}.section-note{font-size:10px;color:#555}.empty{padding:10px 0}@page{size:auto;margin:12mm}@media print{body{margin:0}.no-print{display:none}tr{break-inside:avoid}h2{break-after:avoid}}@media screen{body{max-width:1100px;margin:28px auto}.no-print{position:sticky;top:0;background:#fff;padding:10px 0;border-bottom:1px solid #ddd;margin-bottom:14px}.no-print button{padding:9px 15px;cursor:pointer}}</style></head><body><div class="no-print"><button onclick="window.print()">Печать</button> <button onclick="window.close()">Закрыть</button></div><h1>'+(periodIsMonth?'Месячный отчёт склада':'Дневной отчёт склада')+'</h1><p><b>Дата:</b> '+dateLabel+'</p><p class="muted">Сформирован: '+esc(fmtDateTime(new Date()))+' · Warehouse Orders</p>'+sections.join('')+'</body></html>';
     win.document.open();win.document.write(reportHtml);win.document.close();
     setTimeout(()=>{try{win.focus();win.print();}catch(err){console.warn('Не удалось открыть печать автоматически',err);}},450);
   }catch(err){

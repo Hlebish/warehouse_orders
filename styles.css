@@ -2714,3 +2714,7 @@ body.dark-theme .client-suggestions[hidden]{display:none!important}
 /* Make buyback category filters visibly interactive */
 .buyback-chip[data-status],#buybackSummary [data-summary-status]{cursor:pointer!important;}
 .buyback-chip[data-status]:hover,#buybackSummary [data-summary-status]:hover{filter:brightness(1.12);}
+
+
+/* Defect workflow: clear multi-select and clickable red pending items */
+.order-article-view.article-defect-pending{background:#3a1719!important;border:1px solid #e04444!important;box-shadow:inset 5px 0 0 #e04444;color:#fff;cursor:pointer!important}.order-article-view.article-defect-pending:hover{background:#4a1c1f!important}.defect-multi-list{display:grid;gap:8px;max-height:260px;overflow:auto;padding:8px;border:1px solid var(--border-color,#444);border-radius:10px}.defect-multi-option{display:flex;align-items:center;gap:9px;padding:9px;border-radius:7px;background:rgba(255,255,255,.04);cursor:pointer}.defect-multi-option input{width:18px;height:18px;accent-color:#e04444}

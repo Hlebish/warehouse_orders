@@ -785,7 +785,7 @@ async function saveClient(id){
   try{
     if(id)await updateDoc(doc(db,'clients',id),data);
     else await setDoc(doc(db,'clients',crypto.randomUUID()),{...data,createdAt:isoNow(),createdBy:signedInUser.uid});
-    closeModal();setTimeout(openClientsDirectory,0);toast(id?'Клиент изменён.':'Клиент добавлен.');
+    openClientsDirectory();toast(id?'Клиент изменён.':'Клиент добавлен.');
   }catch(err){console.error(err);toast('Не удалось сохранить клиента: '+(err?.message||'нет доступа'))}
 }
 async function deleteClient(id){

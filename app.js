@@ -2041,16 +2041,19 @@ document.addEventListener('input',e=>{
   if(e.target?.id==='entryText')entryMentionSuggestions();
   if(e.target?.id==='clientName')clientNameSuggestions('clientName','clientNameSuggestions');
   if(e.target?.id==='editClientName')clientNameSuggestions('editClientName','editClientNameSuggestions');
+  if(e.target?.classList?.contains('order-article-input'))showArticleSuggestions(e.target);
 });
 document.addEventListener('focusin',e=>{
   if(e.target?.id==='clientName')clientNameSuggestions('clientName','clientNameSuggestions');
   if(e.target?.id==='editClientName')clientNameSuggestions('editClientName','editClientNameSuggestions');
+  if(e.target?.classList?.contains('order-article-input'))showArticleSuggestions(e.target);
 });
 
 document.addEventListener('keyup',e=>{
   if(e.target?.id==='entryText')entryMentionSuggestions();
   if(e.target?.id==='clientName')clientNameSuggestions('clientName','clientNameSuggestions');
   if(e.target?.id==='editClientName')clientNameSuggestions('editClientName','editClientNameSuggestions');
+  if(e.target?.classList?.contains('order-article-input'))showArticleSuggestions(e.target);
 });
 document.addEventListener('focusout',e=>{
   if(['clientName','editClientName'].includes(e.target?.id)){
@@ -2060,6 +2063,8 @@ document.addEventListener('focusout',e=>{
 });
 
 document.addEventListener('click',e=>{
+  const productSuggestion=e.target.closest('[data-product-article]');
+  if(productSuggestion){e.preventDefault();chooseArticleSuggestion(productSuggestion);return;}
   const noticeCard=e.target.closest('[data-notice-id]');
   if(noticeCard){
     const notice=state.notices.find(n=>n.id===noticeCard.dataset.noticeId);

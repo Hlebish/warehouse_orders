@@ -12,18 +12,18 @@ service firebase.storage {
 
     match /chat/{userId}/{fileName} {
       allow read: if activeUser();
-      allow create, update: if activeUser()
+      allow create: if activeUser()
         && request.auth.uid == userId
-        && request.resource.size < 8 * 1024 * 1024
-        && request.resource.contentType.matches('image/.*');
+        && request.resource.size <= 8 * 1024 * 1024
+        && request.resource.contentType.matches('image/(jpeg|png|webp)');
       allow delete: if activeUser() && request.auth.uid == userId;
     }
 
     match /orders/{orderId}/{entryId}/{fileName} {
       allow read: if activeUser();
-      allow create, update: if activeUser()
-        && request.resource.size < 8 * 1024 * 1024
-        && request.resource.contentType.matches('image/.*');
+      allow create: if activeUser()
+        && request.resource.size <= 8 * 1024 * 1024
+        && request.resource.contentType.matches('image/(jpeg|png|webp)');
       allow delete: if isDirector();
     }
   }

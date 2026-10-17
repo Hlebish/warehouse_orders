@@ -136,6 +136,25 @@ service cloud.firestore {
         && request.resource.data.recipientUserId.size() <= 128
         && (request.resource.data.recipientUserId == ''
           || get(/databases/$(database)/documents/users/$(request.resource.data.recipientUserId)).data.active == true)
+        && (
+          (request.resource.data.category == 'orders'
+            && request.resource.data.target == 'site'
+            && request.resource.data.orderId is string
+            && request.resource.data.orderId.size() > 0
+            && exists(/databases/$(database)/documents/orders/$(request.resource.data.orderId))
+            && request.resource.data.recipientUserId == '')
+          ||
+          (request.resource.data.category == 'chat'
+            && request.resource.data.target == 'chat'
+            && request.resource.data.recipientUserId == '')
+          ||
+          (request.resource.data.category == 'replies'
+            && request.resource.data.recipientUserId.size() > 0)
+          ||
+          (request.resource.data.category == 'likes'
+            && request.resource.data.target == 'chat'
+            && request.resource.data.recipientUserId.size() > 0)
+        )
         && (!request.resource.data.keys().hasAny(['orderId']) || request.resource.data.orderId is string)
         && (!request.resource.data.keys().hasAny(['createdAt'])
           || request.resource.data.createdAt is string

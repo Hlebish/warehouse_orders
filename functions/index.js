@@ -173,6 +173,7 @@ exports.import1COrder = onRequest(
   { secrets: [oneCImportKey] },
   async (req, res) => {
     res.set('Content-Type', 'application/json; charset=utf-8');
+    res.set('Cache-Control', 'no-store');
 
     if (req.method !== 'POST') {
       return res.status(405).json({ ok: false, error: 'POST required' });
@@ -184,19 +185,46 @@ exports.import1COrder = onRequest(
     }
 
     try {
-      const body = req.body && typeof req.body === 'object' ? req.body : {};
+      // Reject oversized payloads before processing or writing to Firestore.
+      const rawBodySize = req.rawBody?.length;
+      if (typeof rawBodySize === 'number' && rawBodySize > 1024 * 1024) {
+        return res.status(413).json({ ok: false, error: 'Request too large' });
+      }
+
+      const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body)
+        ? req.body
+        : {};
       const number = String(body.number || '').trim();
       const client = String(body.client || '').trim();
       const sourceId = String(body.externalId || number).trim();
-      const articles = Array.isArray(body.articles)
-        ? body.articles.map(item => ({
-            article: String(item?.article || '').trim(),
-            quantity: Math.max(1, Number(item?.quantity) || 1)
-          })).filter(item => item.article)
-        : [];
+      const sourceType = String(body.sourceType || 'Заказ покупателя').trim();
+      const rawArticles = body.articles;
 
-      if (!number) return res.status(400).json({ ok: false, error: 'number is required' });
-      if (!articles.length) return res.status(400).json({ ok: false, error: 'articles are required' });
+      if (!number || number.length > 120) {
+        return res.status(400).json({ ok: false, error: 'number is required and must be at most 120 characters' });
+      }
+      if (client.length > 200) {
+        return res.status(400).json({ ok: false, error: 'client must be at most 200 characters' });
+      }
+      if (!sourceId || sourceId.length > 180) {
+        return res.status(400).json({ ok: false, error: 'externalId must be at most 180 characters' });
+      }
+      if (sourceType.length > 100) {
+        return res.status(400).json({ ok: false, error: 'sourceType must be at most 100 characters' });
+      }
+      if (!Array.isArray(rawArticles) || rawArticles.length === 0 || rawArticles.length > 500) {
+        return res.status(400).json({ ok: false, error: 'articles must contain between 1 and 500 items' });
+      }
+
+      const articles = [];
+      for (const item of rawArticles) {
+        const article = String(item?.article || '').trim();
+        const quantity = Number(item?.quantity ?? 1);
+        if (!article || article.length > 120 || !Number.isFinite(quantity) || quantity < 1 || quantity > 1000000) {
+          return res.status(400).json({ ok: false, error: 'Each article needs a valid code and quantity' });
+        }
+        articles.push({ article, quantity });
+      }
 
       const orderRef = db.collection('orders').doc('1c_' + encodeURIComponent(sourceId));
       const existing = await orderRef.get();
@@ -215,7 +243,7 @@ exports.import1COrder = onRequest(
         updatedAt: FieldValue.serverTimestamp(),
         source: '1c',
         externalId: sourceId,
-        sourceType: String(body.sourceType || 'Заказ покупателя')
+        sourceType
       };
 
       if (!existing.exists) {
@@ -227,7 +255,7 @@ exports.import1COrder = onRequest(
           articles,
           source: '1c',
           externalId: sourceId,
-          sourceType: String(body.sourceType || 'Заказ покупателя'),
+          sourceType,
           updatedAt: FieldValue.serverTimestamp()
         });
       }

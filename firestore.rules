@@ -398,13 +398,20 @@ service cloud.firestore {
           'entryId','previousStatus','newStatus'
         ])
         && request.resource.data.actorId == request.auth.uid
-        && request.resource.data.actorRole is string
-        && (!request.resource.data.keys().hasAny(['orderNumber']) || request.resource.data.orderNumber is string)
+        && request.resource.data.actorRole == role()
+        && request.resource.data.actorName is string
+        && request.resource.data.actorName.size() <= 100
         && request.resource.data.action is string
+        && request.resource.data.action.size() > 0
+        && request.resource.data.action.size() <= 120
         && request.resource.data.details is string
-        && (!request.resource.data.keys().hasAny(['entryId']) || request.resource.data.entryId is string)
-        && (!request.resource.data.keys().hasAny(['previousStatus']) || request.resource.data.previousStatus is string)
-        && (!request.resource.data.keys().hasAny(['newStatus']) || request.resource.data.newStatus is string);
+        && request.resource.data.details.size() <= 2000
+        && request.resource.data.createdAt is string
+        && (!request.resource.data.keys().hasAny(['orderId']) || request.resource.data.orderId is string && request.resource.data.orderId.size() <= 128)
+        && (!request.resource.data.keys().hasAny(['orderNumber']) || request.resource.data.orderNumber is string && request.resource.data.orderNumber.size() <= 120)
+        && (!request.resource.data.keys().hasAny(['entryId']) || request.resource.data.entryId is string && request.resource.data.entryId.size() <= 128)
+        && (!request.resource.data.keys().hasAny(['previousStatus']) || request.resource.data.previousStatus is string && request.resource.data.previousStatus.size() <= 100)
+        && (!request.resource.data.keys().hasAny(['newStatus']) || request.resource.data.newStatus is string && request.resource.data.newStatus.size() <= 100);
       allow update, delete: if false;
     }
 

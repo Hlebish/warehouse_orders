@@ -120,15 +120,26 @@ service cloud.firestore {
     }
 
     match /pushQueue/{eventId} {
+      // Client-created notification requests are bounded and limited to active recipients.
       allow create: if activeUser()
         && request.resource.data.keys().hasOnly(['title', 'body', 'authorId', 'orderId', 'target', 'category', 'recipientUserId', 'createdAt', 'sentAt'])
         && request.resource.data.authorId == request.auth.uid
         && request.resource.data.title is string
+        && request.resource.data.title.size() > 0
+        && request.resource.data.title.size() <= 120
         && request.resource.data.body is string
+        && request.resource.data.body.size() <= 500
         && request.resource.data.sentAt == null
         && request.resource.data.target in ['site', 'chat']
         && request.resource.data.category in ['orders', 'chat', 'replies', 'likes']
-        && request.resource.data.recipientUserId is string;
+        && request.resource.data.recipientUserId is string
+        && request.resource.data.recipientUserId.size() <= 128
+        && (request.resource.data.recipientUserId == ''
+          || get(/databases/$(database)/documents/users/$(request.resource.data.recipientUserId)).data.active == true)
+        && (!request.resource.data.keys().hasAny(['orderId']) || request.resource.data.orderId is string)
+        && (!request.resource.data.keys().hasAny(['createdAt'])
+          || request.resource.data.createdAt is string
+          || request.resource.data.createdAt is timestamp);
       allow read, update, delete: if false;
     }
 

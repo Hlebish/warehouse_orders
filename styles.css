@@ -3527,3 +3527,37 @@ body.dark-theme .products-directory-modal #productsDirectoryHint{
  body.dark-theme .products-directory-modal .products-directory-toolbar .search-box{flex-basis:100%!important;min-width:0!important}
  body.dark-theme .products-directory-modal .products-directory-wrap{max-height:58vh!important;min-height:160px!important}
 }
+
+
+/* Warehouse Orders · Primary action button v2 — refined graphite-friendly CTA */
+body.dark-theme .orders-panel .create-order-row .create-order-button,
+body.dark-theme .create-order-row button.create-order-button{
+  display:inline-flex!important;align-items:center!important;justify-content:center!important;
+  gap:10px!important;min-height:44px!important;padding:0 18px!important;
+  border:1px solid #56c58d!important;border-radius:10px!important;
+  background:#35a873!important;color:#071b12!important;
+  font-size:12px!important;font-weight:750!important;letter-spacing:.01em!important;
+  box-shadow:0 3px 10px rgba(35,168,112,.16)!important;
+  transition:background .16s ease,border-color .16s ease,box-shadow .16s ease,transform .16s ease!important;
+}
+body.dark-theme .orders-panel .create-order-row .create-order-button:hover,
+body.dark-theme .create-order-row button.create-order-button:hover{
+  background:#42bb83!important;border-color:#6bd5a0!important;
+  box-shadow:0 5px 14px rgba(35,168,112,.22)!important;transform:translateY(-1px)!important;
+}
+body.dark-theme .orders-panel .create-order-row .create-order-button:active,
+body.dark-theme .create-order-row button.create-order-button:active{transform:translateY(0)!important}
+body.dark-theme .create-order-row .create-order-button>span:first-child{
+  display:grid!important;place-items:center!important;width:22px!important;height:22px!important;
+  border-radius:6px!important;background:rgba(5,48,29,.12)!important;
+  font-size:17px!important;line-height:1!important;
+}
+body.dark-theme .create-order-row .create-order-arrow{font-size:15px!important;margin-left:2px!important;opacity:.7!important}
+body.dark-theme .create-order-row .create-order-spark{
+  width:38px!important;height:38px!important;flex-basis:38px!important;
+  border-radius:10px!important;background:#26352d!important;color:#8bd5a9!important;
+  font-size:20px!important;border:1px solid #344b3d!important;
+}
+@media(max-width:620px){
+ body.dark-theme .create-order-row .create-order-button{width:100%!important;min-height:43px!important}
+}

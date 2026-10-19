@@ -695,7 +695,7 @@ function parseOrderClipboardText(raw){
     const labelIndex=cells.findIndex(x=>/Покупець|Покупатель/i.test(x));
     if(labelIndex<0)continue;
     const labelCell=cells[labelIndex];
-    const inlineValue=labelCell.replace(/^.*?Покупець(?:ля)?\\s*:?\\s*/i,'').trim();
+    const inlineValue=labelCell.replace(/^.*?(?:Покупець|Покупатель)\\s*:?\\s*/i,'').trim();
     if(inlineValue){result.client=inlineValue;break;}
     const nextCell=cells.slice(labelIndex+1).find(x=>x&&!/^(Тел\\.?|Телефон|ІПН|ЄДРПОУ|Адреса)\\s*:/i.test(x));
     if(nextCell){result.client=nextCell.replace(/^\\*+|\\*+$/g,'').trim();break;}

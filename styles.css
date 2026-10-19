@@ -3277,3 +3277,27 @@ body.dark-theme .date-separator.current-date-separator td{
   background:#1b211e!important;border-color:#303b35!important;
 }
 body.dark-theme .date-separator.current-date-separator span{color:#8fbea4!important}
+
+
+/* Warehouse Orders · Graphite finish v7 — compact date separators */
+body.dark-theme .date-separator td{
+  padding:5px 9px 4px!important;
+}
+body.dark-theme .date-separator td::before{
+  margin:0 0 4px!important;
+}
+body.dark-theme .date-separator span{
+  padding:2px 5px!important;font-size:9px!important;line-height:1.25!important;
+}
+body.dark-theme .date-separator.transferred-date-separator td,
+body.dark-theme .date-separator.current-date-separator td{
+  padding:6px 9px!important;
+  line-height:1.3!important;
+}
+body.dark-theme .date-separator.transferred-date-separator span,
+body.dark-theme .date-separator.current-date-separator span{
+  font-size:9px!important;letter-spacing:.025em!important;
+}
+body.dark-theme .orders-panel tbody tr:not(.date-separator) td{
+  padding-top:8px!important;padding-bottom:8px!important;
+}

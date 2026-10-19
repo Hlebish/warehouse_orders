@@ -3219,3 +3219,37 @@ body.dark-theme .orders-panel .status-pill,
 body.dark-theme .orders-panel .status-badge{font-size:10px!important;padding:3px 7px!important}
 body.dark-theme .orders-panel td .comment-count,
 body.dark-theme .orders-panel td .comment-badge{border-radius:6px!important}
+
+
+/* Warehouse Orders · Graphite finish v5 — replace the actual date-separator bars */
+body.dark-theme .date-separator td{
+  padding:10px 10px 7px!important;
+  background:transparent!important;border:0!important;
+}
+body.dark-theme .date-separator td::before{
+  height:1px!important;margin:0 0 7px!important;
+  background:#30383c!important;border-radius:0!important;box-shadow:none!important;
+}
+body.dark-theme .date-separator span{
+  display:inline-block!important;padding:3px 7px!important;
+  background:#1b2022!important;border:1px solid #30383c!important;
+  border-radius:5px!important;color:#9aa6a8!important;
+  font-size:10px!important;font-weight:600!important;letter-spacing:.025em!important;
+}
+body.dark-theme .date-separator.transferred-date-separator td::before,
+body.dark-theme .date-separator.current-date-separator td::before{
+  background:#34423b!important;
+}
+body.dark-theme .date-separator.transferred-date-separator span,
+body.dark-theme .date-separator.current-date-separator span{
+  background:#1b2420!important;border-color:#34423b!important;color:#a8c0b2!important;
+}
+body.dark-theme .orders-panel th,
+body.dark-theme .table-wrap th{
+  color:#aeb8bc!important;border-bottom-color:#30383c!important;
+  text-shadow:none!important;
+}
+body.dark-theme .orders-panel .date-separator+tr td{border-top:0!important}
+@media(max-width:760px){
+ body.dark-theme .date-separator td{padding-top:9px!important}
+}

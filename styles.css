@@ -3656,3 +3656,41 @@ body.dark-theme .stats-grid .stat-card.stat-transferred .stat-label,
 body.dark-theme .stats-grid .stat-card.stat-transferred strong{color:#edf1f3!important}
 body.dark-theme .stats-grid .stat-card.stat-approval:hover{border-color:#574a7c!important}
 body.dark-theme .stats-grid .stat-card.stat-transferred:hover{border-color:#465056!important}
+
+
+/* FIX v4: target actual card border and role buttons, including disabled/locked buttons */
+body.dark-theme .stats-grid .stat-card.stat-created{border-left:3px solid #91a5ba!important}
+body.dark-theme .stats-grid .stat-card.stat-assembled{border-left:3px solid #55c994!important}
+body.dark-theme .stats-grid .stat-card.stat-payment{border-left:3px solid #aab4bb!important}
+body.dark-theme .stats-grid .stat-card.stat-ready{border-left:3px solid #55c994!important}
+body.dark-theme .stats-grid .stat-card.stat-attention{border-left:3px solid #d6ad54!important}
+body.dark-theme .stats-grid .stat-card.stat-approval{border-left:3px solid #a994f2!important}
+body.dark-theme .stats-grid .stat-card.stat-transferred{border-left:3px solid #aab4bb!important}
+body.dark-theme .stats-grid .stat-card.stat-pickup{border-left:3px solid #63c6d4!important}
+
+body.dark-theme .detail-action-roles button.manager-category,
+body.dark-theme .detail-action-roles button.manager-category:disabled,
+body.dark-theme .detail-action-roles button.manager-category.role-action-locked{
+  background:#172b43!important;background-color:#172b43!important;
+  border:1px solid #315f91!important;color:#a9d0ff!important;
+  box-shadow:inset 3px 0 0 #4b9af0!important;opacity:1!important;filter:none!important;
+}
+body.dark-theme .detail-action-roles button.manager-category:hover:not(:disabled){
+  background:#1c3857!important;background-color:#1c3857!important;
+  border-color:#4b8fd1!important;color:#d6e8ff!important;
+}
+body.dark-theme .detail-action-roles button.warehouse-category,
+body.dark-theme .detail-action-roles button.warehouse-category:disabled,
+body.dark-theme .detail-action-roles button.warehouse-category.role-action-locked{
+  background:#193629!important;background-color:#193629!important;
+  border:1px solid #326849!important;color:#a7e6bc!important;
+  box-shadow:inset 3px 0 0 #4bb879!important;opacity:1!important;filter:none!important;
+}
+body.dark-theme .detail-action-roles button.warehouse-category:hover:not(:disabled){
+  background:#214634!important;background-color:#214634!important;
+  border-color:#4a9566!important;color:#d5f6df!important;
+}
+body.dark-theme .detail-action-roles button.manager-category:disabled,
+body.dark-theme .detail-action-roles button.warehouse-category:disabled{
+  opacity:.78!important;cursor:not-allowed!important;
+}

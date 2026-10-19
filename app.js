@@ -97,7 +97,14 @@ document.addEventListener('input',saveUiState,true);
 document.addEventListener('change',saveUiState,true);
 document.addEventListener('click',()=>{setTimeout(saveUiState,0)},true);
 
-const savedTheme=localStorage.getItem('ampTheme')||'light';
+const THEME_MIGRATION_KEY='warehouse_graphite_theme_v1';
+try{
+  if(localStorage.getItem(THEME_MIGRATION_KEY)!=='done'){
+    localStorage.setItem('ampTheme','dark');
+    localStorage.setItem(THEME_MIGRATION_KEY,'done');
+  }
+}catch{}
+const savedTheme=localStorage.getItem('ampTheme')||'dark';
 function applyTheme(theme){
   const next=theme==='dark'?'dark':'light';
   document.body.classList.toggle('dark-theme',next==='dark');

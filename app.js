@@ -39,7 +39,7 @@ const notificationParams=new URLSearchParams(location.search);
 pendingNotificationOrderId=notificationParams.get('order')||'';
 pendingNotificationChat=notificationParams.get('chat')==='1';
 const $=id=>document.getElementById(id), modal=$('modalBackdrop');
-const savedTheme=localStorage.getItem('ampTheme')||'light';
+const savedTheme=localStorage.getItem('ampTheme')||'dark';
 function applyTheme(theme){
   const next=theme==='dark'?'dark':'light';
   document.body.classList.toggle('dark-theme',next==='dark');

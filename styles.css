@@ -2403,3 +2403,178 @@ body.dark-theme .mention-center-button{
 }
 body.dark-theme .mention-center-icon{background:#263b30!important;color:#70d7a0!important}
 body.dark-theme .mention-center-button b{background:#16845b!important;color:#fff!important}
+
+
+/* Warehouse Orders · Graphite Compact UI v1
+   Visual-only layer: keeps existing markup, handlers, Firebase and role logic intact. */
+:root{
+  color-scheme:dark;
+  --wo-bg:#111315;
+  --wo-surface:#191d20;
+  --wo-surface-2:#202529;
+  --wo-surface-hover:#252b2f;
+  --wo-border:#30373b;
+  --wo-text:#e8ecee;
+  --wo-muted:#9aa4a8;
+  --wo-green:#35b879;
+  --wo-green-hover:#279d65;
+  --wo-green-soft:#183328;
+  --wo-amber:#e7ad4e;
+  --wo-red:#ed6b67;
+  --wo-blue:#7aa7f8;
+  --line:var(--wo-border);
+  --muted:var(--wo-muted);
+  --green:var(--wo-green);
+}
+body.dark-theme{
+  background:var(--wo-bg)!important;
+  color:var(--wo-text);
+}
+body.dark-theme .app-shell,
+body.dark-theme .main-area{background:var(--wo-bg)!important;color:var(--wo-text)}
+body.dark-theme .sidebar,
+body.dark-theme .topbar,
+body.dark-theme .orders-panel,
+body.dark-theme .stat-card,
+body.dark-theme .modal,
+body.dark-theme .directory-modal,
+body.dark-theme .products-directory-modal,
+body.dark-theme .panel,
+body.dark-theme .card,
+body.dark-theme .chat-panel{
+  background:var(--wo-surface)!important;
+  color:var(--wo-text);
+  border-color:var(--wo-border)!important;
+  box-shadow:none;
+}
+body.dark-theme .sidebar{padding:18px 12px 12px}
+body.dark-theme .brand{color:var(--wo-text)}
+body.dark-theme .brand-mark{background:var(--wo-green);box-shadow:none;border-radius:9px}
+body.dark-theme .nav{gap:3px;margin-top:28px}
+body.dark-theme .nav-item{height:37px;padding:0 10px;border-radius:7px;color:#a8b1b5}
+body.dark-theme .nav-item:hover{background:var(--wo-surface-hover);color:var(--wo-text)}
+body.dark-theme .nav-item.active{background:var(--wo-green-soft);color:#7be0ad;box-shadow:inset 2px 0 var(--wo-green)}
+body.dark-theme .topbar{height:54px;padding:0 24px;border-bottom:1px solid var(--wo-border)}
+body.dark-theme .content{padding:20px 24px 24px;max-width:1600px}
+body.dark-theme .page-heading{margin-bottom:16px}
+body.dark-theme .page-heading h1{font-size:24px;color:var(--wo-text)}
+body.dark-theme .page-heading p,
+body.dark-theme .panel-heading p,
+body.dark-theme .breadcrumbs,
+body.dark-theme .today,
+body.dark-theme .eyebrow{color:var(--wo-muted)}
+body.dark-theme .breadcrumbs b{color:var(--wo-text)}
+body.dark-theme .stats-grid{gap:8px;margin-bottom:15px}
+body.dark-theme .stat-card{padding:11px 13px;min-height:88px;border-radius:8px}
+body.dark-theme .stat-card strong{font-size:21px;color:var(--wo-text);margin-top:6px}
+body.dark-theme .stat-top{color:var(--wo-muted)}
+body.dark-theme .panel-heading{padding:14px 15px 11px}
+body.dark-theme .panel-heading h2{color:var(--wo-text)}
+body.dark-theme .primary-button,
+body.dark-theme .small-button.good,
+body.dark-theme .buyback-actions button.primary{
+  background:var(--wo-green)!important;color:#071b11!important;border-color:var(--wo-green)!important;box-shadow:none!important
+}
+body.dark-theme .primary-button:hover,
+body.dark-theme .small-button.good:hover{background:var(--wo-green-hover)!important}
+body.dark-theme .secondary-button,
+body.dark-theme .filter-button,
+body.dark-theme .top-history-button,
+body.dark-theme .small-button,
+body.dark-theme .role-choice button{
+  background:var(--wo-surface-2);color:#c6ced1;border-color:var(--wo-border)
+}
+body.dark-theme .top-history-button:hover,
+body.dark-theme .secondary-button:hover,
+body.dark-theme .small-button:hover{background:var(--wo-surface-hover);color:var(--wo-text)}
+body.dark-theme .search-box,
+body.dark-theme input,
+body.dark-theme textarea,
+body.dark-theme select,
+body.dark-theme .field input,
+body.dark-theme .field textarea,
+body.dark-theme .field select,
+body.dark-theme .shipment-day-current input{
+  background:#121517;color:var(--wo-text);border-color:var(--wo-border)
+}
+body.dark-theme input::placeholder,
+body.dark-theme textarea::placeholder{color:#707b80}
+body.dark-theme .table-wrap{background:var(--wo-surface)}
+body.dark-theme thead{background:#202529}
+body.dark-theme th{color:#9ba6aa}
+body.dark-theme td{color:#b5bec1;border-top-color:#292f33}
+body.dark-theme td b,
+body.dark-theme .client-name,
+body.dark-theme .timeline-top b{color:var(--wo-text)}
+body.dark-theme .order-number{color:var(--wo-blue)}
+body.dark-theme .table-footer{border-top-color:var(--wo-border);color:var(--wo-muted)}
+body.dark-theme .status-ready,
+body.dark-theme .status-assembled{background:#193629!important;color:#79dba7!important}
+body.dark-theme .status-question{background:#382d18!important;color:#f0c36e!important}
+body.dark-theme .status-cancel,
+body.dark-theme .small-button.danger{background:#3a2020!important;color:#ff9994!important;border-color:#633331!important}
+body.dark-theme .status-neutral{background:#292f33!important;color:#c0c8cb!important}
+body.dark-theme .status-approval,
+body.dark-theme .status-transferred{background:#2c2840!important;color:#c4b7ff!important}
+body.dark-theme .status-pickup{background:#17353a!important;color:#83d8e0!important}
+body.dark-theme .status-payment{background:#292f33!important;color:#d0d6d8!important;border-color:var(--wo-border)!important}
+body.dark-theme .online-card{border-color:var(--wo-border);background:#15191b}
+body.dark-theme .profile-button{background:transparent;color:var(--wo-text);border-top-color:var(--wo-border)}
+body.dark-theme .avatar{background:#20372b;color:#8be0b2}
+body.dark-theme .modal-head,
+body.dark-theme .modal-foot{border-color:var(--wo-border)}
+body.dark-theme .modal-head h2,
+body.dark-theme .field label,
+body.dark-theme .field-label{color:var(--wo-text)}
+body.dark-theme .timeline-item,
+body.dark-theme .notice-item,
+body.dark-theme .decision-row{background:#15191b;border-color:var(--wo-border);color:#c5cdd0}
+body.dark-theme .timeline-text{color:#d0d6d8}
+body.dark-theme .filter-menu{background:#191d20;border-color:var(--wo-border);box-shadow:0 14px 35px #0008}
+body.dark-theme .filter-menu button{color:#c2cbce}
+body.dark-theme .filter-menu button:hover,
+body.dark-theme .filter-menu button.active{background:#183328;color:#8be0b2}
+body.dark-theme .filter-menu button::before{border-color:#60716a}
+body.dark-theme .demo-banner{background:#2d281a;border-color:#554321;color:#f0c36e}
+body.dark-theme .demo-banner small{color:#d3b77e}
+body.dark-theme .toast{background:#202629;border:1px solid var(--wo-border)}
+body.dark-theme .sidebar-backdrop{background:#0009}
+body.dark-theme .icon-button,
+body.dark-theme .mobile-menu{color:#c2cbce}
+body.dark-theme .top-divider{background:var(--wo-border)}
+/* Compact density: reclaim vertical space without shrinking touch targets on mobile. */
+body.dark-theme .table-wrap table{min-width:690px}
+body.dark-theme th{height:31px;padding-top:0;padding-bottom:0}
+body.dark-theme td{height:48px}
+body.dark-theme .status-pill{padding:4px 7px}
+body.dark-theme .small-button{padding:6px 8px}
+body.dark-theme .detail-actions{gap:5px}
+body.dark-theme .modal-head{padding:18px 20px 13px}
+body.dark-theme .modal-body{padding:16px 20px}
+body.dark-theme .modal-foot{padding:12px 20px 16px}
+body.dark-theme .field{gap:5px;margin-bottom:11px}
+body.dark-theme .field input,
+body.dark-theme .field textarea,
+body.dark-theme .field select{padding:9px 10px}
+@media(max-width:1050px){
+  body.dark-theme .content{padding:17px}
+  body.dark-theme .topbar{padding:0 17px}
+}
+@media(max-width:720px){
+  body.dark-theme .content{padding:13px 10px 20px}
+  body.dark-theme .topbar{height:50px;padding:0 12px}
+  body.dark-theme .page-heading h1{font-size:21px}
+  body.dark-theme .page-heading{gap:10px;align-items:flex-start}
+  body.dark-theme .page-heading p{font-size:11px}
+  body.dark-theme .stats-grid{gap:7px}
+  body.dark-theme .stat-card{padding:10px;min-height:78px}
+  body.dark-theme .stat-card strong{font-size:19px}
+  body.dark-theme .panel-heading{gap:10px;flex-wrap:wrap}
+  body.dark-theme .search-box{max-width:100%}
+  body.dark-theme .modal-head{padding:16px 15px 12px}
+  body.dark-theme .modal-body{padding:14px 15px}
+  body.dark-theme .modal-foot{padding:11px 15px 14px}
+}
+@media(prefers-reduced-motion:reduce){
+  body.dark-theme *,body.dark-theme *::before,body.dark-theme *::after{animation-duration:.01ms!important;transition-duration:.01ms!important;scroll-behavior:auto!important}
+}

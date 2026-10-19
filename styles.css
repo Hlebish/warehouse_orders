@@ -3350,3 +3350,84 @@ body.dark-theme .stats-grid .stat-card:has(.pale-cyan) .stat-icon{background:#19
  body.dark-theme .stats-grid .stat-card .stat-icon,
  body.dark-theme .stats-grid .stat-card .stat-icon-wrap{width:34px!important;height:34px!important;min-width:34px!important}
 }
+
+
+/* Warehouse Orders · Clients directory v1 — clearer controls and readable table */
+body.dark-theme .directory-modal{
+  width:min(1120px,calc(100vw - 32px))!important;
+  max-height:min(88vh,900px)!important;
+  border-radius:14px!important;overflow:hidden!important;
+}
+body.dark-theme .directory-modal .modal-body{
+  padding:18px!important;
+}
+body.dark-theme .directory-modal .directory-toolbar{
+  display:flex!important;align-items:center!important;gap:9px!important;
+  padding:11px!important;margin:0 0 12px!important;
+  border:1px solid #30383c!important;border-radius:10px!important;
+  background:#15191b!important;
+}
+body.dark-theme .directory-modal .directory-toolbar .search-box{
+  flex:1 1 280px!important;width:auto!important;min-width:180px!important;
+  height:39px!important;border:1px solid #343d42!important;border-radius:8px!important;
+  background:#101315!important;padding:0 11px!important;
+}
+body.dark-theme .directory-modal .directory-toolbar .search-box span{
+  color:#849196!important;font-size:16px!important;
+}
+body.dark-theme .directory-modal .directory-toolbar .search-box input{
+  background:transparent!important;border:0!important;outline:0!important;
+  color:#e8ecee!important;font-size:12px!important;
+}
+body.dark-theme .directory-modal .directory-toolbar button{
+  min-height:38px!important;padding:0 12px!important;border-radius:8px!important;
+  white-space:nowrap!important;font-size:11px!important;
+}
+body.dark-theme .directory-modal .directory-table-wrap{
+  max-height:calc(88vh - 235px)!important;min-height:180px!important;
+  overflow:auto!important;border:1px solid #30383c!important;border-radius:10px!important;
+  background:#191d20!important;scrollbar-color:#41494e #191d20;scrollbar-width:thin;
+}
+body.dark-theme .directory-modal .directory-table{
+  min-width:700px!important;border-collapse:separate!important;border-spacing:0!important;
+}
+body.dark-theme .directory-modal .directory-table th{
+  position:sticky!important;top:0!important;z-index:2!important;
+  padding:12px 13px!important;background:#22282b!important;color:#aeb9bd!important;
+  border-bottom:1px solid #3a4448!important;font-size:10px!important;
+  text-transform:uppercase!important;letter-spacing:.04em!important;white-space:nowrap!important;
+}
+body.dark-theme .directory-modal .directory-table td{
+  padding:10px 13px!important;background:#191d20!important;
+  border-bottom:1px solid #2b3236!important;color:#c5cdd0!important;
+  font-size:11px!important;vertical-align:middle!important;
+}
+body.dark-theme .directory-modal .directory-table tbody tr:hover td{
+  background:#22282b!important;
+}
+body.dark-theme .directory-modal .directory-table td:first-child b{
+  color:#e8ecee!important;font-size:12px!important;font-weight:650!important;
+}
+body.dark-theme .directory-modal .directory-table td:last-child{
+  min-width:150px!important;white-space:nowrap!important;
+}
+body.dark-theme .directory-modal .directory-table td:last-child .small-button{
+  min-height:30px!important;padding:0 9px!important;border-radius:7px!important;
+  font-size:10px!important;
+}
+body.dark-theme .directory-modal .directory-help{
+  margin-top:12px!important;padding:10px 12px!important;
+  border:1px solid #30383c!important;border-radius:8px!important;
+  background:#15191b!important;color:#929da1!important;font-size:10px!important;
+}
+body.dark-theme .directory-modal .directory-empty{
+  padding:34px 16px!important;color:#929da1!important;background:#191d20!important;
+}
+@media(max-width:700px){
+ body.dark-theme .directory-modal{width:calc(100vw - 14px)!important;max-height:92vh!important}
+ body.dark-theme .directory-modal .modal-body{padding:10px!important}
+ body.dark-theme .directory-modal .directory-toolbar{padding:8px!important;gap:7px!important}
+ body.dark-theme .directory-modal .directory-toolbar .search-box{flex-basis:100%!important;min-width:0!important}
+ body.dark-theme .directory-modal .directory-toolbar button{flex:1 1 auto!important}
+ body.dark-theme .directory-modal .directory-table-wrap{max-height:58vh!important;min-height:150px!important}
+}

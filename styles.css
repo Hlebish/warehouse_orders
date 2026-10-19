@@ -3168,3 +3168,54 @@ body.dark-theme .nav-item.active{box-shadow:inset 2px 0 #45c889!important}
  body.dark-theme .stats-grid .stat-card{min-height:82px!important;padding:10px!important}
  body.dark-theme .stats-grid .stat-card strong{font-size:21px!important}
 }
+
+
+/* Warehouse Orders · Graphite finish v4 — quieter order table */
+body.dark-theme .orders-panel .table-section-title,
+body.dark-theme .orders-panel .group-heading,
+body.dark-theme .orders-panel tr.table-section-title,
+body.dark-theme .orders-panel tr.group-heading{
+  background:#1d2223!important;color:#9eaaa6!important;
+  border-top:1px solid #30383a!important;border-bottom:1px solid #30383a!important;
+  box-shadow:none!important;
+}
+body.dark-theme .orders-panel .table-section-title td,
+body.dark-theme .orders-panel .group-heading td,
+body.dark-theme .orders-panel tr.table-section-title td,
+body.dark-theme .orders-panel tr.group-heading td{
+  background:transparent!important;color:#9eaaa6!important;
+  padding:8px 10px!important;font-size:10px!important;font-weight:600!important;
+  letter-spacing:.035em!important;border-color:#30383a!important;
+}
+body.dark-theme .orders-panel tbody tr:not(.table-section-title):not(.group-heading) td{
+  border-top:1px solid #252c2f!important;border-bottom:0!important;
+}
+body.dark-theme .orders-panel tbody tr:not(.table-section-title):not(.group-heading):hover td{
+  background:#202629!important;
+}
+body.dark-theme .orders-panel tbody tr:not(.table-section-title):not(.group-heading) td:first-child{
+  border-left:2px solid #30383a!important;
+}
+body.dark-theme .orders-panel tbody tr:not(.table-section-title):not(.group-heading):hover td:first-child{
+  border-left-color:#35b879!important;
+}
+body.dark-theme .orders-panel .table-wrap,
+body.dark-theme .orders-panel .table-scroll,
+body.dark-theme .orders-panel .orders-table-wrap{
+  scrollbar-color:#3a4246 #191d20!important;scrollbar-width:thin!important;
+}
+body.dark-theme .orders-panel .table-wrap::-webkit-scrollbar,
+body.dark-theme .orders-panel .table-scroll::-webkit-scrollbar,
+body.dark-theme .orders-panel .orders-table-wrap::-webkit-scrollbar{height:6px!important}
+body.dark-theme .orders-panel .table-wrap::-webkit-scrollbar-thumb,
+body.dark-theme .orders-panel .table-scroll::-webkit-scrollbar-thumb,
+body.dark-theme .orders-panel .orders-table-wrap::-webkit-scrollbar-thumb{
+  background:#3a4246!important;border:1px solid #191d20!important;border-radius:6px!important;
+}
+body.dark-theme .orders-panel .table-wrap::-webkit-scrollbar-track,
+body.dark-theme .orders-panel .table-scroll::-webkit-scrollbar-track,
+body.dark-theme .orders-panel .orders-table-wrap::-webkit-scrollbar-track{background:#191d20!important}
+body.dark-theme .orders-panel .status-pill,
+body.dark-theme .orders-panel .status-badge{font-size:10px!important;padding:3px 7px!important}
+body.dark-theme .orders-panel td .comment-count,
+body.dark-theme .orders-panel td .comment-badge{border-radius:6px!important}

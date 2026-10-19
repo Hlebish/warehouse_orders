@@ -741,6 +741,7 @@ function parseOrderClipboardText(raw){
   if(!result.articles.length){
     for(const row of rows){
       if(/Разом:|Всього найменувань|У тому числі|Всього до сплати|Итого:/i.test(row.line))break;
+      if(/Замовлення покупця|Заказ покупателя|Покупець:|Покупатель:|Телефон:|Тел\.?\s*:/i.test(row.line))continue;
       if(row.cells.length<3||row.cells.every(x=>/^:?-{2,}:?$/.test(x)||!x))continue;
       const cells=row.cells.map(cleanCell);
       const articleIndexFallback=cells.findIndex(x=>/^(?:[A-ZА-ЯІЇЄ]{1,5}[-_]?)?\d{4,12}[A-ZА-ЯІЇЄ0-9_-]*$/i.test(x));

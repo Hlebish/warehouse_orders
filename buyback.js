@@ -196,7 +196,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!editOverlay.hidden
 $('buybackEditForm').addEventListener('submit',async e=>{
  e.preventDefault();if(!editingBuybackId)return;
  const article=$('buybackEditArticle').value.trim(),quantity=Number($('buybackEditQuantity').value),receivedAt=$('buybackEditDate').value,supplier=$('buybackEditSupplier').value.trim();
- if(!article||article.length>100||!Number.isInteger(quantity)||quantity<1||quantity>100000||!receivedAt||!/^(\\d{4})-(\\d{2})-(\\d{2})$/.test(receivedAt)||Number.isNaN(Date.parse(receivedAt+'T00:00:00'))){showToast('Проверьте артикул, количество и дату.');return}
+ if(!article||article.length>100||!Number.isInteger(quantity)||quantity<1||quantity>100000||!receivedAt||!/^\d{4}-\d{2}-\d{2}$/.test(receivedAt)||Number.isNaN(Date.parse(receivedAt+'T00:00:00'))){showToast('Проверьте артикул, количество и дату.');return}
  const save=$('buybackEditSave');save.disabled=true;save.textContent='Сохраняю…';
  try{await updateDoc(doc(db,'buybackItems',editingBuybackId),{article,quantity,receivedAt,supplier,updatedAt:serverTimestamp()});closeBuybackEditor();showToast('Изменения сохранены.');}
  catch(err){console.error(err);showToast('Не удалось сохранить изменения: '+(err.code||'проверьте доступ'));}

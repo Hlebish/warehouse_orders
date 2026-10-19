@@ -705,36 +705,56 @@ function parseOrderClipboardText(raw){
     if(clientMatch)result.client=clientMatch[1].trim();
   }
 
-  const isArticleHeader=x=>/артикул|код\s*(?:товару|товара)?|article/i.test(x);
-  const isQuantityHeader=x=>/кількість|кол-?во|количество|quantity/i.test(x);
-  const headerIndex=lines.findIndex(line=>{
-    if(!line.includes('|'))return false;
-    const cells=line.split('|').map(x=>x.replace(/[*]/g,'').trim());
-    return cells.some(isArticleHeader)&&cells.some(isQuantityHeader);
-  });
-  if(headerIndex>=0){
-    const header=lines[headerIndex].split('|').map(x=>x.replace(/[*]/g,'').trim());
-    const articleIndex=header.findIndex(isArticleHeader);
-    const quantityIndex=header.findIndex(isQuantityHeader);
-    for(let i=headerIndex+1;i<lines.length;i++){
-      const line=lines[i];
-      if(/Разом:|Всього найменувань|У тому числі|Всього до сплати|Итого:/i.test(line))break;
-      if(!line.includes('|')||/^\s*\|?\s*:?-{2,}/.test(line))continue;
-      const cells=line.split('|').map(x=>x.replace(/[*]/g,'').trim());
-      const article=articleIndex>=0?String(cells[articleIndex]||'').trim():'';
-      if(!article||/^(Артикул|Код|товар|кількість|кол-?во|количество)$/i.test(article))continue;
-      const qCell=quantityIndex>=0?String(cells[quantityIndex]||'').trim():'';
+  const cleanCell=x=>String(x||'').replace(/[*]/g,'').trim();
+  const splitRow=line=>{
+    if(line.includes('|'))return line.split('|').map(cleanCell);
+    if(line.includes('\t'))return line.split('\t').map(cleanCell);
+    return null;
+  };
+  const isArticleHeader=x=>/артикул|код\s*(?:товару|товара|запчасти)?|article/i.test(x);
+  const isQuantityHeader=x=>/кількість|кол-?\s*во|количество|quantity|к-сть/i.test(x);
+  const rows=lines.map(line=>({line,cells:splitRow(line)})).filter(row=>row.cells);
+  let headerRow=null, articleIndex=-1, quantityIndex=-1;
+  for(const row of rows){
+    const a=row.cells.findIndex(isArticleHeader);
+    const q=row.cells.findIndex(isQuantityHeader);
+    if(a>=0&&q>=0){headerRow=row;articleIndex=a;quantityIndex=q;break;}
+  }
+  if(headerRow){
+    let passedHeader=false;
+    for(const row of rows){
+      if(row===headerRow){passedHeader=true;continue;}
+      if(!passedHeader)continue;
+      if(/Разом:|Всього найменувань|У тому числі|Всього до сплати|Итого:|Разом по/i.test(row.line))break;
+      if(row.cells.every(x=>/^:?-{2,}:?$/.test(x)||!x))continue;
+      const article=cleanCell(row.cells[articleIndex]);
+      if(!article||isArticleHeader(article)||/^(товар|кількість|кол-?\s*во|количество)$/i.test(article))continue;
+      const qCell=cleanCell(row.cells[quantityIndex]);
       const qMatch=qCell.match(/\d+(?:[.,]\d+)?/);
       const quantity=Math.max(1,parseInt(qMatch?qMatch[0].replace(',','.'): '1',10)||1);
       result.articles.push({article,quantity});
     }
   }
-  const unique=new Map();
-  for(const item of result.articles){
-    const key=item.article.toLowerCase();
-    unique.set(key,{article:item.article,quantity:(unique.get(key)?.quantity||0)+item.quantity});
+
+  // Fallback for copied invoices where the article column has no recognizable heading.
+  // Keep each source row as a separate order position; never merge rows by article.
+  if(!result.articles.length){
+    for(const row of rows){
+      if(/Разом:|Всього найменувань|У тому числі|Всього до сплати|Итого:/i.test(row.line))break;
+      if(row.cells.length<3||row.cells.every(x=>/^:?-{2,}:?$/.test(x)||!x))continue;
+      const cells=row.cells.map(cleanCell);
+      const articleIndexFallback=cells.findIndex(x=>/^(?:[A-ZА-ЯІЇЄ]{1,5}[-_]?)?\d{4,12}[A-ZА-ЯІЇЄ0-9_-]*$/i.test(x));
+      if(articleIndexFallback<0)continue;
+      const article=cells[articleIndexFallback];
+      // Quantity is usually the first small integer after the article/product columns,
+      // while prices/totals are commonly larger numeric values.
+      const later=cells.slice(articleIndexFallback+1);
+      const quantityCell=later.find(x=>/^\d+(?:[.,]\d+)?$/.test(x)&&Number(x.replace(',','.'))>0&&Number(x.replace(',','.'))<=999);
+      const quantity=Math.max(1,parseInt(quantityCell||'1',10)||1);
+      result.articles.push({article,quantity});
+    }
   }
-  result.articles=[...unique.values()].slice(0,100);
+  result.articles=result.articles.slice(0,100);
   return result;
 }
 function applyParsedOrderData(parsed){

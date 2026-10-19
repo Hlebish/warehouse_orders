@@ -39,6 +39,11 @@ const notificationParams=new URLSearchParams(location.search);
 pendingNotificationOrderId=notificationParams.get('order')||'';
 pendingNotificationChat=notificationParams.get('chat')==='1';
 const $=id=>document.getElementById(id), modal=$('modalBackdrop');
+const THEME_MIGRATION_KEY='warehouse_graphite_theme_v1';
+if(localStorage.getItem(THEME_MIGRATION_KEY)!=='done'){
+  localStorage.setItem('ampTheme','dark');
+  localStorage.setItem(THEME_MIGRATION_KEY,'done');
+}
 const savedTheme=localStorage.getItem('ampTheme')||'dark';
 function applyTheme(theme){
   const next=theme==='dark'?'dark':'light';

@@ -942,22 +942,53 @@ async function deleteClient(id){
   }catch(err){console.error('Ошибка удаления клиента',err);toast('Не удалось удалить клиента: '+(err?.code||err?.message||'нет доступа'))}
 }
 function importClientsExcel(file){
-  if(!file||!window.XLSX)return;
+  if(!file)return;
+  if(!window.XLSX){toast('Не удалось загрузить модуль Excel. Обновите страницу и попробуйте снова.');return;}
   const reader=new FileReader();
+  reader.onerror=()=>toast('Не удалось прочитать выбранный Excel-файл.');
   reader.onload=async e=>{
     try{
-      const wb=window.XLSX.read(new Uint8Array(e.target.result),{type:'array'}),rows=window.XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''});
-      const batchSize=450;let count=0,batch=writeBatch(db),n=0;
-      const key=(row,names)=>{const k=Object.keys(row).find(x=>names.includes(String(x).trim().toLocaleLowerCase('ru')));return k?String(row[k]??'').trim():''};
+      const wb=window.XLSX.read(new Uint8Array(e.target.result),{type:'array'});
+      const sheet=wb.Sheets[wb.SheetNames[0]];
+      if(!sheet)throw new Error('В Excel-файле нет листов.');
+      const rows=window.XLSX.utils.sheet_to_json(sheet,{defval:'',raw:false});
+      if(!rows.length)throw new Error('На первом листе нет строк с клиентами.');
+      const normalize=s=>String(s??'').trim().toLocaleLowerCase('ru').replace(/[\s_\-./]+/g,'');
+      const aliases={
+        name:['имя','клиент','клиентфио','фио','имяклиента','названиеклиента','name','client','customer'],
+        phone:['телефон','номер телефона','номертелефона','тел','мобильный','мобильныйтелефон','phone','telephone','mobile'],
+        address:['адрес','адресклиента','почта','почтовыйадрес','address','customeraddress']
+      };
+      const get=(row,field)=>{
+        const keys=Object.keys(row);
+        const found=keys.find(k=>aliases[field].some(alias=>normalize(alias)===normalize(k)));
+        return found===undefined?'':String(row[found]??'').trim();
+      };
+      const imported=[];
       for(const row of rows){
-        const name=key(row,['имя','клиент','клиент фио','name','client']);if(!name)continue;
-        const data={name,phone:key(row,['телефон','phone','тел']),email:key(row,['адрес','address','адрес клиента']),comment:key(row,['комментарий','comment','примечание']),createdAt:isoNow(),createdBy:signedInUser.uid,updatedAt:isoNow(),updatedBy:signedInUser.uid};
-        batch.set(doc(db,'clients',crypto.randomUUID()),data);n++;count++;
-        if(n>=batchSize){await batch.commit();batch=writeBatch(db);n=0;}
+        const name=get(row,'name');
+        if(!name)continue;
+        imported.push({name,phone:get(row,'phone'),address:get(row,'address'),comment:''});
       }
-      if(n)await batch.commit();
-      toast('Импортировано клиентов: '+count);openClientsDirectory();
-    }catch(err){console.error(err);toast('Ошибка Excel: '+(err?.message||'не удалось прочитать файл'))}
+      if(!imported.length)throw new Error('Не найдена колонка с именем клиента. Подойдут «Имя клиента», «Клиент» или «Имя».');
+      const stamp=isoNow();
+      const batchSize=400;
+      let count=0,batch=writeBatch(db),pending=0;
+      for(const client of imported){
+        batch.set(doc(db,'clients',crypto.randomUUID()),{
+          ...client,createdAt:stamp,createdBy:signedInUser.uid,
+          updatedAt:stamp,updatedBy:signedInUser.uid
+        });
+        pending++;count++;
+        if(pending>=batchSize){await batch.commit();batch=writeBatch(db);pending=0;}
+      }
+      if(pending)await batch.commit();
+      toast('Импортировано клиентов: '+count+'. Старые записи сохранены; проверьте дубли, если импортируете файл повторно.');
+      await openClientsDirectory();
+    }catch(err){
+      console.error('Ошибка импорта клиентов из Excel',err);
+      toast('Не удалось импортировать клиентов: '+(err?.message||err?.code||'ошибка Excel'));
+    }
   };
   reader.readAsArrayBuffer(file);
 }

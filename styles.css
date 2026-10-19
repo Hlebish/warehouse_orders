@@ -3694,3 +3694,27 @@ body.dark-theme .detail-action-roles button.manager-category:disabled,
 body.dark-theme .detail-action-roles button.warehouse-category:disabled{
   opacity:.78!important;cursor:not-allowed!important;
 }
+
+
+/* FIX v5: remove duplicate accent source — use one inset stripe only */
+body.dark-theme .stats-grid .stat-card{
+  border-left:1px solid #30383c!important;
+}
+body.dark-theme .stats-grid .stat-card::before{
+  content:""!important;
+  position:absolute!important;
+  inset:0 auto 0 0!important;
+  width:3px!important;
+  border:0!important;
+  border-radius:12px 0 0 12px!important;
+  opacity:1!important;
+  z-index:1!important;
+}
+body.dark-theme .stats-grid .stat-card.stat-created::before{background:#91a5ba!important}
+body.dark-theme .stats-grid .stat-card.stat-assembled::before{background:#55c994!important}
+body.dark-theme .stats-grid .stat-card.stat-payment::before{background:#aab4bb!important}
+body.dark-theme .stats-grid .stat-card.stat-ready::before{background:#55c994!important}
+body.dark-theme .stats-grid .stat-card.stat-attention::before{background:#d6ad54!important}
+body.dark-theme .stats-grid .stat-card.stat-approval::before{background:#a994f2!important}
+body.dark-theme .stats-grid .stat-card.stat-transferred::before{background:#aab4bb!important}
+body.dark-theme .stats-grid .stat-card.stat-pickup::before{background:#63c6d4!important}

@@ -105,7 +105,7 @@ function render(){
   const cls=isExpired?'expired':days>=10?'critical':days>=6?'warn':'';
   const status=isExpired?'ПРОСРОЧЕН':item.status==='active'?(days>=10?'Срок подходит к концу':days>=6?'Срок возврата приближается':days>=3?'Товар залежался на складе':'Срок идёт'):(item.status==='returned'?'Возвращён':item.status==='sold'?'Продан':item.status==='cancelled'?'Отменён':'');
   const bar=Math.max(0,Math.min(100,days/14*100));
-  const actions=(item.status==='active'||isExpired)?'<button class="primary" data-set-status="returned" data-id="'+item.id+'">Возвращён</button><button class="primary" data-set-status="sold" data-id="'+item.id+'">Продан</button><button data-set-status="cancelled" data-id="'+item.id+'">Отменить</button>':'<button data-set-status="active" data-id="'+item.id+'">Вернуть в работу</button>';
+  const actions='<button class="primary" data-edit-buyback="'+item.id+'">Редактировать</button>'+((item.status==='active'||isExpired)?'<button class="primary" data-set-status="returned" data-id="'+item.id+'">Возвращён</button><button class="primary" data-set-status="sold" data-id="'+item.id+'">Продан</button><button data-set-status="cancelled" data-id="'+item.id+'">Отменить</button>':'<button data-set-status="active" data-id="'+item.id+'">Вернуть в работу</button>');
   return `<article class="buyback-card ${cls}"><div><div class="buyback-article">${escapeHtml(item.article)} <span style="font-weight:500;color:#8a94a1">× ${item.quantity}</span></div><div class="buyback-meta">${item.supplier?'<b>Поставщик:</b> '+escapeHtml(item.supplier)+' · ':''}Принят: ${escapeHtml(item.receivedAt)} · Последний день срока: <b>${escapeHtml(deadline(item).toLocaleDateString('ru-RU',{timeZone:'UTC'}))}</b> · Прошло дней: <b>${Math.max(0,days)}</b> · ${isExpired?'Просрочено на '+Math.max(0,days-14)+' дн.':item.status==='active'?'Осталось дней: '+Math.max(0,left):'14-дневный срок остановлен'}</div><div class="buyback-progress"><span style="width:${bar}%"></span></div><div class="buyback-status">${status}</div></div><div class="buyback-actions">${actions}${(item.status==='active'||isExpired)?'<button data-set-status="returned" data-id="'+item.id+'" data-partial="true">По количеству…</button>':''}</div></article>`;
  }).join('');
 
@@ -128,6 +128,21 @@ $('buybackForm').addEventListener('submit',async e=>{
  finally{submit.disabled=false}
 });
 overlay.addEventListener('click',async e=>{
+ const editBtn=e.target.closest('[data-edit-buyback]');
+ if(editBtn){
+  const item=items.find(x=>x.id===editBtn.dataset.editBuyback);if(!item)return;
+  const article=window.prompt('Артикул:',item.article||'');if(article===null)return;
+  const quantityText=window.prompt('Количество:',String(item.quantity??1));if(quantityText===null)return;
+  const receivedAt=window.prompt('Дата приёма (ГГГГ-ММ-ДД):',item.receivedAt||'');if(receivedAt===null)return;
+  const supplier=window.prompt('Поставщик:',item.supplier||'');if(supplier===null)return;
+  const cleanArticle=article.trim(),cleanSupplier=supplier.trim(),qty=Number(quantityText);
+  if(!cleanArticle||cleanArticle.length>100||!Number.isInteger(qty)||qty<1||qty>100000||!/^\\d{4}-\\d{2}-\\d{2}$/.test(receivedAt)||Number.isNaN(Date.parse(receivedAt+'T00:00:00'))){showToast('Проверьте артикул, количество и дату в формате ГГГГ-ММ-ДД.');return}
+  editBtn.disabled=true;
+  try{await updateDoc(doc(db,'buybackItems',item.id),{article:cleanArticle,quantity:qty,receivedAt,supplier:cleanSupplier,updatedAt:serverTimestamp()});showToast('Позиция перекупного товара обновлена.');}
+  catch(err){console.error(err);showToast('Не удалось сохранить изменения: '+(err.code||'проверьте доступ'));}
+  finally{editBtn.disabled=false}
+  return;
+ }
  const btn=e.target.closest('[data-set-status]');if(!btn)return;
  try{
   const nextStatus=btn.dataset.setStatus,item=items.find(x=>x.id===btn.dataset.id);

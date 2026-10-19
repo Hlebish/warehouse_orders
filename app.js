@@ -953,7 +953,8 @@ function importClientsExcel(file){
       if(!sheet)throw new Error('В Excel-файле нет листов.');
       const rows=window.XLSX.utils.sheet_to_json(sheet,{defval:'',raw:false});
       if(!rows.length)throw new Error('На первом листе нет строк с клиентами.');
-      const normalize=s=>String(s??'').trim().toLocaleLowerCase('ru').replace(/[\s_\-./]+/g,'');
+      const normalize=s=>String(s??'').trim().replace(/\s+/g,' ').toLocaleLowerCase('ru').replace(/ё/g,'е');
+      const headerKey=s=>normalize(s).replace(/[\s_\-./]+/g,'');
       const aliases={
         name:['имя','клиент','клиентфио','фио','имяклиента','названиеклиента','name','client','customer'],
         phone:['телефон','номер телефона','номертелефона','тел','мобильный','мобильныйтелефон','phone','telephone','mobile'],
@@ -961,29 +962,68 @@ function importClientsExcel(file){
       };
       const get=(row,field)=>{
         const keys=Object.keys(row);
-        const found=keys.find(k=>aliases[field].some(alias=>normalize(alias)===normalize(k)));
+        const found=keys.find(k=>aliases[field].some(alias=>headerKey(alias)===headerKey(k)));
         return found===undefined?'':String(row[found]??'').trim();
       };
-      const imported=[];
+      const importedByName=new Map();
       for(const row of rows){
         const name=get(row,'name');
         if(!name)continue;
-        imported.push({name,phone:get(row,'phone'),address:get(row,'address'),comment:''});
+        const key=normalize(name);
+        if(!importedByName.has(key))importedByName.set(key,{name:name.replace(/\s+/g,' ').trim(),phone:get(row,'phone'),address:get(row,'address')});
+        else{
+          const current=importedByName.get(key);
+          const phone=get(row,'phone'),address=get(row,'address');
+          if(phone)current.phone=phone;
+          if(address)current.address=address;
+        }
       }
+      const imported=[...importedByName.entries()];
       if(!imported.length)throw new Error('Не найдена колонка с именем клиента. Подойдут «Имя клиента», «Клиент» или «Имя».');
-      const stamp=isoNow();
-      const batchSize=400;
-      let count=0,batch=writeBatch(db),pending=0;
-      for(const client of imported){
-        batch.set(doc(db,'clients',crypto.randomUUID()),{
-          ...client,createdAt:stamp,createdBy:signedInUser.uid,
-          updatedAt:stamp,updatedBy:signedInUser.uid
-        });
-        pending++;count++;
-        if(pending>=batchSize){await batch.commit();batch=writeBatch(db);pending=0;}
+
+      const existingSnap=await getDocs(collection(db,'clients'));
+      const existingByName=new Map();
+      existingSnap.docs.forEach(d=>{
+        const data=d.data(),key=normalize(data.name);
+        if(!key)return;
+        if(!existingByName.has(key))existingByName.set(key,[]);
+        existingByName.get(key).push(d);
+      });
+      const stamp=isoNow(),operations=[];
+      let added=0,updated=0,hiddenDuplicates=0;
+      for(const [key,client] of imported){
+        const matches=existingByName.get(key)||[];
+        if(!matches.length){
+          operations.push({type:'set',ref:doc(db,'clients',crypto.randomUUID()),data:{
+            name:client.name,phone:client.phone,address:client.address,comment:'',
+            createdAt:stamp,createdBy:signedInUser.uid,updatedAt:stamp,updatedBy:signedInUser.uid
+          }});
+          added++;
+          continue;
+        }
+        const primary=matches.find(d=>!d.data().hiddenFromDirectory)||matches[0];
+        operations.push({type:'update',ref:primary.ref,data:{
+          name:client.name,phone:client.phone,address:client.address,
+          hiddenFromDirectory:false,updatedAt:stamp,updatedBy:signedInUser.uid
+        }});
+        updated++;
+        for(const duplicate of matches){
+          if(duplicate.id===primary.id||duplicate.data().hiddenFromDirectory)continue;
+          operations.push({type:'update',ref:duplicate.ref,data:{
+            hiddenFromDirectory:true,updatedAt:stamp,updatedBy:signedInUser.uid
+          }});
+          hiddenDuplicates++;
+        }
       }
-      if(pending)await batch.commit();
-      toast('Импортировано клиентов: '+count+'. Старые записи сохранены; проверьте дубли, если импортируете файл повторно.');
+      for(let i=0;i<operations.length;i+=400){
+        const batch=writeBatch(db);
+        operations.slice(i,i+400).forEach(op=>{
+          if(op.type==='set')batch.set(op.ref,op.data);
+          else batch.update(op.ref,op.data);
+        });
+        await batch.commit();
+      }
+      toast('Excel обработан: добавлено '+added+', обновлено '+updated+(hiddenDuplicates? ', скрыто повторов: '+hiddenDuplicates:'')+'. Заказы не удалялись.');
       await openClientsDirectory();
     }catch(err){
       console.error('Ошибка импорта клиентов из Excel',err);

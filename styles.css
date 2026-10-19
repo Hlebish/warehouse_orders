@@ -2554,6 +2554,7 @@ body:not(.dark-theme) .shipment-order-card.shipment-order-complete .shipment-ord
 .directory-toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
 .directory-toolbar .search-box{flex:1 1 260px;width:auto}
 .directory-table-wrap{max-height:58vh;overflow:auto;border:1px solid var(--line);border-radius:9px}
+.directory-help{margin:10px 0 0;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--panel,#f8fafb);color:var(--muted);font-size:11px;line-height:1.5;overflow-wrap:anywhere}
 .directory-table{width:100%;min-width:620px;border-collapse:collapse}
 .directory-table th,.directory-table td{padding:9px 11px;height:auto}
 .directory-table th{position:sticky;top:0;background:#fafbfc;z-index:1}
@@ -2689,7 +2690,7 @@ body.dark-theme .client-suggestions[hidden]{display:none!important}
   .directory-modal .directory-table td b{overflow-wrap:anywhere}
   .directory-modal .field-hint{font-size:11px;line-height:1.45;margin-top:10px}
   /* Client rows become compact cards instead of a five-column table. */
-  .directory-modal:not(.products-directory-modal) .directory-table-wrap{max-height:52dvh;overflow:visible}
+  .directory-modal:not(.products-directory-modal) .directory-table-wrap{max-height:52dvh;overflow:auto}
   .directory-modal:not(.products-directory-modal) .directory-table,
   .directory-modal:not(.products-directory-modal) .directory-table tbody{display:block;width:100%;min-width:0}
   .directory-modal:not(.products-directory-modal) .directory-table thead{display:none}

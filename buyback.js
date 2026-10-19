@@ -62,6 +62,58 @@ style.textContent = `
 .buyback-empty{color:#a0a0a0;border-color:#414141;background:#191919}
 .buyback-nav-alert{background:#c83e3e;color:#fff}
 @media(max-width:700px){.buyback-window{max-height:calc(100dvh - 20px);border-radius:14px}.buyback-form{grid-template-columns:1fr 1fr}.buyback-field input,.buyback-field select{font-size:16px}.buyback-add{min-height:42px}}
+
+/* Buyback workspace refresh */
+.buyback-window{width:min(1080px,100%);border-radius:20px;overflow:auto}
+.buyback-head{padding:24px 28px;background:linear-gradient(120deg,#1a2817,#202820);align-items:center}
+.buyback-head .eyebrow{display:inline-block;font-size:10px;letter-spacing:1.6px;font-weight:900;color:#a8d66a}
+.buyback-head h2{font-size:26px;letter-spacing:-.6px;margin:8px 0 6px}
+.buyback-head p{font-size:12px;line-height:1.5;max-width:620px}
+.buyback-body{padding:22px 28px 28px}
+.buyback-form{grid-template-columns:minmax(180px,2fr) minmax(90px,.7fr) minmax(145px,1fr) minmax(150px,1.2fr) auto;gap:12px;padding:18px;background:linear-gradient(135deg,#1c211b,#1a1c19);border-color:#343b30;border-radius:14px}
+.buyback-field{gap:8px;font-size:11px;letter-spacing:.2px}
+.buyback-field input,.buyback-field select{min-height:42px;padding:10px 12px;border-radius:9px;font-size:13px;transition:border-color .15s,box-shadow .15s}
+.buyback-add{min-height:42px;border-radius:9px;padding:0 17px;font-size:12px;box-shadow:0 5px 14px #66990026;transition:transform .15s,filter .15s}
+.buyback-add:hover{filter:brightness(1.1);transform:translateY(-1px)}
+.buyback-summary{gap:9px;margin:0 0 16px}
+.buyback-chip{padding:9px 12px;border-radius:9px;font-size:11px}
+#buybackSummary .buyback-chip{background:#20261d;border-color:#343d2d;color:#c4cbbd}
+#buybackSummary .buyback-chip b{color:#f1f5eb;font-size:13px;margin-left:4px}
+.buyback-summary:has(button[data-status]){padding:5px;background:#171a16;border:1px solid #30362d;border-radius:12px;width:max-content;max-width:100%}
+.buyback-chip[data-status]{padding:9px 13px;border:1px solid transparent;background:transparent;color:#aeb5a8;font-size:11px;font-weight:800;transition:background .15s,color .15s,border-color .15s}
+.buyback-chip[data-status].active,.buyback-chip[data-status][aria-pressed="true"]{background:#2a381b;border-color:#526d2e;color:#d7f3a5}
+.buyback-list{gap:12px}
+.buyback-card{position:relative;padding:18px 20px;border-radius:14px;grid-template-columns:minmax(0,1fr) auto;gap:20px;background:linear-gradient(110deg,#1b1e1a,#191b19);border-color:#30372f;box-shadow:0 4px 16px #00000012;transition:border-color .16s,transform .16s,box-shadow .16s}
+.buyback-card:hover{border-color:#526347;box-shadow:0 8px 22px #00000020;transform:translateY(-1px)}
+.buyback-card.warn{background:linear-gradient(110deg,#272318,#1c1b17);border-color:#5a4928}
+.buyback-card.critical{background:linear-gradient(110deg,#2b1d1d,#1e1919);border-color:#633535}
+.buyback-card.expired{background:linear-gradient(110deg,#301b1b,#211717);border-color:#713737}
+.buyback-article{font-size:18px;letter-spacing:.1px;line-height:1.4}
+.buyback-meta{font-size:12px;line-height:1.85;margin-top:8px;color:#a9b0a4;overflow-wrap:anywhere}
+.buyback-meta b{color:#e4eadc}
+.buyback-progress{max-width:none;height:5px;margin-top:13px;background:#30352e}
+.buyback-status{display:inline-flex;align-items:center;margin-top:11px;padding:5px 9px;border-radius:7px;background:#252b22;color:#c6d7b5;font-size:10px;letter-spacing:.3px;font-weight:900}
+.buyback-card.warn .buyback-status{background:#3b301c;color:#f0ce7d}
+.buyback-card.critical .buyback-status,.buyback-card.expired .buyback-status{background:#452323;color:#ffb1ab}
+.buyback-actions{max-width:250px;align-content:center;gap:7px}
+.buyback-actions button{min-height:34px;padding:8px 11px;border-radius:8px;font-size:11px;font-weight:800;white-space:nowrap;transition:filter .15s,transform .15s}
+.buyback-actions button:hover{filter:brightness(1.13);transform:translateY(-1px)}
+.buyback-actions button.primary{background:#29351d;border-color:#465c2b;color:#d5edae}
+.buyback-actions button.danger{background:#351e1e;color:#ffb8b3;border-color:#633737}
+.buyback-empty{padding:42px 20px;background:#191c18;border-color:#394035;border-radius:14px;font-size:13px}
+.buyback-edit-window{width:min(620px,100%);overflow:hidden}
+.buyback-edit-window .buyback-head{background:linear-gradient(120deg,#24351b,#1b2419)}
+#buybackEditForm{display:flex;flex-direction:column}
+.buyback-edit-grid{display:grid;grid-template-columns:1fr 1fr;gap:17px}
+.buyback-edit-grid .buyback-field:first-child,.buyback-edit-grid .buyback-field:last-child{grid-column:1/-1}
+.buyback-edit-note{margin:18px 0 0;padding:12px 14px;border:1px solid #3b4730;border-radius:10px;background:#20271b;color:#b8c5a9;font-size:12px;line-height:1.55}
+.buyback-edit-footer{display:flex;justify-content:flex-end;gap:9px;padding:16px 24px 22px;border-top:1px solid #30352e;background:#171a16}
+.buyback-edit-footer button{min-height:42px;padding:0 17px;border-radius:9px;font-size:12px;font-weight:800}
+.buyback-cancel-edit{background:#252825;border:1px solid #414640;color:#d6dbd2}
+.buyback-edit-overlay{z-index:60;backdrop-filter:blur(7px)}
+.buyback-edit-overlay[hidden]{display:none}
+@media(max-width:900px){.buyback-form{grid-template-columns:repeat(2,minmax(0,1fr))}.buyback-add{width:100%}.buyback-card{grid-template-columns:minmax(0,1fr)}.buyback-actions{max-width:none;justify-content:flex-start;padding-top:4px}}
+@media(max-width:700px){.buyback-window{border-radius:16px}.buyback-head{padding:18px 18px 16px}.buyback-head h2{font-size:22px}.buyback-body{padding:16px 14px 20px}.buyback-form{grid-template-columns:1fr 1fr;gap:11px;padding:13px}.buyback-form .buyback-field:first-child,.buyback-form .buyback-field:last-of-type{grid-column:1/-1}.buyback-summary:has(button[data-status]){width:100%;display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.buyback-chip[data-status]{width:100%}.buyback-card{padding:15px 14px;gap:10px}.buyback-article{font-size:16px}.buyback-meta{font-size:11px}.buyback-actions button{flex:1 1 auto}.buyback-edit-grid{grid-template-columns:1fr;gap:13px}.buyback-edit-grid .buyback-field:first-child,.buyback-edit-grid .buyback-field:last-child{grid-column:auto}.buyback-edit-footer{padding:13px 14px calc(14px + env(safe-area-inset-bottom))}.buyback-edit-footer button{flex:1}.buyback-edit-window{max-height:calc(100dvh - 20px)}}
 `;
 document.head.append(style);
 const overlay=document.createElement('div');
@@ -81,6 +133,26 @@ overlay.className='buyback-overlay';overlay.hidden=true;overlay.innerHTML=`
 <div class="buyback-list" id="buybackList"><div class="buyback-empty">Загружаю перекупной товар…</div></div>
 </div></section>`;
 document.body.append(overlay);
+const editOverlay=document.createElement('div');
+editOverlay.className='buyback-overlay buyback-edit-overlay';
+editOverlay.hidden=true;
+editOverlay.innerHTML=`
+<section class="buyback-window buyback-edit-window" role="dialog" aria-modal="true" aria-labelledby="buybackEditTitle">
+<header class="buyback-head"><div><span class="eyebrow">ИЗМЕНЕНИЕ ЗАПИСИ</span><h2 id="buybackEditTitle">Редактирование товара</h2><p>Изменения сохранятся в существующей записи.</p></div><button type="button" class="close-button" data-close-buyback-edit aria-label="Закрыть">×</button></header>
+<form id="buybackEditForm">
+<div class="buyback-body">
+<div class="buyback-edit-grid">
+<label class="buyback-field">Артикул<input id="buybackEditArticle" required maxlength="100" autocomplete="off" placeholder="Например, APAU1603"></label>
+<label class="buyback-field">Количество<input id="buybackEditQuantity" required type="number" min="1" max="100000" step="1"></label>
+<label class="buyback-field">Дата приёмки<input id="buybackEditDate" required type="date"></label>
+<label class="buyback-field">Поставщик<input id="buybackEditSupplier" maxlength="160" autocomplete="off" placeholder="Название поставщика"></label>
+</div>
+<p class="buyback-edit-note">Последний день срока и оставшиеся дни пересчитаются автоматически по дате приёмки.</p>
+</div>
+<footer class="buyback-edit-footer"><button type="button" class="buyback-cancel-edit" data-close-buyback-edit>Отмена</button><button type="submit" class="buyback-add" id="buybackEditSave">Сохранить изменения</button></footer>
+</form></section>`;
+document.body.append(editOverlay);
+let editingBuybackId=null;
 const nav=$('buybackNavButton');
 const dateInput=$('buybackDate');
 dateInput.value=(()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')})();
@@ -118,6 +190,18 @@ $('buybackClose').addEventListener('click',close);
 overlay.addEventListener('click',e=>{if(e.target===overlay)close()});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!overlay.hidden)close()});
 overlay.querySelectorAll('[data-status]').forEach(btn=>btn.addEventListener('click',()=>{selectedStatus=btn.dataset.status;render()}));
+function closeBuybackEditor(){editOverlay.hidden=true;editingBuybackId=null}
+editOverlay.addEventListener('click',e=>{if(e.target===editOverlay||e.target.closest('[data-close-buyback-edit]'))closeBuybackEditor()});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!editOverlay.hidden)closeBuybackEditor()});
+$('buybackEditForm').addEventListener('submit',async e=>{
+ e.preventDefault();if(!editingBuybackId)return;
+ const article=$('buybackEditArticle').value.trim(),quantity=Number($('buybackEditQuantity').value),receivedAt=$('buybackEditDate').value,supplier=$('buybackEditSupplier').value.trim();
+ if(!article||article.length>100||!Number.isInteger(quantity)||quantity<1||quantity>100000||!receivedAt||!/^(\\d{4})-(\\d{2})-(\\d{2})$/.test(receivedAt)||Number.isNaN(Date.parse(receivedAt+'T00:00:00'))){showToast('Проверьте артикул, количество и дату.');return}
+ const save=$('buybackEditSave');save.disabled=true;save.textContent='Сохраняю…';
+ try{await updateDoc(doc(db,'buybackItems',editingBuybackId),{article,quantity,receivedAt,supplier,updatedAt:serverTimestamp()});closeBuybackEditor();showToast('Изменения сохранены.');}
+ catch(err){console.error(err);showToast('Не удалось сохранить изменения: '+(err.code||'проверьте доступ'));}
+ finally{if(!editOverlay.hidden){save.disabled=false;save.textContent='Сохранить изменения'}}
+});
 $('buybackForm').addEventListener('submit',async e=>{
  e.preventDefault();if(!currentUser){showToast('Сначала войдите в систему.');return}
  const article=$('buybackArticle').value.trim(),quantity=Number($('buybackQuantity').value),receivedAt=$('buybackDate').value,supplier=$('buybackSupplier').value.trim();
@@ -131,16 +215,15 @@ overlay.addEventListener('click',async e=>{
  const editBtn=e.target.closest('[data-edit-buyback]');
  if(editBtn){
   const item=items.find(x=>x.id===editBtn.dataset.editBuyback);if(!item)return;
-  const article=window.prompt('Артикул:',item.article||'');if(article===null)return;
-  const quantityText=window.prompt('Количество:',String(item.quantity??1));if(quantityText===null)return;
-  const receivedAt=window.prompt('Дата приёма (ГГГГ-ММ-ДД):',item.receivedAt||'');if(receivedAt===null)return;
-  const supplier=window.prompt('Поставщик:',item.supplier||'');if(supplier===null)return;
-  const cleanArticle=article.trim(),cleanSupplier=supplier.trim(),qty=Number(quantityText);
-  if(!cleanArticle||cleanArticle.length>100||!Number.isInteger(qty)||qty<1||qty>100000||!/^\d{4}-\d{2}-\d{2}$/.test(receivedAt)||Number.isNaN(Date.parse(receivedAt+'T00:00:00'))){showToast('Проверьте артикул, количество и дату в формате ГГГГ-ММ-ДД.');return}
-  editBtn.disabled=true;
-  try{await updateDoc(doc(db,'buybackItems',item.id),{article:cleanArticle,quantity:qty,receivedAt,supplier:cleanSupplier,updatedAt:serverTimestamp()});showToast('Позиция перекупного товара обновлена.');}
-  catch(err){console.error(err);showToast('Не удалось сохранить изменения: '+(err.code||'проверьте доступ'));}
-  finally{editBtn.disabled=false}
+  editingBuybackId=item.id;
+  $('buybackEditArticle').value=item.article||'';
+  $('buybackEditQuantity').value=String(item.quantity??1);
+  $('buybackEditDate').value=item.receivedAt||'';
+  $('buybackEditSupplier').value=item.supplier||'';
+  $('buybackEditSave').disabled=false;
+  $('buybackEditSave').textContent='Сохранить изменения';
+  editOverlay.hidden=false;
+  $('buybackEditArticle').focus();
   return;
  }
  const btn=e.target.closest('[data-set-status]');if(!btn)return;

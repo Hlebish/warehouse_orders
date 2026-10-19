@@ -3460,3 +3460,70 @@ body.dark-theme .stats-grid .stat-card .stat-top{gap:10px!important}
  body.dark-theme .stats-grid .stat-card .stat-icon{width:36px!important;height:36px!important;min-width:36px!important;flex-basis:36px!important;border-radius:10px!important}
  body.dark-theme .stats-grid .stat-card .stat-icon svg{width:19px!important;height:19px!important}
 }
+
+
+/* Warehouse Orders · Product catalog v1 — scan-friendly article directory */
+body.dark-theme .products-directory-modal{
+  width:min(1180px,calc(100vw - 32px))!important;
+}
+body.dark-theme .products-directory-modal .products-directory-toolbar{
+  position:sticky!important;top:0!important;z-index:3!important;
+  background:#15191b!important;border:1px solid #30383c!important;
+  border-radius:10px!important;padding:10px!important;margin-bottom:12px!important;
+}
+body.dark-theme .products-directory-modal .products-directory-toolbar .search-box{
+  min-width:220px!important;flex:1 1 340px!important;
+}
+body.dark-theme .products-directory-modal .products-directory-toolbar button{
+  min-height:39px!important;border-radius:8px!important;white-space:nowrap!important;
+}
+body.dark-theme .products-directory-modal .products-directory-wrap{
+  max-height:calc(88vh - 205px)!important;min-height:200px!important;
+  overflow:auto!important;border-radius:10px!important;
+  scrollbar-width:thin!important;scrollbar-color:#41494e #191d20!important;
+}
+body.dark-theme .products-directory-modal .products-directory-table{
+  min-width:850px!important;table-layout:auto!important;
+}
+body.dark-theme .products-directory-modal .products-directory-table th{
+  position:sticky!important;top:0!important;z-index:2!important;
+  background:#22282b!important;color:#aeb9bd!important;
+  padding:12px!important;font-size:10px!important;letter-spacing:.04em!important;
+  text-transform:uppercase!important;border-bottom:1px solid #3a4448!important;
+}
+body.dark-theme .products-directory-modal .products-directory-table td{
+  padding:10px 12px!important;line-height:1.45!important;
+  border-bottom:1px solid #2b3236!important;font-size:11px!important;
+  vertical-align:top!important;
+}
+body.dark-theme .products-directory-modal .products-directory-table td:first-child{
+  min-width:130px!important;white-space:nowrap!important;
+}
+body.dark-theme .products-directory-modal .products-directory-table td:first-child b{
+  display:inline-block!important;color:#8fd5a9!important;font-size:12px!important;
+  font-weight:700!important;letter-spacing:.015em!important;
+}
+body.dark-theme .products-directory-modal .products-directory-table th:nth-child(2),
+body.dark-theme .products-directory-modal .products-directory-table td:nth-child(2){min-width:135px!important}
+body.dark-theme .products-directory-modal .products-directory-table th:nth-child(3),
+body.dark-theme .products-directory-modal .products-directory-table td:nth-child(3){min-width:90px!important}
+body.dark-theme .products-directory-modal .products-directory-table th:nth-child(4),
+body.dark-theme .products-directory-modal .products-directory-table td:nth-child(4){min-width:190px!important;white-space:normal!important}
+body.dark-theme .products-directory-modal .products-directory-table th:nth-child(5),
+body.dark-theme .products-directory-modal .products-directory-table td:nth-child(5){
+  min-width:200px!important;max-width:340px!important;white-space:normal!important;
+  overflow-wrap:anywhere!important;color:#9ba8ad!important;
+}
+body.dark-theme .products-directory-modal .products-directory-table tbody tr:hover td{
+  background:#22282b!important;
+}
+body.dark-theme .products-directory-modal #productsDirectoryHint{
+  margin-top:10px!important;padding:10px 12px!important;
+  border:1px solid #30383c!important;border-radius:8px!important;
+  background:#15191b!important;color:#929da1!important;font-size:10px!important;
+}
+@media(max-width:700px){
+ body.dark-theme .products-directory-modal{width:calc(100vw - 14px)!important}
+ body.dark-theme .products-directory-modal .products-directory-toolbar .search-box{flex-basis:100%!important;min-width:0!important}
+ body.dark-theme .products-directory-modal .products-directory-wrap{max-height:58vh!important;min-height:160px!important}
+}

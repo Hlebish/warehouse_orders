@@ -712,13 +712,14 @@ function parseOrderClipboardText(raw){
     return null;
   };
   const isArticleHeader=x=>/артикул|код\s*(?:товару|товара|запчасти)?|article/i.test(x);
+  const isDescriptionHeader=x=>/^(?:товар|номенклатура|наименование|назва|опис|описание|деталь|product|description)$/i.test(x.trim());
   const isQuantityHeader=x=>/кількість|кол-?\s*во|количество|quantity|к-сть/i.test(x);
   const rows=lines.map(line=>({line,cells:splitRow(line)})).filter(row=>row.cells);
-  let headerRow=null, articleIndex=-1, quantityIndex=-1;
+  let headerRow=null, articleIndex=-1, descriptionIndex=-1, quantityIndex=-1;
   for(const row of rows){
     const a=row.cells.findIndex(isArticleHeader);
     const q=row.cells.findIndex(isQuantityHeader);
-    if(a>=0&&q>=0){headerRow=row;articleIndex=a;quantityIndex=q;break;}
+    if(a>=0&&q>=0){headerRow=row;articleIndex=a;descriptionIndex=row.cells.findIndex((cell,i)=>i!==a&&isDescriptionHeader(cell));quantityIndex=q;break;}
   }
   if(headerRow){
     let passedHeader=false;
@@ -727,8 +728,10 @@ function parseOrderClipboardText(raw){
       if(!passedHeader)continue;
       if(/Разом:|Всього найменувань|У тому числі|Всього до сплати|Итого:|Разом по/i.test(row.line))break;
       if(row.cells.every(x=>/^:?-{2,}:?$/.test(x)||!x))continue;
-      const article=cleanCell(row.cells[articleIndex]);
-      if(!article||isArticleHeader(article)||/^(товар|кількість|кол-?\s*во|количество)$/i.test(article))continue;
+      const articleCode=cleanCell(row.cells[articleIndex]);
+      if(!articleCode||isArticleHeader(articleCode)||/^(товар|кількість|кол-?\s*во|количество)$/i.test(articleCode))continue;
+      const description=descriptionIndex>=0?cleanCell(row.cells[descriptionIndex]):'';
+      const article=description&&description.toLocaleLowerCase('ru')!==articleCode.toLocaleLowerCase('ru')?articleCode+' '+description:articleCode;
       const qCell=cleanCell(row.cells[quantityIndex]);
       const qMatch=qCell.match(/\d+(?:[.,]\d+)?/);
       const quantity=Math.max(1,parseInt(qMatch?qMatch[0].replace(',','.'): '1',10)||1);
@@ -746,7 +749,9 @@ function parseOrderClipboardText(raw){
       const cells=row.cells.map(cleanCell);
       const articleIndexFallback=cells.findIndex(x=>/^(?:[A-ZА-ЯІЇЄ]{1,5}[-_]?)?\d{4,12}[A-ZА-ЯІЇЄ0-9_-]*$/i.test(x));
       if(articleIndexFallback<0)continue;
-      const article=cells[articleIndexFallback];
+      const articleCode=cells[articleIndexFallback];
+      const description=cells.slice(articleIndexFallback+1).find(x=>x&&!/^\d+(?:[.,]\d+)?$/.test(x)&&!/^(?:грн|uah|шт\.?|од\.?|pcs)$/i.test(x))||'';
+      const article=description?articleCode+' '+description:articleCode;
       // Quantity is usually the first small integer after the article/product columns,
       // while prices/totals are commonly larger numeric values.
       const later=cells.slice(articleIndexFallback+1);

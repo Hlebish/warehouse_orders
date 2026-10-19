@@ -7,7 +7,7 @@
   <meta name="description" content="Заказы, дефекты и согласование отгрузки в одном месте">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="./app-icon.svg" type="image/svg+xml">
-  <meta name="app-version" content="2026.10.19.9">
+  <meta name="app-version" content="2026.10.19.10">
   <title>Заказы · Склад</title>
   <style>
     [hidden]{display:none!important}
@@ -28,7 +28,7 @@
 
 <script>
 (() => {
-  const VERSION = '2026.10.19.9';
+  const VERSION = '2026.10.19.10';
   const KEY = 'warehouse_orders_app_version';
   try { localStorage.setItem(KEY, VERSION); } catch {}
 })();
@@ -142,6 +142,6 @@
   <div class="toast-stack" id="toastStack" aria-live="polite"></div>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script type="module" src="app.js?v=1.0.1.156"></script>
-  <script type="module" src="buyback.js?v=1.0.3"></script>
+  <script type="module" src="buyback.js?v=1.0.4"></script>
 </body>
 </html>

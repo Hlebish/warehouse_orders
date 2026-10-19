@@ -3301,3 +3301,52 @@ body.dark-theme .date-separator.current-date-separator span{
 body.dark-theme .orders-panel tbody tr:not(.date-separator) td{
   padding-top:8px!important;padding-bottom:8px!important;
 }
+
+
+/* Warehouse Orders · Graphite finish v8 — unify status summary cards */
+body.dark-theme .stats-grid .stat-card{
+  position:relative!important;overflow:hidden!important;
+  border:1px solid #30373b!important;border-left:1px solid #30373b!important;
+  border-radius:11px!important;
+  background:linear-gradient(145deg,#1c2023 0%,#171a1c 100%)!important;
+  box-shadow:0 4px 12px rgba(0,0,0,.12)!important;
+  transition:border-color .16s ease,background .16s ease,transform .16s ease!important;
+}
+body.dark-theme .stats-grid .stat-card::before{
+  content:""!important;position:absolute!important;inset:0 auto 0 0!important;width:3px!important;
+  background:#59636a!important;opacity:.9!important;
+}
+body.dark-theme .stats-grid .stat-card:hover{
+  border-color:#46514f!important;transform:translateY(-1px)!important;
+  box-shadow:0 7px 18px rgba(0,0,0,.2)!important;
+}
+body.dark-theme .stats-grid .stat-card .stat-top{
+  display:flex!important;align-items:center!important;gap:9px!important;
+  color:#d7dfe1!important;font-size:12px!important;font-weight:650!important;
+}
+body.dark-theme .stats-grid .stat-card .stat-icon,
+body.dark-theme .stats-grid .stat-card .stat-icon-wrap{
+  width:42px!important;height:42px!important;min-width:42px!important;
+  border-radius:50%!important;border:1px solid #3b4449!important;
+  background:#252b2f!important;color:#d5dcdf!important;
+}
+body.dark-theme .stats-grid .stat-card strong{
+  color:#f0f3f4!important;font-size:24px!important;letter-spacing:-.5px!important;
+}
+body.dark-theme .stats-grid .stat-card small,
+body.dark-theme .stats-grid .stat-card p{
+  color:#929da1!important;
+}
+/* Reserve semantic colors for meaningful states, not decorative card chrome. */
+body.dark-theme .stats-grid .stat-card:has(.pale-green)::before{background:#55c994!important}
+body.dark-theme .stats-grid .stat-card:has(.pale-green) .stat-icon{background:#19362b!important;border-color:#285b45!important;color:#70dca8!important}
+body.dark-theme .stats-grid .stat-card:has(.pale-amber)::before{background:#d6ad54!important}
+body.dark-theme .stats-grid .stat-card:has(.pale-amber) .stat-icon{background:#332c1a!important;border-color:#5b4b27!important;color:#e6c36d!important}
+body.dark-theme .stats-grid .stat-card:has(.pale-violet)::before{background:#a994f2!important}
+body.dark-theme .stats-grid .stat-card:has(.pale-violet) .stat-icon{background:#2d2840!important;border-color:#4b416a!important;color:#c1b1ff!important}
+body.dark-theme .stats-grid .stat-card:has(.pale-cyan)::before{background:#63c6d4!important}
+body.dark-theme .stats-grid .stat-card:has(.pale-cyan) .stat-icon{background:#19343a!important;border-color:#2b5861!important;color:#7bd5df!important}
+@media(max-width:720px){
+ body.dark-theme .stats-grid .stat-card .stat-icon,
+ body.dark-theme .stats-grid .stat-card .stat-icon-wrap{width:34px!important;height:34px!important;min-width:34px!important}
+}

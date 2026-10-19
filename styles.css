@@ -2798,3 +2798,32 @@ body.dark-theme .order-import-textarea{background:#111a18;border-color:#304039;c
  .directory-modal:not(.products-directory-modal) .modal-foot{padding:10px 13px calc(13px + env(safe-area-inset-bottom))!important}
  .directory-modal:not(.products-directory-modal) .modal-foot button{width:100%;min-height:43px}
 }
+
+
+/* Client directory: neutral black surfaces, keep green only for primary action */
+.directory-modal:not(.products-directory-modal){background:#101010!important;border-color:#303030!important}
+.directory-modal:not(.products-directory-modal) .modal-head{background:#111!important;border-color:#2c2c2c!important}
+.directory-modal:not(.products-directory-modal) .modal-head .eyebrow{color:#8f9690!important}
+.directory-modal:not(.products-directory-modal) .modal-head h2{color:#f4f4f4!important}
+.directory-modal:not(.products-directory-modal) .modal-body{background:#101010!important}
+.directory-modal:not(.products-directory-modal) .directory-toolbar .search-box{background:#191919!important;border-color:#373737!important}
+.directory-modal:not(.products-directory-modal) .directory-toolbar .search-box:focus-within{border-color:#777!important;box-shadow:0 0 0 2px #ffffff0b!important}
+.directory-modal:not(.products-directory-modal) .directory-toolbar .primary-button{background:#6d9f00!important;border-color:#6d9f00!important}
+.directory-modal:not(.products-directory-modal) .directory-toolbar .secondary-button{background:#202020!important;border-color:#414141!important;color:#e0e0e0!important}
+.directory-modal:not(.products-directory-modal) .directory-table-wrap{background:#111!important;border-color:#303030!important}
+.directory-modal:not(.products-directory-modal) .directory-table th{background:#202020!important;color:#b8b8b8!important;border-color:#383838!important}
+.directory-modal:not(.products-directory-modal) .directory-table td{color:#c5c5c5!important;border-color:#292929!important}
+.directory-modal:not(.products-directory-modal) .directory-table tbody tr:hover td{background:#1a1a1a!important}
+.directory-modal:not(.products-directory-modal) .directory-table td:first-child{color:#f2f2f2!important}
+.directory-modal:not(.products-directory-modal) .directory-table td button.primary-soft{background:#292929!important;border-color:#4a4a4a!important;color:#e4e4e4!important}
+.directory-modal:not(.products-directory-modal) .directory-table td button.danger{background:#351e1e!important;border-color:#633737!important;color:#ffb5b0!important}
+.directory-modal:not(.products-directory-modal) .directory-help{background:#1b1b1b!important;border-color:#363636!important;color:#b7b7b7!important}
+.directory-modal:not(.products-directory-modal) .modal-foot{background:#101010!important;border-color:#303030!important}
+.directory-modal:not(.products-directory-modal) .modal-foot button{background:#1e1e1e!important;border-color:#3a3a3a!important;color:#ededed!important}
+.directory-modal:not(.products-directory-modal) .directory-table tbody tr{background:linear-gradient(145deg,#1b1b1b,#151515)!important;border-color:#363636!important}
+.directory-modal:not(.products-directory-modal) .directory-table tbody td:nth-child(2)::before,
+.directory-modal:not(.products-directory-modal) .directory-table tbody td:nth-child(3)::before,
+.directory-modal:not(.products-directory-modal) .directory-table tbody td:nth-child(4)::before{color:#929292!important}
+.directory-modal:not(.products-directory-modal) .directory-table tbody td:first-child{border-bottom-color:#303030!important}
+.directory-modal:not(.products-directory-modal) .directory-table tbody td:nth-child(4),
+.directory-modal:not(.products-directory-modal) .directory-table tbody td:last-child{border-top-color:#303030!important}

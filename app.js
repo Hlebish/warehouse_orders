@@ -682,12 +682,79 @@ function normalizeArticles(items=[]){return items.map(x=>({article:String(x.arti
 const hasPendingDefect=o=>Array.isArray(o?.entries)&&o.entries.some(e=>e.kind==='defect'&&!e.decision);
 function articlesEqual(a=[],b=[]){return JSON.stringify(normalizeArticles(a).map(x=>({article:x.article,quantity:x.quantity})))===JSON.stringify(normalizeArticles(b).map(x=>({article:x.article,quantity:x.quantity})))}
 function articlesContentEqual(a=[],b=[]){return JSON.stringify((a||[]).map(x=>({article:String(x.article||'').trim(),quantity:Math.max(1,Number(x.quantity)||1)})).filter(x=>x.article))===JSON.stringify((b||[]).map(x=>({article:String(x.article||'').trim(),quantity:Math.max(1,Number(x.quantity)||1)})).filter(x=>x.article))}
-function openNewOrder(){loadProductsCatalog();if(!['warehouse','manager','chief_accountant','accountant'].includes(state.role)&&!canManageUsers){toast('Создавать карточки может только кладовщик, менеджер или администратор.');return}
-const managerCreate=isManagerRole()&&!canManageUsers;
-const statusOptions=managerCreate?'<option value="Создан">Создан</option><option>Под вопросом</option>':'<option value="Создан">Создан</option><option>Собран</option><option>Под вопросом</option>'; 
-const statusHint=managerCreate?'Менеджер создаёт заказ со статусом «Создан». Кладовщик позже отметит его как «Собран».':'Можно сразу отметить заказ как «Собран», если он уже собран.';
-showModal('Добавить заказ',`<form id="newOrderForm"><div class="form-grid"><div class="field"><label for="orderNumber">Номер заказа *</label><input id="orderNumber" required placeholder="Например, ЗК-18472" autocomplete="off"></div><div class="field client-suggestion-wrap"><label for="clientName">Имя клиента *</label><input id="clientName" required placeholder="Имя или название компании" autocomplete="off"><div id="clientNameSuggestions" class="chat-mention-suggestions client-suggestions" hidden></div></div></div><div class="field"><label for="deliveryType">Вид доставки</label><select id="deliveryType"><option value="city">Доставка по городу</option><option value="post">Доставка почтой</option><option value="pickup">Самовывоз</option></select></div><div class="field"><label>Артикулы заказа</label>${articlesEditorHtml([{article:'',quantity:1}])}<span class="field-hint">Для каждого артикула укажите количество. Можно добавлять и удалять позиции.</span></div><div class="field"><label for="startStatus">Начальный статус</label><select id="startStatus">${statusOptions}</select><span class="field-hint">${statusHint}</span></div><div class="field"><label for="initialComment">Комментарий (необязательно)</label><textarea id="initialComment" placeholder="Короткая заметка по заказу"></textarea></div></form>`,[button('Отмена','close'),button('Создать карточку','create-order','primary-button')],'НОВЫЙ ЗАКАЗ')}
-
+function parseOrderClipboardText(raw){
+  const text=String(raw||'').replace(/\u00a0/g,' ').replace(/\r/g,'');
+  const result={number:'',client:'',phone:'',articles:[]};
+  const numberMatch=text.match(/Замовлення\s+покупця\s*№\s*([^|\n\r]+)/i)||text.match(/Заказ\s*(?:покупателя)?\s*№\s*([^|\n\r]+)/i);
+  if(numberMatch)result.number=numberMatch[1].replace(/[*]/g,'').trim().split(/\s+/)[0];
+  const clientMatch=text.match(/Покупець:\s*\|?\s*\*{0,2}([^|\n\r*]+?)\*{0,2}(?:\||$)/i)||text.match(/Покупатель:\s*\|?\s*\*{0,2}([^|\n\r*]+?)\*{0,2}(?:\||$)/i);
+  if(clientMatch)result.client=clientMatch[1].trim();
+  const phoneMatch=text.match(/Тел\.\s*:\s*([+\d][\d\s()\-]+)/i)||text.match(/Телефон\s*:\s*([+\d][\d\s()\-]+)/i);
+  if(phoneMatch)result.phone=phoneMatch[1].trim();
+  const lines=text.split('\n');
+  const headerIndex=lines.findIndex(line=>/Артикул/i.test(line)&&/Товар/i.test(line)&&/Кількість/i.test(line));
+  if(headerIndex>=0){
+    const header=lines[headerIndex].split('|').map(x=>x.replace(/[*]/g,'').trim());
+    const articleIndex=header.findIndex(x=>/Артикул/i.test(x));
+    const quantityIndex=header.findIndex(x=>/Кількість/i.test(x));
+    for(let i=headerIndex+1;i<lines.length;i++){
+      const line=lines[i];
+      if(/Разом:|Всього найменувань|У тому числі/i.test(line))break;
+      if(!line.includes('|')||/^\s*\|?\s*-+/.test(line))continue;
+      const cells=line.split('|').map(x=>x.replace(/[*]/g,'').trim());
+      const article=articleIndex>=0?String(cells[articleIndex]||'').trim():'';
+      if(!article||/^(Артикул|товар|кількість)$/i.test(article))continue;
+      const qRaw=quantityIndex>=0?String(cells[quantityIndex]||'').replace(/[^\d]/g,''):'1';
+      result.articles.push({article,quantity:Math.max(1,parseInt(qRaw,10)||1)});
+    }
+  }
+  const unique=new Map();
+  for(const item of result.articles){
+    const key=item.article.toLowerCase();
+    unique.set(key,{article:item.article,quantity:(unique.get(key)?.quantity||0)+item.quantity});
+  }
+  result.articles=[...unique.values()].slice(0,100);
+  return result;
+}
+function applyParsedOrderData(parsed){
+  if(!parsed)return;
+  if(parsed.number&&$('orderNumber'))$('orderNumber').value=parsed.number;
+  if(parsed.client&&$('clientName'))$('clientName').value=parsed.client;
+  const rows=$('orderArticlesRows');
+  if(rows&&parsed.articles?.length)rows.innerHTML=parsed.articles.map(articleRowHtml).join('');
+  const parts=[];
+  if(parsed.number)parts.push('№ '+parsed.number);
+  if(parsed.client)parts.push(parsed.client);
+  if(parsed.articles?.length)parts.push(parsed.articles.length+' поз.');
+  if(parsed.phone)parts.push(parsed.phone);
+  toast(parts.length?'Данные из документа распознаны: '+parts.join(' · '):'Не удалось найти данные заказа в тексте.');
+}
+function openNewOrder(){
+  loadProductsCatalog();
+  if(!['warehouse','manager','chief_accountant','accountant'].includes(state.role)&&!canManageUsers){toast('Создавать карточки может только кладовщик, менеджер или администратор.');return}
+  const managerCreate=isManagerRole()&&!canManageUsers;
+  const statusOptions=managerCreate?'<option value="Создан">Создан</option><option>Под вопросом</option>':'<option value="Создан">Создан</option><option>Собран</option><option>Под вопросом</option>';
+  const statusHint=managerCreate?'Менеджер создаёт заказ со статусом «Создан». Кладовщик позже отметит его как «Собран».':'Можно сразу отметить заказ как «Собран», если он уже собран.';
+  const body=`<form id="newOrderForm">
+    <div class="order-import-box">
+      <div class="order-import-head"><div><b>⚡ Заполнить из документа</b><span>Вставьте скопированный текст накладной — номер, клиента и артикулы распознаются автоматически.</span></div><button type="button" class="small-button" id="parseOrderClipboard">Разобрать</button></div>
+      <textarea id="orderClipboardText" class="order-import-textarea" placeholder="Скопируйте сюда текст заказа…"></textarea>
+    </div>
+    <div class="form-grid"><div class="field"><label for="orderNumber">Номер заказа *</label><input id="orderNumber" required placeholder="Например, ЗК-18472" autocomplete="off"></div><div class="field client-suggestion-wrap"><label for="clientName">Имя клиента *</label><input id="clientName" required placeholder="Имя или название компании" autocomplete="off"><div id="clientNameSuggestions" class="chat-mention-suggestions client-suggestions" hidden></div></div></div>
+    <div class="field"><label for="deliveryType">Вид доставки</label><select id="deliveryType"><option value="city">Доставка по городу</option><option value="post">Доставка почтой</option><option value="pickup">Самовывоз</option></select></div>
+    <div class="field"><label>Артикулы заказа</label>${articlesEditorHtml([{article:'',quantity:1}])}<span class="field-hint">Для каждого артикула укажите количество. Можно добавлять и удалять позиции.</span></div>
+    <div class="field"><label for="startStatus">Начальный статус</label><select id="startStatus">${statusOptions}</select><span class="field-hint">${statusHint}</span></div>
+    <div class="field"><label for="initialComment">Комментарий (необязательно)</label><textarea id="initialComment" placeholder="Короткая заметка по заказу"></textarea></div>
+  </form>`;
+  showModal('Добавить заказ',body,[button('Отмена','close'),button('Создать карточку','create-order','primary-button')],'НОВЫЙ ЗАКАЗ');
+  setTimeout(()=>{
+    const input=$('orderClipboardText'),parse=$('parseOrderClipboard');
+    if(!input||!parse)return;
+    const run=()=>applyParsedOrderData(parseOrderClipboardText(input.value));
+    parse.addEventListener('click',run);
+    input.addEventListener('paste',()=>setTimeout(run,0));
+  },0);
+}
 /* ===== Справочники клиентов и артикулов ===== */
 let clients=[], productsCatalog=[], clientsUnsubscribe=null, productsLoaded=false;
 

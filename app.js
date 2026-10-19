@@ -683,29 +683,29 @@ const hasPendingDefect=o=>Array.isArray(o?.entries)&&o.entries.some(e=>e.kind===
 function articlesEqual(a=[],b=[]){return JSON.stringify(normalizeArticles(a).map(x=>({article:x.article,quantity:x.quantity})))===JSON.stringify(normalizeArticles(b).map(x=>({article:x.article,quantity:x.quantity})))}
 function articlesContentEqual(a=[],b=[]){return JSON.stringify((a||[]).map(x=>({article:String(x.article||'').trim(),quantity:Math.max(1,Number(x.quantity)||1)})).filter(x=>x.article))===JSON.stringify((b||[]).map(x=>({article:String(x.article||'').trim(),quantity:Math.max(1,Number(x.quantity)||1)})).filter(x=>x.article))}
 function parseOrderClipboardText(raw){
-  const text=String(raw||'').replace(/\\u00a0/g,' ').replace(/\\r/g,'');
+  const text=String(raw||'').replace(/\u00a0/g,' ').replace(/\r/g,'');
   const result={number:'',client:'',articles:[]};
-  const numberMatch=text.match(/Замовлення\\s+покупця\\s*№\\s*([^|\\n\\r]+)/i)||text.match(/Заказ\\s*(?:покупателя)?\\s*№\\s*([^|\\n\\r]+)/i);
-  if(numberMatch)result.number=numberMatch[1].replace(/[*]/g,'').trim().split(/\\s+/)[0];
+  const numberMatch=text.match(/Замовлення\s+покупця\s*№\s*([^|\n\r]+)/i)||text.match(/Заказ\s*(?:покупателя)?\s*№\s*([^|\n\r]+)/i);
+  if(numberMatch)result.number=numberMatch[1].replace(/[*]/g,'').trim().split(/\s+/)[0];
 
-  const lines=text.split('\\n');
+  const lines=text.split('\n');
   for(const line of lines){
     if(!/Покупець|Покупатель/i.test(line))continue;
     const cells=line.split('|').map(x=>x.replace(/[*]/g,'').trim()).filter(Boolean);
     const labelIndex=cells.findIndex(x=>/Покупець|Покупатель/i.test(x));
     if(labelIndex<0)continue;
     const labelCell=cells[labelIndex];
-    const inlineValue=labelCell.replace(/^.*?(?:Покупець|Покупатель)\\s*:?\\s*/i,'').trim();
+    const inlineValue=labelCell.replace(/^.*?(?:Покупець|Покупатель)\s*:?\s*/i,'').trim();
     if(inlineValue){result.client=inlineValue;break;}
-    const nextCell=cells.slice(labelIndex+1).find(x=>x&&!/^(Тел\\.?|Телефон|ІПН|ЄДРПОУ|Адреса)\\s*:/i.test(x));
-    if(nextCell){result.client=nextCell.replace(/^\\*+|\\*+$/g,'').trim();break;}
+    const nextCell=cells.slice(labelIndex+1).find(x=>x&&!/^(Тел\.?|Телефон|ІПН|ЄДРПОУ|Адреса)\s*:/i.test(x));
+    if(nextCell){result.client=nextCell.replace(/^\*+|\*+$/g,'').trim();break;}
   }
   if(!result.client){
-    const clientMatch=text.match(/(?:Покупець|Покупатель)\\s*:\\s*\\*{0,2}([^|\\n\\r*]+?)\\*{0,2}(?=\\s*(?:\\||$))/i);
+    const clientMatch=text.match(/(?:Покупець|Покупатель)\s*:\s*\*{0,2}([^|\n\r*]+?)\*{0,2}(?=\s*(?:\||$))/i);
     if(clientMatch)result.client=clientMatch[1].trim();
   }
 
-  const isArticleHeader=x=>/артикул|код\\s*(?:товару|товара)?|article/i.test(x);
+  const isArticleHeader=x=>/артикул|код\s*(?:товару|товара)?|article/i.test(x);
   const isQuantityHeader=x=>/кількість|кол-?во|количество|quantity/i.test(x);
   const headerIndex=lines.findIndex(line=>{
     if(!line.includes('|'))return false;
@@ -719,12 +719,12 @@ function parseOrderClipboardText(raw){
     for(let i=headerIndex+1;i<lines.length;i++){
       const line=lines[i];
       if(/Разом:|Всього найменувань|У тому числі|Всього до сплати|Итого:/i.test(line))break;
-      if(!line.includes('|')||/^\\s*\\|?\\s*:?-{2,}/.test(line))continue;
+      if(!line.includes('|')||/^\s*\|?\s*:?-{2,}/.test(line))continue;
       const cells=line.split('|').map(x=>x.replace(/[*]/g,'').trim());
       const article=articleIndex>=0?String(cells[articleIndex]||'').trim():'';
       if(!article||/^(Артикул|Код|товар|кількість|кол-?во|количество)$/i.test(article))continue;
       const qCell=quantityIndex>=0?String(cells[quantityIndex]||'').trim():'';
-      const qMatch=qCell.match(/\\d+(?:[.,]\\d+)?/);
+      const qMatch=qCell.match(/\d+(?:[.,]\d+)?/);
       const quantity=Math.max(1,parseInt(qMatch?qMatch[0].replace(',','.'): '1',10)||1);
       result.articles.push({article,quantity});
     }

@@ -2736,3 +2736,65 @@ body.dark-theme .order-import-box{background:#17251f;border-color:#2e493d}
 body.dark-theme .order-import-head b{color:#a8dec5}
 body.dark-theme .order-import-head span{color:#91a89d}
 body.dark-theme .order-import-textarea{background:#111a18;border-color:#304039;color:#e4eee9}
+
+
+/* Client directory refresh: clearer toolbar, polished records, and mobile-first cards */
+.directory-modal:not(.products-directory-modal){width:min(1080px,calc(100vw - 32px));max-width:1080px;border:1px solid #343b33!important;border-radius:22px!important;overflow:hidden;background:#141714!important;box-shadow:0 28px 90px #0009!important}
+.directory-modal:not(.products-directory-modal) .modal-head{padding:23px 26px 19px!important;background:linear-gradient(120deg,#1d271a,#171a17)!important;border-bottom:1px solid #343b33!important}
+.directory-modal:not(.products-directory-modal) .modal-head .eyebrow{color:#83b92a!important;font-size:10px;font-weight:900;letter-spacing:1.5px}
+.directory-modal:not(.products-directory-modal) .modal-head h2{font-size:27px!important;letter-spacing:-.5px;color:#f4f6f0!important}
+.directory-modal:not(.products-directory-modal) .modal-body{padding:20px 24px 22px!important;background:#141714!important}
+.directory-modal:not(.products-directory-modal) .directory-toolbar{display:grid;grid-template-columns:minmax(180px,1fr) auto auto;gap:10px;align-items:center;margin-bottom:16px}
+.directory-modal:not(.products-directory-modal) .directory-toolbar .search-box{height:48px;display:flex;align-items:center;gap:10px;padding:0 14px;border:1px solid #3b4438;border-radius:13px;background:#1c211c;color:#a8b4a0}
+.directory-modal:not(.products-directory-modal) .directory-toolbar .search-box span{font-size:21px}
+.directory-modal:not(.products-directory-modal) .directory-toolbar .search-box input{height:100%;min-width:0;width:100%;border:0!important;outline:0!important;box-shadow:none!important;background:transparent!important;color:#f1f4ed!important;font-size:14px}
+.directory-modal:not(.products-directory-modal) .directory-toolbar .search-box:focus-within{border-color:#78a92a;box-shadow:0 0 0 3px #78a92a20}
+.directory-modal:not(.products-directory-modal) .directory-toolbar .primary-button,
+.directory-modal:not(.products-directory-modal) .directory-toolbar .secondary-button{min-height:46px;padding:10px 16px;border-radius:12px;font-size:13px;font-weight:800;white-space:nowrap}
+.directory-modal:not(.products-directory-modal) .directory-toolbar .primary-button{background:#6d9f00!important;border-color:#6d9f00!important;color:#fff!important;box-shadow:0 5px 15px #6d9f0022}
+.directory-modal:not(.products-directory-modal) .directory-toolbar .secondary-button{background:#202420!important;border:1px solid #41483f!important;color:#e0e6dc!important}
+.directory-modal:not(.products-directory-modal) .directory-table-wrap{max-height:58vh;border:1px solid #343b33;border-radius:15px;background:#171a17;overflow:auto}
+.directory-modal:not(.products-directory-modal) .directory-table{width:100%;border-collapse:separate;border-spacing:0;font-size:13px;color:#dce2d8}
+.directory-modal:not(.products-directory-modal) .directory-table thead{position:sticky;top:0;z-index:2}
+.directory-modal:not(.products-directory-modal) .directory-table th{padding:13px 15px;text-align:left;background:#20261e;color:#aebca5;font-size:10px;text-transform:uppercase;letter-spacing:.8px;border-bottom:1px solid #394235;white-space:nowrap}
+.directory-modal:not(.products-directory-modal) .directory-table td{padding:14px 15px;vertical-align:top;line-height:1.5;border-bottom:1px solid #292f28;color:#b9c1b5;overflow-wrap:anywhere}
+.directory-modal:not(.products-directory-modal) .directory-table tbody tr:last-child td{border-bottom:0}
+.directory-modal:not(.products-directory-modal) .directory-table tbody tr:hover td{background:#1c231a}
+.directory-modal:not(.products-directory-modal) .directory-table td:first-child{min-width:170px;color:#f0f4ec}
+.directory-modal:not(.products-directory-modal) .directory-table td:first-child b{font-size:14px;font-weight:800;line-height:1.4}
+.directory-modal:not(.products-directory-modal) .directory-table td:last-child{min-width:160px;white-space:nowrap}
+.directory-modal:not(.products-directory-modal) .directory-table td button{min-height:34px;padding:7px 11px;border-radius:9px;font-size:11px;font-weight:800}
+.directory-modal:not(.products-directory-modal) .directory-table td button.primary-soft{background:#28351a!important;border:1px solid #49632b!important;color:#c8e59b!important}
+.directory-modal:not(.products-directory-modal) .directory-table td button.danger{background:#351e1e!important;border:1px solid #633737!important;color:#ffb5b0!important}
+.directory-modal:not(.products-directory-modal) .directory-help{margin:14px 0 0;padding:13px 15px;border:1px solid #343e31;border-radius:12px;background:#1b2119;color:#aab7a3;font-size:12px;line-height:1.6}
+.directory-modal:not(.products-directory-modal) .modal-foot{padding:13px 24px 20px!important;border-top:1px solid #30362e!important;background:#141714!important}
+.directory-modal:not(.products-directory-modal) .modal-foot button{min-height:42px;border-radius:11px;font-weight:800}
+.directory-modal:not(.products-directory-modal) .directory-empty{padding:28px!important;text-align:center;color:#aab5a3!important}
+@media(max-width:720px){
+ .directory-modal:not(.products-directory-modal){width:calc(100vw - 20px)!important;max-width:calc(100vw - 20px)!important;max-height:calc(100dvh - 24px)!important;border-radius:18px!important}
+ .directory-modal:not(.products-directory-modal) .modal-head{padding:18px 17px 15px!important}
+ .directory-modal:not(.products-directory-modal) .modal-head h2{font-size:24px!important}
+ .directory-modal:not(.products-directory-modal) .modal-body{padding:13px!important;min-height:0;overflow-y:auto}
+ .directory-modal:not(.products-directory-modal) .directory-toolbar{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px;margin-bottom:12px}
+ .directory-modal:not(.products-directory-modal) .directory-toolbar .search-box{grid-column:1/-1;width:100%;height:46px}
+ .directory-modal:not(.products-directory-modal) .directory-toolbar .primary-button,
+ .directory-modal:not(.products-directory-modal) .directory-toolbar .secondary-button{width:100%;min-width:0;min-height:43px;padding:9px 8px;font-size:12px}
+ .directory-modal:not(.products-directory-modal) .directory-table-wrap{max-height:none;overflow:visible;border:0;background:transparent}
+ .directory-modal:not(.products-directory-modal) .directory-table,
+ .directory-modal:not(.products-directory-modal) .directory-table tbody{display:block;width:100%;min-width:0}
+ .directory-modal:not(.products-directory-modal) .directory-table thead{display:none}
+ .directory-modal:not(.products-directory-modal) .directory-table tbody tr{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:0 12px;margin:0 0 10px;padding:13px;border:1px solid #394236;border-radius:14px;background:linear-gradient(145deg,#1b201b,#171a17);box-shadow:0 4px 12px #0002}
+ .directory-modal:not(.products-directory-modal) .directory-table tbody tr:hover td{background:transparent}
+ .directory-modal:not(.products-directory-modal) .directory-table tbody td{display:block;min-width:0;padding:7px 0;border:0;background:transparent!important;font-size:12px;line-height:1.5;white-space:normal;overflow-wrap:anywhere}
+ .directory-modal:not(.products-directory-modal) .directory-table tbody td:first-child{grid-column:1/-1;padding:0 0 10px;margin-bottom:4px;border-bottom:1px solid #30382d;font-size:15px}
+ .directory-modal:not(.products-directory-modal) .directory-table tbody td:first-child b{font-size:16px}
+ .directory-modal:not(.products-directory-modal) .directory-table tbody td:nth-child(2)::before{content:"ТЕЛЕФОН";display:block;margin-bottom:3px;color:#8e9b86;font-size:9px;font-weight:900;letter-spacing:.8px}
+ .directory-modal:not(.products-directory-modal) .directory-table tbody td:nth-child(3)::before{content:"АДРЕС";display:block;margin-bottom:3px;color:#8e9b86;font-size:9px;font-weight:900;letter-spacing:.8px}
+ .directory-modal:not(.products-directory-modal) .directory-table tbody td:nth-child(4){grid-column:1/-1;padding-top:9px;border-top:1px solid #2c332a;margin-top:4px}
+ .directory-modal:not(.products-directory-modal) .directory-table tbody td:nth-child(4)::before{content:"КОММЕНТАРИЙ";display:block;margin-bottom:3px;color:#8e9b86;font-size:9px;font-weight:900;letter-spacing:.8px}
+ .directory-modal:not(.products-directory-modal) .directory-table tbody td:last-child{grid-column:1/-1;display:flex;gap:8px;flex-wrap:wrap;padding-top:11px;margin-top:4px;border-top:1px solid #2c332a;min-width:0}
+ .directory-modal:not(.products-directory-modal) .directory-table td button{flex:1;min-height:38px;font-size:12px}
+ .directory-modal:not(.products-directory-modal) .directory-help{font-size:11px;padding:12px;margin-top:12px}
+ .directory-modal:not(.products-directory-modal) .modal-foot{padding:10px 13px calc(13px + env(safe-area-inset-bottom))!important}
+ .directory-modal:not(.products-directory-modal) .modal-foot button{width:100%;min-height:43px}
+}

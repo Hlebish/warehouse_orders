@@ -437,22 +437,24 @@ service cloud.firestore {
     match /buybackItems/{itemId} {
       allow read: if activeUser();
       allow create: if activeUser()
-        && request.resource.data.keys().hasOnly(['article','quantity','receivedAt','createdAt','createdOn','createdBy','createdByName','status','soldAt','cancelledAt','returnedAt','sentMilestones','updatedAt'])
+        && request.resource.data.keys().hasOnly(['article','quantity','receivedAt','supplier','createdAt','createdOn','createdBy','createdByName','status','soldAt','cancelledAt','returnedAt','sentMilestones','updatedAt'])
         && request.resource.data.article is string
         && request.resource.data.article.size() > 0
         && request.resource.data.quantity is number
         && request.resource.data.quantity >= 1
         && request.resource.data.receivedAt is string
+        && (!request.resource.data.keys().hasAny(['supplier']) || request.resource.data.supplier is string && request.resource.data.supplier.size() <= 160)
         && request.resource.data.createdBy == request.auth.uid
         && request.resource.data.createdByName is string
         && request.resource.data.status in ['active','returned','sold','cancelled','expired']
         && request.resource.data.sentMilestones is list;
       allow update: if activeUser()
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['article','quantity','receivedAt','status','soldAt','cancelledAt','returnedAt','sentMilestones','updatedAt'])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['article','quantity','receivedAt','supplier','status','soldAt','cancelledAt','returnedAt','sentMilestones','updatedAt'])
         && request.resource.data.article is string
         && request.resource.data.quantity is number
         && request.resource.data.quantity >= 1
         && request.resource.data.receivedAt is string
+        && (!request.resource.data.keys().hasAny(['supplier']) || request.resource.data.supplier is string && request.resource.data.supplier.size() <= 160)
         && request.resource.data.status in ['active','returned','sold','cancelled','expired']
         && request.resource.data.sentMilestones is list;
       allow delete: if canManageUsers();

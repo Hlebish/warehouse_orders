@@ -3002,3 +3002,103 @@ body.dark-theme .field select{padding:9px 10px}
 @media(prefers-reduced-motion:reduce){
   body.dark-theme *,body.dark-theme *::before,body.dark-theme *::after{animation-duration:.01ms!important;transition-duration:.01ms!important;scroll-behavior:auto!important}
 }
+
+
+
+/* Warehouse Orders · Graphite finish v2 — strengthen theme coverage across all current views */
+body.dark-theme,
+body.dark-theme .app-shell,
+body.dark-theme .main-area,
+body.dark-theme .content,
+body.dark-theme .auth-gate,
+body.dark-theme .auth-card{
+  background:#111315!important;color:#e8ecee!important;
+}
+body.dark-theme .sidebar,
+body.dark-theme .topbar,
+body.dark-theme .orders-panel,
+body.dark-theme .panel,
+body.dark-theme .card,
+body.dark-theme .stat-card,
+body.dark-theme .modal,
+body.dark-theme .directory-modal,
+body.dark-theme .products-directory-modal,
+body.dark-theme .chat-panel,
+body.dark-theme .work-insights,
+body.dark-theme .clients-directory,
+body.dark-theme .products-directory,
+body.dark-theme .buyback-panel,
+body.dark-theme .report-panel,
+body.dark-theme .analytics-panel,
+body.dark-theme .returns-panel,
+body.dark-theme .shipment-panel,
+body.dark-theme .staff-panel,
+body.dark-theme .history-panel,
+body.dark-theme .notice-panel{
+  background:#191d20!important;color:#e8ecee!important;border-color:#30373b!important;
+  box-shadow:0 8px 24px rgba(0,0,0,.12)!important;
+}
+body.dark-theme .table-wrap,
+body.dark-theme .directory-table-wrap,
+body.dark-theme .clients-table-wrap,
+body.dark-theme .products-table-wrap,
+body.dark-theme .buyback-table-wrap,
+body.dark-theme .report-table-wrap{
+  background:#191d20!important;border-color:#30373b!important;
+}
+body.dark-theme table{background:#191d20!important;color:#e8ecee!important}
+body.dark-theme thead,
+body.dark-theme thead tr,
+body.dark-theme th{background:#202529!important;color:#aeb8bc!important;border-color:#30373b!important}
+body.dark-theme tbody tr,
+body.dark-theme tbody tr:nth-child(even),
+body.dark-theme tbody tr:nth-child(odd),
+body.dark-theme td{background-color:transparent!important;color:#c5cdd0!important;border-color:#2b3236!important}
+body.dark-theme tbody tr:hover{background:#22282b!important}
+body.dark-theme h1,body.dark-theme h2,body.dark-theme h3,body.dark-theme h4,
+body.dark-theme .page-heading h1,body.dark-theme .panel-heading h2,
+body.dark-theme .modal h2,body.dark-theme .modal h3{color:#eef1f2!important}
+body.dark-theme p,body.dark-theme small,body.dark-theme label,
+body.dark-theme .muted,body.dark-theme .field-hint,
+body.dark-theme .directory-help,body.dark-theme .empty-state span{color:#9aa4a8}
+body.dark-theme input,body.dark-theme textarea,body.dark-theme select,
+body.dark-theme .search-box,body.dark-theme .field input,
+body.dark-theme .field textarea,body.dark-theme .field select,
+body.dark-theme .directory-search input,body.dark-theme .modal input,
+body.dark-theme .modal textarea,body.dark-theme .modal select{
+  background:#121517!important;color:#e8ecee!important;border-color:#30373b!important;
+  box-shadow:none!important;
+}
+body.dark-theme input:focus,body.dark-theme textarea:focus,body.dark-theme select:focus{
+  border-color:#35b879!important;outline:2px solid #35b87922!important;
+}
+body.dark-theme button.secondary-button,
+body.dark-theme button.small-button:not(.good):not(.danger),
+body.dark-theme button.filter-button,
+body.dark-theme button.top-history-button,
+body.dark-theme .directory-modal .modal-foot button{
+  background:#202529!important;color:#d3dadd!important;border-color:#343c40!important;box-shadow:none!important;
+}
+body.dark-theme button.primary-button,
+body.dark-theme button.small-button.good,
+body.dark-theme .buyback-actions button.primary{
+  background:#35b879!important;color:#071b11!important;border-color:#35b879!important;
+}
+body.dark-theme .nav-item.active{background:#183328!important;color:#7be0ad!important}
+body.dark-theme .nav-item:not(.active){color:#a8b1b5!important}
+body.dark-theme .status-pill,body.dark-theme .status-badge{border:1px solid transparent}
+body.dark-theme .status-ready,body.dark-theme .status-assembled{background:#193629!important;color:#79dba7!important}
+body.dark-theme .status-question{background:#382d18!important;color:#f0c36e!important}
+body.dark-theme .status-cancel,body.dark-theme .danger{color:#ff9994}
+body.dark-theme .modal-backdrop{background:rgba(0,0,0,.72)!important;backdrop-filter:blur(3px)}
+body.dark-theme .modal-head,body.dark-theme .modal-foot{background:#191d20!important;border-color:#30373b!important}
+body.dark-theme .directory-modal .directory-table tbody tr{background:#1b2023!important;border-color:#30373b!important}
+body.dark-theme .directory-modal .directory-table tbody tr:hover{background:#242a2e!important}
+body.dark-theme .toast{background:#202529!important;color:#eef1f2!important;border-color:#3a4247!important}
+body.dark-theme .empty-state{color:#aeb8bc!important}
+body.dark-theme .empty-state b{color:#e8ecee!important}
+body.dark-theme .site-version,body.dark-theme .page-footer{color:#737e83!important}
+@media(max-width:720px){
+  body.dark-theme .orders-panel,body.dark-theme .panel{border-radius:9px!important}
+  body.dark-theme .topbar{border-bottom-color:#30373b!important}
+}

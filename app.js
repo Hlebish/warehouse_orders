@@ -684,13 +684,11 @@ function articlesEqual(a=[],b=[]){return JSON.stringify(normalizeArticles(a).map
 function articlesContentEqual(a=[],b=[]){return JSON.stringify((a||[]).map(x=>({article:String(x.article||'').trim(),quantity:Math.max(1,Number(x.quantity)||1)})).filter(x=>x.article))===JSON.stringify((b||[]).map(x=>({article:String(x.article||'').trim(),quantity:Math.max(1,Number(x.quantity)||1)})).filter(x=>x.article))}
 function parseOrderClipboardText(raw){
   const text=String(raw||'').replace(/\u00a0/g,' ').replace(/\r/g,'');
-  const result={number:'',client:'',phone:'',articles:[]};
+  const result={number:'',client:'',articles:[]};
   const numberMatch=text.match(/Замовлення\s+покупця\s*№\s*([^|\n\r]+)/i)||text.match(/Заказ\s*(?:покупателя)?\s*№\s*([^|\n\r]+)/i);
   if(numberMatch)result.number=numberMatch[1].replace(/[*]/g,'').trim().split(/\s+/)[0];
   const clientMatch=text.match(/Покупець:\s*\|?\s*\*{0,2}([^|\n\r*]+?)\*{0,2}(?:\||$)/i)||text.match(/Покупатель:\s*\|?\s*\*{0,2}([^|\n\r*]+?)\*{0,2}(?:\||$)/i);
   if(clientMatch)result.client=clientMatch[1].trim();
-  const phoneMatch=text.match(/Тел\.\s*:\s*([+\d][\d\s()\-]+)/i)||text.match(/Телефон\s*:\s*([+\d][\d\s()\-]+)/i);
-  if(phoneMatch)result.phone=phoneMatch[1].trim();
   const lines=text.split('\n');
   const headerIndex=lines.findIndex(line=>/Артикул/i.test(line)&&/Товар/i.test(line)&&/Кількість/i.test(line));
   if(headerIndex>=0){
@@ -726,7 +724,6 @@ function applyParsedOrderData(parsed){
   if(parsed.number)parts.push('№ '+parsed.number);
   if(parsed.client)parts.push(parsed.client);
   if(parsed.articles?.length)parts.push(parsed.articles.length+' поз.');
-  if(parsed.phone)parts.push(parsed.phone);
   toast(parts.length?'Данные из документа распознаны: '+parts.join(' · '):'Не удалось найти данные заказа в тексте.');
 }
 function openNewOrder(){

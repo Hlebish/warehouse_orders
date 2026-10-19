@@ -124,6 +124,73 @@ style.textContent = `
 .buyback-actions button:hover{filter:brightness(1.12);transform:translateY(-1px)}
 @media(max-width:900px){.buyback-actions{flex-wrap:wrap;justify-content:flex-start}}
 @media(max-width:700px){.buyback-actions{display:flex;flex-wrap:wrap;gap:5px}.buyback-actions button{min-height:29px;padding:6px 8px;font-size:10px;flex:0 0 auto}}
+
+/* Buyback workspace v2 — clearer hierarchy, compact controls, deadline-first cards */
+.buyback-overlay{padding:12px!important;background:rgba(0,0,0,.82)!important;backdrop-filter:blur(3px)!important}
+.buyback-window{width:min(1160px,100%)!important;max-height:calc(100dvh - 24px)!important;border-radius:16px!important;border:1px solid #343b36!important;background:#121514!important;box-shadow:0 28px 90px #000b!important}
+.buyback-head{position:sticky!important;top:0!important;z-index:5!important;padding:18px 24px!important;background:#191f1b!important;border-bottom:1px solid #303831!important}
+.buyback-head h2{font-size:24px!important;letter-spacing:-.45px!important;margin:6px 0 5px!important}
+.buyback-head p{font-size:11px!important;color:#9da9a1!important}
+.buyback-head .eyebrow{color:#8fcf9c!important;letter-spacing:1.2px!important}
+.buyback-head .close-button{width:34px!important;height:34px!important;border-radius:9px!important;background:#242a26!important;border:1px solid #39423c!important;color:#d4ddd7!important}
+.buyback-body{padding:16px 24px 22px!important}
+.buyback-form{grid-template-columns:minmax(200px,1.7fr) minmax(84px,.55fr) minmax(145px,.9fr) minmax(155px,1fr) auto!important;gap:10px!important;padding:13px!important;margin-bottom:14px!important;background:#181d1a!important;border:1px solid #303a32!important;border-radius:12px!important}
+.buyback-field{gap:6px!important;color:#b8c4bc!important;font-size:10px!important;letter-spacing:.1px!important}
+.buyback-field input,.buyback-field select{min-height:39px!important;padding:9px 10px!important;border-radius:8px!important;background:#111513!important;border-color:#354039!important;color:#edf2ee!important;font-size:12px!important}
+.buyback-field input:focus,.buyback-field select:focus{outline:2px solid #4caf7822!important;border-color:#4caf78!important}
+.buyback-add{min-height:39px!important;height:39px!important;padding:0 14px!important;border-radius:8px!important;background:#319b68!important;border:1px solid #48b77d!important;color:#071b11!important;font-size:11px!important;box-shadow:none!important}
+.buyback-add:hover{background:#3bb478!important;filter:none!important;transform:translateY(-1px)!important}
+#buybackSummary.buyback-summary{display:flex!important;gap:7px!important;margin:0 0 12px!important}
+#buybackSummary .buyback-chip{padding:7px 10px!important;border-radius:8px!important;background:#1b211d!important;border-color:#303a32!important;color:#aebbb2!important;font-size:10px!important}
+#buybackSummary .buyback-chip b{font-size:12px!important;color:#edf3ee!important}
+.buyback-summary:has(button[data-status]){display:flex!important;flex-wrap:wrap!important;gap:4px!important;width:max-content!important;max-width:100%!important;padding:4px!important;margin-bottom:14px!important;background:#151916!important;border:1px solid #303831!important;border-radius:10px!important}
+.buyback-chip[data-status]{padding:8px 12px!important;border-radius:7px!important;font-size:10px!important}
+.buyback-chip[data-status].active,.buyback-chip[data-status][aria-pressed="true"]{background:#26382b!important;border-color:#42634a!important;color:#a9e5b7!important}
+.buyback-list{gap:9px!important}
+.buyback-card{grid-template-columns:minmax(0,1fr) auto!important;gap:16px!important;padding:14px 16px!important;border-radius:12px!important;background:#191e1b!important;border:1px solid #303a33!important;border-left:3px solid #4d8b65!important;box-shadow:none!important;transform:none!important}
+.buyback-card:hover{border-color:#46594b!important;box-shadow:0 5px 14px #0003!important;transform:none!important}
+.buyback-card.warn{background:#211f18!important;border-color:#51452d!important;border-left-color:#d0a54b!important}
+.buyback-card.critical{background:#231b1b!important;border-color:#553232!important;border-left-color:#d46b65!important}
+.buyback-card.expired{background:#281a1a!important;border-color:#663535!important;border-left-color:#d24f4f!important}
+.buyback-article{font-size:16px!important;font-weight:800!important;line-height:1.35!important;letter-spacing:0!important}
+.buyback-article span{font-size:12px!important;color:#9ba7a0!important}
+.buyback-meta{margin-top:6px!important;font-size:11px!important;line-height:1.6!important;color:#a5b0a9!important}
+.buyback-meta b{color:#e0e9e2!important}
+.buyback-progress{height:4px!important;margin-top:9px!important;background:#303833!important;border-radius:5px!important;max-width:none!important}
+.buyback-progress span{border-radius:5px!important;background:#55b77b!important}
+.buyback-card.warn .buyback-progress span{background:#d0a54b!important}
+.buyback-card.critical .buyback-progress span,.buyback-card.expired .buyback-progress span{background:#d85e5e!important}
+.buyback-status{margin-top:8px!important;padding:4px 7px!important;border-radius:6px!important;font-size:9px!important;letter-spacing:.2px!important}
+.buyback-actions{max-width:none!important;min-width:0!important;display:flex!important;flex-wrap:wrap!important;align-items:center!important;justify-content:flex-end!important;gap:5px!important}
+.buyback-actions button{min-height:31px!important;padding:6px 9px!important;border-radius:7px!important;font-size:10px!important;font-weight:750!important}
+.buyback-actions button.buyback-action-edit{background:#242a27!important;border-color:#3b4640!important;color:#d5dfd8!important}
+.buyback-actions button.buyback-action-green{background:#203629!important;border-color:#345d41!important;color:#a9e4b6!important}
+.buyback-actions button.buyback-action-red{background:#351f20!important;border-color:#613638!important;color:#f0b2b0!important}
+.buyback-empty{padding:34px 18px!important;background:#171c19!important;border-color:#364039!important;color:#9da9a1!important}
+@media(max-width:900px){
+ .buyback-window{width:min(760px,100%)!important}
+ .buyback-form{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+ .buyback-form .buyback-add{width:100%!important}
+ .buyback-card{grid-template-columns:minmax(0,1fr)!important;gap:10px!important}
+ .buyback-actions{justify-content:flex-start!important;padding-top:2px!important}
+}
+@media(max-width:620px){
+ .buyback-overlay{padding:6px!important}
+ .buyback-window{max-height:calc(100dvh - 12px)!important;border-radius:12px!important}
+ .buyback-head{padding:15px 14px!important}
+ .buyback-head h2{font-size:21px!important}
+ .buyback-body{padding:12px 10px 15px!important}
+ .buyback-form{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:9px!important;padding:10px!important}
+ .buyback-form .buyback-field:first-child,.buyback-form .buyback-field:nth-child(4){grid-column:1/-1!important}
+ .buyback-summary:has(button[data-status]){display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;width:100%!important}
+ .buyback-chip[data-status]{width:100%!important}
+ .buyback-card{padding:12px!important}
+ .buyback-article{font-size:15px!important}
+ .buyback-meta{font-size:10px!important;line-height:1.6!important}
+ .buyback-actions{gap:5px!important}
+ .buyback-actions button{flex:1 1 auto!important;min-height:32px!important}
+}
+
 `;
 document.head.append(style);
 const overlay=document.createElement('div');

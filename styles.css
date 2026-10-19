@@ -3431,3 +3431,32 @@ body.dark-theme .directory-modal .directory-empty{
  body.dark-theme .directory-modal .directory-toolbar button{flex:1 1 auto!important}
  body.dark-theme .directory-modal .directory-table-wrap{max-height:58vh!important;min-height:150px!important}
 }
+
+
+/* Warehouse Orders · Status cards v2 — square icon tiles + consistent line artwork */
+body.dark-theme .stats-grid .stat-card .stat-icon{
+  display:grid!important;place-items:center!important;
+  width:44px!important;height:44px!important;min-width:44px!important;flex:0 0 44px!important;
+  border-radius:12px!important;padding:0!important;
+  background:#242a2e!important;border:1px solid #3a4449!important;
+  color:#d8e0e3!important;box-shadow:none!important;
+  font-size:0!important;line-height:1!important;
+}
+body.dark-theme .stats-grid .stat-card .stat-icon svg{
+  display:block!important;width:22px!important;height:22px!important;
+  fill:none!important;stroke:currentColor!important;stroke-width:1.8!important;
+  stroke-linecap:round!important;stroke-linejoin:round!important;
+}
+body.dark-theme .stats-grid .stat-card.stat-created .stat-icon{background:#242a30!important;border-color:#3d4852!important;color:#b9c9dc!important}
+body.dark-theme .stats-grid .stat-card.stat-assembled .stat-icon,
+body.dark-theme .stats-grid .stat-card.stat-ready .stat-icon{background:#19362b!important;border-color:#285b45!important;color:#72d9a5!important}
+body.dark-theme .stats-grid .stat-card.stat-payment .stat-icon,
+body.dark-theme .stats-grid .stat-card.stat-transferred .stat-icon{background:#242a2e!important;border-color:#3a4449!important;color:#c5d0d5!important}
+body.dark-theme .stats-grid .stat-card.stat-attention .stat-icon{background:#332c1a!important;border-color:#5b4b27!important;color:#e6c36d!important}
+body.dark-theme .stats-grid .stat-card.stat-approval .stat-icon{background:#2d2840!important;border-color:#4b416a!important;color:#c1b1ff!important}
+body.dark-theme .stats-grid .stat-card.stat-pickup .stat-icon{background:#19343a!important;border-color:#2b5861!important;color:#7bd5df!important}
+body.dark-theme .stats-grid .stat-card .stat-top{gap:10px!important}
+@media(max-width:720px){
+ body.dark-theme .stats-grid .stat-card .stat-icon{width:36px!important;height:36px!important;min-width:36px!important;flex-basis:36px!important;border-radius:10px!important}
+ body.dark-theme .stats-grid .stat-card .stat-icon svg{width:19px!important;height:19px!important}
+}

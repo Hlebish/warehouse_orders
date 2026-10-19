@@ -136,7 +136,7 @@ overlay.addEventListener('click',async e=>{
   const receivedAt=window.prompt('Дата приёма (ГГГГ-ММ-ДД):',item.receivedAt||'');if(receivedAt===null)return;
   const supplier=window.prompt('Поставщик:',item.supplier||'');if(supplier===null)return;
   const cleanArticle=article.trim(),cleanSupplier=supplier.trim(),qty=Number(quantityText);
-  if(!cleanArticle||cleanArticle.length>100||!Number.isInteger(qty)||qty<1||qty>100000||!/^\\d{4}-\\d{2}-\\d{2}$/.test(receivedAt)||Number.isNaN(Date.parse(receivedAt+'T00:00:00'))){showToast('Проверьте артикул, количество и дату в формате ГГГГ-ММ-ДД.');return}
+  if(!cleanArticle||cleanArticle.length>100||!Number.isInteger(qty)||qty<1||qty>100000||!/^\d{4}-\d{2}-\d{2}$/.test(receivedAt)||Number.isNaN(Date.parse(receivedAt+'T00:00:00'))){showToast('Проверьте артикул, количество и дату в формате ГГГГ-ММ-ДД.');return}
   editBtn.disabled=true;
   try{await updateDoc(doc(db,'buybackItems',item.id),{article:cleanArticle,quantity:qty,receivedAt,supplier:cleanSupplier,updatedAt:serverTimestamp()});showToast('Позиция перекупного товара обновлена.');}
   catch(err){console.error(err);showToast('Не удалось сохранить изменения: '+(err.code||'проверьте доступ'));}

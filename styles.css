@@ -3634,3 +3634,25 @@ body.dark-theme .detail-action-roles .warehouse-category:hover:not(:disabled){
 body.dark-theme .detail-action-roles .role-action-locked{
   opacity:.58!important;filter:none!important;
 }
+
+
+/* Status card color semantics v3 — icon, accent stripe and tile must match */
+body.dark-theme .stats-grid .stat-card::before{background:#59636a!important}
+body.dark-theme .stats-grid .stat-card.stat-created::before{background:#91a5ba!important}
+body.dark-theme .stats-grid .stat-card.stat-assembled::before{background:#55c994!important}
+body.dark-theme .stats-grid .stat-card.stat-payment::before{background:#aab4bb!important}
+body.dark-theme .stats-grid .stat-card.stat-ready::before{background:#55c994!important}
+body.dark-theme .stats-grid .stat-card.stat-attention::before{background:#d6ad54!important}
+body.dark-theme .stats-grid .stat-card.stat-approval::before{background:#a994f2!important}
+body.dark-theme .stats-grid .stat-card.stat-transferred::before{background:#aab4bb!important}
+body.dark-theme .stats-grid .stat-card.stat-pickup::before{background:#63c6d4!important}
+body.dark-theme .stats-grid .stat-card.stat-approval .stat-icon{
+  background:#2d2840!important;border-color:#4b416a!important;color:#c1b1ff!important;
+}
+body.dark-theme .stats-grid .stat-card.stat-transferred .stat-icon{
+  background:#252b2f!important;border-color:#3a4449!important;color:#d5dcdf!important;
+}
+body.dark-theme .stats-grid .stat-card.stat-transferred .stat-label,
+body.dark-theme .stats-grid .stat-card.stat-transferred strong{color:#edf1f3!important}
+body.dark-theme .stats-grid .stat-card.stat-approval:hover{border-color:#574a7c!important}
+body.dark-theme .stats-grid .stat-card.stat-transferred:hover{border-color:#465056!important}

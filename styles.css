@@ -3612,3 +3612,25 @@ body.dark-theme .chat-upload-progress{background:#252d30!important}
  body.dark-theme .chat-form .chat-input-wrap{grid-column:1!important}
  body.dark-theme .chat-form .primary-button{width:100%!important}
 }
+
+
+/* Order detail role shortcuts: blue for manager, green for warehouse */
+body.dark-theme .detail-action-roles .manager-category,
+body.dark-theme .detail-action-roles .manager-category.role-action-locked{
+  background:#172b43!important;border:1px solid #315f91!important;color:#a9d0ff!important;
+  box-shadow:inset 3px 0 0 #4b9af0!important;
+}
+body.dark-theme .detail-action-roles .manager-category:hover:not(:disabled){
+  background:#1c3857!important;border-color:#4b8fd1!important;color:#d6e8ff!important;
+}
+body.dark-theme .detail-action-roles .warehouse-category,
+body.dark-theme .detail-action-roles .warehouse-category.role-action-locked{
+  background:#193629!important;border:1px solid #326849!important;color:#a7e6bc!important;
+  box-shadow:inset 3px 0 0 #4bb879!important;
+}
+body.dark-theme .detail-action-roles .warehouse-category:hover:not(:disabled){
+  background:#214634!important;border-color:#4a9566!important;color:#d5f6df!important;
+}
+body.dark-theme .detail-action-roles .role-action-locked{
+  opacity:.58!important;filter:none!important;
+}

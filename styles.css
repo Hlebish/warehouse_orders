@@ -4094,3 +4094,8 @@ body.dark-theme tr.date-separator:not(.transferred-date-separator):not(.current-
   font-size:9px!important;padding:0 13px!important;letter-spacing:.2em!important;
  }
 }
+
+/* Slightly tighter tracking for the AMP divider wordmark */
+body.dark-theme tr.date-separator:not(.transferred-date-separator):not(.current-date-separator) td::after{
+  letter-spacing:.10em!important;
+}

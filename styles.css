@@ -3885,3 +3885,15 @@ body.dark-theme .detail-actions .detail-action-utility .small-button[data-action
 body.dark-theme .detail-actions .detail-action-utility .small-button[data-action="add-comment"]:active{
   background:#292f34!important;border:1px solid #4a555d!important;color:#e1e6e9!important;
 }
+
+
+/* Transferred-order indicators in the orders table: neutral white/grey */
+body.dark-theme .orders-panel .status-transferred,
+body.dark-theme .orders-panel .status-pill.status-transferred,
+body.dark-theme .orders-panel .status-badge.status-transferred,
+body.dark-theme .orders-panel [data-status="Перенесен"],
+body.dark-theme .orders-panel [data-status="Перенесён"]{
+  background:#303438!important;
+  color:#f3f5f6!important;
+  border-color:#d8dde0!important;
+}

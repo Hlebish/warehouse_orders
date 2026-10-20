@@ -4,7 +4,8 @@ importScripts(
 );
 
 const SITE_URL = 'https://hlebish.github.io/warehouse_orders/';
-const CACHE = 'order-desk-fcm-v67';
+const CACHE = 'order-desk-fcm-v68';
+// Version bump triggers install/activate; activate notifies open tabs to reload.
 const ASSETS = [
   './',
   './index.html',

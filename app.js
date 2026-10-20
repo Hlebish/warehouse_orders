@@ -131,16 +131,54 @@ function isMentionNotice(n){const t=String(n?.title||'').toLocaleLowerCase('ru')
 function shouldShowAttentionToast(n){return isMentionNotice(n)||flagOn(n,'isReply')||n?.category==='chat'}
 function unreadMentionNotices(){return state.notices.filter(n=>!n.read&&isMentionNotice(n))}
 function paintMentionCenter(){const b=$('mentionCenterButton'),c=$('mentionCenterCount'),l=$('mentionCenterLabel');if(!b||!c||!l)return;const n=unreadMentionNotices().length;c.textContent=String(n);b.hidden=n===0;l.textContent=n===1?'Вас упомянули':`У вас ${n} новых упоминания`}
-const shownMentionNoticeIds=new Set();
-function showAttentionToast(n){const key=String(n.id||n.eventId||`${n.title||''}|${n.message||n.body||''}|${n.orderId||''}`);if(shownMentionNoticeIds.has(key))return;shownMentionNoticeIds.add(key);if(shownMentionNoticeIds.size>300)shownMentionNoticeIds.delete(shownMentionNoticeIds.values().next().value);const sender=String(n.title||'Сотрудник');const heading=isMentionNotice(n)?'Вас упомянули':flagOn(n,'isReply')?'Вам ответили':(n?.target==='chat'||n?.category==='chat')?'Новое сообщение в общем чате':'Новое сообщение';const text=String(n.message||n.body||'Откройте, чтобы посмотреть сообщение');const t=toast(`${heading} · ${sender}: ${text}`,String(n.orderId||''));t.classList.add('mention-toast');t.setAttribute('role','button');t.tabIndex=0;t.setAttribute('aria-label',`${heading} от ${sender}. Открыть сообщение`);t.addEventListener('click',()=>openMentionNotice(n));t.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openMentionNotice(n)}})}
+const shownAttentionToastKeys=new Map();
+function showAttentionToast(n){
+  const now=Date.now();
+  for(const [key,time] of shownAttentionToastKeys){if(now-time>15000)shownAttentionToastKeys.delete(key);}
+  const sender=String(n.title||'Сотрудник');
+  const message=String(n.message||n.body||'Откройте, чтобы посмотреть сообщение');
+  const semanticKey='semantic:'+[`${n.target||''}`,sender,message,String(n.orderId||'')].join('|').toLocaleLowerCase('ru');
+  const eventKey='event:'+String(n.eventId||n.id||semanticKey);
+  if(shownAttentionToastKeys.has(eventKey)||shownAttentionToastKeys.has(semanticKey))return;
+  shownAttentionToastKeys.set(eventKey,now);
+  shownAttentionToastKeys.set(semanticKey,now);
+  while(shownAttentionToastKeys.size>600)shownAttentionToastKeys.delete(shownAttentionToastKeys.keys().next().value);
+  const heading=isMentionNotice(n)||flagOn(n,'isMention')?'Вас упомянули':flagOn(n,'isReply')?'Вам ответили':(n?.target==='chat'||n?.category==='chat')?'Новое сообщение в общем чате':'Новое сообщение';
+  const t=toast(`${heading} · ${sender}: ${message}`,String(n.orderId||''));
+  t.classList.add('mention-toast');t.setAttribute('role','button');t.tabIndex=0;
+  t.setAttribute('aria-label',`${heading} от ${sender}. Открыть сообщение`);
+  t.addEventListener('click',()=>openMentionNotice(n));
+  t.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openMentionNotice(n)}});
+}
 function openMentionNotice(n){if(n?.orderId){closeModal();openOrder(String(n.orderId));return}if(n?.target==='chat'||n?.category==='chat'||n?.category==='replies'){openChat();return}showNotifications()}
 function openMentionCenter(){const items=unreadMentionNotices();if(!items.length){showNotifications();return}const body='<div class="mention-center-list">'+items.map(n=>'<button type="button" class="mention-center-item" data-mention-notice="'+esc(n.id)+'"><b>'+esc(n.title||'Вас упомянули')+'</b><span>'+esc(n.message||n.body||'Новое упоминание')+'</span><small>'+esc(fmtDateTime(n.createdAt||n.at))+'</small></button>').join('')+'</div>';showModal('Новые упоминания',body,[button('Все уведомления','show-notifications','small-button'),button('Закрыть','close')],'ВАС УПОМЯНУЛИ')}
 function watchChatBadge(){
   chatBadgeUnsubscribe?.();
   if(!signedInUser)return;
+  let initialSnapshot=true;
+  let knownMessageIds=new Set();
   const q=query(collection(db,'chatMessages'),orderBy('createdAt','desc'),limit(100));
   chatBadgeUnsubscribe=onSnapshot(q,snap=>{
-    const messages=snap.docs.map(d=>d.data()||{});
+    const messages=snap.docs.map(d=>({id:d.id,...(d.data()||{})}));
+    if(!initialSnapshot){
+      messages.filter(m=>!knownMessageIds.has(m.id)&&m.authorId&&m.authorId!==signedInUser.uid).forEach(m=>{
+        const messageText=String(m.text||m.message||m.content||'').trim()||'📷 Фото';
+        const sender=chatDisplayName(m.authorName||m.author||m.userName||'Сотрудник');
+        const mentionToken='@'+chatMentionToken(profileName||'');
+        const isMention=!!profileName&&messageText.toLocaleLowerCase('ru').includes(mentionToken.toLocaleLowerCase('ru'));
+        showAttentionToast({
+          id:'chat-message:'+m.id,
+          title:sender,
+          message:messageText.slice(0,300),
+          target:'chat',
+          category:'chat',
+          isReply:!!m.replyToId,
+          isMention
+        });
+      });
+    }
+    initialSnapshot=false;
+    knownMessageIds=new Set(messages.map(m=>m.id));
     knownChatPeople=[...new Map(messages.filter(m=>m.authorId&&m.authorName).map(m=>[m.authorId,{id:m.authorId,name:chatDisplayName(m.authorName)}])).values()];
     chatUnread=messages.some(m=>m.authorId!==signedInUser.uid && Array.isArray(m.readBy) && !m.readBy.includes(signedInUser.uid));
     paintChatBadge();
@@ -435,6 +473,16 @@ async function syncPushToken(requestPermission=false){
     }
   }
 }
+
+let lastPushTokenRefreshAt=0;
+function refreshPushTokenOnResume(){
+  if(!signedInUser||!('Notification' in window)||Notification.permission!=='granted')return;
+  if(Date.now()-lastPushTokenRefreshAt<5*60*1000)return;
+  lastPushTokenRefreshAt=Date.now();
+  syncPushToken(false);
+}
+window.addEventListener('pageshow',refreshPushTokenOnResume);
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')refreshPushTokenOnResume();});
 
 async function enablePush(){
   await syncPushToken(true);

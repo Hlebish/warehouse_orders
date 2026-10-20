@@ -3954,3 +3954,12 @@ body.dark-theme .date-separator span::after{
 @media(max-width:700px){
   body.dark-theme .date-separator span::after{width:calc(100vw - 100px)!important;opacity:.8!important}
 }
+
+/* Keep section headers clean; neutral date dividers with a subtle shadow */
+body.dark-theme .date-separator span::after{
+  background:linear-gradient(90deg,rgba(205,215,220,.48) 0%,rgba(205,215,220,.22) 58%,rgba(205,215,220,0) 100%)!important;
+  box-shadow:0 0 2px rgba(220,230,235,.16)!important;
+}
+/* Category/group heading rows should not inherit the date-divider decoration */
+body.dark-theme tr:not(.date-separator) span::after{ }
+body.dark-theme .date-separator td[colspan]::after{display:none!important}

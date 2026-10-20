@@ -4125,3 +4125,35 @@ body.dark-theme tr.date-separator:not(.transferred-date-separator):not(.current-
     right:105px!important;
   }
 }
+
+
+/* AMP original emblem: preserve the complete artwork on desktop and mobile */
+body.dark-theme .brand img.brand-logo{
+  display:block!important;
+  width:42px!important;
+  height:42px!important;
+  min-width:42px!important;
+  min-height:42px!important;
+  max-width:42px!important;
+  max-height:42px!important;
+  flex:0 0 42px!important;
+  object-fit:contain!important;
+  object-position:center!important;
+  padding:0!important;
+  overflow:visible!important;
+  border-radius:10px!important;
+  background:#101214!important;
+  box-sizing:border-box!important;
+}
+@media(max-width:700px){
+  body.dark-theme .brand img.brand-logo{
+    width:42px!important;
+    height:42px!important;
+    min-width:42px!important;
+    min-height:42px!important;
+    max-width:42px!important;
+    max-height:42px!important;
+    flex-basis:42px!important;
+    object-fit:contain!important;
+  }
+}

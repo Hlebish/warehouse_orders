@@ -4,7 +4,7 @@ importScripts(
 );
 
 const SITE_URL = 'https://hlebish.github.io/warehouse_orders/';
-const CACHE = 'order-desk-fcm-v68';
+const CACHE = 'order-desk-fcm-v69';
 // Version bump triggers install/activate; activate notifies open tabs to reload.
 const ASSETS = [
   './',
@@ -13,7 +13,7 @@ const ASSETS = [
   './app.js',
   './firebase-config.js',
   './manifest.webmanifest',
-  './amp-logo.png',
+  './amp-logo.svg',
   './app-icon.svg'
 ];
 
@@ -95,8 +95,8 @@ function showPushNotification(data={}){
 
   return self.registration.showNotification(title,{
     body,
-    icon:'./amp-logo.png',
-    badge:'./amp-logo.png',
+    icon:'./amp-logo.svg',
+    badge:'./amp-logo.svg',
     tag:eventId||'warehouse-push',
     renotify:true,
     silent:false,

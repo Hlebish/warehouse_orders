@@ -3864,3 +3864,24 @@ body.dark-theme .detail-actions .small-button{
   }
   body.dark-theme .detail-actions .detail-action-utility .small-button{min-height:44px!important}
 }
+
+
+/* Final requested tweaks: manager stays blue; add-comment is neutral grey */
+body.dark-theme .detail-actions .detail-action-roles .small-button.manager-category,
+body.dark-theme .detail-actions .detail-action-roles .small-button.manager-category:hover,
+body.dark-theme .detail-actions .detail-action-roles .small-button.manager-category:focus,
+body.dark-theme .detail-actions .detail-action-roles .small-button.manager-category:active{
+  background:#18385f!important;border-color:#3477ba!important;color:#f2f7ff!important;
+}
+body.dark-theme .detail-actions .detail-action-roles .small-button.warehouse-category,
+body.dark-theme .detail-actions .detail-action-roles .small-button.warehouse-category:hover,
+body.dark-theme .detail-actions .detail-action-roles .small-button.warehouse-category:focus,
+body.dark-theme .detail-actions .detail-action-roles .small-button.warehouse-category:active{
+  background:#174832!important;border-color:#2d9a64!important;color:#edfff5!important;
+}
+body.dark-theme .detail-actions .detail-action-utility .small-button[data-action="add-comment"],
+body.dark-theme .detail-actions .detail-action-utility .small-button[data-action="add-comment"]:hover,
+body.dark-theme .detail-actions .detail-action-utility .small-button[data-action="add-comment"]:focus,
+body.dark-theme .detail-actions .detail-action-utility .small-button[data-action="add-comment"]:active{
+  background:#292f34!important;border:1px solid #4a555d!important;color:#e1e6e9!important;
+}

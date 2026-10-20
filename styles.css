@@ -4800,3 +4800,29 @@ body:not(.dark-theme) .shipment-manifest-modal .small-button {
   body:not(.dark-theme) .modal-backdrop { background: rgba(15,23,42,.48) !important; }
   body:not(.dark-theme) .modal { background: #fff !important; color: #172b4d !important; }
 }
+
+
+/* Buyback view: match the site's neutral graphite panels, not a green-tinted surface. */
+body.dark-theme .buyback-panel,
+body.dark-theme .buyback-panel > *,
+body.dark-theme .buyback-form,
+body.dark-theme .buyback-summary,
+body.dark-theme #buybackModal .modal-content,
+body.dark-theme #buybackModal .modal-head,
+body.dark-theme #buybackModal .modal-body,
+body.dark-theme #buybackModal .modal-foot {
+  background-color: #191d20 !important;
+  color: #e8ecee !important;
+  border-color: #30373b !important;
+}
+body.dark-theme .buyback-panel {
+  background: #191d20 !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,.12) !important;
+}
+body.dark-theme .buyback-panel input,
+body.dark-theme .buyback-panel select,
+body.dark-theme .buyback-panel textarea {
+  background: #121517 !important;
+  color: #e8ecee !important;
+  border-color: #30373b !important;
+}

@@ -3917,3 +3917,10 @@ body.dark-theme .order-detail-head .detail-client-link:hover{
 .client-detail-field span{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted,#87939a);font-weight:750}
 .client-detail-field b{font-size:14px;font-weight:550;overflow-wrap:anywhere;white-space:pre-wrap}
 .client-detail-comment{border-bottom:0}
+
+/* Daily order group separators */
+body.dark-theme .date-separator td{padding:14px 10px 8px!important;border:0!important;background:transparent!important}
+body.dark-theme .date-separator td::before{display:none!important}
+body.dark-theme .date-separator span{display:inline-flex!important;align-items:center!important;max-width:100%!important;box-sizing:border-box!important;padding:7px 12px!important;border:1px solid #35483f!important;border-left:3px solid #35b879!important;border-radius:7px!important;background:rgba(53,184,121,.09)!important;color:#b9e8d0!important;font-size:10px!important;font-weight:800!important;letter-spacing:.05em!important;line-height:1.35!important}
+body.dark-theme .date-separator+tr td{border-top:1px solid #303b36!important}
+@media(max-width:700px){body.dark-theme .date-separator td{padding:11px 7px 7px!important}body.dark-theme .date-separator span{padding:6px 9px!important;font-size:9px!important}}

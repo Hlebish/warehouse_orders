@@ -973,7 +973,10 @@ function importClientsExcel(file){
       };
       const matchesAlias=(header,field)=>{
         const key=headerKey(header);
-        return aliases[field].some(alias=>headerKey(alias)===key);
+        return aliases[field].some(alias=>{
+          const a=headerKey(alias);
+          return key===a||key.includes(a);
+        });
       };
 
       // Выгрузка 1С может содержать несколько служебных строк перед настоящим заголовком.

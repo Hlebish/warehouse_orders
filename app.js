@@ -121,16 +121,18 @@ function watchNotifications(){
   const q=query(collection(db,'users',signedInUser.uid,'notifications'),orderBy('createdAt','desc'),limit(100));
   notificationsUnsubscribe=onSnapshot(q,snap=>{
     const next=snap.docs.map(d=>({id:d.id,...d.data(),at:d.data().createdAt||d.data().at||isoNow()}));
-    if(!initialSnapshot){next.filter(n=>!knownNoticeIds.has(n.id)&&isMentionNotice(n)&&!n.read).forEach(showMentionToast)}
+    if(!initialSnapshot){next.filter(n=>!knownNoticeIds.has(n.id)&&shouldShowAttentionToast(n)&&!n.read).forEach(showAttentionToast)}
     initialSnapshot=false;
     knownNoticeIds=new Set(next.map(n=>n.id));state.notices=next;paintNotices();paintMentionCenter();
   },err=>console.error('Не удалось загрузить историю уведомлений',err));
 }
-function isMentionNotice(n){const t=String(n?.title||'').toLocaleLowerCase('ru');return t.includes('упомянули вас')||t.includes('вас упомянули')||n?.isMention===true||n?.category==='mention'||(n?.category==='replies'&&n?.target==='chat'&&n?.isReply!==true)}
+function flagOn(n,key){return n?.[key]===true||n?.[key]==='true'||n?.[key]===1}
+function isMentionNotice(n){const t=String(n?.title||'').toLocaleLowerCase('ru');return flagOn(n,'isMention')||t.includes('упомянули вас')||t.includes('вас упомянули')||n?.category==='mention'||(n?.category==='replies'&&n?.target==='chat'&&!flagOn(n,'isReply'))}
+function shouldShowAttentionToast(n){return isMentionNotice(n)||flagOn(n,'isReply')||n?.category==='chat'}
 function unreadMentionNotices(){return state.notices.filter(n=>!n.read&&isMentionNotice(n))}
 function paintMentionCenter(){const b=$('mentionCenterButton'),c=$('mentionCenterCount'),l=$('mentionCenterLabel');if(!b||!c||!l)return;const n=unreadMentionNotices().length;c.textContent=String(n);b.hidden=n===0;l.textContent=n===1?'Вас упомянули':`У вас ${n} новых упоминания`}
 const shownMentionNoticeIds=new Set();
-function showMentionToast(n){const key=String(n.id||n.eventId||`${n.title||''}|${n.message||n.body||''}|${n.orderId||''}`);if(shownMentionNoticeIds.has(key))return;shownMentionNoticeIds.add(key);if(shownMentionNoticeIds.size>300)shownMentionNoticeIds.delete(shownMentionNoticeIds.values().next().value);const text=String(n.message||n.body||'Вас упомянули в сообщении');const t=toast(`${n.title||'Вас упомянули'}: ${text}`,String(n.orderId||''));t.classList.add('mention-toast');t.setAttribute('role','button');t.tabIndex=0;t.addEventListener('click',()=>openMentionNotice(n));t.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openMentionNotice(n)}})}
+function showAttentionToast(n){const key=String(n.id||n.eventId||`${n.title||''}|${n.message||n.body||''}|${n.orderId||''}`);if(shownMentionNoticeIds.has(key))return;shownMentionNoticeIds.add(key);if(shownMentionNoticeIds.size>300)shownMentionNoticeIds.delete(shownMentionNoticeIds.values().next().value);const sender=String(n.title||'Сотрудник');const heading=isMentionNotice(n)?'Вас упомянули':flagOn(n,'isReply')?'Вам ответили':(n?.target==='chat'||n?.category==='chat')?'Новое сообщение в общем чате':'Новое сообщение';const text=String(n.message||n.body||'Откройте, чтобы посмотреть сообщение');const t=toast(`${heading} · ${sender}: ${text}`,String(n.orderId||''));t.classList.add('mention-toast');t.setAttribute('role','button');t.tabIndex=0;t.setAttribute('aria-label',`${heading} от ${sender}. Открыть сообщение`);t.addEventListener('click',()=>openMentionNotice(n));t.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openMentionNotice(n)}})}
 function openMentionNotice(n){if(n?.orderId){closeModal();openOrder(String(n.orderId));return}if(n?.target==='chat'||n?.category==='chat'||n?.category==='replies'){openChat();return}showNotifications()}
 function openMentionCenter(){const items=unreadMentionNotices();if(!items.length){showNotifications();return}const body='<div class="mention-center-list">'+items.map(n=>'<button type="button" class="mention-center-item" data-mention-notice="'+esc(n.id)+'"><b>'+esc(n.title||'Вас упомянули')+'</b><span>'+esc(n.message||n.body||'Новое упоминание')+'</span><small>'+esc(fmtDateTime(n.createdAt||n.at))+'</small></button>').join('')+'</div>';showModal('Новые упоминания',body,[button('Все уведомления','show-notifications','small-button'),button('Закрыть','close')],'ВАС УПОМЯНУЛИ')}
 function watchChatBadge(){
@@ -311,7 +313,7 @@ async function save(){
   throw err;
  }
 }
-async function queuePush(title,body,authorId,orderId='',target='site',category='',recipientUserId=''){
+async function queuePush(title,body,authorId,orderId='',target='site',category='',recipientUserId='',attention={}){
   try{
     const normalizedCategory=category||(target==='chat'?'chat':'orders');
     await setDoc(doc(db,'pushQueue',crypto.randomUUID()),{
@@ -321,6 +323,8 @@ async function queuePush(title,body,authorId,orderId='',target='site',category='
       orderId:String(orderId||''),
       target:target==='chat'?'chat':'site',
       category:normalizedCategory,
+      isMention:attention.isMention===true,
+      isReply:attention.isReply===true,
       recipientUserId:String(recipientUserId||''),
       createdAt:isoNow(),
       sentAt:null
@@ -463,7 +467,8 @@ onMessage(messaging,payload=>{
     if((eventId&&recentPushEvents.has(`event:${eventId}`))||recentPushEvents.has(`msg:${signature}`))return;
     if(eventId)recentPushEvents.set(`event:${eventId}`,now);
     recentPushEvents.set(`msg:${signature}`,now);
-    if(String(n.category||'')==='mention'||String(n.category||'')==='replies'||String(n.title||'').toLocaleLowerCase('ru').includes('упомянули вас')||String(n.title||'').toLocaleLowerCase('ru').includes('вас упомянули')){showForegroundPushNotification(n);if(String(n.category||'')==='mention'||(String(n.category||'')==='replies'&&String(n.target||'')==='chat'&&!n.isReply)||String(n.title||'').toLocaleLowerCase('ru').includes('упомянули вас')||String(n.title||'').toLocaleLowerCase('ru').includes('вас упомянули'))showMentionToast({...n,title:'Вас упомянули'})}
+    const attention={...n,isMention:n.isMention==='true'||n.isMention===true,isReply:n.isReply==='true'||n.isReply===true};
+    if(category==='mention'||category==='replies'||category==='chat'){showForegroundPushNotification(n);if(shouldShowAttentionToast(attention))showAttentionToast({...attention,id:eventId||signature})}
     notify(message,orderId,target,target==='chat'?'chat':'orders');
   }
 });
@@ -1466,7 +1471,7 @@ try{
 const photoBlobs=await readPhotos($('entryPhotos').files);const important=kind==='comment'&&$('entryImportant')?.checked===true;
 const entryId=crypto.randomUUID();
 const photos=await uploadPhotos(o.id,entryId,photoBlobs);
-if(kind==='defect'){o.status='Дефект';articleIndexes.forEach((idx,n)=>{const item=o.articles[idx];o.entries.push({id:n===0?entryId:crypto.randomUUID(),kind,article:item.article,articleIndex:idx,text,important:false,authorId:signedInUser.uid,author:profileName||roles[state.role],createdAt:isoNow(),photos:n===0?photos:[]});});}else{o.entries.push({id:entryId,kind,article:'',...(replyTarget?{replyToEntryId:replyTarget.id,replyToAuthorId:replyTarget.authorId||'',replyToAuthorName:replyTarget.author||'Сотрудник',replyToText:String(replyTarget.text||'').slice(0,500)}:{}),text,important,authorId:signedInUser.uid,author:profileName||roles[state.role],createdAt:isoNow(),photos});}await save();if(kind==='comment'){if(replyTarget?.authorId&&replyTarget.authorId!==signedInUser.uid){await queuePush(profileName||roles[state.role],`Ответ на ваш комментарий: ${text}`,signedInUser.uid,o.id,'site','replies',replyTarget.authorId);}const tokens=[...text.matchAll(/(^|[\s])@([\p{L}\p{N}_-]{2,})/gu)].map(x=>x[2].toLocaleLowerCase('ru'));const mentioned=[...new Map(knownChatPeople.map(p=>[p.id,p])).values()].filter(p=>p.id&&p.id!==signedInUser.uid&&p.id!==replyTarget?.authorId&&tokens.includes(chatMentionToken(p.name).toLocaleLowerCase('ru')));await Promise.all(mentioned.map(p=>queuePush(profileName||roles[state.role],text,signedInUser.uid,o.id,'site','replies',p.id)));}await writeAudit(kind==='defect'?'Добавлен дефект':'Добавлен комментарий',text,o.id,{entryId});closeModal();render();if(kind==='defect'){const defectToast=toast(`⚠️ ДЕФЕКТ · Заказ № ${o.number}`,o.id);defectToast.classList.add('defect-toast');}else{toast('Запись добавлена в историю заказа.');}notify(`${kind==='defect'?'Дефект':'Комментарий'} к заказу № ${o.number}`,o.id);openOrder(o.id)
+if(kind==='defect'){o.status='Дефект';articleIndexes.forEach((idx,n)=>{const item=o.articles[idx];o.entries.push({id:n===0?entryId:crypto.randomUUID(),kind,article:item.article,articleIndex:idx,text,important:false,authorId:signedInUser.uid,author:profileName||roles[state.role],createdAt:isoNow(),photos:n===0?photos:[]});});}else{o.entries.push({id:entryId,kind,article:'',...(replyTarget?{replyToEntryId:replyTarget.id,replyToAuthorId:replyTarget.authorId||'',replyToAuthorName:replyTarget.author||'Сотрудник',replyToText:String(replyTarget.text||'').slice(0,500)}:{}),text,important,authorId:signedInUser.uid,author:profileName||roles[state.role],createdAt:isoNow(),photos});}await save();if(kind==='comment'){if(replyTarget?.authorId&&replyTarget.authorId!==signedInUser.uid){await queuePush(profileName||roles[state.role],`Ответ на ваш комментарий: ${text}`,signedInUser.uid,o.id,'site','replies',replyTarget.authorId,{isReply:true});}const tokens=[...text.matchAll(/(^|[\s])@([\p{L}\p{N}_-]{2,})/gu)].map(x=>x[2].toLocaleLowerCase('ru'));const mentioned=[...new Map(knownChatPeople.map(p=>[p.id,p])).values()].filter(p=>p.id&&p.id!==signedInUser.uid&&p.id!==replyTarget?.authorId&&tokens.includes(chatMentionToken(p.name).toLocaleLowerCase('ru')));await Promise.all(mentioned.map(p=>queuePush(profileName||roles[state.role],text,signedInUser.uid,o.id,'site','replies',p.id,{isMention:true})));}await writeAudit(kind==='defect'?'Добавлен дефект':'Добавлен комментарий',text,o.id,{entryId});closeModal();render();if(kind==='defect'){const defectToast=toast(`⚠️ ДЕФЕКТ · Заказ № ${o.number}`,o.id);defectToast.classList.add('defect-toast');}else{toast('Запись добавлена в историю заказа.');}notify(`${kind==='defect'?'Дефект':'Комментарий'} к заказу № ${o.number}`,o.id);openOrder(o.id)
 }catch(e){if(kind==='defect'&&o?.status==='Дефект'&&previousStatus){o.status=previousStatus;}toast(e.message)}
 finally{entrySending=false;if(sendButton){sendButton.disabled=false;sendButton.textContent=kind==='defect'?'Добавить дефект':'Отправить';}}}
 async function setStatus(status,text,kind='system'){const o=state.orders.find(x=>x.id===selectedId);if(!o||!signedInUser)return;if(!canEditOrder(o)){toast('После отгрузки заказ заблокирован для этой роли.');return;}if(hasPendingDefect(o)){toast('Пока есть нерассмотренный дефект, другие изменения заказа заблокированы.');return;}const previous=o.status;const previousTransferredAt=o.transferredAt;const previousResumedAt=o.resumedAt;const previousAssembledAt=o.assembledAt;const previousShippedAt=o.shippedAt;const previousAssemblyInProgress=o.assemblyInProgress;const now=isoNow();const entry={id:crypto.randomUUID(),kind,text,authorId:signedInUser.uid,author:profileName||roles[state.role],createdAt:now,photos:[]};const statusUpdate={status,updatedAt:now,updatedBy:signedInUser.uid,updatedByName:profileName||roles[state.role]};if(status==='Собран'){o.assembledAt=now;statusUpdate.assembledAt=now;}if(status==='Отгружен кладовщиком'){o.shippedAt=now;statusUpdate.shippedAt=now;}if(status==='Собран'||status==='Отгружен кладовщиком'){o.assemblyInProgress=false;statusUpdate.assemblyInProgress=false;}if(status==='Перенесен'){o.transferredAt=now;statusUpdate.transferredAt=now;}if(previous==='Перенесен'&&status!=='Перенесен'){o.resumedAt=now;statusUpdate.resumedAt=now;}try{o.status=status;await updateDoc(doc(db,'orders',o.id),statusUpdate);await setDoc(doc(db,'orders',o.id,'entries',entry.id),entryToCloud(entry));o.entries.push(entry);serverCache.set(o.id,{...serverCache.get(o.id),...o});await writeAudit('Изменён статус заказа',text,o.id,{previousStatus:previous,newStatus:status});await queuePush(`${o.client||'Клиент не указан'} · ${status}`,text,signedInUser.uid,o.id);render();notify(`Заказ № ${o.number}: ${status}`,o.id);openOrder(o.id)}catch(err){o.status=previous;o.transferredAt=previousTransferredAt;o.resumedAt=previousResumedAt;o.assembledAt=previousAssembledAt;o.shippedAt=previousShippedAt;o.assemblyInProgress=previousAssemblyInProgress;console.error('Ошибка изменения статуса заказа',err);toast('Не удалось изменить статус: '+(err?.message||'нет доступа'));}}
@@ -1774,12 +1779,12 @@ function openChat(){
         readBy:[signedInUser.uid],
         ...(chatReplyTo?{replyToId:chatReplyTo.id,replyToAuthorId:chatReplyTo.authorId,replyToAuthorName:chatReplyTo.authorName||'Сотрудник',replyToText:(chatReplyTo.text||'📷 Фото').slice(0,300)}:{})
       });
-      if(chatReplyTo){await queuePush(profileName,text||'📷 Фото',signedInUser.uid,'','chat','replies',chatReplyTo.authorId);}else{await queuePush(profileName,text||'📷 Фото',signedInUser.uid,'','chat','chat');}
+      if(chatReplyTo){await queuePush(profileName,text||'📷 Фото',signedInUser.uid,'','chat','replies',chatReplyTo.authorId,{isReply:true});}else{await queuePush(profileName,text||'📷 Фото',signedInUser.uid,'','chat','chat');}
       const mentionedTokens=[...text.matchAll(/(^|[\s])@([\p{L}\p{N}_-]{2,})/gu)].map(x=>x[2].toLocaleLowerCase('ru'));
       const mentionedUsers=[...new Map(chatMessages.map(m=>[m.authorId,{id:m.authorId,name:chatDisplayName(m.authorName)}])).values()]
         .filter(p=>p.id&&p.id!==signedInUser.uid&&mentionedTokens.includes(chatMentionToken(p.name).toLocaleLowerCase('ru')));
       for(const person of mentionedUsers){
-        await queuePush(profileName,text||'📷 Фото',signedInUser.uid,'','chat','replies',person.id);
+        await queuePush(profileName,text||'📷 Фото',signedInUser.uid,'','chat','replies',person.id,{isMention:true});
       }
       input.value='';
       cancelChatReply();

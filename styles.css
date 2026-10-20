@@ -3963,3 +3963,15 @@ body.dark-theme .date-separator span::after{
 /* Category/group heading rows should not inherit the date-divider decoration */
 body.dark-theme tr:not(.date-separator) span::after{ }
 body.dark-theme .date-separator td[colspan]::after{display:none!important}
+
+/* Section titles are labels only — no trailing divider */
+body.dark-theme tr.transferred-date-separator span::after,
+body.dark-theme tr.current-date-separator span::after{
+  display:none!important;
+  content:none!important;
+}
+/* Date divider: neutral silver-grey, very thin with a restrained shadow */
+body.dark-theme tr.date-separator:not(.transferred-date-separator):not(.current-date-separator) span::after{
+  background:linear-gradient(90deg,rgba(190,199,204,.58) 0%,rgba(190,199,204,.30) 65%,rgba(190,199,204,0) 100%)!important;
+  box-shadow:0 0 2px rgba(220,230,235,.22)!important;
+}

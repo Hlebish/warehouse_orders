@@ -4099,3 +4099,16 @@ body.dark-theme tr.date-separator:not(.transferred-date-separator):not(.current-
 body.dark-theme tr.date-separator:not(.transferred-date-separator):not(.current-date-separator) td::after{
   letter-spacing:.10em!important;
 }
+
+
+/* Final fix: keep the AMP divider line clear of the date badge */
+body.dark-theme tr.date-separator:not(.transferred-date-separator):not(.current-date-separator) td::before{
+  left:190px!important;
+  right:10px!important;
+}
+@media(max-width:700px){
+  body.dark-theme tr.date-separator:not(.transferred-date-separator):not(.current-date-separator) td::before{
+    left:150px!important;
+    right:7px!important;
+  }
+}

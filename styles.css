@@ -3897,3 +3897,23 @@ body.dark-theme .orders-panel [data-status="Перенесён"]{
   color:#f3f5f6!important;
   border-color:#d8dde0!important;
 }
+
+
+/* Clickable client name in the order detail */
+body.dark-theme .order-detail-head .detail-client-link{
+  display:inline-flex!important;align-items:center!important;
+  padding:0!important;margin:0!important;
+  border:0!important;background:transparent!important;
+  color:#f2f5f6!important;font:inherit!important;font-size:inherit!important;
+  font-weight:750!important;text-align:left!important;cursor:pointer!important;
+  text-decoration:underline;text-decoration-color:#64747d;text-underline-offset:3px;
+}
+body.dark-theme .order-detail-head .detail-client-link:hover{
+  color:#8fc8ff!important;text-decoration-color:#8fc8ff!important;
+}
+.client-detail-card{display:grid;gap:0;border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.client-detail-name{padding:16px;font-size:18px;font-weight:800;background:rgba(128,128,128,.06);border-bottom:1px solid var(--line)}
+.client-detail-field{display:grid;gap:5px;padding:13px 16px;border-bottom:1px solid var(--line);min-width:0}
+.client-detail-field span{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted,#87939a);font-weight:750}
+.client-detail-field b{font-size:14px;font-weight:550;overflow-wrap:anywhere;white-space:pre-wrap}
+.client-detail-comment{border-bottom:0}

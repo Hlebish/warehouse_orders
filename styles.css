@@ -4112,3 +4112,16 @@ body.dark-theme tr.date-separator:not(.transferred-date-separator):not(.current-
     right:7px!important;
   }
 }
+
+
+/* Balanced AMP date-divider line: equal breathing room at both ends */
+body.dark-theme tr.date-separator:not(.transferred-date-separator):not(.current-date-separator) td::before{
+  left:122px!important;
+  right:122px!important;
+}
+@media(max-width:700px){
+  body.dark-theme tr.date-separator:not(.transferred-date-separator):not(.current-date-separator) td::before{
+    left:105px!important;
+    right:105px!important;
+  }
+}

@@ -4976,3 +4976,21 @@ body.dark-theme .buyback-panel textarea {
     margin-bottom:7px !important;
   }
 }
+
+
+/* Mobile workspace header: remove the oversized black curved decoration. */
+@media (max-width:700px) {
+  body.dark-theme .workspace-header::before,
+  body.dark-theme .workspace-header::after,
+  body.dark-theme .workspace-top::before,
+  body.dark-theme .workspace-top::after,
+  body.dark-theme .workspace-shortcuts::before,
+  body.dark-theme .workspace-shortcuts::after,
+  body.dark-theme .topbar::before,
+  body.dark-theme .topbar::after {
+    content:none !important;
+    display:none !important;
+    background:none !important;
+    box-shadow:none !important;
+  }
+}

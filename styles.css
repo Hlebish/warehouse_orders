@@ -4021,3 +4021,15 @@ body.dark-theme tr.date-separator:not(.transferred-date-separator):not(.current-
   pointer-events:none!important;
 }
 body.dark-theme tr.date-separator:not(.transferred-date-separator):not(.current-date-separator) span::after{display:none!important}
+
+/* Start the divider after the date badge so it never crosses the label */
+body.dark-theme tr.date-separator:not(.transferred-date-separator):not(.current-date-separator) td::before{
+  left:122px!important;
+  right:10px!important;
+}
+@media(max-width:700px){
+  body.dark-theme tr.date-separator:not(.transferred-date-separator):not(.current-date-separator) td::before{
+    left:105px!important;
+    right:7px!important;
+  }
+}

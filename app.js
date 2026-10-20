@@ -963,35 +963,94 @@ function importClientsExcel(file){
       const wb=window.XLSX.read(new Uint8Array(e.target.result),{type:'array'});
       const sheet=wb.Sheets[wb.SheetNames[0]];
       if(!sheet)throw new Error('В Excel-файле нет листов.');
-      const rows=window.XLSX.utils.sheet_to_json(sheet,{defval:'',raw:false});
-      if(!rows.length)throw new Error('На первом листе нет строк с клиентами.');
+
       const normalize=s=>String(s??'').trim().replace(/\s+/g,' ').toLocaleLowerCase('ru').replace(/ё/g,'е');
-      const headerKey=s=>normalize(s).replace(/[\s_\-./]+/g,'');
+      const headerKey=s=>normalize(s).replace(/[\s_\-./:]+/g,'');
       const aliases={
-        name:['имя','клиент','клиентфио','фио','имяклиента','названиеклиента','name','client','customer'],
+        name:['имя','клиент','клиентфио','фио','имяклиента','названиеклиента','название','name','client','customer','группирование','групування'],
         phone:['телефон','номер телефона','номертелефона','тел','мобильный','мобильныйтелефон','phone','telephone','mobile'],
-        address:['адрес','адресклиента','почта','почтовыйадрес','address','customeraddress']
+        address:['адрес','адресклиента','адресдоставки','фактическийадрес','фактичнаадреса','юридическийадрес','юридичнаадреса','почтовыйадрес','address','customeraddress']
       };
-      const get=(row,field)=>{
-        const keys=Object.keys(row);
-        const found=keys.find(k=>aliases[field].some(alias=>headerKey(alias)===headerKey(k)));
-        return found===undefined?'':String(row[found]??'').trim();
+      const matchesAlias=(header,field)=>{
+        const key=headerKey(header);
+        return aliases[field].some(alias=>headerKey(alias)===key);
       };
+
+      // Выгрузка 1С может содержать несколько служебных строк перед настоящим заголовком.
+      const matrix=window.XLSX.utils.sheet_to_json(sheet,{header:1,defval:'',raw:false});
+      let headerRowIndex=-1;
+      for(let i=0;i<Math.min(matrix.length,40);i++){
+        const row=Array.isArray(matrix[i])?matrix[i]:[];
+        const hasName=row.some(v=>matchesAlias(v,'name'));
+        const hasPhone=row.some(v=>matchesAlias(v,'phone'));
+        const hasAddress=row.some(v=>matchesAlias(v,'address'));
+        if(hasName && (hasPhone||hasAddress)){headerRowIndex=i;break;}
+      }
+      if(headerRowIndex<0)headerRowIndex=0;
+
+      const rows=window.XLSX.utils.sheet_to_json(sheet,{range:headerRowIndex,defval:'',raw:false});
+      if(!rows.length)throw new Error('На первом листе нет строк с клиентами.');
+
+      const columns={name:[],phone:[],address:[]};
+      const firstRowKeys=Object.keys(rows[0]||{});
+      for(const key of firstRowKeys){
+        if(matchesAlias(key,'name'))columns.name.push(key);
+        if(matchesAlias(key,'phone'))columns.phone.push(key);
+        if(matchesAlias(key,'address'))columns.address.push(key);
+      }
+
+      const pick=(row,keys)=>{
+        for(const key of keys){
+          const value=String(row[key]??'').trim();
+          if(value)return value;
+        }
+        return '';
+      };
+      const prioritizedPhone=columns.phone.sort((a,b)=>{
+        const score=k=>{
+          const h=headerKey(k);
+          if(h.includes('телефонконтрагента'))return 0;
+          if(h==='телефон')return 1;
+          if(h.includes('другой'))return 2;
+          if(h.includes('мобиль'))return 3;
+          return 4;
+        };
+        return score(a)-score(b);
+      });
+      const prioritizedAddress=columns.address.sort((a,b)=>{
+        const score=k=>{
+          const h=headerKey(k);
+          if(h.includes('фактичнаадреса')||h.includes('фактическийадрес'))return 0;
+          if(h.includes('адресадоставки'))return 1;
+          if(h.includes('юридичнаадреса')||h.includes('юридическийадрес'))return 2;
+          return 3;
+        };
+        return score(a)-score(b);
+      });
+      const nameKey=columns.name[0];
+
+      if(!nameKey)throw new Error('Не найдена колонка с именем клиента. Подойдут «Имя клиента», «Клиент», «Название» или выгрузка 1С с колонкой «Групування».');
+      if(!prioritizedPhone.length&&!prioritizedAddress.length)throw new Error('Не найдены колонки телефона или адреса.');
+
       const importedByName=new Map();
+      let skipped=0;
       for(const row of rows){
-        const name=get(row,'name');
-        if(!name)continue;
+        const rawName=String(row[nameKey]??'').trim();
+        if(!rawName){skipped++;continue;}
+        const name=rawName.replace(/\s+/g,' ').trim();
         const key=normalize(name);
-        if(!importedByName.has(key))importedByName.set(key,{name:name.replace(/\s+/g,' ').trim(),phone:get(row,'phone'),address:get(row,'address')});
+        const phone=pick(row,prioritizedPhone);
+        const address=pick(row,prioritizedAddress);
+        if(!importedByName.has(key))importedByName.set(key,{name,phone,address});
         else{
           const current=importedByName.get(key);
-          const phone=get(row,'phone'),address=get(row,'address');
           if(phone)current.phone=phone;
           if(address)current.address=address;
         }
       }
+
       const imported=[...importedByName.entries()];
-      if(!imported.length)throw new Error('Не найдена колонка с именем клиента. Подойдут «Имя клиента», «Клиент» или «Имя».');
+      if(!imported.length)throw new Error('Не найдено ни одной записи с именем клиента.');
 
       const existingSnap=await getDocs(collection(db,'clients'));
       const existingByName=new Map();
@@ -1001,6 +1060,7 @@ function importClientsExcel(file){
         if(!existingByName.has(key))existingByName.set(key,[]);
         existingByName.get(key).push(d);
       });
+
       const stamp=isoNow(),operations=[];
       let added=0,updated=0,hiddenDuplicates=0;
       for(const [key,client] of imported){
@@ -1013,12 +1073,17 @@ function importClientsExcel(file){
           added++;
           continue;
         }
+
         const primary=matches.find(d=>!d.data().hiddenFromDirectory)||matches[0];
+        const old=primary.data()||{};
         operations.push({type:'update',ref:primary.ref,data:{
-          name:client.name,phone:client.phone,address:client.address,
+          name:client.name,
+          phone:client.phone||old.phone||'',
+          address:client.address||old.address||'',
           hiddenFromDirectory:false,updatedAt:stamp,updatedBy:signedInUser.uid
         }});
         updated++;
+
         for(const duplicate of matches){
           if(duplicate.id===primary.id||duplicate.data().hiddenFromDirectory)continue;
           operations.push({type:'update',ref:duplicate.ref,data:{
@@ -1027,6 +1092,7 @@ function importClientsExcel(file){
           hiddenDuplicates++;
         }
       }
+
       for(let i=0;i<operations.length;i+=400){
         const batch=writeBatch(db);
         operations.slice(i,i+400).forEach(op=>{
@@ -1035,7 +1101,11 @@ function importClientsExcel(file){
         });
         await batch.commit();
       }
-      toast('Excel обработан: добавлено '+added+', обновлено '+updated+(hiddenDuplicates? ', скрыто повторов: '+hiddenDuplicates:'')+'. Заказы не удалялись.');
+
+      const sourceLabel=headerRowIndex>0?'Выгрузка 1С':'Excel';
+      toast(sourceLabel+' обработан: добавлено '+added+', обновлено '+updated+
+        (hiddenDuplicates?', скрыто повторов: '+hiddenDuplicates:'')+
+        (skipped?', пропущено пустых строк: '+skipped:'')+'. Заказы не удалялись.');
       await openClientsDirectory();
     }catch(err){
       console.error('Ошибка импорта клиентов из Excel',err);
@@ -1044,7 +1114,8 @@ function importClientsExcel(file){
   };
   reader.readAsArrayBuffer(file);
 }
-async function importProductsExcel(file){
+
+function importProductsExcel(file){
   if(!file)return;
   if(!window.XLSX){toast('Не удалось загрузить модуль Excel. Обновите страницу и попробуйте снова.');return;}
   const reader=new FileReader();

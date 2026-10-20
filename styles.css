@@ -4033,3 +4033,37 @@ body.dark-theme tr.date-separator:not(.transferred-date-separator):not(.current-
     right:7px!important;
   }
 }
+
+/* Visible AMP wordmark centered in each date divider */
+body.dark-theme tr.date-separator:not(.transferred-date-separator):not(.current-date-separator) td::after{
+  content:"A M P"!important;
+  position:absolute!important;
+  left:50%!important;
+  top:50%!important;
+  transform:translate(-50%,-50%)!important;
+  z-index:5!important;
+  display:block!important;
+  padding:2px 14px!important;
+  background:#191d20!important;
+  border:1px solid #3a4247!important;
+  border-radius:5px!important;
+  color:#e8edf0!important;
+  font-size:11px!important;
+  font-weight:900!important;
+  letter-spacing:.16em!important;
+  line-height:1.4!important;
+  text-shadow:0 1px 2px rgba(0,0,0,.9)!important;
+  opacity:1!important;
+  visibility:visible!important;
+  pointer-events:none!important;
+}
+body.dark-theme tr.date-separator:not(.transferred-date-separator):not(.current-date-separator) td::before{
+  left:122px!important;
+  right:10px!important;
+}
+@media(max-width:700px){
+  body.dark-theme tr.date-separator:not(.transferred-date-separator):not(.current-date-separator) td::after{
+    font-size:10px!important;padding:2px 10px!important;letter-spacing:.12em!important;
+  }
+  body.dark-theme tr.date-separator:not(.transferred-date-separator):not(.current-date-separator) td::before{left:105px!important;right:7px!important}
+}

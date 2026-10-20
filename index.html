@@ -7,7 +7,7 @@
   <meta name="description" content="Заказы, дефекты и согласование отгрузки в одном месте">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" type="image/png" sizes="any" href="./%D0%9C%D0%B8%D0%BD%D0%B8%D0%BC%D0%B0%D0%BB%D0%B8%D1%81%D1%82%D0%B8%D1%87%D0%BD%D0%B0%D1%8F%20%D1%8D%D0%BC%D0%B1%D0%BB%D0%B5%D0%BC%D0%B0%20AMP.png?v=20261020-3">
-  <meta name="app-version" content="2026.10.20.38">
+  <meta name="app-version" content="2026.10.20.39">
   <title>Заказы · Склад</title>
   <style>
     [hidden]{display:none!important}
@@ -24,11 +24,11 @@
     @keyframes siteLoaderSpin{to{transform:rotate(360deg)}}
     @media(prefers-reduced-motion:reduce){#siteLoader .loader-spinner{animation-duration:2s}#siteLoader{transition:none}}
   </style>
-  <link rel="stylesheet" href="styles.css?v=1.0.1.192">
+  <link rel="stylesheet" href="styles.css?v=1.0.1.161">
 
 <script>
 (() => {
-  const VERSION = '2026.10.20.38';
+  const VERSION = '2026.10.20.39';
   const KEY = 'warehouse_orders_app_version';
   try { localStorage.setItem(KEY, VERSION); } catch {}
 })();
@@ -141,7 +141,7 @@
   <button type="button" id="mentionCenterButton" class="mention-center-button" hidden aria-live="polite"><span class="mention-center-icon">＠</span><span id="mentionCenterLabel">Вас упомянули</span><b id="mentionCenterCount">0</b></button>
   <div class="toast-stack" id="toastStack" aria-live="polite"></div>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <script type="module" src="app.js?v=1.0.1.160"></script>
+  <script type="module" src="app.js?v=1.0.1.159"></script>
   <script type="module" src="buyback.js?v=1.0.9"></script>
 </body>
 </html>

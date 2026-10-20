@@ -118,10 +118,17 @@ function watchNotifications(){
   if(!signedInUser)return;
   let knownNoticeIds=new Set(state.notices.map(n=>n.id));
   let initialSnapshot=true;
+  // Only surface notifications created while this live listener is active.
+  // Firestore can replay changes accumulated during sleep/offline; keep those in history, not as a toast flood.
+  const listenerStartedAt=Date.now();
+  const isFreshLiveNotice=n=>{
+    const created=asDate(n.createdAt||n.at)?.getTime();
+    return Number.isFinite(created)&&created>=listenerStartedAt-5000&&Date.now()-created<=60000;
+  };
   const q=query(collection(db,'users',signedInUser.uid,'notifications'),orderBy('createdAt','desc'),limit(100));
   notificationsUnsubscribe=onSnapshot(q,snap=>{
     const next=snap.docs.map(d=>({id:d.id,...d.data(),at:d.data().createdAt||d.data().at||isoNow()}));
-    if(!initialSnapshot){next.filter(n=>!knownNoticeIds.has(n.id)&&shouldShowAttentionToast(n)&&!n.read).forEach(showAttentionToast)}
+    if(!initialSnapshot){next.filter(n=>!knownNoticeIds.has(n.id)&&shouldShowAttentionToast(n)&&!n.read&&isFreshLiveNotice(n)).forEach(showAttentionToast)}
     initialSnapshot=false;
     knownNoticeIds=new Set(next.map(n=>n.id));state.notices=next;paintNotices();paintMentionCenter();
   },err=>console.error('Не удалось загрузить историю уведомлений',err));
@@ -157,11 +164,16 @@ function watchChatBadge(){
   if(!signedInUser)return;
   let initialSnapshot=true;
   let knownMessageIds=new Set();
+  const listenerStartedAt=Date.now();
+  const isFreshLiveMessage=m=>{
+    const created=asDate(m.createdAt)?.getTime();
+    return Number.isFinite(created)&&created>=listenerStartedAt-5000&&Date.now()-created<=60000;
+  };
   const q=query(collection(db,'chatMessages'),orderBy('createdAt','desc'),limit(100));
   chatBadgeUnsubscribe=onSnapshot(q,snap=>{
     const messages=snap.docs.map(d=>({id:d.id,...(d.data()||{})}));
     if(!initialSnapshot){
-      messages.filter(m=>!knownMessageIds.has(m.id)&&m.authorId&&m.authorId!==signedInUser.uid).forEach(m=>{
+      messages.filter(m=>!knownMessageIds.has(m.id)&&m.authorId&&m.authorId!==signedInUser.uid&&isFreshLiveMessage(m)).forEach(m=>{
         const messageText=String(m.text||m.message||m.content||'').trim()||'📷 Фото';
         const sender=chatDisplayName(m.authorName||m.author||m.userName||'Сотрудник');
         const mentionToken='@'+chatMentionToken(profileName||'');

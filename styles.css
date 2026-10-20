@@ -4994,3 +4994,107 @@ body.dark-theme .buyback-panel textarea {
     box-shadow:none !important;
   }
 }
+
+
+/* Returns modal: bring return cards in line with the graphite site theme. */
+body.dark-theme #modalBody .history-controls {
+  padding:10px !important;
+  gap:8px !important;
+  border:1px solid #30373b !important;
+  border-radius:14px !important;
+  background:#191d20 !important;
+}
+body.dark-theme #modalBody .history-controls .search-box {
+  min-width:0 !important;
+  background:#111416 !important;
+  border:1px solid #30373b !important;
+  border-radius:10px !important;
+}
+body.dark-theme #modalBody .history-controls input {
+  color:#e5e9eb !important;
+  background:transparent !important;
+}
+body.dark-theme #modalBody .analytics-kpi {
+  padding:14px 16px !important;
+  border:1px solid #30373b !important;
+  border-radius:14px !important;
+  background:#191d20 !important;
+  color:#c4cbce !important;
+}
+body.dark-theme #modalBody .analytics-kpi b {
+  color:#e8ecee !important;
+}
+body.dark-theme #modalBody .timeline {
+  gap:10px !important;
+}
+body.dark-theme #modalBody .timeline > .timeline-item {
+  padding:14px !important;
+  border:1px solid #30373b !important;
+  border-radius:16px !important;
+  background:linear-gradient(145deg,#1a1e21,#171a1d) !important;
+  box-shadow:0 3px 10px rgba(0,0,0,.12) !important;
+}
+body.dark-theme #modalBody .timeline-top {
+  display:flex !important;
+  align-items:center !important;
+  justify-content:space-between !important;
+  flex-wrap:wrap !important;
+  gap:8px !important;
+  color:#dce1e3 !important;
+}
+body.dark-theme #modalBody .timeline-article {
+  margin:8px 0 !important;
+  color:#cbd2d5 !important;
+  font-weight:600 !important;
+}
+body.dark-theme #modalBody .timeline-type {
+  display:inline-flex !important;
+  align-items:center !important;
+  min-height:28px !important;
+  padding:4px 10px !important;
+  border:1px solid rgba(53,184,121,.35) !important;
+  border-radius:9px !important;
+  background:rgba(53,184,121,.12) !important;
+  color:#72d5a3 !important;
+  font-size:12px !important;
+  font-weight:700 !important;
+  letter-spacing:.02em !important;
+}
+body.dark-theme #modalBody .timeline > .timeline-item .timeline {
+  margin-top:6px !important;
+}
+body.dark-theme #modalBody .timeline > .timeline-item .timeline .timeline-item {
+  padding:12px !important;
+  border:1px solid #30373b !important;
+  border-radius:13px !important;
+  background:#15181b !important;
+}
+body.dark-theme #modalBody .timeline-text {
+  margin:8px 0 !important;
+  color:#d2d8db !important;
+  line-height:1.5 !important;
+  overflow-wrap:anywhere !important;
+}
+body.dark-theme #modalBody .timeline-text span {
+  color:#9ba6ac !important;
+}
+body.dark-theme #modalBody .timeline-item .small-button.primary-soft {
+  background:#202629 !important;
+  border:1px solid #374146 !important;
+  color:#d5dcdf !important;
+}
+body.dark-theme #modalBody .timeline-item .small-button.danger {
+  background:rgba(207,91,91,.13) !important;
+  border:1px solid rgba(207,91,91,.38) !important;
+  color:#f09b9b !important;
+}
+body.dark-theme #modalBody .timeline-type {
+  background:#202629 !important;
+  border-color:#465056 !important;
+  color:#e2e7e9 !important;
+}
+body.dark-theme #modalBody .timeline-item .timeline .timeline-type {
+  background:rgba(53,184,121,.12) !important;
+  border-color:rgba(53,184,121,.35) !important;
+  color:#72d5a3 !important;
+}

@@ -88,6 +88,8 @@ async function createNotificationHistory(data, eventId) {
       orderId: String(data.orderId || ''),
       target: data.target === 'chat' ? 'chat' : 'site',
       category,
+      isMention: data.isMention === true || data.isMention === 'true',
+      isReply: data.isReply === true || data.isReply === 'true',
       eventId,
       createdAt: FieldValue.serverTimestamp(),
       read: false
@@ -331,7 +333,9 @@ exports.sendWarehousePush = onDocumentCreated({ document: 'pushQueue/{eventId}',
             link,
             orderId,
             target,
-            category
+            category,
+            isMention: String(data.isMention === true || data.isMention === 'true'),
+            isReply: String(data.isReply === true || data.isReply === 'true')
           }
         };
 

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+<rect width="512" height="512" rx="112" fill="#111315"/>
+<circle cx="256" cy="256" r="224" fill="#0b0d0e" stroke="#76b900" stroke-width="5"/>
+<circle cx="256" cy="256" r="204" fill="none" stroke="#343a3d" stroke-width="3"/>
+<g fill="none" stroke-linejoin="round" stroke-width="17">
+<path d="M170 135l10 9 13-5 2-13 14-2 5 12 13 4 9-9 12 8-3 13 9 10 13-3 7 13-10 8 1 13-10 8 2 13-14 5-7-11-13 1-8 10-13-6 2-13-9-10-13 3-7-13 10-8-1-13 10-8z" stroke="#d6dadd" transform="translate(-12 18) scale(1.12)"/>
+<path d="M285 181l10 9 13-5 2-13 14-2 5 12 13 4 9-9 12 8-3 13 9 10 13-3 7 13-10 8 1 13-10 8 2 13-14 5-7-11-13 1-8 10-13-6 2-13-9-10-13 3-7-13 10-8-1-13 10-8z" stroke="#76b900" transform="translate(-3 6) scale(1.12)"/>
+</g>
+<text x="256" y="354" font-family="Arial,Helvetica,sans-serif" font-size="94" font-weight="800" text-anchor="middle" fill="#e7eaec">A<tspan fill="#76b900">M</tspan>P</text>
+<text x="256" y="83" font-family="Arial,Helvetica,sans-serif" font-size="21" letter-spacing="4" text-anchor="middle" fill="#c2c8cb">AUTOMOBILE PARTS</text>
+</svg>

@@ -216,6 +216,8 @@ style.textContent = `
   color: #e0e6e8 !important;
 }
 
+`;
+document.head.append(style);
 
 const overlay=document.createElement('div');
 overlay.className='buyback-overlay';overlay.hidden=true;overlay.innerHTML=`

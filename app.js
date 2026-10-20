@@ -332,6 +332,8 @@ async function queuePush(title,body,authorId,orderId='',target='site',category='
     return true;
   }catch(err){
     console.error('Push event was not queued',err);
+    const code=String(err?.code||'').replace(/^.*?\//,'');
+    toast('Не удалось создать уведомление'+(code?' ('+code+')':'')+'. Проверьте подключение и правила Firebase.');
     return false;
   }
 }

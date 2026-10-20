@@ -3931,3 +3931,26 @@ body.dark-theme .date-separator span{padding:5px 10px!important;font-size:9px!im
 body.dark-theme .date-separator+tr td{border-top:1px solid #303b36!important}
 body.dark-theme .date-separator td::before{display:none!important}
 @media(max-width:700px){body.dark-theme .date-separator td{padding:7px 7px 4px!important}body.dark-theme .date-separator span{padding:5px 8px!important;font-size:9px!important}}
+
+/* Extend the date badge accent into a fine divider across the remaining row */
+body.dark-theme .date-separator span{
+  position:relative!important;
+  z-index:0!important;
+}
+body.dark-theme .date-separator span::after{
+  content:""!important;
+  position:absolute!important;
+  left:calc(100% + 12px)!important;
+  top:50%!important;
+  width:calc(100vw - 420px)!important;
+  height:1px!important;
+  transform:translateY(-50%)!important;
+  background:linear-gradient(90deg,rgba(53,184,121,.65) 0%,rgba(53,184,121,.22) 45%,rgba(53,184,121,0) 100%)!important;
+  pointer-events:none!important;
+}
+@media(max-width:900px){
+  body.dark-theme .date-separator span::after{width:calc(100vw - 160px)!important}
+}
+@media(max-width:700px){
+  body.dark-theme .date-separator span::after{width:calc(100vw - 100px)!important;opacity:.8!important}
+}

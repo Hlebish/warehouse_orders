@@ -191,8 +191,32 @@ style.textContent = `
  .buyback-actions button{flex:1 1 auto!important;min-height:32px!important}
 }
 
-`;
-document.head.append(style);
+/* Final graphite pass: neutralize the green cast on the buyback workspace shell and form. */
+.buyback-window,
+.buyback-head,
+.buyback-body,
+.buyback-form,
+.buyback-summary:has(button[data-status]),
+#buybackSummary .buyback-chip {
+  background: #191d20 !important;
+  border-color: #30373b !important;
+  color: #e8ecee !important;
+}
+.buyback-head .eyebrow { color: #8f999e !important; }
+.buyback-head p, .buyback-field { color: #aeb8bc !important; }
+.buyback-form input, .buyback-form select {
+  background: #121517 !important;
+  border-color: #30373b !important;
+  color: #e8ecee !important;
+}
+.buyback-chip[data-status].active,
+.buyback-chip[data-status][aria-pressed="true"] {
+  background: #242a2e !important;
+  border-color: #454e53 !important;
+  color: #e0e6e8 !important;
+}
+
+
 const overlay=document.createElement('div');
 overlay.className='buyback-overlay';overlay.hidden=true;overlay.innerHTML=`
 <section class="buyback-window" role="dialog" aria-modal="true" aria-labelledby="buybackTitle">

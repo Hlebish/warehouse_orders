@@ -5270,3 +5270,38 @@ body.dark-theme #modalBody:has(#chatMessages) { min-width:0 !important; }
   body.dark-theme #chatMessages .chat-message-head time { font-size:11px !important; }
   body.dark-theme #chatMessages .chat-message-text { font-size:14px !important; }
 }
+
+
+/* AMP chat v3: give message history most of the modal height. */
+body.dark-theme #modalBody:has(#chatMessages) {
+  display:flex !important; flex-direction:column !important;
+  min-height:0 !important; overflow:hidden !important;
+}
+body.dark-theme #modalBody:has(#chatMessages) .chat-shell {
+  display:flex !important; flex-direction:column !important;
+  min-height:0 !important; height:100% !important; flex:1 1 auto !important;
+  gap:8px !important;
+}
+body.dark-theme #modalBody:has(#chatMessages) .chat-toolbar {
+  flex:0 0 auto !important; padding:8px !important;
+}
+body.dark-theme #modalBody:has(#chatMessages) #chatMessages.chat-messages {
+  flex:1 1 auto !important; min-height:280px !important;
+  height:auto !important; max-height:none !important;
+  overflow-y:auto !important; overscroll-behavior:contain !important;
+}
+body.dark-theme #modalBody:has(#chatMessages) #chatForm.chat-form {
+  flex:0 0 auto !important; padding:8px !important; gap:6px !important;
+}
+body.dark-theme #modalBody:has(#chatMessages) #chatForm textarea {
+  min-height:48px !important; max-height:96px !important;
+}
+@media(min-width:601px) {
+  body.dark-theme #modalBody:has(#chatMessages) { height:calc(100vh - 190px) !important; max-height:calc(100vh - 190px) !important; }
+  body.dark-theme #modalBody:has(#chatMessages) #chatMessages.chat-messages { min-height:360px !important; }
+}
+@media(max-width:600px) {
+  body.dark-theme #modalBody:has(#chatMessages) { height:calc(100dvh - 220px) !important; max-height:calc(100dvh - 220px) !important; }
+  body.dark-theme #modalBody:has(#chatMessages) #chatMessages.chat-messages { min-height:180px !important; }
+  body.dark-theme #modalBody:has(#chatMessages) #chatForm .chat-attach-row { margin-top:3px !important; }
+}

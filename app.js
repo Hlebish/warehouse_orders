@@ -1555,7 +1555,7 @@ async function disablePush(){try{if(!signedInUser)throw new Error('User is not s
 async function toggleNotificationSetting(category){if(!signedInUser||!['chat','replies','likes','orders'].includes(category))return;const next=state.notificationSettings[category]===false;try{state.notificationSettings[category]=next;await updateDoc(doc(db,'users',signedInUser.uid),{notificationSettings:state.notificationSettings});toast(next?'Уведомления включены.':'Уведомления выключены.');showNotifications()}catch(err){console.error('Не удалось изменить настройку уведомлений',err);state.notificationSettings[category]=!next;toast('Не удалось сохранить настройку уведомлений.')}}
 async function toggleExtraPhoneNotifications(){if(!signedInUser)return;const previous=state.extraPhoneNotifications;const next=!previous;try{await updateDoc(doc(db,'users',signedInUser.uid),{extraPhoneNotifications:next});state.extraPhoneNotifications=next;toast(next?'Дополнительные уведомления на все устройства включены.':'Дополнительные уведомления на все устройства выключены.');showNotifications()}catch(err){console.error('Не удалось сохранить настройку дополнительных уведомлений на все устройства',err);state.extraPhoneNotifications=previous;toast('Не удалось сохранить настройку. Проверьте подключение и права доступа.');showNotifications()}}
 
-let chatMessages=[],olderChatMessages=[],chatOldestCursor=null,hasOlderChatMessages=false,loadingOlderChatMessages=false,chatPendingScrollRestore=null,
+let chatMessages=[],olderChatMessages=[],chatOldestCursor=null,hasOlderChatMessages=false,loadingOlderChatMessages=false,chatPendingScrollRestore=null;
 let knownChatPeople=[];
 
 function startChatReply(messageId){

@@ -1718,6 +1718,8 @@ function renderChatMessages(){
   const orderCommentMessages=state.orders.flatMap(o=>(o.entries||[]).filter(e=>e.kind==='comment'&&String(e.text||'').trim()).map(e=>({id:'order-comment-'+o.id+'-'+e.id,source:'order-comment',orderId:o.id,orderNumber:o.number,client:o.client||'',authorName:e.author||'Сотрудник',text:e.text||'',createdAt:e.createdAt||o.createdAt,photos:Array.isArray(e.photos)?e.photos:[]})));
   // Always combine the latest snapshot with order comments; do not reuse a stale timeline cache.
   const combinedMessages=[...olderChatMessages,...chatMessages,...orderCommentMessages].sort((x,y)=>{const time=v=>v?.toMillis?v.toMillis():new Date(v||0).getTime();return time(x.createdAt)-time(y.createdAt)||String(x.id).localeCompare(String(y.id))});
+  // Keep ordinary staff chat messages at the end of the default All timeline so order comments cannot push them out of the visible bottom area.
+  if(activeChatFilter==='all'&&!queryText){combinedMessages.sort((x,y)=>{const ax=x.source==='order-comment'?0:1,ay=y.source==='order-comment'?0:1;return ax-ay||(x.createdAt?.toMillis?x.createdAt.toMillis():new Date(x.createdAt||0).getTime())-(y.createdAt?.toMillis?y.createdAt.toMillis():new Date(y.createdAt||0).getTime())});}
   const visibleMessages=combinedMessages.filter(m=>{
     const hay=(String(m.authorName||'')+' '+String(m.text||'')+' '+String(m.replyToText||'')).toLocaleLowerCase('ru');
     if(queryText&&!hay.includes(queryText))return false;

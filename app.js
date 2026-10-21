@@ -1776,7 +1776,7 @@ function openChat(){
   // Subscribe only to the newest 50 messages; older history is fetched on demand while scrolling up.
   const chatQuery=query(collection(db,'chatMessages'),orderBy('createdAt','desc'),limit(50));
   chatUnsubscribe=onSnapshot(chatQuery,snap=>{
-    chatMessages=snap.docs.map(d=>{const data=d.data();return {id:d.id,...data,text:String(data.text??data.message??data.content??''),authorName:data.authorName??data.author??data.userName??'Сотрудник',createdAt:data.createdAt??data.timestamp??data.sentAt??data.date,photos:Array.isArray(data.photos)?data.photos:(Array.isArray(data.images)?data.images:[])};}).filter(m=>String(m.text||'').trim()||Array.isArray(m.photos)&&m.photos.length).sort((x,y)=>{const date=v=>v?.toMillis?v.toMillis():new Date(v||0).getTime();return date(x.createdAt)-date(y.createdAt)||String(x.id).localeCompare(String(y.id));});
+    chatMessages=snap.docs.map(d=>{const data=d.data();return {id:d.id,...data,source:'chat-message',text:String(data.text??data.message??data.content??''),authorName:data.authorName??data.author??data.userName??'Сотрудник',createdAt:data.createdAt??data.timestamp??data.sentAt??data.date,photos:Array.isArray(data.photos)?data.photos:(Array.isArray(data.images)?data.images:[])};}).filter(m=>String(m.text||'').trim()||Array.isArray(m.photos)&&m.photos.length).sort((x,y)=>{const date=v=>v?.toMillis?v.toMillis():new Date(v||0).getTime();return date(x.createdAt)-date(y.createdAt)||String(x.id).localeCompare(String(y.id));});
     chatTimelineCache=null;
     chatOldestCursor=snap.docs.at(-1)||null;
     hasOlderChatMessages=snap.docs.length===50;

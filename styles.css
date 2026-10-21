@@ -5437,3 +5437,33 @@ body.dark-theme #modalBody .chat-message-menu-items > button:focus-visible {
   background-color:#2a3337 !important;
   color:#f0f4f5 !important;
 }
+
+
+/* In-chat reader dialog: never replace the parent chat modal. */
+body.dark-theme #modalBody:has(#chatMessages) { position:relative !important; }
+.chat-readers-overlay {
+  position:absolute; inset:0; z-index:120;
+  display:flex; align-items:center; justify-content:center;
+  padding:16px; background:rgba(5,8,9,.58);
+  border-radius:inherit;
+}
+.chat-readers-dialog {
+  width:min(360px,100%); max-height:min(70%,420px);
+  display:flex; flex-direction:column; overflow:hidden;
+  color:#dce3e6; background:#1b2023;
+  border:1px solid #3a4449; border-radius:14px;
+  box-shadow:0 16px 40px rgba(0,0,0,.45);
+}
+.chat-readers-dialog header {
+  display:flex; align-items:center; justify-content:space-between;
+  gap:12px; padding:12px 14px; border-bottom:1px solid #303a3f;
+}
+.chat-readers-close {
+  width:30px; height:30px; border:1px solid #3a4449;
+  border-radius:8px; background:#252c30; color:#dce3e6;
+  font-size:20px; cursor:pointer;
+}
+.chat-readers-list { padding:8px 12px; overflow:auto; }
+.chat-reader-name { padding:9px 8px; border-bottom:1px solid #2c3438; }
+.chat-reader-name:last-child { border-bottom:0; }
+.chat-readers-dialog .chat-empty { padding:12px 8px; color:#9ba6ac; }

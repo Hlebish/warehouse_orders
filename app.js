@@ -200,7 +200,7 @@ function chatUnreadIndicatorMode(){return signedInUser&&localStorage.getItem('wa
 function paintChatBadge(){const button=$('chatSidebarButton');if(!button)return;const unread=!!chatUnread;button.classList.toggle('has-unread-chat',unread&&chatUnreadIndicatorMode()==='dot');button.classList.toggle('has-unread-chat-bell',unread&&chatUnreadIndicatorMode()==='bell');}
 async function markChatMessagesRead(messages=[]){
   if(!signedInUser)return;
-  const unread=messages.filter(m=>m.authorId!==signedInUser.uid && Array.isArray(m.readBy) && !m.readBy.includes(signedInUser.uid));
+  const unread=messages.filter(m=>m.authorId!==signedInUser.uid && !(Array.isArray(m.readBy) && m.readBy.includes(signedInUser.uid)));
   if(!unread.length){chatUnread=false;paintChatBadge();return;}
   await Promise.all(unread.map(m=>updateDoc(doc(db,'chatMessages',m.id),{readBy:arrayUnion(signedInUser.uid)}).catch(err=>console.warn('Не удалось отметить чат прочитанным',err))));
   chatUnread=false;paintChatBadge();
@@ -1710,7 +1710,17 @@ function showChatReaders(id){
   const ids=Array.isArray(m.readBy)?m.readBy:[];
   const people=[...new Map([...knownChatPeople,...chatMessages,...olderChatMessages].filter(x=>x.authorId&&x.authorName).map(x=>[x.authorId,{id:x.authorId,name:chatDisplayName(x.authorName)}])).values()];
   const names=ids.map(uid=>people.find(p=>p.id===uid)?.name||(uid===signedInUser?.uid?profileName:'Сотрудник'));
-  showModal('Прочитали сообщение','<div class="notice-list">'+(names.length?names.map(n=>'<div class="notice-item">'+esc(n)+'</div>').join(''):'<div class="chat-empty">Пока никто не прочитал.</div>')+'</div>',[button('Закрыть','close')],'ПРОЧИТАНО');
+  const body=$('modalBody');if(!body)return;
+  body.querySelector('.chat-readers-overlay')?.remove();
+  const overlay=document.createElement('div');
+  overlay.className='chat-readers-overlay';
+  overlay.innerHTML='<section class="chat-readers-dialog" role="dialog" aria-modal="true" aria-label="Прочитали сообщение"><header><b>Прочитали сообщение</b><button type="button" class="chat-readers-close" aria-label="Закрыть">×</button></header><div class="chat-readers-list">'+(names.length?names.map(n=>'<div class="chat-reader-name">'+esc(n)+'</div>').join(''):'<div class="chat-empty">Пока никто не прочитал.</div>')+'</div></section>';
+  body.appendChild(overlay);
+  const close=()=>overlay.remove();
+  overlay.querySelector('.chat-readers-close')?.addEventListener('click',close);
+  overlay.addEventListener('click',e=>{if(e.target===overlay)close();});
+  const onKey=e=>{if(e.key==='Escape'){close();document.removeEventListener('keydown',onKey);}};
+  document.addEventListener('keydown',onKey);
 }
 async function loadOlderChatMessages(){
   if(loadingOlderChatMessages||!hasOlderChatMessages||!chatOldestCursor||!$('chatMessages'))return;
@@ -1794,20 +1804,25 @@ function openChat(){
   chatUnsubscribe?.();
   chatMessages=[];olderChatMessages=[];chatOldestCursor=null;hasOlderChatMessages=false;loadingOlderChatMessages=false;chatPendingScrollRestore=null;chatReplyTo=null;chatFilterText='';chatFilterMode='all';
   showModal('Общий чат','<div class="chat-shell"><div class="chat-toolbar"><label class="search-box"><span>⌕</span><input id="chatSearch" type="search" placeholder="Поиск по чату"></label><select id="chatFilter"><option value="all">Все сообщения</option><option value="mine">Мои</option><option value="replies">С ответами</option><option value="photos">С фото</option></select></div><div class="chat-messages" id="chatMessages"><div class="chat-empty">Загрузка сообщений…</div></div><form id="chatForm" class="chat-form"><div id="chatReplyPreview" class="chat-reply-preview" hidden></div><div class="chat-input-wrap"><textarea id="chatInput" maxlength="1000" rows="2" placeholder="Напишите сообщение… (можно вставить фото из буфера)" autocomplete="off"></textarea><div id="chatMentionSuggestions" class="chat-mention-suggestions" hidden></div></div><div class="chat-attach-row"><label class="chat-attach-button">📎 Фото<input id="chatPhotoInput" type="file" accept="image/*" multiple hidden></label><span id="chatPhotoHint">До 5 фото, по 8 МБ</span></div><div id="chatUploadProgress" class="chat-upload-progress" hidden><div class="chat-upload-progress-track"><div id="chatUploadProgressBar" class="chat-upload-progress-bar"></div></div><span id="chatUploadProgressText">Загрузка…</span></div><div id="chatPhotoPreview" class="chat-photo-preview"></div></form></div>',[button('Закрыть','close'),button('Отправить','send-chat','primary-button')],'ОБЩИЙ ЧАТ');
-  // Read the full chat collection without ordering/limiting in Firestore.
-  // Older records may use a different createdAt type (Timestamp vs string); orderBy+limit can hide them.
-  chatUnsubscribe=onSnapshot(collection(db,'chatMessages'),snap=>{
-    chatMessages=snap.docs.map(d=>{const data=d.data();return {id:d.id,...data,source:'chat-message',text:String(data.text??data.message??data.content??''),authorName:data.authorName??data.author??data.userName??'Сотрудник',createdAt:data.createdAt??data.timestamp??data.sentAt??data.date,photos:Array.isArray(data.photos)?data.photos:(Array.isArray(data.images)?data.images:[])};}).filter(m=>String(m.text||'').trim()||Array.isArray(m.photos)&&m.photos.length).sort((x,y)=>{const date=v=>v?.toMillis?v.toMillis():new Date(v||0).getTime();return date(x.createdAt)-date(y.createdAt)||String(x.id).localeCompare(String(y.id));});
-    olderChatMessages=[];
-    chatOldestCursor=null;
-    hasOlderChatMessages=false;
-    renderChatMessages();
+  // Load only the latest 100 messages initially; older messages are fetched on scroll.
+  const initialChatQuery=query(collection(db,'chatMessages'),orderBy('createdAt','desc'),limit(100));
+  chatUnsubscribe=onSnapshot(initialChatQuery,snap=>{
+    const next=snap.docs.map(d=>{const data=d.data();return {id:d.id,...data,source:'chat-message',text:String(data.text??data.message??data.content??''),authorName:data.authorName??data.author??data.userName??'Сотрудник',createdAt:data.createdAt??data.timestamp??data.sentAt??data.date,photos:Array.isArray(data.photos)?data.photos:(Array.isArray(data.images)?data.images:[])};}).filter(m=>String(m.text||'').trim()||Array.isArray(m.photos)&&m.photos.length).sort((x,y)=>{const date=v=>v?.toMillis?v.toMillis():new Date(v||0).getTime();return date(x.createdAt)-date(y.createdAt)||String(x.id).localeCompare(String(y.id));});
+    const box=$('chatMessages');
+    const oldTop=box?.scrollTop||0, oldHeight=box?.scrollHeight||0;
+    const wasAtBottom=!!box&&(box.scrollHeight-box.clientHeight-box.scrollTop<80);
+    const previousIds=new Set(chatMessages.map(m=>m.id));
+    const hasNewIncoming=next.some(m=>!previousIds.has(m.id)&&m.authorId!==signedInUser?.uid);
+    chatMessages=next;
+    chatOldestCursor=snap.docs.length?snap.docs[snap.docs.length-1]:null;
+    hasOlderChatMessages=snap.docs.length===100;
+    renderChatMessages({preserveScroll:true,oldTop,oldHeight,wasAtBottom,scrollToNew:hasNewIncoming&&wasAtBottom});
     markChatMessagesRead(chatMessages);
   },err=>{
     console.error('Не удалось загрузить общий чат',err);
     const box=$('chatMessages');
-    if(box)box.innerHTML='<div class="danger-note">Не удалось загрузить сообщения.<br><small>Скорее всего, правила Firestore ещё не опубликованы.</small></div>';
-    toast('Чат не имеет доступа к Firestore. Опубликуйте firestore.rules.');
+    if(box)box.innerHTML='<div class="danger-note">Не удалось загрузить сообщения.<br><small>Не удалось прочитать историю чата.</small></div>';
+    toast('Чат не имеет доступа к Firestore. Проверьте правила доступа.');
   });
   const chatScrollBox=$('chatMessages');
   chatScrollBox?.addEventListener('scroll',()=>{if(chatScrollBox.scrollTop<60)loadOlderChatMessages();},{passive:true});

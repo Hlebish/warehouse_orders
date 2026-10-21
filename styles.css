@@ -5413,3 +5413,27 @@ body.dark-theme #chatMessages .chat-read-receipt {
   background:#202629 !important;
   border:1px solid #343d41 !important;
 }
+
+
+/* Final override for the chat action popover in graphite theme. */
+body.dark-theme #modalBody #chatMessages .chat-message-menu-items,
+body.dark-theme #modalBody .chat-message-menu-items {
+  background-color:#1b2023 !important;
+  background-image:none !important;
+  color:#d9e0e3 !important;
+  border:1px solid #3a4449 !important;
+  box-shadow:0 10px 28px rgba(0,0,0,.48) !important;
+  opacity:1 !important;
+}
+body.dark-theme #modalBody #chatMessages .chat-message-menu-items > button,
+body.dark-theme #modalBody .chat-message-menu-items > button {
+  background-color:transparent !important;
+  color:#d9e0e3 !important;
+}
+body.dark-theme #modalBody #chatMessages .chat-message-menu-items > button:hover,
+body.dark-theme #modalBody #chatMessages .chat-message-menu-items > button:focus-visible,
+body.dark-theme #modalBody .chat-message-menu-items > button:hover,
+body.dark-theme #modalBody .chat-message-menu-items > button:focus-visible {
+  background-color:#2a3337 !important;
+  color:#f0f4f5 !important;
+}

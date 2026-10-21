@@ -5352,3 +5352,11 @@ body.dark-theme #modalBody:has(#chatMessages) #chatForm .chat-attach-row {
     padding:6px !important;
   }
 }
+
+/* AMP chat v5: Telegram-like message scale */
+body.dark-theme #chatMessages .chat-message{max-width:min(76%,700px)!important;min-width:150px!important;padding:12px 14px!important;border-radius:16px!important}
+body.dark-theme #chatMessages .chat-message-text{font-size:15px!important;line-height:1.45!important;margin-bottom:8px!important;overflow-wrap:anywhere!important}
+body.dark-theme #chatMessages .chat-author-line{font-size:13px!important}
+body.dark-theme #chatMessages .chat-message-head time{font-size:12px!important}
+body.dark-theme #chatMessages.chat-messages{gap:9px!important;padding:14px!important}
+@media(max-width:600px){body.dark-theme #chatMessages .chat-message{max-width:94%!important;min-width:0!important;padding:10px 12px!important}body.dark-theme #chatMessages .chat-message-text{font-size:15px!important}body.dark-theme #chatMessages.chat-messages{gap:7px!important;padding:9px!important}}

@@ -545,7 +545,7 @@ function watchOrders(){
      if(existingOrder&&existingOrder.status!==data.status&&selectedId===d.id&&!modal.hidden&&modal.dataset.orderDetail===d.id)openedOrderStatusChanged=true;
      const order={id:d.id,number:pending?.number??data.number,client:pending?.client??(data.client||''),deliveryType:['city','pickup','post'].includes(data.deliveryType)?data.deliveryType:'city',status:pending?.status??data.status,returnCancelled:data.returnCancelled===true||(Array.isArray(data.returns)&&data.returns.some(r=>r?.status==='cancelled')),articles:pending?.articles??(Array.isArray(data.articles)?data.articles:[]),createdAt:data.createdAt,updatedAt:data.updatedAt,transferredAt:data.transferredAt,resumedAt:data.resumedAt,assembledAt:data.assembledAt,shippedAt:data.shippedAt,assemblyInProgress:data.assemblyInProgress===true,assemblyStartedAt:data.assemblyStartedAt,assemblyStartedBy:data.assemblyStartedBy,assemblyStartedByName:data.assemblyStartedByName,returns:Array.isArray(data.returns)?data.returns:[],author:data.createdByName||'Сотрудник',createdBy:data.createdBy,updatedBy:data.updatedBy,updatedByName:data.updatedByName,entries:prior?.entries||[],returns:Array.isArray(data.returns)?data.returns:[]};
      const at=state.orders.findIndex(o=>o.id===d.id);if(at<0)state.orders.push(order);else state.orders[at]={...order,entries:state.orders[at].entries||[]};serverCache.set(d.id,{...order,articles:(order.articles||[]).map(x=>({...x})),entries:(prior?.entries||[]).map(x=>({...x}))});
-     if(!entryUnsubscribes.has(d.id)){let firstEntries=true;entryUnsubscribes.set(d.id,onSnapshot(collection(db,'orders',d.id,'entries'),es=>{const entries=es.docs.map(x=>entryFromCloud(x.id,x.data())).sort((a,b)=>(asDate(a.createdAt)?.getTime()||0)-(asDate(b.createdAt)?.getTime()||0)||String(a.id).localeCompare(String(b.id)));const item=state.orders.find(o=>o.id===d.id);if(!item)return;const before=JSON.stringify(item.entries||[]);item.entries=entries;serverCache.set(d.id,{...serverCache.get(d.id),entries:entries.map(x=>({...x}))});const entriesChanged=before!==JSON.stringify(entries);
+     if(!entryUnsubscribes.has(d.id)){let firstEntries=true;entryUnsubscribes.set(d.id,onSnapshot(collection(db,'orders',d.id,'entries'),es=>{const entries=es.docs.map(x=>entryFromCloud(x.id,x.data())).sort((a,b)=>(asDate(a.createdAt)?.getTime()||0)-(asDate(b.createdAt)?.getTime()||0)||String(a.id).localeCompare(String(b.id)));const item=state.orders.find(o=>o.id===d.id);if(!item)return;const before=JSON.stringify(item.entries||[]);item.entries=entries;chatTimelineCache=null;serverCache.set(d.id,{...serverCache.get(d.id),entries:entries.map(x=>({...x}))});const entriesChanged=before!==JSON.stringify(entries);
 if(!initialCloudLoad&&!firstEntries&&entriesChanged){const last=entries.at(-1);if(last?.kind!=='system')toast(`Обновлён заказ № ${item.number}${last?`: ${last.author} добавил запись`:''}`);}
 const wasFirstEntries=firstEntries;
 firstEntries=false;
@@ -558,7 +558,7 @@ if(wasFirstEntries&&selectedId===d.id&&!modal.hidden&&modal.dataset.orderDetail=
      if(pending && data.number===pending.number && data.client===pending.client && data.status===pending.status){pendingOrderData.delete(d.id);}
    }
    for(const o of [...state.orders])if(!remoteIds.has(o.id)&&!pendingWrites.has(o.id)){state.orders=state.orders.filter(x=>x.id!==o.id);entryUnsubscribes.get(o.id)?.();entryUnsubscribes.delete(o.id);serverCache.delete(o.id)}
-   initialCloudLoad=false;render();restoreUiState();
+   chatTimelineCache=null;initialCloudLoad=false;render();restoreUiState();
    // Keep the open order card in sync when another employee changes its status.
    if(openedOrderStatusChanged&&selectedId&&!modal.hidden&&modal.dataset.orderDetail===selectedId)openOrder(selectedId);
    if(pendingNotificationOrderId){const target=pendingNotificationOrderId;pendingNotificationOrderId='';history.replaceState({},'',location.pathname+location.hash);if(state.orders.some(o=>o.id===target))openOrder(target);}
@@ -1555,7 +1555,7 @@ async function disablePush(){try{if(!signedInUser)throw new Error('User is not s
 async function toggleNotificationSetting(category){if(!signedInUser||!['chat','replies','likes','orders'].includes(category))return;const next=state.notificationSettings[category]===false;try{state.notificationSettings[category]=next;await updateDoc(doc(db,'users',signedInUser.uid),{notificationSettings:state.notificationSettings});toast(next?'Уведомления включены.':'Уведомления выключены.');showNotifications()}catch(err){console.error('Не удалось изменить настройку уведомлений',err);state.notificationSettings[category]=!next;toast('Не удалось сохранить настройку уведомлений.')}}
 async function toggleExtraPhoneNotifications(){if(!signedInUser)return;const previous=state.extraPhoneNotifications;const next=!previous;try{await updateDoc(doc(db,'users',signedInUser.uid),{extraPhoneNotifications:next});state.extraPhoneNotifications=next;toast(next?'Дополнительные уведомления на все устройства включены.':'Дополнительные уведомления на все устройства выключены.');showNotifications()}catch(err){console.error('Не удалось сохранить настройку дополнительных уведомлений на все устройства',err);state.extraPhoneNotifications=previous;toast('Не удалось сохранить настройку. Проверьте подключение и права доступа.');showNotifications()}}
 
-let chatMessages=[],olderChatMessages=[],chatOldestCursor=null,hasOlderChatMessages=false,loadingOlderChatMessages=false,chatPendingScrollRestore=null;
+let chatMessages=[],olderChatMessages=[],chatOldestCursor=null,hasOlderChatMessages=false,loadingOlderChatMessages=false,chatPendingScrollRestore=null,chatTimelineCache=null;
 let knownChatPeople=[];
 
 function startChatReply(messageId){
@@ -1700,6 +1700,7 @@ async function loadOlderChatMessages(){
       const known=new Set([...chatMessages,...olderChatMessages].map(m=>m.id));
       const loaded=snap.docs.map(d=>({id:d.id,...d.data()})).filter(m=>(m.text||Array.isArray(m.photos)&&m.photos.length)&&!known.has(m.id));
       olderChatMessages=[...olderChatMessages,...loaded];
+      chatTimelineCache=null;
       chatOldestCursor=snap.docs.at(-1);
       hasOlderChatMessages=snap.docs.length===50;
       renderChatMessages();
@@ -1714,9 +1715,14 @@ function renderChatMessages(){
   const previousScrollTop=box.scrollTop;
   const queryText=chatFilterText.toLocaleLowerCase('ru');
   const activeChatFilter=$('chatFilter')?.value||chatFilterMode||'all';
-  const orderCommentMessages=state.orders.flatMap(o=>(o.entries||[]).filter(e=>e.kind==='comment'&&String(e.text||'').trim()).map(e=>({id:'order-comment-'+o.id+'-'+e.id,source:'order-comment',orderId:o.id,orderNumber:o.number,client:o.client||'',authorName:e.author||'Сотрудник',text:e.text||'',createdAt:e.createdAt||o.createdAt,photos:Array.isArray(e.photos)?e.photos:[]})));
-  // Interleave ordinary chat messages and order comments by their actual send/create time.
-  const combinedMessages=[...olderChatMessages,...chatMessages,...orderCommentMessages].sort((x,y)=>{const time=v=>v?.toMillis?v.toMillis():new Date(v||0).getTime();return time(x.createdAt)-time(y.createdAt)||String(x.id).localeCompare(String(y.id))});
+  // Build and sort the combined timeline only when its source data changes.
+  // Search/filter changes reuse this cache instead of rescanning every order and sorting all comments.
+  if(!chatTimelineCache){
+    const orderCommentMessages=state.orders.flatMap(o=>(o.entries||[]).filter(e=>e.kind==='comment'&&String(e.text||'').trim()).map(e=>({id:'order-comment-'+o.id+'-'+e.id,source:'order-comment',orderId:o.id,orderNumber:o.number,client:o.client||'',authorName:e.author||'Сотрудник',text:e.text||'',createdAt:e.createdAt||o.createdAt,photos:Array.isArray(e.photos)?e.photos:[]})));
+    const combinedMessages=[...olderChatMessages,...chatMessages,...orderCommentMessages].sort((x,y)=>{const time=v=>v?.toMillis?v.toMillis():new Date(v||0).getTime();return time(x.createdAt)-time(y.createdAt)||String(x.id).localeCompare(String(y.id))});
+    chatTimelineCache=combinedMessages;
+  }
+  const combinedMessages=chatTimelineCache;
   const visibleMessages=combinedMessages.filter(m=>{
     const hay=(String(m.authorName||'')+' '+String(m.text||'')+' '+String(m.replyToText||'')).toLocaleLowerCase('ru');
     if(queryText&&!hay.includes(queryText))return false;
@@ -1765,12 +1771,13 @@ function sendChatMessage(){ $('chatForm')?.requestSubmit(); }
 function openChat(){
   if(!signedInUser)return;
   chatUnsubscribe?.();
-  chatMessages=[];olderChatMessages=[];chatOldestCursor=null;hasOlderChatMessages=false;loadingOlderChatMessages=false;chatPendingScrollRestore=null;chatReplyTo=null;chatFilterText='';chatFilterMode='all';
+  chatMessages=[];olderChatMessages=[];chatTimelineCache=null;chatOldestCursor=null;hasOlderChatMessages=false;loadingOlderChatMessages=false;chatPendingScrollRestore=null;chatReplyTo=null;chatFilterText='';chatFilterMode='all';
   showModal('Общий чат','<div class="chat-shell"><div class="chat-toolbar"><label class="search-box"><span>⌕</span><input id="chatSearch" type="search" placeholder="Поиск по чату"></label><select id="chatFilter"><option value="all">Все сообщения</option><option value="mine">Мои</option><option value="replies">С ответами</option><option value="photos">С фото</option></select></div><div class="chat-messages" id="chatMessages"><div class="chat-empty">Загрузка сообщений…</div></div><form id="chatForm" class="chat-form"><div id="chatReplyPreview" class="chat-reply-preview" hidden></div><div class="chat-input-wrap"><textarea id="chatInput" maxlength="1000" rows="2" placeholder="Напишите сообщение… (можно вставить фото из буфера)" autocomplete="off"></textarea><div id="chatMentionSuggestions" class="chat-mention-suggestions" hidden></div></div><div class="chat-attach-row"><label class="chat-attach-button">📎 Фото<input id="chatPhotoInput" type="file" accept="image/*" multiple hidden></label><span id="chatPhotoHint">До 5 фото, по 8 МБ</span></div><div id="chatUploadProgress" class="chat-upload-progress" hidden><div class="chat-upload-progress-track"><div id="chatUploadProgressBar" class="chat-upload-progress-bar"></div></div><span id="chatUploadProgressText">Загрузка…</span></div><div id="chatPhotoPreview" class="chat-photo-preview"></div></form></div>',[button('Закрыть','close'),button('Отправить','send-chat','primary-button')],'ОБЩИЙ ЧАТ');
   // Subscribe only to the newest 50 messages; older history is fetched on demand while scrolling up.
   const chatQuery=query(collection(db,'chatMessages'),orderBy('createdAt','desc'),limit(50));
   chatUnsubscribe=onSnapshot(chatQuery,snap=>{
     chatMessages=snap.docs.map(d=>{const data=d.data();return {id:d.id,...data,text:String(data.text??data.message??data.content??''),authorName:data.authorName??data.author??data.userName??'Сотрудник',createdAt:data.createdAt??data.timestamp??data.sentAt??data.date,photos:Array.isArray(data.photos)?data.photos:(Array.isArray(data.images)?data.images:[])};}).filter(m=>String(m.text||'').trim()||Array.isArray(m.photos)&&m.photos.length).sort((x,y)=>{const date=v=>v?.toMillis?v.toMillis():new Date(v||0).getTime();return date(x.createdAt)-date(y.createdAt)||String(x.id).localeCompare(String(y.id));});
+    chatTimelineCache=null;
     chatOldestCursor=snap.docs.at(-1)||null;
     hasOlderChatMessages=snap.docs.length===50;
     renderChatMessages();

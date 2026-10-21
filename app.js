@@ -1707,9 +1707,9 @@ async function shareChatMessage(id){
 }
 async function sharePhotoViaViber(url,context='Фото из заказа'){
   if(!url)return;
-  const message=context+'\\n'+url;
+  const message=context+'\n'+url;
   try{await navigator.clipboard.writeText(message);toast('Ссылка на фото скопирована. Если Viber не открылся, вставь её в нужный чат.');}catch{}
-  window.location.href='viber://forward?text='+encodeURIComponent(message.slice(0,200));
+  window.location.href='viber://forward?text='+encodeURIComponent(message);
 }
 async function shareChatMessageViaViber(id){
   const m=findChatMessage(id);if(!m)return;

@@ -5383,3 +5383,33 @@ body.dark-theme #chatMessages .chat-like-button,body.dark-theme #chatMessages .c
 .chat-message-menu-items button{border:0;background:transparent;color:inherit;text-align:left;padding:9px 11px;border-radius:8px;white-space:nowrap;cursor:pointer}
 .chat-message-menu-items button:hover{background:var(--surface-2,#e9edf2)}
 .chat-read-receipt{border:0;background:transparent;color:inherit;cursor:pointer;padding:4px 6px;border-radius:6px}
+
+
+/* Dark theme: chat action menu must match the graphite chat, not the light theme. */
+body.dark-theme #chatMessages .chat-message-menu > summary {
+  color:#c5cdd1 !important;
+}
+body.dark-theme #chatMessages .chat-message-menu[open] > summary,
+body.dark-theme #chatMessages .chat-message-menu > summary:hover {
+  background:#252c30 !important;
+}
+body.dark-theme #chatMessages .chat-message-menu-items {
+  color:#d9e0e3 !important;
+  background:#1b2023 !important;
+  border:1px solid #3a4449 !important;
+  box-shadow:0 10px 28px rgba(0,0,0,.42) !important;
+}
+body.dark-theme #chatMessages .chat-message-menu-items button {
+  color:#d9e0e3 !important;
+  background:transparent !important;
+}
+body.dark-theme #chatMessages .chat-message-menu-items button:hover,
+body.dark-theme #chatMessages .chat-message-menu-items button:focus-visible {
+  color:#f0f4f5 !important;
+  background:#2a3337 !important;
+  outline:none !important;
+}
+body.dark-theme #chatMessages .chat-read-receipt {
+  background:#202629 !important;
+  border:1px solid #343d41 !important;
+}

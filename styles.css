@@ -5305,3 +5305,50 @@ body.dark-theme #modalBody:has(#chatMessages) #chatForm textarea {
   body.dark-theme #modalBody:has(#chatMessages) #chatMessages.chat-messages { min-height:180px !important; }
   body.dark-theme #modalBody:has(#chatMessages) #chatForm .chat-attach-row { margin-top:3px !important; }
 }
+
+
+/* AMP chat v4: keep composer fully visible and let history use the remaining height. */
+body.dark-theme #modalBody:has(#chatMessages) {
+  box-sizing:border-box !important;
+  height:calc(100vh - 150px) !important;
+  max-height:calc(100vh - 150px) !important;
+  padding:8px 12px !important;
+  gap:8px !important;
+}
+body.dark-theme #modalBody:has(#chatMessages) .chat-shell {
+  flex:1 1 0 !important; min-height:0 !important; height:100% !important;
+  overflow:hidden !important; gap:8px !important;
+}
+body.dark-theme #modalBody:has(#chatMessages) #chatMessages.chat-messages {
+  flex:1 1 0 !important; min-height:0 !important; height:0 !important;
+  max-height:none !important; padding:10px !important;
+}
+body.dark-theme #modalBody:has(#chatMessages) #chatForm.chat-form {
+  box-sizing:border-box !important; flex:0 0 auto !important;
+  min-height:0 !important; margin:0 !important; overflow:visible !important;
+  padding:8px !important; gap:6px !important;
+}
+body.dark-theme #modalBody:has(#chatMessages) #chatForm .chat-input-wrap {
+  min-height:0 !important; margin:0 !important;
+}
+body.dark-theme #modalBody:has(#chatMessages) #chatForm textarea {
+  display:block !important; box-sizing:border-box !important;
+  min-height:46px !important; max-height:72px !important;
+}
+body.dark-theme #modalBody:has(#chatMessages) #chatForm .chat-attach-row {
+  display:flex !important; align-items:center !important;
+  flex-wrap:wrap !important; gap:6px !important; margin:4px 0 0 !important;
+}
+@media(max-width:600px) {
+  body.dark-theme #modalBody:has(#chatMessages) {
+    height:calc(100dvh - 205px) !important;
+    max-height:calc(100dvh - 205px) !important;
+    padding:6px 8px !important;
+  }
+  body.dark-theme #modalBody:has(#chatMessages) #chatMessages.chat-messages {
+    min-height:0 !important; padding:7px !important;
+  }
+  body.dark-theme #modalBody:has(#chatMessages) #chatForm.chat-form {
+    padding:6px !important;
+  }
+}

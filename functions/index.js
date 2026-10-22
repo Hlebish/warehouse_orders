@@ -486,7 +486,11 @@ const { getDatabase } = require('firebase-admin/database');
 
 const warehouseMapApp = initializeApp({
   credential: applicationDefault(),
-  databaseURL: 'https://warehouse-map-b6ed6-default-rtdb.europe-west1.firebasedatabase.app'
+  databaseURL: 'https://warehouse-map-b6ed6-default-rtdb.europe-west1.firebasedatabase.app',
+  // Use RTDB Security Rules instead of unrestricted Admin SDK access.
+  // Current map rules allow authenticated reads but restrict writes to named emails;
+  // this synthetic identity has no email claim, so writes should be denied.
+  databaseAuthVariableOverride: { uid: 'warehouse-map-reader' }
 }, 'warehouse-map-reader');
 
 const WAREHOUSE_MAP_ALLOWED_ORIGINS = new Set([

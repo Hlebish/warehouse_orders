@@ -5467,3 +5467,8 @@ body.dark-theme #modalBody:has(#chatMessages) { position:relative !important; }
 .chat-reader-name { padding:9px 8px; border-bottom:1px solid #2c3438; }
 .chat-reader-name:last-child { border-bottom:0; }
 .chat-readers-dialog .chat-empty { padding:12px 8px; color:#9ba6ac; }
+
+
+/* Read-only Warehouse Map address shown under each order article. */
+.warehouse-map-address{display:block;margin-top:3px;font-size:10px;line-height:1.35;color:#28784f;font-weight:600;overflow-wrap:anywhere}
+body.dark-theme .warehouse-map-address{color:#8bd7a8}

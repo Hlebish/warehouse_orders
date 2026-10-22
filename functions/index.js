@@ -491,10 +491,12 @@ let warehouseMapApp;
 function getWarehouseMapApp() {
   if (!warehouseMapApp) {
     warehouseMapApp = initializeApp({
+      // Cross-project access is granted to this function's runtime service
+      // account by IAM in the Warehouse Map project. Do not use
+      // databaseAuthVariableOverride here: it produces invalid credentials
+      // for this cross-project Application Default Credentials setup.
       credential: applicationDefault(),
-      databaseURL: 'https://warehouse-map-b6ed6-default-rtdb.europe-west1.firebasedatabase.app',
-      // Use RTDB Security Rules instead of unrestricted Admin SDK access.
-      databaseAuthVariableOverride: { uid: 'warehouse-map-reader' }
+      databaseURL: 'https://warehouse-map-b6ed6-default-rtdb.europe-west1.firebasedatabase.app'
     }, 'warehouse-map-reader');
   }
   return warehouseMapApp;

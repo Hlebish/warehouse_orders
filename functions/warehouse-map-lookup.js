@@ -2,7 +2,7 @@ function normalizeMapArticle(value) {
   const text = String(value || '').trim().toUpperCase();
   // Order lines may contain the article code followed by a product description.
   // Match the warehouse code prefix (AP + 2-letter brand + digits) only.
-  const code = text.match(/^(AP[A-Z]{2}\\d+)/);
+  const code = text.match(/^(AP[A-Z]{2}\d+)/);
   return code ? code[1] : text.replace(/[^A-Z0-9]/g, '');
 }
 

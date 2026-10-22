@@ -1695,8 +1695,8 @@ function insertEntryMention(token){
   if(!input)return;
   const start=input.selectionStart??input.value.length;
   const before=input.value.slice(0,start).replace(/@[\p{L}\p{N}_-]*$/u,'@'+token);
-  const after=input.value.slice(start);
-  const separator=/^\s/u.test(after)?' ':' ';
+  const after=input.value.slice(start).replace(/^\s/u,'');
+  const separator=' ';
   input.value=before+separator+after;
   const pos=before.length+separator.length;
   input.setSelectionRange(pos,pos);
@@ -1708,8 +1708,8 @@ function insertChatMention(token){
   if(!input)return;
   const start=input.selectionStart??input.value.length;
   const before=input.value.slice(0,start).replace(/@[\p{L}\p{N}_-]*$/u,'@'+token);
-  const after=input.value.slice(start);
-  const separator=/^\s/u.test(after)?' ':' ';
+  const after=input.value.slice(start).replace(/^\s/u,'');
+  const separator=' ';
   input.value=before+separator+after;
   const pos=before.length+separator.length;
   input.setSelectionRange(pos,pos);

@@ -369,6 +369,32 @@ style.textContent = `
  .buyback-chip[data-status]{flex:initial!important;min-height:36px!important;padding:7px 8px!important;font-size:11px!important;border-radius:7px!important}
 }
 
+
+/* Clickable KPI cards and compact detail dialog */
+#buybackSummary .buyback-stat-card{width:100%;text-align:left;cursor:pointer;font:inherit;appearance:none;-webkit-appearance:none;transition:transform .12s,border-color .15s,background .15s;position:relative}
+#buybackSummary .buyback-stat-card:after{content:'↗';position:absolute;right:9px;top:7px;color:#647487;font-size:11px;opacity:0}
+#buybackSummary .buyback-stat-card:hover{border-color:#52657a!important;background:linear-gradient(110deg,#222b35,#1c2229)!important}
+#buybackSummary .buyback-stat-card:active{transform:scale(.985)}
+#buybackSummary .buyback-stat-card:focus-visible{outline:2px solid #7898bd;outline-offset:2px}
+.buyback-stat-modal[hidden]{display:none!important}
+.buyback-stat-modal{position:fixed;inset:0;z-index:100000;background:#080b0fbd;backdrop-filter:blur(6px);display:grid;place-items:center;padding:18px}
+.buyback-stat-dialog{display:flex;flex-direction:column;width:min(620px,100%);max-height:min(78dvh,760px);overflow:hidden;background:#191e24;color:#e8edf3;border:1px solid #35404c;border-radius:16px;box-shadow:0 25px 80px #0009}
+.buyback-stat-dialog>header{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:17px 19px;border-bottom:1px solid #303943;background:#1b2128}
+.buyback-stat-dialog .eyebrow{font-size:9px;letter-spacing:1.5px;color:#9ba9b8;font-weight:800}
+.buyback-stat-dialog h3{margin:4px 0;font-size:20px;color:#f1f4f8}
+.buyback-stat-dialog p{margin:0;color:#9daab8;font-size:12px}
+.buyback-stat-close{width:36px;height:36px;flex:0 0 36px;border:1px solid #39434e;border-radius:9px;background:#252d36;color:#e1e7ee;font-size:23px;cursor:pointer}
+.buyback-stat-items{overflow:auto;padding:12px;display:flex;flex-direction:column;gap:7px}
+.buyback-stat-item{padding:10px 12px;background:#20262d;border:1px solid #343e49;border-radius:9px;min-width:0}
+.buyback-stat-item-main{display:flex;align-items:baseline;gap:8px;color:#edf2f7;font-size:13px;overflow-wrap:anywhere}
+.buyback-stat-item-main span{color:#9daab8;font-size:12px;white-space:nowrap}
+.buyback-stat-item-name{margin-top:3px;color:#c1ccd7;font-size:11px;overflow-wrap:anywhere}
+.buyback-stat-item-meta{margin-top:4px;color:#9caab8;font-size:10px;line-height:1.45;overflow-wrap:anywhere}
+.buyback-stat-item-status{display:inline-block;margin-top:6px;padding:3px 7px;border-radius:5px;background:#293542;color:#c5d9ef;font-size:9px;font-weight:750}
+.buyback-stat-item-status.approaching{background:#352e20;color:#f0c66f}.buyback-stat-item-status.critical,.buyback-stat-item-status.expired{background:#382527;color:#ff9b9b}
+.buyback-stat-empty{padding:28px 14px;text-align:center;color:#9eabb9;font-size:12px}
+@media(max-width:700px){.buyback-stat-modal{padding:10px;align-items:end}.buyback-stat-dialog{max-height:78dvh;border-radius:15px}.buyback-stat-dialog>header{padding:13px 14px}.buyback-stat-dialog h3{font-size:18px}.buyback-stat-items{padding:9px;gap:6px}.buyback-stat-item{padding:9px 10px}}
+
 `;
 document.head.append(style);
 
@@ -419,10 +445,10 @@ function deadline(item){const [year,month,day]=item.receivedAt.split('-').map(Nu
 function render(){
  const active=items.filter(x=>x.status==='active'&&elapsedDays(x.receivedAt)<14);
  const expiredItems=items.filter(x=>x.status==='expired'||(x.status==='active'&&elapsedDays(x.receivedAt)>=14));
- const critical=active.filter(x=>elapsedDays(x.receivedAt)>=10&&elapsedDays(x.receivedAt)<14).length;
- const warn=active.filter(x=>elapsedDays(x.receivedAt)>=6&&elapsedDays(x.receivedAt)<10).length;
+ const criticalItems=active.filter(x=>elapsedDays(x.receivedAt)>=10&&elapsedDays(x.receivedAt)<14);
+ const warnItems=active.filter(x=>elapsedDays(x.receivedAt)>=6&&elapsedDays(x.receivedAt)<10);
  $('buybackNavAlert').hidden=!active.some(x=>elapsedDays(x.receivedAt)>=10);
- $('buybackSummary').innerHTML=`<span class="buyback-chip"><span class="buyback-stat-icon blue">⬡</span><span class="buyback-stat-label">В работе</span><b>${active.length}</b></span><span class="buyback-chip"><span class="buyback-stat-icon amber">◷</span><span class="buyback-stat-label">Срок подходит</span><b>${warn}</b></span><span class="buyback-chip"><span class="buyback-stat-icon red">!</span><span class="buyback-stat-label">Критично</span><b>${critical}</b></span><span class="buyback-chip"><span class="buyback-stat-icon neutral">⌛</span><span class="buyback-stat-label">Просрочено</span><b>${expiredItems.length}</b></span>`;
+ $('buybackSummary').innerHTML=`<button type="button" class="buyback-chip buyback-stat-card" data-buyback-stat="active"><span class="buyback-stat-icon blue">⬡</span><span class="buyback-stat-label">В работе</span><b>${active.length}</b></button><button type="button" class="buyback-chip buyback-stat-card" data-buyback-stat="approaching"><span class="buyback-stat-icon amber">◷</span><span class="buyback-stat-label">Срок подходит</span><b>${warnItems.length}</b></button><button type="button" class="buyback-chip buyback-stat-card" data-buyback-stat="critical"><span class="buyback-stat-icon red">!</span><span class="buyback-stat-label">Критично</span><b>${criticalItems.length}</b></button><button type="button" class="buyback-chip buyback-stat-card" data-buyback-stat="expired"><span class="buyback-stat-icon neutral">⌛</span><span class="buyback-stat-label">Просрочено</span><b>${expiredItems.length}</b></button>`;
  const visible=items.filter(x=>{
    const isExpired=x.status==='expired'||(x.status==='active'&&elapsedDays(x.receivedAt)>=14);
    return selectedStatus==='expired'?isExpired:selectedStatus==='approaching'?!isExpired&&x.status==='active'&&elapsedDays(x.receivedAt)>=6&&elapsedDays(x.receivedAt)<10:selectedStatus==='critical'?!isExpired&&x.status==='active'&&elapsedDays(x.receivedAt)>=10&&elapsedDays(x.receivedAt)<14:(selectedStatus==='active'?!isExpired&&x.status==='active':x.status===selectedStatus);
@@ -484,6 +510,29 @@ function close(fromPopState=false){
   try{history.back()}catch{}
  }
 }
+
+const buybackStatModal=document.createElement('div');
+buybackStatModal.className='buyback-stat-modal';
+buybackStatModal.hidden=true;
+buybackStatModal.innerHTML='<section class="buyback-stat-dialog" role="dialog" aria-modal="true" aria-labelledby="buybackStatTitle"><header><div><span class="eyebrow">ОБЗОР ТОВАРА</span><h3 id="buybackStatTitle">Товары</h3><p id="buybackStatSubtitle"></p></div><button type="button" class="buyback-stat-close" aria-label="Закрыть">×</button></header><div class="buyback-stat-items" id="buybackStatItems"></div></section>';
+document.body.append(buybackStatModal);
+function closeBuybackStatModal(){buybackStatModal.hidden=true}
+buybackStatModal.addEventListener('click',e=>{if(e.target===buybackStatModal||e.target.closest('.buyback-stat-close'))closeBuybackStatModal()});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!buybackStatModal.hidden)closeBuybackStatModal()});
+function openBuybackStatModal(category){
+ const nowActive=items.filter(x=>x.status==='active'&&elapsedDays(x.receivedAt)<14);
+ const matches=category==='active'?nowActive:category==='approaching'?nowActive.filter(x=>elapsedDays(x.receivedAt)>=6&&elapsedDays(x.receivedAt)<10):category==='critical'?nowActive.filter(x=>elapsedDays(x.receivedAt)>=10&&elapsedDays(x.receivedAt)<14):items.filter(x=>x.status==='expired'||(x.status==='active'&&elapsedDays(x.receivedAt)>=14));
+ const labels={active:'В работе',approaching:'Срок подходит',critical:'Критично',expired:'Просрочено'};
+ $('buybackStatTitle').textContent=labels[category]||'Товары';
+ $('buybackStatSubtitle').textContent='Найдено позиций: '+matches.length;
+ $('buybackStatItems').innerHTML=matches.length?matches.slice().sort((a,b)=>String(a.receivedAt).localeCompare(String(b.receivedAt))).map(item=>{
+ const days=elapsedDays(item.receivedAt),isExpired=item.status==='expired'||(item.status==='active'&&days>=14);
+ const state=isExpired?'Просрочен':item.status==='active'?(days>=10?'Критично':days>=6?'Срок подходит':'В работе'):(item.status==='returned'?'Возвращён':item.status==='sold'?'Продан':item.status==='cancelled'?'Отменён':'');
+ return '<article class="buyback-stat-item"><div class="buyback-stat-item-main"><b>'+escapeHtml(item.article||'Без артикула')+'</b><span>× '+escapeHtml(item.quantity??1)+'</span></div>'+(item.name?'<div class="buyback-stat-item-name">'+escapeHtml(item.name)+'</div>':'')+'<div class="buyback-stat-item-meta">'+(item.supplier?escapeHtml(item.supplier)+' · ':'')+'Приём: '+escapeHtml(item.receivedAt||'—')+' · '+Math.max(0,days)+' дн. на складе</div><span class="buyback-stat-item-status '+(isExpired?'expired':days>=10?'critical':days>=6?'approaching':'')+'">'+state+'</span></article>';
+ }).join(''):'<div class="buyback-stat-empty">В этой категории товаров нет.</div>';
+ buybackStatModal.hidden=false;
+}
+
 nav?.addEventListener('click',open);
 $('buybackClose').addEventListener('click',()=>close());
 overlay.addEventListener('click',e=>{if(e.target===overlay)close()});
@@ -519,6 +568,7 @@ $('buybackForm').addEventListener('submit',async e=>{
  finally{submit.disabled=false}
 });
 overlay.addEventListener('click',async e=>{
+ const statCard=e.target.closest('[data-buyback-stat]');if(statCard){openBuybackStatModal(statCard.dataset.buybackStat);return}
  const commentBtn=e.target.closest('[data-save-buyback-comment]');
  if(commentBtn){
   const itemId=commentBtn.dataset.saveBuybackComment;

@@ -1691,26 +1691,30 @@ function entryMentionSuggestions(){
   list.hidden=false;
 }
 function insertEntryMention(token){
-  const input=$('entryText');
+  const input=$('entryText'),list=$('entryMentionSuggestions');
   if(!input)return;
   const start=input.selectionStart??input.value.length;
   const before=input.value.slice(0,start).replace(/@[\p{L}\p{N}_-]*$/u,'@'+token);
-  input.value=before+input.value.slice(start);
-  const pos=before.length;
+  const after=input.value.slice(start);
+  const separator=/^\s/u.test(after)?' ':' ';
+  input.value=before+separator+after;
+  const pos=before.length+separator.length;
   input.setSelectionRange(pos,pos);
+  if(list){list.hidden=true;list.innerHTML='';}
   input.focus();
-  entryMentionSuggestions();
 }
 function insertChatMention(token){
-  const input=$('chatInput');
+  const input=$('chatInput'),list=$('chatMentionSuggestions');
   if(!input)return;
   const start=input.selectionStart??input.value.length;
   const before=input.value.slice(0,start).replace(/@[\p{L}\p{N}_-]*$/u,'@'+token);
-  input.value=before+input.value.slice(start);
-  const pos=before.length;
+  const after=input.value.slice(start);
+  const separator=/^\s/u.test(after)?' ':' ';
+  input.value=before+separator+after;
+  const pos=before.length+separator.length;
   input.setSelectionRange(pos,pos);
+  if(list){list.hidden=true;list.innerHTML='';}
   input.focus();
-  chatMentionSuggestions();
 }
 async function toggleChatLike(messageId){
   if(!signedInUser||!messageId)return;

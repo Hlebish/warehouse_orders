@@ -5472,3 +5472,63 @@ body.dark-theme #modalBody:has(#chatMessages) { position:relative !important; }
 /* Read-only Warehouse Map address shown under each order article. */
 .warehouse-map-address{display:block;margin-top:3px;font-size:10px;line-height:1.35;color:#28784f;font-weight:600;overflow-wrap:anywhere}
 body.dark-theme .warehouse-map-address{color:#8bd7a8}
+
+
+/* Graphite styling for order-comment replies and photo attachments. */
+body.dark-theme #modalBody .timeline-reply-reference{
+  background:#20252b!important;
+  border:1px solid #363d45!important;
+  border-left:3px solid #667382!important;
+  border-radius:9px!important;
+  color:#e0e4e9!important;
+  padding:11px 12px!important;
+}
+body.dark-theme #modalBody .timeline-reply-reference>b{color:#f0f2f5!important}
+body.dark-theme #modalBody .timeline-reply-reference>div{color:#b9c1ca!important;opacity:1!important}
+body.dark-theme #modalBody #entryForm .field label,
+body.dark-theme #modalBody #entryForm .field-label{color:#c6ccd4!important}
+body.dark-theme #modalBody #entryForm textarea,
+body.dark-theme #modalBody #entryForm input:not([type="file"]){
+  background:#171b20!important;
+  color:#edf0f4!important;
+  border:1px solid #39414b!important;
+  border-radius:9px!important;
+  box-shadow:none!important;
+}
+body.dark-theme #modalBody #entryForm textarea::placeholder{color:#818b97!important}
+body.dark-theme #modalBody #entryForm textarea:focus,
+body.dark-theme #modalBody #entryForm input:focus{
+  border-color:#667586!important;
+  outline:2px solid #66758622!important;
+  box-shadow:none!important;
+}
+body.dark-theme #modalBody #entryForm .upload-box{
+  background:#20252b!important;
+  border:1px dashed #46505c!important;
+  border-radius:10px!important;
+  color:#d2d8df!important;
+}
+body.dark-theme #modalBody #entryForm .upload-box input[type="file"]{
+  background:transparent!important;
+  color:#c5ccd4!important;
+  border:0!important;
+}
+body.dark-theme #modalBody #entryForm .field-hint{color:#929ca8!important}
+body.dark-theme #modalBody .timeline-reply-button,
+body.dark-theme #modalBody .small-button.primary-soft{
+  background:#252c34!important;
+  border:1px solid #3d4855!important;
+  color:#d4dce5!important;
+}
+body.dark-theme #modalBody .timeline-reply-button:hover,
+body.dark-theme #modalBody .small-button.primary-soft:hover{
+  background:#2c3540!important;
+  border-color:#566474!important;
+}
+body.dark-theme #modalBody .modal-foot .primary-button{
+  background:#343e4a!important;
+  border:1px solid #465362!important;
+  color:#f0f3f6!important;
+  box-shadow:none!important;
+}
+body.dark-theme #modalBody .modal-foot .primary-button:hover{background:#3b4755!important}

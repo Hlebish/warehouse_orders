@@ -9,6 +9,7 @@ test('normalizes article codes without changing alphanumeric identity', () => {
 test('matches a whole article token, not a longer neighboring code', () => {
   assert.equal(lineContainsExactArticle('APHD4307 — капот Honda', 'APHD4307'), true);
   assert.equal(lineContainsExactArticle('APHD43070 — капот Honda', 'APHD4307'), false);
+  assert.equal(lineContainsExactArticle('AP-HD-4307 — капот Honda', 'APHD4307'), true);
   assert.equal(lineContainsExactArticle('Описание без артикула', 'APHD4307'), false);
 });
 

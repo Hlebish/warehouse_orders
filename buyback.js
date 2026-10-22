@@ -395,6 +395,18 @@ style.textContent = `
 .buyback-stat-empty{padding:28px 14px;text-align:center;color:#9eabb9;font-size:12px}
 @media(max-width:700px){.buyback-stat-modal{padding:10px;align-items:end}.buyback-stat-dialog{max-height:78dvh;border-radius:15px}.buyback-stat-dialog>header{padding:13px 14px}.buyback-stat-dialog h3{font-size:18px}.buyback-stat-items{padding:9px;gap:6px}.buyback-stat-item{padding:9px 10px}}
 
+
+/* Manual add form is a compact, collapsed graphite accordion */
+.buyback-manual-add{margin:0 0 10px;border:1px solid #303943;border-radius:13px;background:linear-gradient(135deg,#1b2128,#191e24);overflow:hidden}
+.buyback-manual-add>summary{list-style:none;display:flex;align-items:center;gap:11px;min-height:54px;padding:10px 14px;cursor:pointer;color:#e7edf4;font-size:14px;font-weight:750;user-select:none}
+.buyback-manual-add>summary::-webkit-details-marker{display:none}
+.buyback-manual-plus{display:grid;place-items:center;width:29px;height:29px;flex:0 0 29px;border:1px solid #45576c;border-radius:50%;background:#263548;color:#b8d4f6;font-size:22px;font-weight:400;line-height:1}
+.buyback-manual-chevron{margin-left:auto;color:#9eacbb;font-size:18px;transition:transform .15s}
+.buyback-manual-add[open] .buyback-manual-chevron{transform:rotate(180deg)}
+.buyback-manual-add .buyback-manual-content{padding:0 10px 10px;border-top:1px solid #2d3742}
+.buyback-manual-add .buyback-form{margin:10px 0 0!important;background:#191e24!important;border-color:#303943!important}
+@media(max-width:700px){.buyback-manual-add{margin-bottom:9px}.buyback-manual-add>summary{min-height:48px;padding:8px 11px;font-size:13px}.buyback-manual-add .buyback-manual-content{padding:0 8px 8px}.buyback-manual-add .buyback-form{margin-top:8px!important}}
+
 `;
 document.head.append(style);
 
@@ -403,6 +415,9 @@ overlay.className='buyback-overlay';overlay.hidden=true;overlay.innerHTML=`
 <section class="buyback-window" role="dialog" aria-modal="true" aria-labelledby="buybackTitle">
 <header class="buyback-head"><div><span class="eyebrow">КОНТРОЛЬ СРОКОВ · 14 ДНЕЙ</span><h2 id="buybackTitle">Перекупной товар</h2><p>Срок считается от даты приёма на склад. Напоминания на 3-й, 6-й и 10-й день.</p></div><button id="buybackClose" class="close-button" aria-label="Закрыть">×</button></header>
 <div class="buyback-body">
+<details class="buyback-manual-add">
+<summary><span class="buyback-manual-plus">＋</span><span>Добавить вручную</span><span class="buyback-manual-chevron">⌄</span></summary>
+<div class="buyback-manual-content">
 <form id="buybackForm" class="buyback-form">
 <label class="buyback-field">Артикул<input id="buybackArticle" required maxlength="100" placeholder="Например, APAU1603"></label>
 <label class="buyback-field">Количество<input id="buybackQuantity" required type="number" min="1" step="1" value="1"></label>
@@ -410,6 +425,8 @@ overlay.className='buyback-overlay';overlay.hidden=true;overlay.innerHTML=`
 <label class="buyback-field">Поставщик<input id="buybackSupplier" maxlength="160" placeholder="Название поставщика"></label>
 <button class="buyback-add" type="submit">＋ Добавить</button>
 </form>
+</div>
+</details>
 <div class="buyback-summary" id="buybackSummary"></div>
 <div class="buyback-supplier-filter"><label for="buybackSupplierFilter">Поставщик</label><select id="buybackSupplierFilter"><option value="">Все поставщики</option></select></div>
 <div class="buyback-summary"><button class="buyback-chip" data-status="active" type="button">В работе</button><button class="buyback-chip" data-status="returned" type="button">Возвращён</button><button class="buyback-chip" data-status="sold" type="button">Продан</button><button class="buyback-chip" data-status="cancelled" type="button">Отменён</button><button class="buyback-chip" data-status="expired" type="button">Просрочен</button></div>

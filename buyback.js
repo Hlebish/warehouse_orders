@@ -407,6 +407,38 @@ style.textContent = `
 .buyback-manual-add .buyback-form{margin:10px 0 0!important;background:#191e24!important;border-color:#303943!important}
 @media(max-width:700px){.buyback-manual-add{margin-bottom:9px}.buyback-manual-add>summary{min-height:48px;padding:8px 11px;font-size:13px}.buyback-manual-add .buyback-manual-content{padding:0 8px 8px}.buyback-manual-add .buyback-form{margin-top:8px!important}}
 
+
+/* Refined status selector: compact segmented grid, no oversized empty panel */
+.buyback-summary:has(button[data-status]){
+ display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;
+ gap:7px!important;width:100%!important;max-width:none!important;
+ padding:9px!important;margin:0 0 12px!important;
+ background:#151a20!important;border:1px solid #303943!important;
+ border-radius:13px!important;box-sizing:border-box!important;
+}
+.buyback-chip[data-status]{
+ display:flex!important;align-items:center;justify-content:center!important;
+ gap:8px!important;min-width:0!important;min-height:42px!important;
+ padding:9px 10px!important;border:1px solid #303a46!important;
+ border-radius:9px!important;background:#1b2128!important;
+ color:#bac4cf!important;font-size:12px!important;font-weight:650!important;
+ line-height:1.2!important;white-space:normal!important;
+}
+.buyback-chip[data-status]:before{content:'';width:7px;height:7px;flex:0 0 7px;border-radius:50%;background:#748293!important;box-shadow:none!important}
+.buyback-chip[data-status]:hover{background:#232c36!important;border-color:#465568!important;color:#e7edf4!important}
+.buyback-chip[data-status].active,.buyback-chip[data-status][aria-pressed="true"]{
+ background:linear-gradient(135deg,#293b51,#222f40)!important;
+ border-color:#4a6584!important;color:#f1f6fc!important;
+ box-shadow:inset 0 1px 0 #ffffff08!important;
+}
+.buyback-chip[data-status].active:before,.buyback-chip[data-status][aria-pressed="true"]:before{
+ background:#8fc0ff!important;box-shadow:0 0 0 4px #7eaff51c!important;
+}
+@media(max-width:700px){
+ .buyback-summary:has(button[data-status]){grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:6px!important;padding:7px!important;border-radius:12px!important}
+ .buyback-chip[data-status]{min-height:39px!important;padding:8px 6px!important;font-size:11px!important;border-radius:8px!important}
+}
+
 `;
 document.head.append(style);
 

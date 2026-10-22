@@ -2,7 +2,7 @@ function normalizeMapArticle(value) {
   return String(value || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
 }
 
-function lineContainsExactArticle(line, article) {
+function lineContainsExactArticle(line, normalizedArticle) {
   const tokens = String(line || '').toUpperCase().match(/[A-Z0-9]+/g) || [];
   for (let start = 0; start < tokens.length; start++) {
     let combined = '';
@@ -16,6 +16,7 @@ function lineContainsExactArticle(line, article) {
 }
 
 function lookupArticleInMap(cells, unaddressed, article) {
+  const normalizedArticle = normalizeMapArticle(article);
   const locations = [];
   for (const [street, shelves] of Object.entries(cells || {})) {
     if (!/^S[1-5]$/.test(street) || !shelves || typeof shelves !== 'object') continue;
@@ -30,7 +31,7 @@ function lookupArticleInMap(cells, unaddressed, article) {
   }
 
   const isUnaddressed = Object.values(unaddressed || {}).some(item =>
-    normalizeMapArticle(item?.article) === article
+    normalizeMapArticle(item?.article) === normalizedArticle
   );
   return { article, locations, unaddressed: isUnaddressed };
 }

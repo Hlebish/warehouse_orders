@@ -4,12 +4,16 @@ const { initializeApp, deleteApp } = require('firebase-admin/app');
 const { getDatabase } = require('firebase-admin/database');
 
 const projectId = 'demo-warehouse-map-rules';
-const databaseUrl = `http://127.0.0.1:9000?ns=${projectId}`;
+// Firebase Database Emulator names its default instance <project-id>-default-rtdb.
+// Use that exact namespace; using only projectId creates a second, unconfigured
+// namespace with the emulator's permissive fallback rules.
+const databaseNamespace = `${projectId}-default-rtdb`;
+const databaseUrl = `http://127.0.0.1:9000?ns=${databaseNamespace}`;
 const emulatorHost = process.env.FIREBASE_DATABASE_EMULATOR_HOST || '127.0.0.1:9000';
 
 async function seedEmulator() {
   const response = await fetch(
-    `http://${emulatorHost}/warehouse.json?ns=${projectId}&auth=owner`,
+    `http://${emulatorHost}/warehouse.json?ns=${databaseNamespace}&auth=owner`,
     {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -26,6 +30,18 @@ async function seedEmulator() {
 test('Warehouse Map auth override reads allowed paths, denies writes, and exposes current broad read scope', async t => {
   assert.ok(process.env.FIREBASE_DATABASE_EMULATOR_HOST,
     'Run this test through the Firebase Realtime Database emulator script');
+
+  // Guard against accidentally testing a different, permissively configured namespace.
+  const rulesResponse = await fetch(
+    `http://${emulatorHost}/.settings/rules.json?ns=${databaseNamespace}`,
+    { headers: { Authorization: 'Bearer owner' } }
+  );
+  assert.equal(rulesResponse.ok, true, 'Could not inspect emulator rules');
+  const activeRules = await rulesResponse.json();
+  assert.equal(activeRules?.rules?.warehouse?.['.read'], 'auth != null',
+    'Expected Warehouse Map rules were not loaded into the default RTDB namespace');
+  assert.equal(typeof activeRules?.rules?.['.write'], 'undefined',
+    'Unexpected root-level write rule would invalidate this test');
 
   await seedEmulator();
 

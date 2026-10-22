@@ -13,9 +13,9 @@ This feature branch adds a read-only API bridge from Warehouse Orders to the sep
 
 ## Required infrastructure setup (not performed)
 
-The function uses Application Default Credentials, not a service-account key in source code. The separate Admin SDK app is configured with `databaseAuthVariableOverride: { uid: 'warehouse-map-reader' }` so Realtime Database Security Rules evaluate its requests as a synthetic identity rather than granting unrestricted Admin SDK access. The current `database.rules.json` explicitly excludes this identity from the parent-level `warehouse/.read` rule, while allowing authenticated reads at `warehouse/cells` and `warehouse/unaddressed`. Other child paths explicitly exclude this identity.
+The function uses Application Default Credentials, not a service-account key in source code. The separate Admin SDK app is configured with `databaseAuthVariableOverride: { uid: 'warehouse-map-reader' }` so Realtime Database Security Rules evaluate its requests as a synthetic identity rather than granting unrestricted Admin SDK access. The checked-in rules in [Warehouse Map](https://github.com/Hlebish/warehouse-map/blob/main/database.rules.json) exclude this identity from the parent-level `warehouse/.read` rule and allow authenticated reads at `warehouse/cells` and `warehouse/unaddressed`. Other child paths explicitly exclude this identity. The emulator CI test uses a checked-in fixture copy at `test-fixtures/warehouse-map.database.rules.json`; it does not read or verify the rules currently deployed in Firebase.
 
-**Security boundary:** the function requests only `warehouse/cells` and `warehouse/unaddressed`; the rules should additionally ensure the synthetic identity cannot read other child paths or write any data. Keep the rule fixture in Warehouse Orders synchronized with Warehouse Map rules. Do not grant the runtime identity database-admin access for this bridge. Production deployment still requires a non-production verification of the effective rules and the runtime service account's IAM permissions.
+**Security boundary:** the function requests only `warehouse/cells` and `warehouse/unaddressed`; the checked-in rules also limit the synthetic identity's reads to those child paths and deny writes. Keep the rule fixture in Warehouse Orders synchronized with Warehouse Map rules. Do not grant the runtime identity database-admin access for this bridge. Before deployment, an authorized operator must compare the effective Firebase rules with the checked-in source, then verify the runtime service account's read-only IAM access against a non-production database.
 
 The API's map database URL is currently:
 `https://warehouse-map-b6ed6-default-rtdb.europe-west1.firebasedatabase.app`
@@ -34,7 +34,7 @@ Confirm the deployed URL in Firebase/Google Cloud before enabling the frontend.
 5. Verify partial matches (for example `APHD43070` when querying `APHD4307`) do not match.
 6. Verify missing articles and unaddressed articles are reported without returning cell text, item metadata, history, or write capabilities.
 7. Verify unknown browser origins are rejected and allowed origins work with preflight.
-8. Verify IAM denies the function's runtime service account from writing to the map database.
+8. Verify the runtime service account cannot write to the map database and has no database-admin role.
 9. Verify the order detail remains usable when the API is unavailable; the “На карте” button must still open the existing map search.
 10. Deploy only after review, with no changes to Warehouse Map Firebase rules and no writes to the map database.
 

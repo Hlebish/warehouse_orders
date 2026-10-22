@@ -5558,3 +5558,52 @@ body.dark-theme #modalBody .modal-foot .primary-button:hover{background:#3b4755!
   body.dark-theme .topbar #notificationButton svg{width:21px!important;height:21px!important;margin:0!important}
   body.dark-theme .topbar #notificationButton #notificationDot{position:absolute!important;top:5px!important;right:5px!important}
 }
+
+
+/* Mobile quick actions: keep reports and shipment access visible below the header. */
+@media(max-width:720px){
+  .topbar{
+    height:auto;
+    min-height:56px;
+    padding:10px 14px 9px;
+    display:grid;
+    grid-template-columns:32px minmax(0,1fr) 40px;
+    grid-template-rows:auto auto;
+    column-gap:10px;
+    row-gap:9px;
+    overflow:visible;
+  }
+  .mobile-menu{grid-column:1;grid-row:1;align-self:center}
+  .breadcrumbs{grid-column:2;grid-row:1;align-self:center;margin:0;min-width:0}
+  .top-actions{
+    display:flex;
+    grid-column:1 / -1;
+    grid-row:2;
+    width:100%;
+    min-width:0;
+    gap:7px;
+    overflow-x:auto;
+    overscroll-behavior-x:contain;
+    scrollbar-width:none;
+    padding:1px 0 2px;
+  }
+  .top-actions::-webkit-scrollbar{display:none}
+  .top-actions .top-history-button{
+    display:inline-flex;
+    flex:0 0 auto;
+    align-items:center;
+    justify-content:center;
+    height:34px;
+    padding:0 10px;
+    font-size:11px;
+    white-space:nowrap;
+  }
+  .top-actions .top-history-button:first-child,
+  .top-actions .top-history-button:nth-child(2){font-size:11px}
+  .top-actions .top-history-button:first-child::after,
+  .top-actions .top-history-button:nth-child(2)::after{content:none}
+  .top-actions .top-divider{display:none}
+  .top-actions #notificationButton{position:absolute;right:0;top:-45px;width:40px;height:40px}
+  .top-actions .today{display:none}
+  .content{padding-top:16px}
+}

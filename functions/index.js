@@ -475,3 +475,144 @@ exports.checkBuybackDeadlines = onSchedule({
     }
   }
 });
+
+
+// Read-only bridge to Warehouse Map. The function's runtime service account must be
+// granted read-only access to the map project's Realtime Database via Google Cloud IAM.
+// Never place a service-account key in source code or browser assets.
+const { getAuth } = require('firebase-admin/auth');
+const { applicationDefault } = require('firebase-admin/app');
+const { getDatabase } = require('firebase-admin/database');
+
+const warehouseMapApp = initializeApp({
+  credential: applicationDefault(),
+  databaseURL: 'https://warehouse-map-b6ed6-default-rtdb.europe-west1.firebasedatabase.app'
+}, 'warehouse-map-reader');
+
+const WAREHOUSE_MAP_ALLOWED_ORIGINS = new Set([
+  'https://hlebish.github.io',
+  'https://localhost',
+  'capacitor://localhost'
+]);
+
+function normalizeMapArticle(value) {
+  return String(value || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+}
+
+function lineContainsExactArticle(line, article) {
+  return (String(line || '').toUpperCase().match(/[A-Z0-9]+/g) || [])
+    .some(token => normalizeMapArticle(token) === article);
+}
+
+function lookupArticleInMap(cells, unaddressed, article) {
+  const locations = [];
+  for (const [street, shelves] of Object.entries(cells || {})) {
+    if (!/^S[1-5]$/.test(street) || !shelves || typeof shelves !== 'object') continue;
+    for (const [shelf, cellRows] of Object.entries(shelves)) {
+      if (!/^[ABCDE FGHJK]$/.test(shelf.replace(' ', '')) || !cellRows || typeof cellRows !== 'object') continue;
+      for (const [cell, rawValue] of Object.entries(cellRows)) {
+        if (!/^([1-9]|10)$/.test(cell) || typeof rawValue !== 'string' || !rawValue.trim()) continue;
+        const matched = rawValue.split(/\r?\n/).some(line => lineContainsExactArticle(line, article));
+        if (matched) locations.push({ address: street + '-' + shelf + '-' + cell, street, shelf, cell });
+      }
+    }
+  }
+
+  const isUnaddressed = Object.values(unaddressed || {}).some(item =>
+    normalizeMapArticle(item?.article) === article
+  );
+  return { article, locations, unaddressed: isUnaddressed };
+}
+
+exports.lookupWarehouseMapAddress = onRequest(
+  { memory: '256MiB', timeoutSeconds: 15, maxInstances: 5, invoker: 'public' },
+  async (req, res) => {
+    res.set('Content-Type', 'application/json; charset=utf-8');
+    res.set('Cache-Control', 'no-store, max-age=0');
+    res.set('Vary', 'Origin');
+
+    const origin = String(req.get('origin') || '');
+    if (origin && WAREHOUSE_MAP_ALLOWED_ORIGINS.has(origin)) {
+      res.set('Access-Control-Allow-Origin', origin);
+      res.set('Access-Control-Allow-Headers', 'Authorization, Content-Type');
+      res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
+      res.set('Access-Control-Max-Age', '600');
+    }
+
+    if (req.method === 'OPTIONS') {
+      if (origin && !WAREHOUSE_MAP_ALLOWED_ORIGINS.has(origin)) {
+        return res.status(403).json({ ok: false, error: 'Origin not allowed' });
+      }
+      return res.status(204).send('');
+    }
+    if (origin && !WAREHOUSE_MAP_ALLOWED_ORIGINS.has(origin)) {
+      return res.status(403).json({ ok: false, error: 'Origin not allowed' });
+    }
+    if (req.method !== 'POST') {
+      res.set('Allow', 'POST, OPTIONS');
+      return res.status(405).json({ ok: false, error: 'POST required' });
+    }
+
+    try {
+      const rawBodySize = req.rawBody?.length;
+      if (typeof rawBodySize === 'number' && rawBodySize > 16 * 1024) {
+        return res.status(413).json({ ok: false, error: 'Request too large' });
+      }
+
+      const authorization = String(req.get('authorization') || '');
+      const match = authorization.match(/^Bearer\s+(.+)$/i);
+      if (!match) return res.status(401).json({ ok: false, error: 'Authentication required' });
+
+      let decoded;
+      try {
+        decoded = await getAuth().verifyIdToken(match[1], true);
+      } catch {
+        return res.status(401).json({ ok: false, error: 'Invalid or expired session' });
+      }
+
+      const userSnap = await db.collection('users').doc(decoded.uid).get();
+      if (!userSnap.exists || userSnap.data()?.active !== true) {
+        return res.status(403).json({ ok: false, error: 'Active warehouse account required' });
+      }
+
+      const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body)
+        ? req.body : {};
+      const rawArticles = Array.isArray(body.articles) ? body.articles : [body.article];
+      if (!rawArticles.length || rawArticles.length > 100) {
+        return res.status(400).json({ ok: false, error: 'Provide between 1 and 100 article codes' });
+      }
+
+      const articles = [];
+      const seen = new Set();
+      for (const raw of rawArticles) {
+        const article = String(raw || '').trim();
+        const normalized = normalizeMapArticle(article);
+        if (!article || article.length > 120 || !normalized || normalized.length > 120) {
+          return res.status(400).json({ ok: false, error: 'Each article must be a non-empty code of at most 120 characters' });
+        }
+        if (!seen.has(normalized)) {
+          seen.add(normalized);
+          articles.push({ original: article, normalized });
+        }
+      }
+
+      // Only read the storage cells and unaddressed-item list. History, metadata,
+      // undo data, and write paths are deliberately not exposed by this API.
+      const snapshot = await getDatabase(warehouseMapApp).ref('warehouse').get();
+      const warehouse = snapshot.val() || {};
+      const cells = warehouse.cells || {};
+      const unaddressed = warehouse.unaddressed || {};
+      const results = articles.map(item => {
+        const found = lookupArticleInMap(cells, unaddressed, item.normalized);
+        return { article: item.original, locations: found.locations, unaddressed: found.unaddressed };
+      });
+
+      return res.status(200).json({ ok: true, results });
+    } catch (error) {
+      logger.error('Warehouse Map lookup failed', {
+        error: String(error?.message || error)
+      });
+      return res.status(503).json({ ok: false, error: 'Warehouse Map lookup temporarily unavailable' });
+    }
+  }
+);

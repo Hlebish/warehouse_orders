@@ -59,20 +59,23 @@ function parseInvoice(raw) {
 function install() {
   const form = document.getElementById('buybackForm');
   if (!form || document.getElementById('buybackInvoiceImport')) return;
-  const panel = document.createElement('section');
+  const panel = document.createElement('details');
   panel.id = 'buybackInvoiceImport';
-  panel.style.cssText = 'margin:16px 0;padding:15px;border:1px solid #343b46;border-radius:10px;background:#191d23';
   panel.innerHTML = `
-    <h3 style="margin:0 0 8px;font-size:15px">Импорт приходной накладной 1С</h3>
-    <p style="margin:0 0 10px;color:#9da7b4;font-size:12px">Вставь скопированную печатную форму целиком. Проверь поставщика, дату и позиции перед добавлением.</p>
-    <textarea id="buybackInvoiceText" rows="7" placeholder="Вставь сюда текст приходной накладной из 1С…" style="box-sizing:border-box;width:100%;resize:vertical;padding:10px;border:1px solid #3b4350;border-radius:7px;background:#101317;color:#f3f4f6;font:12px/1.5 monospace"></textarea>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:9px">
-      <button type="button" id="buybackInvoiceParse" style="border:0;border-radius:7px;padding:9px 13px;background:#35465d;color:white;font-weight:700">Разобрать накладную</button>
-      <button type="button" id="buybackInvoiceSave" disabled style="border:0;border-radius:7px;padding:9px 13px;background:#2867dc;color:white;font-weight:700;opacity:.5">Добавить все позиции</button>
-    </div>
-    <div id="buybackInvoiceStatus" role="status" style="margin-top:10px;font-size:12px;color:#b5bec9"></div>
-    <div id="buybackInvoicePreview" style="overflow:auto;margin-top:10px"></div>`;
-  form.insertAdjacentElement('afterend', panel);
+    <summary>
+      <span class="invoice-icon" aria-hidden="true">▤</span>
+      <span><span class="invoice-heading">Импорт приходной накладной 1С</span>
+      <span class="invoice-description">Вставь скопированную печатную форму целиком. Проверь поставщика, дату и позиции перед добавлением.</span></span>
+    </summary>
+    <div class="invoice-content">
+      <textarea id="buybackInvoiceText" rows="7" placeholder="Вставь сюда текст приходной накладной из 1С…"></textarea>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+        <button type="button" id="buybackInvoiceParse">Разобрать накладную</button>
+        <button type="button" id="buybackInvoiceSave" disabled style="opacity:.5">Добавить все позиции</button>
+      </div>
+      <div id="buybackInvoiceStatus" role="status" style="margin-top:10px;font-size:12px"></div>
+      <div id="buybackInvoicePreview" style="overflow:auto;margin-top:10px"></div>
+    </div>`;  form.insertAdjacentElement('afterend', panel);
   let parsed = null;
   const status = panel.querySelector('#buybackInvoiceStatus');
   const save = panel.querySelector('#buybackInvoiceSave');
@@ -81,7 +84,7 @@ function install() {
     parsed = parseInvoice(panel.querySelector('#buybackInvoiceText').value);
     save.disabled = !parsed.rows.length || !parsed.receivedAt;
     save.style.opacity = save.disabled ? '.5' : '1';
-    status.style.color = parsed.rows.length && parsed.receivedAt ? '#8ed6a3' : '#f0bd74';
+    status.style.color = parsed.rows.length && parsed.receivedAt ? '#b7c8dd' : '#e5bd78';
     status.textContent = !parsed.rows.length ? 'Не удалось найти позиции. Убедись, что скопирована вся таблица с артикулами, наименованиями и количеством.' : !parsed.receivedAt ? 'Позиции найдены, но не распознана дата документа. Проверь заголовок накладной.' : `Найдено позиций: ${parsed.rows.length}. Поставщик: ${parsed.supplier || 'не распознан'} · Дата: ${parsed.receivedAt}. Проверь список ниже.`;
     preview.innerHTML = parsed.rows.length ? `<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr><th style="text-align:left;padding:7px;border-bottom:1px solid #3b4350">Артикул</th><th style="text-align:left;padding:7px;border-bottom:1px solid #3b4350">Наименование</th><th style="text-align:right;padding:7px;border-bottom:1px solid #3b4350">Кол-во</th></tr></thead><tbody>${parsed.rows.map(r => `<tr><td style="padding:7px;border-bottom:1px solid #303640;white-space:nowrap">${esc(r.article)}</td><td style="padding:7px;border-bottom:1px solid #303640">${esc(r.name)}</td><td style="padding:7px;text-align:right;border-bottom:1px solid #303640">${r.quantity}</td></tr>`).join('')}</tbody></table>` : '';
   });
@@ -105,13 +108,13 @@ function install() {
         });
         added++;
       }
-      status.style.color = '#8ed6a3';
+      status.style.color = '#b7c8dd';
       status.textContent = `Готово: добавлено ${added} позиций. Таймер хранения рассчитывается от даты приёма ${parsed.receivedAt}.`;
       preview.innerHTML = '';
       panel.querySelector('#buybackInvoiceText').value = '';
       parsed = null;
     } catch (error) {
-      status.style.color = '#f0bd74';
+      status.style.color = '#e5bd78';
       status.textContent = `Добавлено ${added} из ${parsed.rows.length}. Ошибка: ${error?.message || error}. Не запускай импорт повторно, пока не проверишь список перекупного товара.`;
     } finally {
       panel.querySelector('#buybackInvoiceParse').disabled = false;

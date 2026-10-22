@@ -13,7 +13,9 @@ This feature branch adds a read-only API bridge from Warehouse Orders to the sep
 
 ## Required infrastructure setup (not performed)
 
-The function uses Application Default Credentials, not a service-account key in source code. Before deploying it, identify the actual runtime service account for the Cloud Function in the Warehouse Orders project and grant that identity **read-only** access to the Realtime Database in the Warehouse Map project. Use the narrowest supported IAM role, such as the Realtime Database Viewer role, and verify it permits reads of the target database. Do not grant database-admin access unless Firebase/IAM limitations are confirmed and explicitly reviewed.
+The function uses Application Default Credentials, not a service-account key in source code. The separate Admin SDK app is configured with `databaseAuthVariableOverride: { uid: 'warehouse-map-reader' }` so Realtime Database Security Rules evaluate its requests as a synthetic, non-email identity instead of giving the bridge unrestricted Admin SDK access. Under the currently supplied rules, this identity should be allowed to read under `warehouse` because `.read` is `auth != null`, while writes to protected child paths should be denied because the synthetic identity has no matching email claim.
+
+**Important limitation:** the current parent-level `warehouse/.read` rule permits this identity to read the entire `warehouse` subtree, not just `cells` and `unaddressed`. The function code only requests those two paths, but this is not a hard database-level read restriction. Do not deploy until the rule-evaluation behavior is tested against a non-production database and the broader read scope is explicitly accepted or the rules are redesigned safely. Do not grant the runtime identity database-admin access for this bridge.
 
 The API's map database URL is currently:
 `https://warehouse-map-b6ed6-default-rtdb.europe-west1.firebasedatabase.app`

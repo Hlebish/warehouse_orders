@@ -5628,3 +5628,12 @@ body.dark-theme #modalBody .modal-foot .primary-button:hover{background:#3b4755!
   body.dark-theme .topbar #notificationButton{display:flex!important;visibility:visible!important;opacity:1!important;position:absolute!important;right:10px!important;top:8px!important;width:38px!important;height:38px!important;align-items:center!important;justify-content:center!important;color:#dce3e5!important;background:#24292d!important;border:1px solid #3a4247!important;border-radius:12px!important}
   body.dark-theme .topbar #notificationButton svg{display:block!important;width:21px!important;height:21px!important}
 }
+
+
+/* Mobile header: show report shortcut next to shipment. */
+@media(max-width:720px){
+  body.dark-theme .topbar .top-actions #dailyReportButton{
+    display:inline-flex!important;visibility:visible!important;opacity:1!important;
+    flex:0 0 auto!important;
+  }
+}

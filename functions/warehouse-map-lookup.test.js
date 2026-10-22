@@ -20,14 +20,14 @@ test('returns every exact storage address and no inventory contents', () => {
     S6: { A: { '1': 'APHD4307 — invalid street' } },
     S2: { Z: { '1': 'APHD4307 — invalid shelf' } }
   };
-  const result = lookupArticleInMap(cells, {}, 'APHD4307');
+  const result = lookupArticleInMap(cells, {}, 'AP-HD-4307');
   assert.deepEqual(result.locations.map(x => x.address), ['S1-A-1', 'S5-K-10']);
   assert.equal(result.unaddressed, false);
   assert.equal(Object.hasOwn(result, 'content'), false);
 });
 
 test('flags an article in the unaddressed list', () => {
-  const result = lookupArticleInMap({}, { item1: { article: 'AP-H D4307' } }, 'APHD4307');
+  const result = lookupArticleInMap({}, { item1: { article: 'AP-H D4307' } }, 'AP-H D4307');
   assert.deepEqual(result.locations, []);
   assert.equal(result.unaddressed, true);
 });

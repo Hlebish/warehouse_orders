@@ -13,9 +13,11 @@ This feature branch adds a read-only API bridge from Warehouse Orders to the sep
 
 ## Required infrastructure setup (not performed)
 
-The function uses Application Default Credentials, not a service-account key in source code. The separate Admin SDK app is configured with `databaseAuthVariableOverride: { uid: 'warehouse-map-reader' }` so Realtime Database Security Rules evaluate its requests as a synthetic identity rather than granting unrestricted Admin SDK access. The checked-in rules in [Warehouse Map](https://github.com/Hlebish/warehouse-map/blob/main/database.rules.json) exclude this identity from the parent-level `warehouse/.read` rule and allow authenticated reads at `warehouse/cells` and `warehouse/unaddressed`. Other child paths explicitly exclude this identity. The emulator CI test uses a checked-in fixture copy at `test-fixtures/warehouse-map.database.rules.json`; it does not read or verify the rules currently deployed in Firebase.
+The function uses Application Default Credentials, not a service-account key in source code. The separate Admin SDK app is configured with `databaseAuthVariableOverride: { uid: 'warehouse-map-reader' }` so Realtime Database Security Rules evaluate its requests as a synthetic identity rather than granting unrestricted Admin SDK access. The checked-in rules in [Warehouse Map](https://github.com/Hlebish/warehouse-map/blob/main/database.rules.json) exclude this identity from the parent-level `warehouse/.read` rule and allow authenticated reads at `warehouse/cells` and `warehouse/unaddressed`. The emulator CI test uses a checked-in fixture copy at `test-fixtures/warehouse-map.database.rules.json`; it does not read or verify the rules currently deployed in Firebase.
 
-**Security boundary:** the function requests only `warehouse/cells` and `warehouse/unaddressed`; the checked-in rules also limit the synthetic identity's reads to those child paths and deny writes. Keep the rule fixture in Warehouse Orders synchronized with Warehouse Map rules. Do not grant the runtime identity database-admin access for this bridge. Before deployment, an authorized operator must compare the effective Firebase rules with the checked-in source, then verify the runtime service account's read-only IAM access against a non-production database.
+**Observed live-rules blocker (rules copied from Firebase Console by the operator on 2026-10-22):** the supplied rules have `warehouse/.read: auth != null` and do not exclude `warehouse-map-reader`. A parent-level RTDB read grant flows to its descendants, so this permits every authenticated identity—including the synthetic bridge identity—to read the entire `warehouse` subtree. It also grants that broad read to any authenticated user of the map project. This differs from the checked-in rules. Do not enable the API against the supplied rules. The rules have not been independently fetched by CI or changed by this PR.
+
+**Required security boundary:** before enabling the bridge, an authorized owner must reconcile the deployed RTDB rules with the reviewed source and verify them in a non-production database. The source rules currently deny the synthetic identity at `warehouse` and explicitly allow it to read only `cells` and `unaddressed`. The emulator CI test verifies the source fixture, not the deployed rules. Also verify the runtime service account's effective IAM permissions; no IAM changes or production rule changes have been made.
 
 The API's map database URL is currently:
 `https://warehouse-map-b6ed6-default-rtdb.europe-west1.firebasedatabase.app`
@@ -28,7 +30,7 @@ Confirm the deployed URL in Firebase/Google Cloud before enabling the frontend.
 ## Verification checklist
 
 1. Run `cd functions && npm ci && npm test`.
-2. Run the Firebase Functions emulator against a non-production test project.
+2. In a non-production project, verify the intended rules deny reads at `warehouse` for `warehouse-map-reader`, allow reads at `warehouse/cells` and `warehouse/unaddressed`, deny reads at other children, and deny writes.
 3. Verify unauthenticated requests return 401, expired/invalid tokens return 401, and signed-in but inactive users return 403.
 4. Verify a valid active warehouse user receives only the address list for an exact article match.
 5. Verify partial matches (for example `APHD43070` when querying `APHD4307`) do not match.
@@ -36,7 +38,7 @@ Confirm the deployed URL in Firebase/Google Cloud before enabling the frontend.
 7. Verify unknown browser origins are rejected and allowed origins work with preflight.
 8. Verify the runtime service account cannot write to the map database and has no database-admin role.
 9. Verify the order detail remains usable when the API is unavailable; the “На карте” button must still open the existing map search.
-10. Deploy only after review, with no changes to Warehouse Map Firebase rules and no writes to the map database.
+10. Enable the frontend only after review and non-production verification. Any production rule or IAM change requires separate explicit authorization.
 
 ## Rollback
 

@@ -7,7 +7,7 @@ const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 const $ = id => document.getElementById(id);
-let currentUser = null, unsubscribe = null, items = [], selectedStatus = 'active';
+let currentUser = null, unsubscribe = null, items = [], selectedStatus = 'active', selectedSupplier = '';
 
 const style = document.createElement('style');
 style.textContent = `
@@ -22,7 +22,7 @@ style.textContent = `
 .buyback-field{display:grid;gap:6px;font-size:11px;font-weight:700;color:#667180}.buyback-field input,.buyback-field select{width:100%;min-width:0;padding:10px;border:1px solid #dfe4ea;border-radius:7px;background:white;color:#27313d;font:inherit;font-weight:400}
 .buyback-add{height:38px;border:0;border-radius:7px;background:#2867dc;color:white;padding:0 15px;font-weight:700}
 .buyback-summary{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 14px}.buyback-chip{padding:7px 10px;border-radius:7px;background:#f0f3f7;font-size:11px;color:#596574}
-.buyback-list{display:grid;gap:10px}.buyback-card{border:1px solid #e5e8ed;border-left:4px solid #72a88a;border-radius:10px;padding:14px 15px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center}
+.buyback-list{display:grid;gap:10px}.buyback-supplier-filter{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 14px;padding:10px 12px;border:1px solid #303a32;border-radius:10px;background:#181d1a}.buyback-supplier-filter label{font-size:11px;font-weight:800;color:#b8c4bc}.buyback-supplier-filter select{min-width:0;max-width:100%;flex:1;padding:9px 11px;border-radius:8px;border:1px solid #354039;background:#111513;color:#edf2ee;font-size:12px}.buyback-card{border:1px solid #e5e8ed;border-left:4px solid #72a88a;border-radius:10px;padding:14px 15px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center}
 .buyback-card.warn{border-left-color:#d6a03c;background:#fffdf8}.buyback-card.critical{border-left-color:#cf4141;background:#fff8f7}.buyback-card.expired{border-left-color:#8d2929;background:#fff0ef}
 .buyback-article{font-size:15px;font-weight:800;color:#283341;overflow-wrap:anywhere}.buyback-meta{font-size:11px;color:#8993a0;margin-top:5px;line-height:1.6}
 .buyback-progress{height:6px;background:#edf0f4;border-radius:99px;overflow:hidden;margin-top:10px;max-width:400px}.buyback-progress span{display:block;height:100%;background:#6da985;border-radius:99px}
@@ -240,6 +240,7 @@ overlay.className='buyback-overlay';overlay.hidden=true;overlay.innerHTML=`
 <button class="buyback-add" type="submit">＋ Добавить</button>
 </form>
 <div class="buyback-summary" id="buybackSummary"></div>
+<div class="buyback-supplier-filter"><label for="buybackSupplierFilter">Поставщик</label><select id="buybackSupplierFilter"><option value="">Все поставщики</option></select></div>
 <div class="buyback-summary"><button class="buyback-chip" data-status="active" type="button">В работе</button><button class="buyback-chip" data-status="returned" type="button">Возвращён</button><button class="buyback-chip" data-status="sold" type="button">Продан</button><button class="buyback-chip" data-status="cancelled" type="button">Отменён</button><button class="buyback-chip" data-status="expired" type="button">Просрочен</button></div>
 <div class="buyback-list" id="buybackList"><div class="buyback-empty">Загружаю перекупной товар…</div></div>
 </div></section>`;
@@ -323,6 +324,7 @@ window.addEventListener('popstate',()=>{
  if(!overlay.hidden){buybackHistoryEntry=false;close(true)}
 });
 overlay.querySelectorAll('[data-status]').forEach(btn=>btn.addEventListener('click',()=>{selectedStatus=btn.dataset.status;render()}));
+$('buybackSupplierFilter').addEventListener('change',e=>{selectedSupplier=e.target.value;render()});
 function closeBuybackEditor(){editOverlay.hidden=true;editingBuybackId=null}
 editOverlay.addEventListener('click',e=>{if(e.target===editOverlay||e.target.closest('[data-close-buyback-edit]'))closeBuybackEditor()});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!editOverlay.hidden)closeBuybackEditor()});

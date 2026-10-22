@@ -385,5 +385,5 @@ onAuthStateChanged(auth,user=>{
  nav.hidden=false;
  unsubscribe=onSnapshot(query(collection(db,'buybackItems'),orderBy('receivedAt','desc')),snap=>{
   items=snap.docs.map(d=>({id:d.id,...d.data()}));render();items.filter(x=>x.status==='active'&&elapsedDays(x.receivedAt)>=14).forEach(x=>updateDoc(doc(db,'buybackItems',x.id),{status:'expired',updatedAt:serverTimestamp()}).catch(err=>console.error('Не удалось отметить товар просроченным',x.id,err)));
- },err=>{console.error('buybackItems snapshot failed',err);$('buybackList').innerHTML='<div class="buyback-empty">Нет доступа к перекупному товару. Проверьте правила Firestore.</div>';});
+ },err=>{console.error('buybackItems snapshot failed',err);const code=String(err?.code||'unknown');const message=String(err?.message||'').replace(/[&<>\"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[ch]));$('buybackList').innerHTML='<div class="buyback-empty">Нет доступа к перекупному товару.<br><b>Код:</b> '+code+'<br><b>Детали:</b> '+message+'</div>';});
 });

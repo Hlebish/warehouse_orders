@@ -294,12 +294,34 @@ function render(){
 
 }
 function escapeHtml(value){return String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
-function open(){overlay.hidden=false;nav?.classList.add('active');}
-function close(){overlay.hidden=true;nav?.classList.remove('active')}
+let buybackHistoryEntry=false;
+function open(){
+ if(!overlay.hidden)return;
+ overlay.hidden=false;
+ nav?.classList.add('active');
+ // Make the phone/browser Back gesture close this panel instead of leaving the site.
+ try{history.pushState({...history.state,buybackPanelOpen:true},'');buybackHistoryEntry=true}catch{buybackHistoryEntry=false}
+}
+function close(fromPopState=false){
+ if(overlay.hidden)return;
+ overlay.hidden=true;
+ nav?.classList.remove('active');
+ if(buybackHistoryEntry&&!fromPopState){
+  buybackHistoryEntry=false;
+  try{history.back()}catch{}
+ }
+}
 nav?.addEventListener('click',open);
-$('buybackClose').addEventListener('click',close);
+$('buybackClose').addEventListener('click',()=>close());
 overlay.addEventListener('click',e=>{if(e.target===overlay)close()});
-document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!overlay.hidden)close()});
+document.addEventListener('keydown',e=>{
+ if(e.key!=='Escape')return;
+ if(!editOverlay.hidden){e.preventDefault();closeBuybackEditor();return}
+ if(!overlay.hidden){e.preventDefault();close()}
+});
+window.addEventListener('popstate',()=>{
+ if(!overlay.hidden){buybackHistoryEntry=false;close(true)}
+});
 overlay.querySelectorAll('[data-status]').forEach(btn=>btn.addEventListener('click',()=>{selectedStatus=btn.dataset.status;render()}));
 function closeBuybackEditor(){editOverlay.hidden=true;editingBuybackId=null}
 editOverlay.addEventListener('click',e=>{if(e.target===editOverlay||e.target.closest('[data-close-buyback-edit]'))closeBuybackEditor()});

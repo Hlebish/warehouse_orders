@@ -3,13 +3,14 @@ function normalizeMapArticle(value) {
 }
 
 function lineContainsExactArticle(line, normalizedArticle) {
+  const normalizedArticle = normalizeMapArticle(article);
   const tokens = String(line || '').toUpperCase().match(/[A-Z0-9]+/g) || [];
   for (let start = 0; start < tokens.length; start++) {
     let combined = '';
     for (let end = start; end < Math.min(tokens.length, start + 5); end++) {
       combined += normalizeMapArticle(tokens[end]);
-      if (combined === article) return true;
-      if (combined.length >= article.length) break;
+      if (combined === normalizedArticle) return true;
+      if (combined.length >= normalizedArticle.length) break;
     }
   }
   return false;

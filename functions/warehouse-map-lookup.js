@@ -29,7 +29,12 @@ function lookupArticleInMap(cells, unaddressed, article) {
       if (!/^[A-EFGHJK]$/.test(shelf) || !cellRows || typeof cellRows !== 'object') continue;
       for (const [cell, rawValue] of Object.entries(cellRows)) {
         if (!/^([1-9]|10)$/.test(cell) || typeof rawValue !== 'string' || !rawValue.trim()) continue;
-        const matched = rawValue.split(/\r?\n/).some(line => lineContainsExactArticle(line, normalizedArticle));
+        const matched = rawValue.split(/\r?\n/).some(line => {
+          // Mirror the warehouse map's exact-article search: compare compact
+          // alphanumeric text so codes can appear beside descriptions or other items.
+          const compactLine = String(line || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+          return compactLine.includes(normalizedArticle) || lineContainsExactArticle(line, normalizedArticle);
+        });
         if (matched) locations.push({ address: street + '-' + shelf + '-' + cell, street, shelf, cell });
       }
     }

@@ -306,6 +306,41 @@ style.textContent = `
 @media(max-width:900px){.buyback-window{width:calc(100vw - 24px)}.buyback-summary#buybackSummary{grid-template-columns:repeat(2,minmax(0,1fr))}.buyback-supplier-groups{grid-template-columns:repeat(2,minmax(0,1fr))}.buyback-form{grid-template-columns:repeat(2,minmax(0,1fr))}.buyback-add{width:100%}}
 @media(max-width:700px){.buyback-overlay{padding:0;place-items:stretch}.buyback-window{width:100%;height:100%;max-height:100dvh;border-radius:0}.buyback-head{padding:17px 16px 14px;position:sticky;top:0;z-index:3;background:#151a20}.buyback-head h2{font-size:22px}.buyback-body{padding:14px 12px calc(20px + env(safe-area-inset-bottom))}.buyback-summary#buybackSummary{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px!important}.buyback-chip[data-status]{flex:1 0 100px}.buyback-supplier-filter{grid-template-columns:1fr;gap:7px}.buyback-supplier-toggle{min-height:76px;padding:10px;font-size:11px}.buyback-supplier-toggle small{font-size:10px}.buyback-supplier-groups{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.buyback-supplier-group[open]{grid-column:1/-1}.buyback-supplier-items{padding:7px}.buyback-form{grid-template-columns:1fr 1fr}.buyback-form .buyback-field:first-child,.buyback-form .buyback-field:last-of-type{grid-column:1/-1}#buybackInvoiceImport>summary{min-height:72px;padding:12px}#buybackInvoiceImport .invoice-heading{font-size:13px}#buybackInvoiceImport .invoice-description{font-size:11px}#buybackInvoiceImport .invoice-content{padding:12px}#buybackInvoiceImport .invoice-icon{display:none}}
 
+/* Mobile polish: compact add form, keep supplier groups before the long list, slim import field */
+@media(max-width:700px){
+ .buyback-head{padding:15px 14px 12px!important}
+ .buyback-head .eyebrow{font-size:9px!important}
+ .buyback-head h2{font-size:21px!important;margin:5px 0!important}
+ .buyback-head p{font-size:11px!important;line-height:1.45!important}
+ .buyback-head .close-button{width:36px!important;height:36px!important}
+ .buyback-body{padding:10px 10px calc(18px + env(safe-area-inset-bottom))!important}
+ .buyback-form{gap:8px!important;padding:10px!important;margin-bottom:10px!important}
+ .buyback-field{gap:5px!important;font-size:10px!important}
+ .buyback-field input,.buyback-field select{min-height:36px!important;padding:7px 9px!important;border-radius:8px!important;font-size:13px!important}
+ .buyback-add{min-height:34px!important;height:34px!important;padding:0 11px!important;font-size:11px!important;border-radius:8px!important}
+ .buyback-summary#buybackSummary{gap:7px!important;margin-bottom:10px!important}
+ #buybackSummary .buyback-chip{grid-template-columns:26px minmax(0,1fr) auto!important;gap:7px!important;min-height:54px!important;padding:9px!important}
+ .buyback-stat-icon{width:25px;height:25px;font-size:17px}
+ #buybackSummary .buyback-chip b{font-size:18px!important}
+ #buybackSummary .buyback-chip .buyback-stat-label{font-size:10px;line-height:1.25}
+ #buybackInvoiceImport{margin:0 0 10px!important}
+ #buybackInvoiceImport>summary{min-height:58px!important;padding:10px 12px!important;gap:9px!important}
+ #buybackInvoiceImport .invoice-heading{font-size:12px!important}
+ #buybackInvoiceImport .invoice-description{font-size:10px!important;line-height:1.4!important;margin-top:3px!important}
+ #buybackInvoiceImport .invoice-content{padding:10px!important}
+ #buybackInvoiceImport textarea{display:block;width:100%!important;box-sizing:border-box!important;min-height:76px!important;height:76px!important;max-height:120px!important;resize:vertical!important;padding:9px!important;font-size:11px!important;line-height:1.4!important}
+ #buybackInvoiceImport .invoice-content>div:first-of-type{display:grid!important;grid-template-columns:1fr 1fr!important;gap:7px!important}
+ #buybackInvoiceImport button#buybackInvoiceParse,#buybackInvoiceImport button#buybackInvoiceSave{min-height:36px!important;padding:7px 8px!important;font-size:11px!important;white-space:normal!important}
+ .buyback-supplier-filter{margin-bottom:9px!important;padding:10px 12px!important}
+ .buyback-supplier-filter select{min-height:38px!important;padding:8px 10px!important;font-size:13px!important}
+ .buyback-summary:has(button[data-status]){margin-bottom:10px!important}
+ .buyback-chip[data-status]{min-height:36px!important;padding:7px 8px!important;font-size:11px!important}
+ .buyback-supplier-groups{grid-template-columns:1fr!important;gap:7px!important}
+ .buyback-supplier-group[open]{grid-column:auto!important}
+ .buyback-supplier-toggle{min-height:48px!important;padding:9px 11px!important;font-size:12px!important}
+ .buyback-supplier-items{padding:7px!important}
+}
+
 `;
 document.head.append(style);
 

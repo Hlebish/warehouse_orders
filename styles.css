@@ -5670,3 +5670,25 @@ body.dark-theme #modalBody .modal-foot .primary-button:hover{background:#3b4755!
     position:absolute!important;right:10px!important;top:8px!important;
   }
 }
+
+
+/* Mobile action bar: show all shortcuts in a compact horizontally scrollable row. */
+@media(max-width:720px){
+  body.dark-theme .topbar .top-actions{
+    display:flex!important;flex-wrap:nowrap!important;justify-content:flex-start!important;
+    width:100%!important;max-width:100%!important;min-width:0!important;
+    overflow-x:auto!important;overflow-y:hidden!important;gap:6px!important;
+    padding:2px 0 5px!important;scrollbar-width:thin!important;
+  }
+  body.dark-theme .topbar .top-actions .top-history-button{
+    display:inline-flex!important;visibility:visible!important;opacity:1!important;
+    flex:0 0 auto!important;position:static!important;width:auto!important;min-width:max-content!important;
+    height:34px!important;padding:0 10px!important;font-size:11px!important;white-space:nowrap!important;border-radius:9px!important;
+  }
+  body.dark-theme .topbar .top-actions #shipmentManifestButton,
+  body.dark-theme .topbar .top-actions #dailyReportButton,
+  body.dark-theme .topbar .top-actions #siteHistoryButton,
+  body.dark-theme .topbar .top-actions #analyticsButton{display:inline-flex!important}
+  body.dark-theme .topbar .top-actions .top-divider,
+  body.dark-theme .topbar .top-actions .today{display:none!important}
+}

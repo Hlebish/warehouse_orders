@@ -10,6 +10,7 @@
     "firebase-functions": "^7.4.0"
   },
   "scripts": {
-    "test": "node --test"
+    "test": "node --test",
+    "test:warehouse-map-rules": "firebase emulators:exec --config ../firebase.warehouse-map-test.json --project demo-warehouse-map-rules \"node --test warehouse-map-rtdb-emulator.test.js\""
   }
 }

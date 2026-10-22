@@ -87,39 +87,34 @@ service cloud.firestore {
             && request.resource.data.replyToText is string
             && get(/databases/$(database)/documents/chatMessages/$(request.resource.data.replyToId)).data.authorId == request.resource.data.replyToAuthorId))
         && (request.resource.data.text.size() > 0 || request.resource.data.photos.size() > 0);
+      // Read receipts and likes are validated independently so malformed legacy
+      // fields cannot block an unrelated update.
       allow update: if activeUser()
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes', 'readBy'])
-        // Legacy chat documents may not contain likes/readBy yet.
-        && (!request.resource.data.keys().hasAny(['likes'])
-          || (request.resource.data.likes is list && request.resource.data.likes.size() <= 200))
-        && (!request.resource.data.keys().hasAny(['readBy'])
-          || (request.resource.data.readBy is list && request.resource.data.readBy.size() <= 200))
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['readBy'])
+        && request.resource.data.readBy is list
+        && request.resource.data.readBy.size() <= 500
+        && request.resource.data.readBy.hasAll([request.auth.uid])
         && (
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['readBy'])
+          // Preserve existing receipts when the legacy value is a valid list.
+          !(resource.data.keys().hasAny(['readBy']) && resource.data.readBy is list)
           ||
           (
-            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes'])
-            && request.resource.data.likes is list
-            &&
-            (
-              (request.resource.data.likes.hasOnly(chatLikes(resource.data).concat([request.auth.uid]))
-                && request.resource.data.likes.size() == chatLikes(resource.data).size() + 1)
-              ||
-              (chatLikes(resource.data).hasOnly(request.resource.data.likes.concat([request.auth.uid]))
-                && request.resource.data.likes.size() == chatLikes(resource.data).size() - 1)
-            )
+            request.resource.data.readBy.hasAll(resource.data.readBy)
+            && request.resource.data.readBy.size() <= resource.data.readBy.size() + 1
           )
         )
-        && (
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes'])
-          ||
-          (
-            request.resource.data.readBy is list
-            && request.resource.data.readBy.hasAll(chatReadBy(resource.data))
-            && request.resource.data.readBy.hasAll([request.auth.uid])
-            && request.resource.data.readBy.size() <= chatReadBy(resource.data).size() + 1
-          )
-        );
+        ||
+        (activeUser()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes'])
+          && request.resource.data.likes is list
+          && request.resource.data.likes.size() <= 200
+          && (
+            (request.resource.data.likes.hasOnly(chatLikes(resource.data).concat([request.auth.uid]))
+              && request.resource.data.likes.size() == chatLikes(resource.data).size() + 1)
+            ||
+            (chatLikes(resource.data).hasOnly(request.resource.data.likes.concat([request.auth.uid]))
+              && request.resource.data.likes.size() == chatLikes(resource.data).size() - 1)
+          ));
       allow delete: if false;
     }
 

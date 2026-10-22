@@ -571,10 +571,13 @@ exports.lookupWarehouseMapAddress = onRequest(
 
       // Only read the storage cells and unaddressed-item list. History, metadata,
       // undo data, and write paths are deliberately not exposed by this API.
-      const snapshot = await getDatabase(warehouseMapApp).ref('warehouse').get();
-      const warehouse = snapshot.val() || {};
-      const cells = warehouse.cells || {};
-      const unaddressed = warehouse.unaddressed || {};
+      const mapRoot = getDatabase(warehouseMapApp).ref('warehouse');
+      const [cellsSnapshot, unaddressedSnapshot] = await Promise.all([
+        mapRoot.child('cells').get(),
+        mapRoot.child('unaddressed').get()
+      ]);
+      const cells = cellsSnapshot.val() || {};
+      const unaddressed = unaddressedSnapshot.val() || {};
       const results = articles.map(item => {
         const found = lookupArticleInMap(cells, unaddressed, item.normalized);
         return { article: item.original, locations: found.locations, unaddressed: found.unaddressed };

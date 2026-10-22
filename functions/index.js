@@ -541,6 +541,7 @@ exports.lookupWarehouseMapAddress = onRequest(
         return res.status(413).json({ ok: false, error: 'Request too large' });
       }
 
+      logger.info('Warehouse Map lookup: request accepted');
       const authorization = String(req.get('authorization') || '');
       const match = authorization.match(/^Bearer\s+(.+)$/i);
       if (!match) return res.status(401).json({ ok: false, error: 'Authentication required' });
@@ -548,11 +549,16 @@ exports.lookupWarehouseMapAddress = onRequest(
       let decoded;
       try {
         decoded = await getAuth().verifyIdToken(match[1], true);
-      } catch {
+        logger.info('Warehouse Map lookup: token verified');
+      } catch (error) {
+        logger.error('Warehouse Map lookup: token verification failed', {
+          error: String(error?.message || error)
+        });
         return res.status(401).json({ ok: false, error: 'Invalid or expired session' });
       }
 
       const userSnap = await db.collection('users').doc(decoded.uid).get();
+      logger.info('Warehouse Map lookup: warehouse user checked', { exists: userSnap.exists });
       if (!userSnap.exists || userSnap.data()?.active !== true) {
         return res.status(403).json({ ok: false, error: 'Active warehouse account required' });
       }
@@ -580,11 +586,18 @@ exports.lookupWarehouseMapAddress = onRequest(
 
       // Only read the storage cells and unaddressed-item list. History, metadata,
       // undo data, and write paths are deliberately not exposed by this API.
+      logger.info('Warehouse Map lookup: starting Realtime Database reads', {
+        articleCount: articles.length
+      });
       const mapRoot = getDatabase(getWarehouseMapApp()).ref('warehouse');
       const [cellsSnapshot, unaddressedSnapshot] = await Promise.all([
         mapRoot.child('cells').get(),
         mapRoot.child('unaddressed').get()
       ]);
+      logger.info('Warehouse Map lookup: Realtime Database reads completed', {
+        cellsExists: cellsSnapshot.exists(),
+        unaddressedExists: unaddressedSnapshot.exists()
+      });
       const cells = cellsSnapshot.val() || {};
       const unaddressed = unaddressedSnapshot.val() || {};
       const results = articles.map(item => {

@@ -12,6 +12,7 @@ initializeApp();
 const db = getFirestore();
 const messaging = getMessaging();
 const oneCImportKey = defineSecret('ONE_C_API_KEY');
+const warehouseMapServiceAccount = defineSecret('WAREHOUSE_MAP_SERVICE_ACCOUNT');
 
 setGlobalOptions({
   region: 'europe-west1',
@@ -481,7 +482,7 @@ exports.checkBuybackDeadlines = onSchedule({
 // granted read-only access to the map project's Realtime Database via Google Cloud IAM.
 // Never place a service-account key in source code or browser assets.
 const { getAuth } = require('firebase-admin/auth');
-const { applicationDefault } = require('firebase-admin/app');
+const { applicationDefault, cert } = require('firebase-admin/app');
 const { getDatabase } = require('firebase-admin/database');
 
 // Initialize the cross-project RTDB app lazily. Keeping credential discovery and
@@ -490,13 +491,15 @@ const { getDatabase } = require('firebase-admin/database');
 let warehouseMapApp;
 function getWarehouseMapApp() {
   if (!warehouseMapApp) {
+    // Use a dedicated service account created in the Warehouse Map project.
+    // The JSON key is stored in Secret Manager, never committed to source.
+    // databaseAuthVariableOverride ensures RTDB rules restrict this identity
+    // to the explicitly permitted read-only paths.
+    const serviceAccount = JSON.parse(warehouseMapServiceAccount.value());
     warehouseMapApp = initializeApp({
-      // Cross-project access is granted to this function's runtime service
-      // account by IAM in the Warehouse Map project. Do not use
-      // databaseAuthVariableOverride here: it produces invalid credentials
-      // for this cross-project Application Default Credentials setup.
-      credential: applicationDefault(),
-      databaseURL: 'https://warehouse-map-b6ed6-default-rtdb.europe-west1.firebasedatabase.app'
+      credential: cert(serviceAccount),
+      databaseURL: 'https://warehouse-map-b6ed6-default-rtdb.europe-west1.firebasedatabase.app',
+      databaseAuthVariableOverride: { uid: 'warehouse-map-reader' }
     }, 'warehouse-map-reader');
   }
   return warehouseMapApp;
@@ -511,7 +514,7 @@ const WAREHOUSE_MAP_ALLOWED_ORIGINS = new Set([
 const { normalizeMapArticle, lookupArticleInMap } = require('./warehouse-map-lookup');
 
 exports.lookupWarehouseMapAddress = onRequest(
-  { memory: '256MiB', timeoutSeconds: 15, maxInstances: 5, invoker: 'public' },
+  { memory: '256MiB', timeoutSeconds: 15, maxInstances: 5, invoker: 'public', secrets: [warehouseMapServiceAccount] },
   async (req, res) => {
     res.set('Content-Type', 'application/json; charset=utf-8');
     res.set('Cache-Control', 'no-store, max-age=0');

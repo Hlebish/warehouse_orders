@@ -1,0 +1,40 @@
+name: Warehouse Map API compatibility
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [feature/secure-warehouse-map-api]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: functions/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Install Functions dependencies
+        working-directory: functions
+        run: npm ci
+      - name: Run map lookup tests
+        working-directory: functions
+        run: npm test
+      - name: Run Warehouse Map RTDB rules emulator test
+        working-directory: functions
+        run: npm run test:warehouse-map-rules
+      - name: Check Cloud Functions syntax
+        run: node --check functions/index.js
+      - name: Check shared lookup module syntax
+        run: node --check functions/warehouse-map-lookup.js
+      - name: Check browser app syntax as an ES module
+        run: node --input-type=module --check < app.js

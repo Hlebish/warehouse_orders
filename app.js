@@ -1305,7 +1305,7 @@ async function saveReturn(){
   }
 }
 const WAREHOUSE_MAP_LOOKUP_URL='https://europe-west1-sklad-18f38.cloudfunctions.net/lookupWarehouseMapAddress';
-function normalizeMapArticleForUi(value){return String(value||'').toUpperCase().replace(/[^A-Z0-9]/g,'')}
+function normalizeMapArticleForUi(value){const text=String(value||'').trim().toUpperCase();const code=text.match(/^(AP[A-Z]{2}\\d+)/);return code?code[1]:text.replace(/[^A-Z0-9]/g,'')}
 async function loadWarehouseMapAddresses(orderArticles){
   const elements=[...document.querySelectorAll('[data-map-location-article]')];
   if(!elements.length)return;

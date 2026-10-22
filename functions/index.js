@@ -343,7 +343,8 @@ exports.sendWarehousePush = onDocumentCreated({ document: 'pushQueue/{eventId}',
           ? {
               ...baseMessage,
               android: {
-                priority: 'high'
+                priority: 'high',
+                ttl: 60000
               }
             }
           : {
@@ -351,7 +352,8 @@ exports.sendWarehousePush = onDocumentCreated({ document: 'pushQueue/{eventId}',
               webpush: {
                 headers: {
                   Urgency: 'high',
-                  TTL: '86400'
+                  // Do not deliver stale notifications after a computer wakes up.
+                  TTL: '60'
                 },
                 fcmOptions: {
                   link

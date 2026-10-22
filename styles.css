@@ -5532,3 +5532,29 @@ body.dark-theme #modalBody .modal-foot .primary-button{
   box-shadow:none!important;
 }
 body.dark-theme #modalBody .modal-foot .primary-button:hover{background:#3b4755!important}
+
+
+/* Mobile header cleanup: remove orphan dividers and align notification bell */
+@media (max-width:720px){
+  body.dark-theme .topbar{
+    display:flex!important;align-items:center!important;justify-content:space-between!important;
+    gap:10px!important;overflow:hidden!important;
+  }
+  body.dark-theme .topbar .top-divider{display:none!important}
+  body.dark-theme .topbar .top-history-button{display:none!important}
+  body.dark-theme .topbar .top-actions{
+    display:flex!important;align-items:center!important;justify-content:flex-end!important;
+    flex:0 0 auto!important;width:auto!important;max-width:none!important;
+    margin:0 0 0 auto!important;padding:0!important;gap:0!important;
+    position:relative!important;inset:auto!important;transform:none!important;
+  }
+  body.dark-theme .topbar #notificationButton{
+    display:grid!important;place-items:center!important;
+    width:38px!important;height:38px!important;min-width:38px!important;
+    margin:0!important;padding:0!important;border:1px solid #343c42!important;
+    border-radius:10px!important;background:#1b2024!important;
+    color:#c5cdd1!important;line-height:1!important;box-sizing:border-box!important;
+  }
+  body.dark-theme .topbar #notificationButton svg{width:21px!important;height:21px!important;margin:0!important}
+  body.dark-theme .topbar #notificationButton #notificationDot{position:absolute!important;top:5px!important;right:5px!important}
+}

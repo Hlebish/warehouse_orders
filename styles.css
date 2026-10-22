@@ -5637,3 +5637,13 @@ body.dark-theme #modalBody .modal-foot .primary-button:hover{background:#3b4755!
     flex:0 0 auto!important;
   }
 }
+
+
+/* Mobile quick actions: show the daily report button alongside shipment. */
+@media(max-width:720px){
+  body.dark-theme .topbar .top-history-button#dailyReportButton{
+    display:inline-flex!important;
+    visibility:visible!important;
+    opacity:1!important;
+  }
+}

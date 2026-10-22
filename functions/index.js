@@ -484,14 +484,21 @@ const { getAuth } = require('firebase-admin/auth');
 const { applicationDefault } = require('firebase-admin/app');
 const { getDatabase } = require('firebase-admin/database');
 
-const warehouseMapApp = initializeApp({
-  credential: applicationDefault(),
-  databaseURL: 'https://warehouse-map-b6ed6-default-rtdb.europe-west1.firebasedatabase.app',
-  // Use RTDB Security Rules instead of unrestricted Admin SDK access.
-  // Current map rules allow authenticated reads but restrict writes to named emails;
-  // this synthetic identity has no email claim, so writes should be denied.
-  databaseAuthVariableOverride: { uid: 'warehouse-map-reader' }
-}, 'warehouse-map-reader');
+// Initialize the cross-project RTDB app lazily. Keeping credential discovery and
+// named-app initialization out of module loading lets Firebase CLI inspect the
+// function backend without waiting on Application Default Credentials.
+let warehouseMapApp;
+function getWarehouseMapApp() {
+  if (!warehouseMapApp) {
+    warehouseMapApp = initializeApp({
+      credential: applicationDefault(),
+      databaseURL: 'https://warehouse-map-b6ed6-default-rtdb.europe-west1.firebasedatabase.app',
+      // Use RTDB Security Rules instead of unrestricted Admin SDK access.
+      databaseAuthVariableOverride: { uid: 'warehouse-map-reader' }
+    }, 'warehouse-map-reader');
+  }
+  return warehouseMapApp;
+}
 
 const WAREHOUSE_MAP_ALLOWED_ORIGINS = new Set([
   'https://hlebish.github.io',
@@ -575,7 +582,7 @@ exports.lookupWarehouseMapAddress = onRequest(
 
       // Only read the storage cells and unaddressed-item list. History, metadata,
       // undo data, and write paths are deliberately not exposed by this API.
-      const mapRoot = getDatabase(warehouseMapApp).ref('warehouse');
+      const mapRoot = getDatabase(getWarehouseMapApp()).ref('warehouse');
       const [cellsSnapshot, unaddressedSnapshot] = await Promise.all([
         mapRoot.child('cells').get(),
         mapRoot.child('unaddressed').get()

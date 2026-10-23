@@ -78,7 +78,7 @@ async function createNotificationHistory(data, eventId) {
     const profile = user.data() || {};
     if (!recipientUserId && user.id === authorId && profile.extraPhoneNotifications !== true) continue;
     const settings = profile.notificationSettings || {};
-    if (settings[category] === false && !data.buybackItemId) continue;
+    if (settings[category] === false && !data.buybackItemId && data.forceAll !== true) continue;
 
     const notificationRef = user.ref.collection('notifications').doc(eventId);
     batch.set(notificationRef, {
@@ -299,7 +299,7 @@ exports.sendWarehousePush = onDocumentCreated({ document: 'pushQueue/{eventId}',
     : (orderId ? `${siteUrl}?order=${encodeURIComponent(orderId)}` : siteUrl);
 
   try {
-    const tokenDocs = await collectTokens(category, recipientUserId, String(data.authorId || ''), Boolean(data.buybackItemId));
+    const tokenDocs = await collectTokens(category, recipientUserId, String(data.authorId || ''), Boolean(data.buybackItemId) || data.forceAll === true);
 
     if (!tokenDocs.length) {
       await historyPromise;

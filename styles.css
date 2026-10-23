@@ -6038,3 +6038,27 @@ body.dark-theme #modalBody .modal-foot .primary-button:hover{background:#3b4755!
   body.dark-theme .orders-panel #ordersBody .row-menu{display:inline-flex!important;align-items:center!important;justify-content:center!important;min-width:24px!important;min-height:23px!important;padding:0 4px!important;color:#aab5b8!important;border-radius:6px!important;line-height:1!important}
   body.dark-theme .orders-panel #ordersBody>tr.date-separator>td{padding:8px 9px!important;background:#171b1d!important}
 }
+
+
+/* Keep mobile row actions visually distinct: comments and overflow menu must not touch. */
+@media(max-width:720px){
+  body.dark-theme .orders-panel #ordersBody>tr:not(.date-separator)>td:nth-child(5){
+    grid-column:2!important;grid-row:2!important;justify-self:start!important;
+    display:flex!important;align-items:center!important;min-width:0!important;
+    padding-right:32px!important;
+  }
+  body.dark-theme .orders-panel #ordersBody>tr:not(.date-separator)>td:nth-child(7){
+    grid-column:3!important;grid-row:2!important;justify-self:end!important;
+    align-self:center!important;position:relative!important;z-index:1!important;
+    margin-left:8px!important;padding-left:4px!important;
+    background:#1b1f21!important;border-radius:6px!important;
+  }
+  body.dark-theme .orders-panel #ordersBody .row-open-comments{
+    gap:7px!important;flex-shrink:0!important;
+  }
+  body.dark-theme .orders-panel #ordersBody .row-menu{
+    min-width:30px!important;min-height:28px!important;font-size:20px!important;
+    letter-spacing:1px!important;background:#242a2d!important;
+    border:1px solid #343c40!important;border-radius:7px!important;
+  }
+}

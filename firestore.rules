@@ -454,7 +454,7 @@ service cloud.firestore {
       // For updates, validate fields when they are changed. This lets older
       // records with legacy/missing optional fields have their status restored.
       allow update: if activeUser()
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['article','name','quantity','receivedAt','supplier','comment','status','soldAt','cancelledAt','returnedAt','shippedAt','sentMilestones','updatedAt','orderId','orderNumber','clientName','reservedAt','soldByOrderId','soldByOrderNumber','soldToClient'])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['article','name','quantity','receivedAt','supplier','comment','status','soldAt','cancelledAt','returnedAt','shippedAt','sentMilestones','updatedAt','orderId','orderNumber','clientName','reservedAt','soldByOrderId','soldByOrderNumber','soldToClient','shippedLate','overdueDaysAtShipment'])
         && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['article']) || request.resource.data.article is string && request.resource.data.article.size() > 0)
         && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['quantity']) || request.resource.data.quantity is number && request.resource.data.quantity >= 1)
         && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['receivedAt']) || request.resource.data.receivedAt is string)

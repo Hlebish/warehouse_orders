@@ -7,7 +7,7 @@
   <meta name="description" content="Заказы, дефекты и согласование отгрузки в одном месте">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" type="image/png" sizes="any" href="./%D0%9C%D0%B8%D0%BD%D0%B8%D0%BC%D0%B0%D0%BB%D0%B8%D1%81%D1%82%D0%B8%D1%87%D0%BD%D0%B0%D1%8F%20%D1%8D%D0%BC%D0%B1%D0%BB%D0%B5%D0%BC%D0%B0%20%D0%B0%D0%B2%D1%82%D0%BE%D0%B7%D0%B0%D0%BF%D1%87%D0%B0%D1%81%D1%82%D0%B5%D0%B9%20AMP.png?v=20261020-4">
-  <meta name="app-version" content="2026.10.23.48">
+  <meta name="app-version" content="2026.10.23.49">
   <title>Заказы · Склад</title>
   <style>
     [hidden]{display:none!important}
@@ -15,7 +15,7 @@
     html:not(.app-booted) #siteLoader{visibility:visible!important;transition:opacity .36s ease,visibility .36s ease!important}
     html:not(.app-booted),html:not(.app-booted) body{background:#0a111d!important}
     html:not(.app-booted) body > :not(#siteLoader){visibility:hidden!important}
-    #siteLoader{position:fixed;inset:0;z-index:20000;display:flex;align-items:center;justify-content:center;padding:24px;background:radial-gradient(ellipse at 50% 38%,#153b3b 0%,#101e30 52%,#0a111d 100%);color:#f1f7f4;opacity:1;visibility:visible;transition:opacity .36s ease,visibility .36s ease;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;animation:siteLoaderAppear .24s ease-out both}
+    #siteLoader{position:fixed;inset:0;z-index:20000;display:flex;align-items:center;justify-content:center;padding:24px;background:radial-gradient(ellipse at 50% 38%,#153b3b 0%,#101e30 52%,#0a111d 100%);color:#f1f7f4;opacity:1;visibility:visible;transition:opacity .36s ease,visibility .36s ease;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
     #siteLoader.site-loader-hidden{opacity:0;visibility:hidden;pointer-events:none}
     @keyframes siteLoaderAppear{from{opacity:0}to{opacity:1}}
     #siteLoader .loader-content{display:flex;flex-direction:column;align-items:center;gap:19px;text-align:center}
@@ -25,6 +25,17 @@
     @keyframes siteLoaderSpin{to{transform:rotate(360deg)}}
     @media(prefers-reduced-motion:reduce){#siteLoader .loader-spinner{animation-duration:2s}#siteLoader{transition:none;animation:none}html:not(.app-booted) #siteLoader{transition:none!important}}
   </style>
+  <script>
+  // Keep the loading screen in the page snapshot when mobile browsers suspend
+  // or restore this tab, preventing the stale app UI from flashing first.
+  window.addEventListener('pagehide', () => {
+    const loader = document.getElementById('siteLoader');
+    if (!loader) return;
+    document.documentElement.classList.remove('app-booted');
+    loader.hidden = false;
+    loader.classList.remove('site-loader-hidden');
+  }, {capture:true});
+  </script>
   <link rel="stylesheet" href="styles.css?v=1.0.1.198">
 
 <script>
@@ -142,7 +153,7 @@
   <button type="button" id="mentionCenterButton" class="mention-center-button" hidden aria-live="polite"><span class="mention-center-icon">＠</span><span id="mentionCenterLabel">Вас упомянули</span><b id="mentionCenterCount">0</b></button>
   <div class="toast-stack" id="toastStack" aria-live="polite"></div>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <script type="module" src="app.js?v=1.0.1.205"></script>
+  <script type="module" src="app.js?v=1.0.1.206"></script>
   <script type="module" src="buyback.js?v=1.2.8"></script>
   <script type="module" src="buyback-import.js?v=1.0.2"></script>
 </body>

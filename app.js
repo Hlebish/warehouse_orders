@@ -2760,10 +2760,11 @@ document.addEventListener('submit',e=>e.preventDefault());
 if('serviceWorker'in navigator){
   navigator.serviceWorker.addEventListener('message',event=>{
     if(event.data?.type==='APP_UPDATED'){
+      // Do not force-reload an active session: on mobile this interrupts startup
+      // and makes the loader appear after the app shell has already been shown.
       const key='warehouse_orders_app_version';
       const version=document.querySelector('meta[name="app-version"]')?.content||'';
-      if(version)localStorage.setItem(key,version);
-      window.location.reload();
+      if(version){try{localStorage.setItem(key,version)}catch{}}
     }
   });
   window.addEventListener('load',async()=>{try{const registration=await navigator.serviceWorker.register('./sw.js',{updateViaCache:'none'});await registration.update();}catch(err){console.warn('Не удалось проверить обновление приложения',err);}});

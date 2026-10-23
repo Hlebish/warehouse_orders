@@ -2757,6 +2757,12 @@ document.addEventListener('keydown',e=>{
  }
 });
 document.addEventListener('submit',e=>e.preventDefault());
+// Restore the already-running app without leaving the startup loader over it.
+window.addEventListener('warehouse-app-resumed',()=>{
+ const shell=document.querySelector('.app-shell');
+ const gate=$('authGate');
+ if((signedInUser&&shell&&!shell.hidden)||(gate&&!gate.hidden))finishInitialLoading();
+});
 if('serviceWorker'in navigator){
   navigator.serviceWorker.addEventListener('message',event=>{
     if(event.data?.type==='APP_UPDATED'){

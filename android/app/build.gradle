@@ -18,11 +18,14 @@ android {
     signingConfigs {
         release {
             def storeFilePath = System.getenv('ANDROID_KEYSTORE_PATH')
-            if (storeFilePath) {
+            def storePasswordValue = System.getenv('ANDROID_KEYSTORE_PASSWORD')
+            def aliasValue = System.getenv('ANDROID_KEY_ALIAS')
+            def keyPasswordValue = System.getenv('ANDROID_KEY_PASSWORD')
+            if (storeFilePath && storePasswordValue && aliasValue && keyPasswordValue) {
                 storeFile file(storeFilePath)
-                storePassword System.getenv('ANDROID_KEYSTORE_PASSWORD')
-                keyAlias System.getenv('ANDROID_KEY_ALIAS')
-                keyPassword System.getenv('ANDROID_KEY_PASSWORD')
+                storePassword storePasswordValue
+                keyAlias aliasValue
+                keyPassword keyPasswordValue
             }
         }
     }
@@ -31,7 +34,7 @@ android {
         release {
             minifyEnabled false
             shrinkResources false
-            if (System.getenv('ANDROID_KEYSTORE_PATH')) {
+            if (System.getenv('ANDROID_KEYSTORE_PATH') && System.getenv('ANDROID_KEYSTORE_PASSWORD') && System.getenv('ANDROID_KEY_ALIAS') && System.getenv('ANDROID_KEY_PASSWORD')) {
                 signingConfig signingConfigs.release
             }
         }

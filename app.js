@@ -1605,7 +1605,7 @@ async function markBuybackArticlesSoldForOrder(order){
   if(sold===available)await updateDoc(doc(db,'buybackItems',item.id),patch);
   else{
    const soldId=crypto.randomUUID();
-   await setDoc(doc(db,'buybackItems',soldId),{...item,id:undefined,quantity:sold,...patch,createdAt:serverTimestamp()});
+   const {id:sourceId,...itemData}=item;await setDoc(doc(db,'buybackItems',soldId),{...itemData,quantity:sold,...patch,createdAt:serverTimestamp()});
    await updateDoc(doc(db,'buybackItems',item.id),{quantity:available-sold,updatedAt:serverTimestamp()});
   }
   orderQty.set(article,needed-sold);changed++;

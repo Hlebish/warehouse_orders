@@ -18,7 +18,7 @@ import com.google.firebase.messaging.RemoteMessage;
 import java.util.Map;
 
 public class WarehouseFirebaseMessagingService extends FirebaseMessagingService {
-    private static final String CHANNEL_ID = "warehouse_orders";
+    private static final String CHANNEL_ID = "warehouse_orders_v2";
 
     @Override
     public void onNewToken(@NonNull String token) {

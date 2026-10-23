@@ -6263,3 +6263,30 @@ body{min-height:100%;min-height:100dvh}
   .modal-card,.modal-content{max-height:calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 24px);overflow-y:auto;overscroll-behavior:contain}
   .content{padding-bottom:max(22px,env(safe-area-inset-bottom))}
 }
+
+
+/* Android WebView: reserve physical space for the camera/status-bar area.
+   Keep the drawer toggle in the site's dark green/charcoal visual language. */
+@media(max-width:720px){
+  .topbar{
+    padding-top:calc(env(safe-area-inset-top, 0px) + 58px)!important;
+    min-height:calc(56px + env(safe-area-inset-top, 0px) + 58px)!important;
+    height:auto!important;
+    align-items:flex-end!important;
+    padding-bottom:10px!important;
+  }
+  .mobile-menu{
+    background:#202629!important;
+    border:1px solid #34413d!important;
+    color:#a8c0b4!important;
+    box-shadow:none!important;
+    -webkit-appearance:none;
+    appearance:none;
+  }
+  body.dark-theme .mobile-menu{
+    background:#202629!important;
+    border-color:#34413d!important;
+    color:#a8c0b4!important;
+  }
+  .mobile-menu:active{background:#29332f!important;color:#74d7ad!important}
+}

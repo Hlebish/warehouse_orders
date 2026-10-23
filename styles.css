@@ -5692,3 +5692,38 @@ body.dark-theme #modalBody .modal-foot .primary-button:hover{background:#3b4755!
   body.dark-theme .topbar .top-actions .top-divider,
   body.dark-theme .topbar .top-actions .today{display:none!important}
 }
+
+
+/* Mobile: compact order and route tables to avoid constant sideways scrolling. */
+@media(max-width:720px){
+  body.dark-theme .orders-panel .table-wrap,
+  body.dark-theme .orders-panel .orders-table-wrap,
+  body.dark-theme .table-wrap{
+    overflow-x:hidden!important;max-width:100%!important;
+  }
+  body.dark-theme .orders-panel .table-wrap table,
+  body.dark-theme .orders-panel .orders-table-wrap table,
+  body.dark-theme .table-wrap table{
+    min-width:0!important;width:100%!important;table-layout:fixed!important;
+  }
+  body.dark-theme .orders-panel th,
+  body.dark-theme .orders-panel td,
+  body.dark-theme .table-wrap th,
+  body.dark-theme .table-wrap td{
+    padding:6px 4px!important;font-size:10px!important;line-height:1.25!important;
+    white-space:normal!important;overflow-wrap:anywhere!important;word-break:normal!important;
+  }
+  body.dark-theme .orders-panel th:first-child,
+  body.dark-theme .orders-panel td:first-child,
+  body.dark-theme .table-wrap th:first-child,
+  body.dark-theme .table-wrap td:first-child{padding-left:6px!important}
+  body.dark-theme .orders-panel .status-pill,
+  body.dark-theme .orders-panel .status-badge,
+  body.dark-theme .table-wrap .status-pill,
+  body.dark-theme .table-wrap .status-badge{
+    white-space:normal!important;max-width:100%!important;display:inline-flex!important;
+    font-size:9px!important;padding:3px 5px!important;line-height:1.2!important;
+  }
+  body.dark-theme .orders-panel .date-separator td,
+  body.dark-theme .table-wrap .date-separator td{padding:7px 5px!important}
+}

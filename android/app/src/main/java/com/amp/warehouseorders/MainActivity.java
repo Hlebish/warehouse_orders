@@ -22,6 +22,11 @@ import androidx.activity.OnBackPressedCallback;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
+import com.google.android.gms.auth.api.signin.GoogleSignIn;
+import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
+import com.google.android.gms.auth.api.signin.GoogleSignInClient;
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions;
+import com.google.android.gms.common.api.ApiException;
 import com.google.firebase.installations.FirebaseInstallations;
 import com.google.firebase.messaging.FirebaseMessaging;
 
@@ -32,8 +37,11 @@ public class MainActivity extends AppCompatActivity {
     private static final String PREFS = "warehouse_push";
     private static final String PREF_TOKEN = "token";
     private static final String PREF_INSTALLATION = "installationId";
+    private static final int GOOGLE_SIGN_IN_REQUEST = 1002;
+    private static final String GOOGLE_WEB_CLIENT_ID = "329606730319-bqe5c2lkngq4jk87atifp6n9qnn3chfh.apps.googleusercontent.com";
 
     private WebView webView;
+    private GoogleSignInClient googleSignInClient;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -51,6 +59,11 @@ public class MainActivity extends AppCompatActivity {
         }
         createNotificationChannel();
         requestNotificationPermission();
+        GoogleSignInOptions googleOptions = new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+            .requestEmail()
+            .requestIdToken(GOOGLE_WEB_CLIENT_ID)
+            .build();
+        googleSignInClient = GoogleSignIn.getClient(this, googleOptions);
 
         webView = new WebView(this);
         webView.setBackgroundColor(android.graphics.Color.rgb(17, 19, 21));
@@ -165,8 +178,30 @@ public class MainActivity extends AppCompatActivity {
 
     private class AndroidBridge {
         @JavascriptInterface
+        public void startGoogleSignIn() {
+            runOnUiThread(() -> startActivityForResult(googleSignInClient.getSignInIntent(), GOOGLE_SIGN_IN_REQUEST));
+        }
+
+        @JavascriptInterface
         public void requestNativePushToken() {
             MainActivity.this.requestNativePushToken();
+        }
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, android.content.Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode != GOOGLE_SIGN_IN_REQUEST) return;
+        try {
+            GoogleSignInAccount account = GoogleSignIn.getSignedInAccountFromIntent(data).getResult(ApiException.class);
+            String idToken = account == null ? null : account.getIdToken();
+            if (idToken == null || idToken.isEmpty()) throw new IllegalStateException("Google did not return an ID token");
+            if (webView != null) webView.post(() -> webView.evaluateJavascript(
+                "window.handleNativeGoogleSignIn && window.handleNativeGoogleSignIn(" + JSONObject.quote(idToken) + ")", null));
+        } catch (Exception error) {
+            String message = error instanceof ApiException ? "Google Sign-In failed (" + ((ApiException) error).getStatusCode() + ")" : "Google Sign-In failed";
+            if (webView != null) webView.post(() -> webView.evaluateJavascript(
+                "window.handleNativeGoogleSignInError && window.handleNativeGoogleSignInError(" + JSONObject.quote(message) + ")", null));
         }
     }
 

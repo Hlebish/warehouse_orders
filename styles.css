@@ -6248,3 +6248,18 @@ body.dark-theme #modalBody .modal-foot .primary-button:hover{background:#3b4755!
    background-image:none!important;
  }
 }
+
+
+/* Android/PWA safe-area and touch ergonomics */
+html{min-height:100%;min-height:100dvh}
+body{min-height:100%;min-height:100dvh}
+.app-shell{min-height:100dvh}
+@media(max-width:720px){
+  .sidebar{padding-top:max(18px,env(safe-area-inset-top));padding-bottom:max(14px,env(safe-area-inset-bottom))}
+  .sidebar-backdrop{touch-action:pan-y}
+  .mobile-menu{position:relative;z-index:8;display:grid!important;place-items:center;flex:0 0 42px;width:42px;height:42px;border:1px solid var(--line);border-radius:12px;background:var(--surface,#fff);color:inherit;font-size:23px;line-height:1;touch-action:manipulation}
+  .topbar{padding-top:env(safe-area-inset-top);padding-left:max(12px,env(safe-area-inset-left));padding-right:max(12px,env(safe-area-inset-right));min-height:calc(56px + env(safe-area-inset-top));height:auto}
+  .modal,.modal-backdrop,.modal-overlay{padding-top:max(12px,env(safe-area-inset-top));padding-bottom:max(12px,env(safe-area-inset-bottom))}
+  .modal-card,.modal-content{max-height:calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 24px);overflow-y:auto;overscroll-behavior:contain}
+  .content{padding-bottom:max(22px,env(safe-area-inset-bottom))}
+}

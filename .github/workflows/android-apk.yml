@@ -57,6 +57,17 @@ jobs:
         working-directory: android
         run: gradle --no-daemon assembleDebug
 
+      - name: Print APK signing certificate SHA-1
+        shell: bash
+        run: |
+          if [ -f android/app/build/outputs/apk/release/app-release.apk ]; then
+            APK_PATH="android/app/build/outputs/apk/release/app-release.apk"
+          else
+            APK_PATH="android/app/build/outputs/apk/debug/app-debug.apk"
+          fi
+          echo "APK used for signing certificate check: $APK_PATH"
+          keytool -printcert -jarfile "$APK_PATH" | grep -E 'SHA1:|SHA256:'
+
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:

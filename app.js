@@ -586,8 +586,8 @@ setPersistence(auth,browserLocalPersistence).then(()=>onAuthStateChanged(auth,us
   startedWithCache=true;
  }
  profileUnsubscribe=onSnapshot(doc(db,'users',user.uid),snap=>{
-   if(!snap.exists()){try{localStorage.removeItem(profileCacheKey)}catch{}stopCloud();showAuth('Учётная запись создана, но профиль не найден. Обратитесь к администратору.');$('authError').textContent=`UID: ${user.uid}`;return}
-   const profile=snap.data();if(profile.active!==true||!roles[profile.role]){try{localStorage.removeItem(profileCacheKey)}catch{}stopCloud();showAuth('Доступ отключён или роль не назначена. Обратитесь к администратору.');return}
+   if(!snap.exists()){startedWithCache=false;try{localStorage.removeItem(profileCacheKey)}catch{}stopCloud();showAuth('Учётная запись создана, но профиль не найден. Обратитесь к администратору.');$('authError').textContent=`UID: ${user.uid}`;return}
+   const profile=snap.data();if(profile.active!==true||!roles[profile.role]){startedWithCache=false;try{localStorage.removeItem(profileCacheKey)}catch{}stopCloud();showAuth('Доступ отключён или роль не назначена. Обратитесь к администратору.');return}
    try{localStorage.setItem(profileCacheKey,JSON.stringify(profile))}catch{}
    state.role=profile.role;canManageUsers=profile.admin===true||profile.role==='director';profileName=profile.displayName||user.email||roles[profile.role];state.notificationSettings={chat:profile.notificationSettings?.chat!==false,replies:profile.notificationSettings?.replies!==false,likes:profile.notificationSettings?.likes!==false,orders:profile.notificationSettings?.orders!==false};state.extraPhoneNotifications=profile.extraPhoneNotifications===true;$('userName').textContent=profileName;$('userRole').textContent=canManageUsers?`Администратор · ${roles[profile.role]}`:roles[profile.role];
    if(!startedWithCache){

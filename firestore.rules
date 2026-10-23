@@ -461,7 +461,8 @@ service cloud.firestore {
         && (!request.resource.data.keys().hasAny(['name']) || request.resource.data.name is string && request.resource.data.name.size() <= 300)
         && (!request.resource.data.keys().hasAny(['comment']) || request.resource.data.comment is string && request.resource.data.comment.size() <= 1000)
         && request.resource.data.status in ['active','returned','sold','cancelled','expired']
-        && request.resource.data.sentMilestones is list;
+        // Legacy records may not have sentMilestones; allow status restoration without requiring this unrelated field.
+        && (!request.resource.data.keys().hasAny(['sentMilestones']) || request.resource.data.sentMilestones is list);
       allow delete: if canManageUsers();
     }
 

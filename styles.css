@@ -6062,3 +6062,24 @@ body.dark-theme #modalBody .modal-foot .primary-button:hover{background:#3b4755!
     border:1px solid #343c40!important;border-radius:7px!important;
   }
 }
+
+
+/* Mobile: place the comment icon in the open center area of each order card. */
+@media(max-width:720px){
+  body.dark-theme .orders-panel #ordersBody>tr:not(.date-separator)>td:nth-child(5){
+    grid-column:2!important;grid-row:2!important;
+    justify-self:center!important;align-self:center!important;
+    display:flex!important;align-items:center!important;justify-content:center!important;
+    width:100%!important;min-height:32px!important;padding:0!important;
+    padding-right:0!important;
+    transform:translateX(16px)!important;
+  }
+  body.dark-theme .orders-panel #ordersBody>tr:not(.date-separator)>td:nth-child(5) .row-open-comments{
+    display:inline-flex!important;align-items:center!important;justify-content:center!important;
+    gap:7px!important;margin:0!important;
+  }
+  body.dark-theme .orders-panel #ordersBody>tr:not(.date-separator)>td:nth-child(7){
+    grid-column:3!important;grid-row:2!important;justify-self:end!important;
+    align-self:center!important;z-index:2!important;
+  }
+}

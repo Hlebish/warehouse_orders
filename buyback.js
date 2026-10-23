@@ -385,7 +385,7 @@ style.textContent = `
 .buyback-stat-dialog p{margin:0;color:#9daab8;font-size:12px}
 .buyback-stat-close{width:36px;height:36px;flex:0 0 36px;border:1px solid #39434e;border-radius:9px;background:#252d36;color:#e1e7ee;font-size:23px;cursor:pointer}
 .buyback-stat-items{overflow:auto;padding:12px;display:flex;flex-direction:column;gap:7px}
-.buyback-stat-item{padding:10px 12px;background:#20262d;border:1px solid #343e49;border-radius:9px;min-width:0}
+.buyback-stat-item{padding:10px 12px;background:#20262d;border:1px solid #343e49;border-radius:9px;min-width:0;cursor:pointer;transition:border-color .15s,background .15s,transform .15s}.buyback-stat-item[data-buyback-stat-item]:hover,.buyback-stat-item[data-buyback-stat-item]:focus-visible{border-color:#7cae28;background:#252d22;transform:translateY(-1px);outline:none}.buyback-stat-item[data-buyback-stat-item]:focus-visible{box-shadow:0 0 0 2px #7cae2855}
 .buyback-stat-item-main{display:flex;align-items:baseline;gap:8px;color:#edf2f7;font-size:13px;overflow-wrap:anywhere}
 .buyback-stat-item-main span{color:#9daab8;font-size:12px;white-space:nowrap}
 .buyback-stat-item-name{margin-top:3px;color:#c1ccd7;font-size:11px;overflow-wrap:anywhere}

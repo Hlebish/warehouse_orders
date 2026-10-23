@@ -2715,7 +2715,7 @@ const notice=e.target.closest('[data-open-notification]');if(notice){const id=no
 let sidebarHistoryEntry=false,handlingSidebarPop=false;function closeSidebar(fromPop=false){$('sidebar').classList.remove('open');$('sidebarBackdrop').hidden=true;if(sidebarHistoryEntry&&!fromPop){handlingSidebarPop=true;history.back()}sidebarHistoryEntry=false}
 function openSidebar(){if($('sidebar').classList.contains('open')){closeSidebar();return}$('sidebar').classList.add('open');$('sidebarBackdrop').hidden=false;history.pushState({mobileSidebar:true},'','#menu');sidebarHistoryEntry=true}
 /* Native-like edge swipe for the mobile navigation drawer. Ignore horizontal gestures that start in forms, modals, or the drawer itself. */
-(()=>{let startX=0,startY=0,tracking=false;const edge=28,threshold=72;
+(()=>{let startX=0,startY=0,tracking=false;const edge=48,threshold=64;
 document.addEventListener('touchstart',e=>{if(!e.touches||e.touches.length!==1)return;const t=e.touches[0];startX=t.clientX;startY=t.clientY;tracking=startX<=edge&&!$('sidebar').classList.contains('open')&&!e.target.closest('input,textarea,select,button,.modal,.sidebar');},{passive:true});
 document.addEventListener('touchend',e=>{if(!tracking||!e.changedTouches||e.changedTouches.length!==1)return;const t=e.changedTouches[0];const dx=t.clientX-startX,dy=t.clientY-startY;tracking=false;if(dx>=threshold&&Math.abs(dy)<80)openSidebar();},{passive:true});
 })();

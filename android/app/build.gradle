@@ -15,10 +15,28 @@ android {
         versionName '1.0.1'
     }
 
+    signingConfigs {
+        release {
+            def storeFilePath = System.getenv('ANDROID_KEYSTORE_PATH')
+            if (storeFilePath) {
+                storeFile file(storeFilePath)
+                storePassword System.getenv('ANDROID_KEYSTORE_PASSWORD')
+                keyAlias System.getenv('ANDROID_KEY_ALIAS')
+                keyPassword System.getenv('ANDROID_KEY_PASSWORD')
+            }
+        }
+    }
+
     buildTypes {
         release {
             minifyEnabled false
             shrinkResources false
+            if (System.getenv('ANDROID_KEYSTORE_PATH')) {
+                signingConfig signingConfigs.release
+            }
+        }
+        debug {
+            // Debug builds keep Android's standard debug signing.
         }
     }
 }

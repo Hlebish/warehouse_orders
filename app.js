@@ -341,6 +341,7 @@ async function save(){
    // Persist the order and its changed history entries together, reducing
    // round-trips while ensuring push notifications are queued only after data commits.
    await flushBatch();
+   if(!base||articlesChanged||base.client!==o.client||base.number!==o.number){try{await syncBuybackOrderReferences(o);}catch(linkErr){console.error('Не удалось связать перекупной товар с заказом',linkErr);}}
    await Promise.all(pushTasks.map(task=>task()));
    pendingWrites.delete(o.id);
    serverCache.set(o.id,{...(serverCache.get(o.id)||o),...o,articles:normalizeArticles(o.articles||[]),entries:[...(o.entries||[])]});
@@ -1581,6 +1582,22 @@ function normalizeBuybackArticle(value){
  const code=text.match(/^(AP[A-Z]{2}\\d+)/);
  return code?code[1]:text.replace(/[^A-Z0-9]/g,'');
 }
+async function syncBuybackOrderReferences(order){
+ if(!order?.id||!Array.isArray(order.articles)||!order.articles.length)return;
+ const snapshot=await getDocs(collection(db,'buybackItems'));
+ const articleSet=new Set(normalizeArticles(order.articles).map(x=>normalizeBuybackArticle(x.article)).filter(Boolean));
+ if(!articleSet.size)return;
+ const sold=['Отгружен кладовщиком','Клиент забрал самовывозом'].includes(order.status);
+ const today=new Date().toISOString().slice(0,10);
+ for(const snap of snapshot.docs){
+  const item=snap.data(),article=normalizeBuybackArticle(item.article);
+  if(!articleSet.has(article)||!['active','expired'].includes(item.status))continue;
+  if(item.orderId&&item.orderId!==order.id)continue;
+  const patch={orderId:order.id,orderNumber:String(order.number||''),clientName:String(order.client||'Клиент не указан'),reservedAt:item.reservedAt||today,updatedAt:serverTimestamp()};
+  if(sold)Object.assign(patch,{status:'sold',soldAt:today,soldByOrderId:order.id,soldByOrderNumber:String(order.number||''),soldToClient:String(order.client||'Клиент не указан')});
+  await updateDoc(doc(db,'buybackItems',snap.id),patch);
+ }
+}
 async function markBuybackArticlesSoldForOrder(order){
  const soldStatuses=['Отгружен кладовщиком','Клиент забрал самовывозом'];
  if(!order||!soldStatuses.includes(order.status)||soldStatuses.includes(order._previousStatusForBuyback))return;
@@ -1601,7 +1618,7 @@ async function markBuybackArticlesSoldForOrder(order){
   const available=Math.max(0,Number(item.quantity)||1);
   if(!available)continue;
   const sold=Math.min(available,needed);
-  const patch={status:'sold',soldAt:today,updatedAt:serverTimestamp(),soldByOrderId:order.id,soldByOrderNumber:String(order.number||'')};
+  const patch={status:'sold',soldAt:today,updatedAt:serverTimestamp(),soldByOrderId:order.id,soldByOrderNumber:String(order.number||''),soldToClient:String(order.client||'Клиент не указан'),orderId:order.id,orderNumber:String(order.number||''),clientName:String(order.client||'Клиент не указан')};
   if(sold===available)await updateDoc(doc(db,'buybackItems',item.id),patch);
   else{
    const soldId=crypto.randomUUID();

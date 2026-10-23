@@ -438,7 +438,7 @@ service cloud.firestore {
     match /buybackItems/{itemId} {
       allow read: if activeUser();
       allow create: if activeUser()
-        && request.resource.data.keys().hasOnly(['article','name','quantity','receivedAt','supplier','comment','createdAt','createdOn','createdBy','createdByName','status','soldAt','cancelledAt','returnedAt','shippedAt','sentMilestones','updatedAt','orderId','orderNumber','clientName','reservedAt','soldByOrderId','soldByOrderNumber','soldToClient'])
+        && request.resource.data.keys().hasOnly(['article','name','quantity','receivedAt','supplier','comment','createdAt','createdOn','createdBy','createdByName','status','soldAt','cancelledAt','returnedAt','shippedAt','sentMilestones','updatedAt','orderId','orderNumber','clientName','reservedAt','soldByOrderId','soldByOrderNumber','soldToClient','shippedLate','overdueDaysAtShipment'])
         && request.resource.data.article is string
         && request.resource.data.article.size() > 0
         && request.resource.data.quantity is number

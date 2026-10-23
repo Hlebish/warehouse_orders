@@ -6402,3 +6402,21 @@ td b,.client-name{color:#f0f2f5!important}
 .filter-menu button:hover,.filter-menu button.active{background:#303640!important;color:#fff!important}
 .toast{background:#303640!important;color:#fff!important}
 @media(max-width:760px){.topbar{background:#1c2026!important;box-shadow:none!important}.topbar:after{background:#171a1f!important}.content{background:#171a1f!important}}
+
+/* Final graphite pass: neutralize remaining green accents in both themes. */
+body.dark-theme .nav-item.active,
+.nav-item.active{background:#252a30!important;color:#edf0f4!important;box-shadow:inset 3px 0 #aeb6c2!important}
+body.dark-theme .primary-button,.primary-button,.create-order-button,.create-order-hint{background:#555e6b!important;color:#fff!important;border-color:#555e6b!important;box-shadow:none!important}
+body.dark-theme .primary-button:hover,.primary-button:hover,.create-order-button:hover,.create-order-hint:hover{background:#68717e!important;border-color:#68717e!important}
+body.dark-theme .order-number,.order-number{color:#c6cdd7!important}
+body.dark-theme .eyebrow,.eyebrow{color:#b8c0cb!important}
+body.dark-theme .online-card .pulse,.pulse{background:#aeb6c2!important;box-shadow:0 0 0 4px #aeb6c222!important}
+body.dark-theme .brand-mark,.brand-mark{background:#242a32!important;border-color:#424954!important}
+body.dark-theme .nav-item.active .nav-icon,.nav-item.active .nav-icon{color:#d7dce4!important}
+body.dark-theme .stat-card .stat-icon,.stat-card .stat-icon{background:#303640!important;color:#d7dce4!important}
+body.dark-theme .date-chip,body.dark-theme .date-label,.date-chip,.date-label,.date-separator{background:#252a30!important;color:#c6cdd7!important;border-color:#3a414b!important}
+body.dark-theme .status-pill,body.dark-theme .status-pill[class*="status-"]{background:#303640!important;color:#e0e4ea!important;border-color:#454c56!important}
+body.dark-theme .nav-item .nav-count,.nav-item .nav-count{color:#c6cdd7!important}
+body.dark-theme .chat-sidebar-button,.chat-sidebar-button{background:#20252b!important;color:#d7dce4!important;border-color:#3a414b!important}
+body.dark-theme .chat-sidebar-button:hover,.chat-sidebar-button:hover{background:#303640!important}
+body.dark-theme .filter-menu button.active,.filter-menu button.active{background:#303640!important;color:#fff!important}

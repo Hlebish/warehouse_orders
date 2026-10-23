@@ -458,11 +458,11 @@ service cloud.firestore {
         && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['article']) || request.resource.data.article is string && request.resource.data.article.size() > 0)
         && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['quantity']) || request.resource.data.quantity is number && request.resource.data.quantity >= 1)
         && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['receivedAt']) || request.resource.data.receivedAt is string)
-        && (!request.resource.data.keys().hasAny(['supplier']) || request.resource.data.supplier is string && request.resource.data.supplier.size() <= 160)
-        && (!request.resource.data.keys().hasAny(['name']) || request.resource.data.name is string && request.resource.data.name.size() <= 300)
-        && (!request.resource.data.keys().hasAny(['comment']) || request.resource.data.comment is string && request.resource.data.comment.size() <= 1000)
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['supplier']) || !request.resource.data.keys().hasAny(['supplier']) || request.resource.data.supplier is string && request.resource.data.supplier.size() <= 160)
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['name']) || !request.resource.data.keys().hasAny(['name']) || request.resource.data.name is string && request.resource.data.name.size() <= 300)
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['comment']) || !request.resource.data.keys().hasAny(['comment']) || request.resource.data.comment is string && request.resource.data.comment.size() <= 1000)
         && request.resource.data.status in ['active','returned','sold','cancelled','expired','shipped']
-        && (!request.resource.data.keys().hasAny(['sentMilestones']) || request.resource.data.sentMilestones is list);
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['sentMilestones']) || request.resource.data.sentMilestones is list);
       allow delete: if canManageUsers();
     }
 

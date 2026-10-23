@@ -38,6 +38,11 @@ jobs:
           test -s "$RUNNER_TEMP/warehouse-release.jks"
           echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/warehouse-release.jks" >> "$GITHUB_ENV"
 
+      - name: Set unique Android version
+        run: |
+          echo "ANDROID_VERSION_CODE=$GITHUB_RUN_NUMBER" >> "$GITHUB_ENV"
+          echo "ANDROID_VERSION_NAME=1.0.$GITHUB_RUN_NUMBER" >> "$GITHUB_ENV"
+
       - name: Build signed release APK
         if: env.HAS_SIGNING_KEY == 'true'
         working-directory: android

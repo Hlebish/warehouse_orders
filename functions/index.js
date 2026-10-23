@@ -616,3 +616,61 @@ exports.lookupWarehouseMapAddress = onRequest(
     }
   }
 );
+
+
+// Admin-only temporary password reset. Password changes are performed server-side
+// with the Admin SDK; never expose privileged credentials in browser code.
+exports.setStaffTemporaryPassword = onRequest(
+  { memory: '256MiB', timeoutSeconds: 30, maxInstances: 5, invoker: 'public' },
+  async (req, res) => {
+    res.set('Content-Type', 'application/json; charset=utf-8');
+    res.set('Cache-Control', 'no-store, max-age=0');
+    res.set('Vary', 'Origin');
+    const allowedOrigins = new Set(['https://hlebish.github.io', 'https://localhost', 'capacitor://localhost']);
+    const origin = String(req.get('origin') || '');
+    if (origin && !allowedOrigins.has(origin)) {
+      return res.status(403).json({ ok: false, error: 'Origin not allowed' });
+    }
+    if (origin) {
+      res.set('Access-Control-Allow-Origin', origin);
+      res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
+      res.set('Access-Control-Allow-Headers', 'Authorization, Content-Type');
+    }
+    if (req.method === 'OPTIONS') return res.status(204).send('');
+    if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'POST required' });
+
+    try {
+      const authorization = String(req.get('authorization') || '');
+      const match = authorization.match(/^Bearer (.+)$/i);
+      if (!match) return res.status(401).json({ ok: false, error: 'Authentication required' });
+
+      const { getAuth } = require('firebase-admin/auth');
+      const decoded = await getAuth().verifyIdToken(match[1], true);
+      const actorSnap = await db.collection('users').doc(decoded.uid).get();
+      const actor = actorSnap.data() || {};
+      if (!actorSnap.exists || actor.active !== true || !(actor.admin === true || actor.role === 'director')) {
+        return res.status(403).json({ ok: false, error: 'Administrator permission required' });
+      }
+
+      const uid = String(req.body?.uid || '').trim();
+      if (!uid || uid.length > 128) return res.status(400).json({ ok: false, error: 'Valid employee uid required' });
+      if (uid === decoded.uid) return res.status(400).json({ ok: false, error: 'You cannot reset your own password here' });
+
+      const targetSnap = await db.collection('users').doc(uid).get();
+      if (!targetSnap.exists) return res.status(404).json({ ok: false, error: 'Employee profile not found' });
+      if (targetSnap.data()?.active !== true) return res.status(400).json({ ok: false, error: 'Employee account is disabled' });
+
+      await getAuth().updateUser(uid, { password: '111111' });
+      logger.info('Temporary staff password set by administrator', { actorUid: decoded.uid, targetUid: uid });
+      return res.status(200).json({ ok: true });
+    } catch (error) {
+      logger.error('Temporary staff password reset failed', { error: String(error?.message || error) });
+      const code = String(error?.code || '');
+      if (code === 'auth/id-token-revoked' || code === 'auth/invalid-id-token' || code === 'auth/argument-error') {
+        return res.status(401).json({ ok: false, error: 'Session expired; sign in again' });
+      }
+      if (code === 'auth/user-not-found') return res.status(404).json({ ok: false, error: 'Authentication account not found' });
+      return res.status(500).json({ ok: false, error: 'Password reset failed' });
+    }
+  }
+);

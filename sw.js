@@ -4,7 +4,7 @@ importScripts(
 );
 
 const SITE_URL = 'https://hlebish.github.io/warehouse_orders/';
-const CACHE = 'order-desk-fcm-v78';
+const CACHE = 'order-desk-fcm-v79';
 // Version bump triggers install/activate; activate notifies open tabs to reload.
 const ASSETS = [
   './',
@@ -124,10 +124,6 @@ self.addEventListener('activate', event => {
     caches.keys()
       .then(keys => Promise.all(keys.map(key => caches.delete(key))))
       .then(() => self.clients.claim())
-      .then(() => self.clients.matchAll({type:'window', includeUncontrolled:true}))
-      .then(clientsList => {
-        clientsList.forEach(client => client.postMessage({type:'APP_UPDATED'}));
-      })
   );
 });
 

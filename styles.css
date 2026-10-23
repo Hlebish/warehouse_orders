@@ -6220,3 +6220,31 @@ body.dark-theme #modalBody .modal-foot .primary-button:hover{background:#3b4755!
     background:#1d2224!important;
   }
 }
+
+
+/* Graphite-only order cards: green remains reserved for text, icons and actions. */
+@media (min-width:721px){
+ body.dark-theme .orders-panel #ordersBody>tr.order-card-row>td,
+ body.dark-theme .orders-panel #ordersBody>tr.transferred-order-row.order-card-row>td{
+   background-color:#1b1f21!important;
+   background-image:none!important;
+ }
+ body.dark-theme .orders-panel #ordersBody>tr.order-card-row:hover>td,
+ body.dark-theme .orders-panel #ordersBody>tr.order-card-row:focus-visible>td{
+   background-color:#24292c!important;
+ }
+ body.dark-theme .orders-panel #ordersBody>tr.order-card-row>td:first-child,
+ body.dark-theme .orders-panel #ordersBody>tr.order-card-row>td:last-child{
+   background-color:#1b1f21!important;
+ }
+ body.dark-theme .orders-panel #ordersBody>tr.order-card-row:hover>td:first-child,
+ body.dark-theme .orders-panel #ordersBody>tr.order-card-row:hover>td:last-child,
+ body.dark-theme .orders-panel #ordersBody>tr.order-card-row:focus-visible>td:first-child,
+ body.dark-theme .orders-panel #ordersBody>tr.order-card-row:focus-visible>td:last-child{
+   background-color:#24292c!important;
+ }
+ body.dark-theme .orders-panel #ordersBody>tr.date-separator>td{
+   background-color:#191d1f!important;
+   background-image:none!important;
+ }
+}

@@ -11,8 +11,8 @@ android {
         applicationId 'com.amp.warehouseorders'
         minSdk 23
         targetSdk 34
-        versionCode 1
-        versionName '1.0.1'
+        versionCode (System.getenv("ANDROID_VERSION_CODE") ?: "1").toInteger()
+        versionName (System.getenv("ANDROID_VERSION_NAME") ?: "1.0.1")
     }
 
     signingConfigs {

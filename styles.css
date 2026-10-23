@@ -6179,3 +6179,44 @@ body.dark-theme #modalBody .modal-foot .primary-button:hover{background:#3b4755!
    border-color:#30383c!important;
  }
 }
+
+
+/* Desktop order rows as framed, fully clickable cards. Mobile card layout stays unchanged. */
+@media (min-width:721px){
+  body.dark-theme .orders-panel #ordersBody>tr.order-card-row{
+    cursor:pointer;
+    outline:none;
+  }
+  body.dark-theme .orders-panel #ordersBody>tr.order-card-row>td{
+    background:#1b1f21!important;
+    background-image:none!important;
+    border-top:1px solid #30383c!important;
+    border-bottom:1px solid #30383c!important;
+    transition:background-color .14s,border-color .14s;
+  }
+  body.dark-theme .orders-panel #ordersBody>tr.order-card-row>td:first-child{
+    border-left:1px solid #30383c!important;
+    border-radius:9px 0 0 9px;
+  }
+  body.dark-theme .orders-panel #ordersBody>tr.order-card-row>td:last-child{
+    border-right:1px solid #30383c!important;
+    border-radius:0 9px 9px 0;
+  }
+  body.dark-theme .orders-panel #ordersBody>tr.order-card-row:hover>td,
+  body.dark-theme .orders-panel #ordersBody>tr.order-card-row:focus-visible>td{
+    background:#222a2c!important;
+    border-top-color:#4b6655!important;
+    border-bottom-color:#4b6655!important;
+  }
+  body.dark-theme .orders-panel #ordersBody>tr.order-card-row:hover>td:first-child,
+  body.dark-theme .orders-panel #ordersBody>tr.order-card-row:focus-visible>td:first-child{
+    border-left-color:#4b6655!important;
+  }
+  body.dark-theme .orders-panel #ordersBody>tr.order-card-row:hover>td:last-child,
+  body.dark-theme .orders-panel #ordersBody>tr.order-card-row:focus-visible>td:last-child{
+    border-right-color:#4b6655!important;
+  }
+  body.dark-theme .orders-panel #ordersBody>tr.transferred-order-row>td{
+    background:#1d2224!important;
+  }
+}

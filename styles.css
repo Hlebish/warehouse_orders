@@ -6149,3 +6149,33 @@ body.dark-theme #modalBody .modal-foot .primary-button:hover{background:#3b4755!
  body.dark-theme .orders-panel #ordersBody>tr.date-separator,body.dark-theme .orders-panel #ordersBody>tr.date-separator>td{background:#171b1d!important;background-image:none!important}
  body.dark-theme .orders-panel #ordersBody>tr.transferred-order-row,body.dark-theme .orders-panel #ordersBody>tr.current-order-row{background:#1b1f21!important;background-image:none!important}
 }
+
+
+/* Dark graphite palette correction: the new-order area must not use green-tinted surfaces. */
+@media(max-width:720px){
+ body.dark-theme .orders-panel,
+ body.dark-theme .orders-panel .panel-heading,
+ body.dark-theme .orders-panel .table-wrap,
+ body.dark-theme .orders-panel .table-footer,
+ body.dark-theme .orders-panel .list-controls,
+ body.dark-theme .orders-panel .order-create-panel,
+ body.dark-theme .orders-panel .new-order-card,
+ body.dark-theme .orders-panel .create-order-card,
+ body.dark-theme .orders-panel .create-order-section,
+ body.dark-theme .orders-panel .new-order-section,
+ body.dark-theme .orders-panel .order-create-banner,
+ body.dark-theme .orders-panel .create-order-banner{
+   background-color:#191d1f!important;
+   background-image:none!important;
+   box-shadow:none!important;
+ }
+ body.dark-theme .orders-panel .new-order-card,
+ body.dark-theme .orders-panel .create-order-card,
+ body.dark-theme .orders-panel .create-order-section,
+ body.dark-theme .orders-panel .new-order-section,
+ body.dark-theme .orders-panel .order-create-panel,
+ body.dark-theme .orders-panel .order-create-banner,
+ body.dark-theme .orders-panel .create-order-banner{
+   border-color:#30383c!important;
+ }
+}

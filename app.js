@@ -1,6 +1,6 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js';
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, createUserWithEmailAndPassword, updatePassword, EmailAuthProvider, reauthenticateWithCredential, GoogleAuthProvider, signInWithPopup, linkWithCredential, setPersistence, browserLocalPersistence } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js';
-import { getFirestore, collection, doc, onSnapshot, setDoc, deleteDoc, getDocs, getDoc, updateDoc, writeBatch, runTransaction, serverTimestamp, query, orderBy, limit, startAfter, arrayUnion, arrayRemove } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
+import { getFirestore, collection, doc, onSnapshot, setDoc, deleteDoc, getDocs, getDocsFromServer, getDoc, updateDoc, writeBatch, runTransaction, serverTimestamp, query, orderBy, limit, startAfter, arrayUnion, arrayRemove } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
 import { getStorage, ref as storageRef, uploadBytes, uploadBytesResumable, getDownloadURL, deleteObject } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-storage.js';
 import { getMessaging, getToken, deleteToken, onMessage } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-messaging.js';
 import { firebaseConfig, vapidKey } from './firebase-config.js';
@@ -2773,6 +2773,7 @@ document.addEventListener('keydown',e=>{
 document.addEventListener('submit',e=>e.preventDefault());
 // Restore the already-running app without leaving the startup loader over it.
 window.addEventListener('warehouse-app-resumed',()=>{
+ if(signedInUser){getDocsFromServer(collection(db,'orders')).catch(err=>console.warn('Не удалось обновить заказы с сервера при возврате в приложение',err));}
  const shell=document.querySelector('.app-shell');
  const gate=$('authGate');
  if((signedInUser&&shell&&!shell.hidden)||(gate&&!gate.hidden))finishInitialLoading();

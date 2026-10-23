@@ -9,6 +9,8 @@ import android.os.Build;
 import android.os.Bundle;
 import android.graphics.Rect;
 import java.util.Collections;
+import android.graphics.Rect;
+import java.util.Collections;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;

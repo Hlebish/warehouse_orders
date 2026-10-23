@@ -6334,3 +6334,7 @@ body{min-height:100%;min-height:100dvh}
   }
   body.dark-theme .topbar .mobile-menu:active::before{color:#f0f2f3!important}
 }
+
+
+/* Native Android WebView: remove legacy double top offset on home screen. */
+@media(max-width:720px){html,body,body.dark-theme,.app-shell,body.dark-theme .main-area{background:#111315!important}body.dark-theme .main-area{padding-top:0!important;margin-top:0!important}body.dark-theme .topbar{margin-top:0!important;padding-top:8px!important;min-height:74px!important;height:auto!important;background:#191d20!important;border-bottom:1px solid #30363a!important}body.dark-theme .topbar:before,body.dark-theme .topbar:after{display:none!important;content:none!important}}

@@ -5943,3 +5943,59 @@ body.dark-theme #modalBody .modal-foot .primary-button:hover{background:#3b4755!
     padding:8px 9px!important;background:#171b1d!important;
   }
 }
+
+
+/* Mobile order card option 1 refinement: reduce card height and align actions. */
+@media(max-width:720px){
+  body.dark-theme .orders-panel #ordersBody>tr:not(.date-separator){
+    grid-template-columns:82px minmax(0,1fr) auto!important;
+    grid-template-rows:auto auto auto!important;
+    gap:5px 9px!important;
+    padding:9px 9px!important;
+    min-height:0!important;
+    align-items:center!important;
+    background:linear-gradient(110deg,#191e20,#15191b)!important;
+  }
+  body.dark-theme .orders-panel #ordersBody>tr:not(.date-separator)>td:nth-child(1){
+    grid-column:1!important;grid-row:1 / span 3!important;
+    justify-content:center!important;
+  }
+  body.dark-theme .orders-panel #ordersBody>tr:not(.date-separator)>td:nth-child(2){
+    grid-column:2!important;grid-row:1!important;padding-right:2px!important;
+  }
+  body.dark-theme .orders-panel #ordersBody>tr:not(.date-separator)>td:nth-child(3){
+    grid-column:3!important;grid-row:1!important;justify-self:end!important;align-self:start!important;
+  }
+  body.dark-theme .orders-panel #ordersBody>tr:not(.date-separator)>td:nth-child(4){
+    grid-column:2 / 4!important;grid-row:2!important;align-self:center!important;
+    min-width:0!important;
+  }
+  body.dark-theme .orders-panel #ordersBody>tr:not(.date-separator)>td:nth-child(5){
+    grid-column:2!important;grid-row:3!important;align-self:center!important;
+  }
+  body.dark-theme .orders-panel #ordersBody>tr:not(.date-separator)>td:nth-child(6){
+    display:none!important;
+  }
+  body.dark-theme .orders-panel #ordersBody>tr:not(.date-separator)>td:nth-child(7){
+    grid-column:3!important;grid-row:3!important;justify-self:end!important;align-self:center!important;
+    min-height:24px!important;
+  }
+  body.dark-theme .orders-panel #ordersBody .order-number{font-size:13px!important;margin-bottom:4px!important}
+  body.dark-theme .orders-panel #ordersBody .client-name{font-size:13px!important;line-height:1.28!important}
+  body.dark-theme .orders-panel #ordersBody .client-sub{font-size:10px!important;line-height:1.25!important;margin-top:3px!important}
+  body.dark-theme .orders-panel #ordersBody .delivery-type-pill{
+    display:inline-flex!important;width:auto!important;max-width:100%!important;
+    padding:1px 0!important;font-size:10px!important;line-height:1.2!important;
+  }
+  body.dark-theme .orders-panel #ordersBody .row-open-comments{
+    min-height:23px!important;gap:5px!important;
+  }
+  body.dark-theme .orders-panel #ordersBody .row-menu{
+    min-height:23px!important;min-width:26px!important;padding:0 5px!important;
+    line-height:1!important;
+  }
+  body.dark-theme .orders-panel #ordersBody .status-pill,
+  body.dark-theme .orders-panel #ordersBody .status-badge{
+    max-width:94px!important;font-size:9px!important;padding:4px 6px!important;
+  }
+}

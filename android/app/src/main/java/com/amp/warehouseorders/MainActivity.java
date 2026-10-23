@@ -7,7 +7,6 @@ import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
-import android.view.Window;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
@@ -36,18 +35,26 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        // Android 15 enforces edge-to-edge for targetSdk 35; keep the WebView below system bars.
-        getWindow().getDecorView().setSystemUiVisibility(0);
+        // Keep the web app content below the status bar, camera cutout and gesture/navigation area.
+        androidx.core.view.WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
         if (Build.VERSION.SDK_INT >= 21) {
             getWindow().setStatusBarColor(android.graphics.Color.rgb(17, 19, 21));
             getWindow().setNavigationBarColor(android.graphics.Color.rgb(17, 19, 21));
         }
-        androidx.core.view.WindowCompat.setDecorFitsSystemWindows(getWindow(), true);
         createNotificationChannel();
         requestNotificationPermission();
 
         webView = new WebView(this);
         setContentView(webView);
+        androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(webView, (view, windowInsets) -> {
+            androidx.core.graphics.Insets safeInsets = windowInsets.getInsets(
+                androidx.core.view.WindowInsetsCompat.Type.systemBars()
+                    | androidx.core.view.WindowInsetsCompat.Type.displayCutout()
+            );
+            view.setPadding(safeInsets.left, safeInsets.top, safeInsets.right, safeInsets.bottom);
+            return windowInsets;
+        });
+        androidx.core.view.ViewCompat.requestApplyInsets(webView);
 
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
@@ -80,7 +87,11 @@ public class MainActivity extends AppCompatActivity {
                 NotificationManager.IMPORTANCE_HIGH
             );
             channel.setDescription("Уведомления заказов и чата");
-            channel.setSound(null, null);
+            android.net.Uri soundUri = android.net.Uri.parse("android.resource://" + getPackageName() + "/raw/notification_lock");
+            channel.setSound(soundUri, new android.media.AudioAttributes.Builder()
+                .setUsage(android.media.AudioAttributes.USAGE_NOTIFICATION)
+                .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                .build());
             channel.enableVibration(true);
 
             NotificationManager manager = getSystemService(NotificationManager.class);

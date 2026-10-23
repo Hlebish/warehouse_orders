@@ -403,6 +403,7 @@ async function queuePush(title,body,authorId,orderId='',target='site',category='
       category:normalizedCategory,
       isMention:attention.isMention===true,
       isReply:attention.isReply===true,
+      forceAll:attention.forceAll===true,
       recipientUserId:String(recipientUserId||''),
       createdAt:isoNow(),
       sentAt:null

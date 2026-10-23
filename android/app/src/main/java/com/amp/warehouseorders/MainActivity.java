@@ -78,6 +78,7 @@ public class MainActivity extends AppCompatActivity {
         }
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
+        settings.setUserAgentString(settings.getUserAgentString() + " WarehouseOrdersAndroid");
         settings.setDomStorageEnabled(true);
         settings.setDatabaseEnabled(true);
         settings.setMediaPlaybackRequiresUserGesture(false);
@@ -179,7 +180,10 @@ public class MainActivity extends AppCompatActivity {
     private class AndroidBridge {
         @JavascriptInterface
         public void startGoogleSignIn() {
-            runOnUiThread(() -> startActivityForResult(googleSignInClient.getSignInIntent(), GOOGLE_SIGN_IN_REQUEST));
+            runOnUiThread(() -> {
+                android.util.Log.i("WarehouseOrders", "Starting native Google sign-in");
+                startActivityForResult(googleSignInClient.getSignInIntent(), GOOGLE_SIGN_IN_REQUEST);
+            });
         }
 
         @JavascriptInterface

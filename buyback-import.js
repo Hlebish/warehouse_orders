@@ -18,8 +18,8 @@ const monthMap = {
 const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 
 function parseInvoice(raw) {
-  const text = raw.replace(/\u00a0/g, ' ').replace(/\r/g, '');
-  const dateMatch = text.match(/(?:Прибуткова\s+накладна|Приходная\s+накладная)[^\n]*?\bвід?\s*(\d{1,2})\s+([а-яіїєґ]+)\s+(\d{4})\s*(?:р\.?|г\.?)?/i)
+  const text = String(raw || '').replace(/\u00a0/g, ' ').replace(/\r/g, '');
+  const dateMatch = text.match(/(?:Прибуткова\s+накладна|Приходная\s+накладная)[^\n]*?\bвід\s*(\d{1,2})\s+([а-яіїєґ]+)\s+(\d{4})\s*(?:р\.?|г\.?)?/i)
     || text.match(/(?:від|от)\s*(\d{1,2})\s+([а-яіїєґ]+)\s+(\d{4})\s*(?:р\.?|г\.?)?/i);
   let receivedAt = '';
   if (dateMatch) {
@@ -28,24 +28,51 @@ function parseInvoice(raw) {
   }
   const supplierMatch = text.match(/Постачальник\s*:\s*([^\n\t]+)/i) || text.match(/Поставщик\s*:\s*([^\n\t]+)/i);
   const supplier = supplierMatch ? supplierMatch[1].replace(/[«»"“”]/g, '').trim().slice(0,160) : '';
-  const lines = text.split('\n');
   const rows = [];
-  const articlePattern = /^[A-ZА-ЯІЇЄҐ0-9][A-ZА-ЯІЇЄҐ0-9 .\/_-]{2,}$/i;
-  for (const original of lines) {
+  const articlePattern = /^[A-ZА-ЯІЇЄҐ0-9][A-ZА-ЯІЇЄҐ0-9.\/_-]{2,}$/i;
+  const isQuantity = value => /^\d+(?:[,.]\d+)?$/.test(String(value || '').trim());
+  const isUnit = value => /^(?:шт\.?|штук(?:а|и)?|pcs|од\.?|одиниц(?:я|і|ь)?|штучн(?:ий|а|е))$/i.test(String(value || '').trim());
+  for (const original of text.split('\n')) {
     const line = original.trim();
-    if (!line || !/\b\d+[,.]?\d*\s*(?:шт\.?|штук|pcs|од\.?|одиниц)/i.test(line)) continue;
-    let parts = original.split('\t').map(x => x.trim()).filter(Boolean);
-    if (parts.length < 3) parts = line.split(/\s{2,}/).map(x => x.trim()).filter(Boolean);
-    if (parts.length < 3) continue;
-    const qtyIndex = parts.findIndex((part, i) => i > 0 && /^\d+[,.]?\d*\s*(?:шт\.?|штук|pcs|од\.?|одиниц)?$/i.test(part));
-    if (qtyIndex < 1) continue;
-    const article = parts.slice(0, qtyIndex - 1).join(' ').replace(/^\d+\s*/, '').trim();
-    const name = parts.slice(qtyIndex - 1, qtyIndex).join(' ').trim();
-    const qtyText = parts[qtyIndex].match(/\d+[,.]?\d*/)?.[0] || '1';
-    const quantity = Math.max(1, Math.floor(Number(qtyText.replace(',', '.')) || 1));
-    if (!article || !name || !articlePattern.test(article)) continue;
-    if (/^(артикул|код|товар|найменування|наименование|кількість|количество)$/i.test(article)) continue;
-    rows.push({ article, name, quantity });
+    if (!line) continue;
+    let parts = original.includes('\t')
+      ? original.split('\t').map(x => x.trim())
+      : line.split(/\s{2,}/).map(x => x.trim());
+    // Preserve the printed 1C table columns: №, article, name, quantity, unit, prices.
+    let articleIndex = parts.findIndex((part, i) => i > 0 && /^\d{5,}$/.test(part));
+    if (articleIndex >= 0) {
+      const article = parts[articleIndex];
+      let name = '';
+      for (let i = articleIndex + 1; i < parts.length; i++) {
+        if (!parts[i]) continue;
+        if (isQuantity(parts[i]) || isUnit(parts[i]) || /^\d+[,.]\d{2}$/.test(parts[i])) break;
+        name = name ? name + ' ' + parts[i] : parts[i];
+      }
+      let quantity = 1;
+      for (let i = articleIndex + 2; i < parts.length; i++) {
+        if (isQuantity(parts[i]) && (isUnit(parts[i + 1]) || isUnit(parts[i - 1]))) {
+          quantity = Math.max(1, Math.floor(Number(parts[i].replace(',', '.')) || 1));
+          break;
+        }
+      }
+      // Also support text copied without tabs or with columns collapsed into spaces.
+      if (!name || !parts.some(isUnit)) {
+        const compact = line.match(/^\s*\d+\s+(\d{5,})\s+(.+?)\s+(\d+(?:[,.]\d+)?)\s*(?:шт\.?|штук|pcs|од\.?|одиниц)\b/i);
+        if (compact) {
+          name = compact[2].trim();
+          quantity = Math.max(1, Math.floor(Number(compact[3].replace(',', '.')) || 1));
+        }
+      }
+      if (articlePattern.test(article) && name && !/^(артикул|код|товар|найменування|наименование|кількість|количество)$/i.test(name)) {
+        rows.push({ article, name, quantity });
+      }
+      continue;
+    }
+    // Fallback for older pasted layouts where the article is not a standalone tab column.
+    const compact = line.match(/^\s*\d+\s+([A-ZА-ЯІЇЄҐ0-9][A-ZА-ЯІЇЄҐ0-9.\/_-]{4,})\s+(.+?)\s+(\d+(?:[,.]\d+)?)\s*(?:шт\.?|штук|pcs|од\.?|одиниц)\b/i);
+    if (compact) {
+      rows.push({article:compact[1],name:compact[2].trim(),quantity:Math.max(1,Math.floor(Number(compact[3].replace(',','.'))||1))});
+    }
   }
   const unique = [];
   const seen = new Set();
@@ -58,7 +85,8 @@ function parseInvoice(raw) {
 
 function install() {
   const form = document.getElementById('buybackForm');
-  if (!form || document.getElementById('buybackInvoiceImport')) return;
+  const summary = document.getElementById('buybackSummary');
+  if (!form || !summary || document.getElementById('buybackInvoiceImport')) return;
   const panel = document.createElement('details');
   panel.id = 'buybackInvoiceImport';
   panel.innerHTML = `
@@ -75,7 +103,8 @@ function install() {
       </div>
       <div id="buybackInvoiceStatus" role="status" style="margin-top:10px;font-size:12px"></div>
       <div id="buybackInvoicePreview" style="overflow:auto;margin-top:10px"></div>
-    </div>`;  form.insertAdjacentElement('afterend', panel);
+    </div>`;  // Keep invoice import independent from the collapsible manual-entry form.
+  summary.insertAdjacentElement('beforebegin', panel);
   let parsed = null;
   const status = panel.querySelector('#buybackInvoiceStatus');
   const save = panel.querySelector('#buybackInvoiceSave');

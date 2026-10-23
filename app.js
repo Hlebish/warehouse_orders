@@ -559,7 +559,7 @@ if(wasFirstEntries&&selectedId===d.id&&!modal.hidden&&modal.dataset.orderDetail=
      if(pending && data.number===pending.number && data.client===pending.client && data.status===pending.status){pendingOrderData.delete(d.id);}
    }
    for(const o of [...state.orders])if(!remoteIds.has(o.id)&&!pendingWrites.has(o.id)){state.orders=state.orders.filter(x=>x.id!==o.id);entryUnsubscribes.get(o.id)?.();entryUnsubscribes.delete(o.id);serverCache.delete(o.id)}
-   initialCloudLoad=false;render();restoreUiState();
+   if(!snap.metadata.fromCache)initialCloudLoad=false;render();restoreUiState();
    // Keep the open order card in sync when another employee changes its status.
    if(openedOrderStatusChanged&&selectedId&&!modal.hidden&&modal.dataset.orderDetail===selectedId)openOrder(selectedId);
    if(pendingNotificationOrderId){const target=pendingNotificationOrderId;pendingNotificationOrderId='';history.replaceState({},'',location.pathname+location.hash);if(state.orders.some(o=>o.id===target))openOrder(target);}
@@ -2773,7 +2773,7 @@ document.addEventListener('keydown',e=>{
 document.addEventListener('submit',e=>e.preventDefault());
 // Restore the already-running app without leaving the startup loader over it.
 window.addEventListener('warehouse-app-resumed',()=>{
- if(signedInUser){getDocsFromServer(collection(db,'orders')).catch(err=>console.warn('Не удалось обновить заказы с сервера при возврате в приложение',err));}
+ if(signedInUser){watchOrders();}
  const shell=document.querySelector('.app-shell');
  const gate=$('authGate');
  if((signedInUser&&shell&&!shell.hidden)||(gate&&!gate.hidden))finishInitialLoading();

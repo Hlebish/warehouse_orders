@@ -27,7 +27,7 @@ import com.google.firebase.messaging.FirebaseMessaging;
 
 public class MainActivity extends AppCompatActivity {
     private static final String SITE_URL = "https://hlebish.github.io/warehouse_orders/";
-    private static final String CHANNEL_ID = "warehouse_orders_v3";
+    private static final String CHANNEL_ID = "warehouse_orders_v4";
     private static final int NOTIFICATION_PERMISSION_REQUEST = 1001;
     private static final String PREFS = "warehouse_push";
     private static final String PREF_TOKEN = "token";
@@ -110,12 +110,7 @@ public class MainActivity extends AppCompatActivity {
             );
             channel.setDescription("Уведомления заказов и чата");
             channel.enableVibration(true);
-            android.net.Uri soundUri = android.net.Uri.parse("android.resource://" + getPackageName() + "/" + R.raw.car_lock_sound_effect);
-            android.media.AudioAttributes audioAttributes = new android.media.AudioAttributes.Builder()
-                .setUsage(android.media.AudioAttributes.USAGE_NOTIFICATION)
-                .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                .build();
-            channel.setSound(soundUri, audioAttributes);
+            // Leave the channel sound unset so Android uses the device default notification sound.
 
             NotificationManager manager = getSystemService(NotificationManager.class);
             manager.createNotificationChannel(channel);

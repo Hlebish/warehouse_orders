@@ -1629,7 +1629,65 @@ async function markBuybackArticlesSoldForOrder(order){
  }
  if(changed)toast('Перекупной товар из заказа № '+order.number+' отмечен проданным.');
 }
-async function setStatus(status,text,kind='system'){const o=state.orders.find(x=>x.id===selectedId);if(!o||!signedInUser)return;if(!canEditOrder(o)){toast('После отгрузки заказ заблокирован для этой роли.');return;}if(hasPendingDefect(o)){toast('Пока есть нерассмотренный дефект, другие изменения заказа заблокированы.');return;}const previous=o.status;const previousTransferredAt=o.transferredAt;const previousResumedAt=o.resumedAt;const previousAssembledAt=o.assembledAt;const previousShippedAt=o.shippedAt;const previousAssemblyInProgress=o.assemblyInProgress;const now=isoNow();const entry={id:crypto.randomUUID(),kind,text,authorId:signedInUser.uid,author:profileName||roles[state.role],createdAt:now,photos:[]};const statusUpdate={status,updatedAt:now,updatedBy:signedInUser.uid,updatedByName:profileName||roles[state.role]};if(status==='Собран'){o.assembledAt=now;statusUpdate.assembledAt=now;}if(status==='Отгружен кладовщиком'){o.shippedAt=now;statusUpdate.shippedAt=now;}if(status==='Собран'||status==='Отгружен кладовщиком'){o.assemblyInProgress=false;statusUpdate.assemblyInProgress=false;}if(status==='Перенесен'){o.transferredAt=now;statusUpdate.transferredAt=now;}if(previous==='Перенесен'&&status!=='Перенесен'){o.resumedAt=now;statusUpdate.resumedAt=now;}try{o.status=status;await updateDoc(doc(db,'orders',o.id),statusUpdate);await setDoc(doc(db,'orders',o.id,'entries',entry.id),entryToCloud(entry));if(['Отгружен кладовщиком','Клиент забрал самовывозом'].includes(status)&&!['Отгружен кладовщиком','Клиент забрал самовывозом'].includes(previous)){try{await markBuybackArticlesSoldForOrder({...o,_previousStatusForBuyback:previous});}catch(buybackErr){console.error('Не удалось автоматически отметить перекупной товар проданным',buybackErr);toast('Заказ сохранён, но перекупной товар не обновлён автоматически.');}}o.entries.push(entry);serverCache.set(o.id,{...serverCache.get(o.id),...o});await writeAudit('Изменён статус заказа',text,o.id,{previousStatus:previous,newStatus:status});await queuePush(`${o.client||'Клиент не указан'} · ${status}`,text,signedInUser.uid,o.id);render();notify(`Заказ № ${o.number}: ${status}`,o.id);openOrder(o.id)}catch(err){o.status=previous;o.transferredAt=previousTransferredAt;o.resumedAt=previousResumedAt;o.assembledAt=previousAssembledAt;o.shippedAt=previousShippedAt;o.assemblyInProgress=previousAssemblyInProgress;console.error('Ошибка изменения статуса заказа',err);toast('Не удалось изменить статус: '+(err?.message||'нет доступа'));}}
+async function setStatus(status,text,kind='system'){
+ const o=state.orders.find(x=>x.id===selectedId);
+ if(!o||!signedInUser)return;
+ if(!canEditOrder(o)){toast('После отгрузки заказ заблокирован для этой роли.');return;}
+ if(hasPendingDefect(o)){toast('Пока есть нерассмотренный дефект, другие изменения заказа заблокированы.');return;}
+ const previous=o.status;
+ const previousTransferredAt=o.transferredAt;
+ const previousResumedAt=o.resumedAt;
+ const previousAssembledAt=o.assembledAt;
+ const previousShippedAt=o.shippedAt;
+ const previousAssemblyInProgress=o.assemblyInProgress;
+ const now=isoNow();
+ const entry={id:crypto.randomUUID(),kind,text,authorId:signedInUser.uid,author:profileName||roles[state.role],createdAt:now,photos:[]};
+ const statusUpdate={status,updatedAt:now,updatedBy:signedInUser.uid,updatedByName:profileName||roles[state.role]};
+ if(status==='Собран'){o.assembledAt=now;statusUpdate.assembledAt=now;}
+ if(status==='Отгружен кладовщиком'){o.shippedAt=now;statusUpdate.shippedAt=now;}
+ if(status==='Собран'||status==='Отгружен кладовщиком'){o.assemblyInProgress=false;statusUpdate.assemblyInProgress=false;}
+ if(status==='Перенесен'){o.transferredAt=now;statusUpdate.transferredAt=now;}
+ if(previous==='Перенесен'&&status!=='Перенесен'){o.resumedAt=now;statusUpdate.resumedAt=now;}
+ try{
+  o.status=status;
+  // Save the order and its history entry concurrently; neither waits for the other.
+  await Promise.all([
+   updateDoc(doc(db,'orders',o.id),statusUpdate),
+   setDoc(doc(db,'orders',o.id,'entries',entry.id),entryToCloud(entry))
+  ]);
+  o.entries.push(entry);
+  serverCache.set(o.id,{...serverCache.get(o.id),...o});
+  // Show the saved status immediately; slower auxiliary tasks continue in the background.
+  render();
+  notify(`Заказ № ${o.number}: ${status}`,o.id);
+  openOrder(o.id);
+  void (async()=>{
+   if(['Отгружен кладовщиком','Клиент забрал самовывозом'].includes(status)&&!['Отгружен кладовщиком','Клиент забрал самовывозом'].includes(previous)){
+    try{
+     await markBuybackArticlesSoldForOrder({...o,_previousStatusForBuyback:previous});
+    }catch(buybackErr){
+     console.error('Не удалось автоматически отметить перекупной товар проданным',buybackErr);
+     toast('Заказ сохранён, но перекупной товар не обновлён автоматически.');
+    }
+   }
+   try{
+    await writeAudit('Изменён статус заказа',text,o.id,{previousStatus:previous,newStatus:status});
+   }catch(auditErr){console.error('Не удалось записать аудит изменения статуса',auditErr);}
+   try{
+    await queuePush(`${o.client||'Клиент не указан'} · ${status}`,text,signedInUser.uid,o.id);
+   }catch(pushErr){console.error('Не удалось отправить уведомление об изменении статуса',pushErr);}
+  })();
+ }catch(err){
+  o.status=previous;
+  o.transferredAt=previousTransferredAt;
+  o.resumedAt=previousResumedAt;
+  o.assembledAt=previousAssembledAt;
+  o.shippedAt=previousShippedAt;
+  o.assemblyInProgress=previousAssemblyInProgress;
+  console.error('Ошибка изменения статуса заказа',err);
+  toast('Не удалось изменить статус: '+(err?.message||'нет доступа'));
+ }
+}
 function cancelOrder(){const o=state.orders.find(x=>x.id===selectedId);if(o&&!canEditOrder(o)){toast('После отгрузки или получения заказа клиентом отменять заказ могут только администратор и директор.');return;}showModal('Отменить заказ',`<p style="font-size:12px;color:#697382;margin:0 0 14px">Укажите причину отмены заказа № ${esc(o.number)}. Причина сохранится в истории.</p><div class="field"><label for="cancelReason">Причина отмены *</label><textarea id="cancelReason" required placeholder="Почему заказ отменён?"></textarea></div>`,[button('Назад','back-detail'),button('Отменить заказ','confirm-cancel','small-button danger')],'РЕШЕНИЕ МЕНЕДЖЕРА')}
 function approveOrder(){showModal('Одобрить на отгрузку',`<p style="font-size:12px;color:#697382;margin:0 0 12px">Заказ № ${esc(state.orders.find(x=>x.id===selectedId)?.number||'')} будет отмечен как одобренный к отгрузке клиенту.</p><div class="field"><label for="approvalComment">Комментарий менеджера (необязательно)</label><textarea id="approvalComment" placeholder="Добавьте пояснение для кладовщика"></textarea></div>`,[button('Назад','back-detail'),button('Одобрить','confirm-approve','small-button good')],'РЕШЕНИЕ МЕНЕДЖЕРА')}
 function confirmApprove(){const note=$('approvalComment').value.trim()||'Согласовано к отгрузке клиенту.';setStatus('Одобрен на отгрузку клиенту',note,'decision')}

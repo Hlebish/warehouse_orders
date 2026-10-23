@@ -7,6 +7,8 @@ import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
+import android.graphics.Rect;
+import java.util.Collections;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
@@ -37,7 +39,7 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         // Keep the web app content below the status bar, camera cutout and gesture/navigation area.
-        androidx.core.view.WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
+        androidx.core.view.WindowCompat.setDecorFitsSystemWindows(getWindow(), true);
         if (Build.VERSION.SDK_INT >= 21) {
             getWindow().setStatusBarColor(android.graphics.Color.rgb(17, 19, 21));
             getWindow().setNavigationBarColor(android.graphics.Color.rgb(17, 19, 21));
@@ -49,15 +51,14 @@ public class MainActivity extends AppCompatActivity {
         webView = new WebView(this);
         webView.setBackgroundColor(android.graphics.Color.rgb(17, 19, 21));
         setContentView(webView);
-        androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(webView, (view, windowInsets) -> {
-            androidx.core.graphics.Insets insets = windowInsets.getInsets(
-                androidx.core.view.WindowInsetsCompat.Type.systemBars()
-                    | androidx.core.view.WindowInsetsCompat.Type.displayCutout()
-            );
-            view.setPadding(insets.left, insets.top, insets.right, insets.bottom);
-            return windowInsets;
-        });
-        androidx.core.view.ViewCompat.requestApplyInsets(webView);
+        if (Build.VERSION.SDK_INT >= 29) {
+            webView.addOnLayoutChangeListener((view, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) -> {
+                int edgeWidth = (int) (32 * getResources().getDisplayMetrics().density);
+                view.setSystemGestureExclusionRects(Collections.singletonList(
+                    new Rect(0, 0, edgeWidth, Math.max(0, bottom - top))
+                ));
+            });
+        }
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(true);
@@ -104,7 +105,6 @@ public class MainActivity extends AppCompatActivity {
                 NotificationManager.IMPORTANCE_HIGH
             );
             channel.setDescription("Уведомления заказов и чата");
-            channel.enableVibration(true);
             channel.enableVibration(true);
 
             NotificationManager manager = getSystemService(NotificationManager.class);

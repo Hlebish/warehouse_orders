@@ -9,8 +9,6 @@ import android.os.Build;
 import android.os.Bundle;
 import android.graphics.Rect;
 import java.util.Collections;
-import android.graphics.Rect;
-import java.util.Collections;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
@@ -43,9 +41,13 @@ public class MainActivity extends AppCompatActivity {
         // Keep the web app content below the status bar, camera cutout and gesture/navigation area.
         androidx.core.view.WindowCompat.setDecorFitsSystemWindows(getWindow(), true);
         if (Build.VERSION.SDK_INT >= 21) {
+            getWindow().clearFlags(android.view.WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS | android.view.WindowManager.LayoutParams.FLAG_TRANSLUCENT_NAVIGATION);
             getWindow().setStatusBarColor(android.graphics.Color.rgb(17, 19, 21));
             getWindow().setNavigationBarColor(android.graphics.Color.rgb(17, 19, 21));
-            getWindow().getDecorView().setSystemUiVisibility(0);
+            getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(android.graphics.Color.rgb(17, 19, 21)));
+            androidx.core.view.WindowInsetsControllerCompat bars = androidx.core.view.WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView());
+            bars.setAppearanceLightStatusBars(false);
+            bars.setAppearanceLightNavigationBars(false);
         }
         createNotificationChannel();
         requestNotificationPermission();

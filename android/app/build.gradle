@@ -3,6 +3,14 @@ plugins {
     id 'com.google.gms.google-services'
 }
 
+// Copy the custom notification sound from the repository root into Android resources before packaging.
+def prepareCustomNotificationSound = tasks.register('prepareCustomNotificationSound', Copy) {
+    from(rootProject.file('../delivered-message-sound.mp3'))
+    into(layout.projectDirectory.dir('src/main/res/raw'))
+    rename { 'delivered_message_sound.mp3' }
+}
+tasks.named('preBuild').configure { dependsOn(prepareCustomNotificationSound) }
+
 android {
     namespace 'com.amp.warehouseorders'
     compileSdk 35

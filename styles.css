@@ -6420,3 +6420,38 @@ body.dark-theme .nav-item .nav-count,.nav-item .nav-count{color:#c6cdd7!importan
 body.dark-theme .chat-sidebar-button,.chat-sidebar-button{background:#20252b!important;color:#d7dce4!important;border-color:#3a414b!important}
 body.dark-theme .chat-sidebar-button:hover,.chat-sidebar-button:hover{background:#303640!important}
 body.dark-theme .filter-menu button.active,.filter-menu button.active{background:#303640!important;color:#fff!important}
+
+/* GitHub-inspired neutral graphite canvas; preserve the green primary action button. */
+html,body,body.dark-theme,.main-area,.content{background:#0d1117!important;color:#e6edf3!important}
+.sidebar{background:#010409!important;border-right:1px solid #30363d!important;box-shadow:none!important}
+.topbar{background:#161b22!important;border-color:#30363d!important}
+.orders-panel,.panel-heading,.stats-grid .stat-card,.stat-card{background:#161b22!important;border-color:#30363d!important;box-shadow:none!important}
+.stats-grid .stat-card:nth-child(n){background:#161b22!important}
+thead,.table-wrap thead{background:#21262d!important}
+td{border-color:#30363d!important;color:#c9d1d9!important}
+th{color:#8b949e!important}
+.nav-item.active{background:#21262d!important;color:#f0f6fc!important;box-shadow:inset 3px 0 #8b949e!important}
+.nav-item:hover{background:#161b22!important;color:#f0f6fc!important}
+.nav-item,.nav-icon,.nav-item.active .nav-icon{color:#c9d1d9!important}
+.brand,.brand-sub,.breadcrumbs b,.page-heading h1,.panel-heading h2,.stat-card strong,.stat-top{color:#f0f6fc!important}
+.brand-sub,.breadcrumbs,.page-heading p,.panel-heading p,.stat-card small,.client-sub,.time-cell,.table-footer,.page-footer{color:#8b949e!important}
+.online-card,.profile-button{background:#0d1117!important;border-color:#30363d!important;color:#e6edf3!important}
+.online-card b,.profile-button b{color:#e6edf3!important}
+.online-card small,.profile-button small,.dots{color:#8b949e!important}
+.avatar,.brand-mark,.stat-icon,.pale-blue,.pale-amber,.pale-violet,.pale-green,.pale-neutral,.pale-cyan{background:#21262d!important;color:#c9d1d9!important;border-color:#30363d!important;box-shadow:none!important}
+.order-number{color:#c9d1d9!important}
+.search-box,.filter-button,.secondary-button,.top-history-button,.small-button{background:#0d1117!important;border-color:#30363d!important;color:#c9d1d9!important}
+.search-box input{background:transparent!important;color:#e6edf3!important}
+.search-box input::placeholder{color:#6e7681!important}
+.demo-banner{background:#161b22!important;border-color:#30363d!important;color:#c9d1d9!important}
+.demo-banner b,.demo-banner small,.demo-banner a{color:#c9d1d9!important}
+.modal,.auth-card,.modal-head,.modal-foot,.timeline-item,.notice-item{background:#161b22!important;border-color:#30363d!important;color:#e6edf3!important}
+.modal-head h2,.auth-card h1,.auth-card .field,.field label,.field-label{color:#e6edf3!important}
+.auth-gate{background:#0d1117!important}
+.auth-card p,.field-hint{color:#8b949e!important}
+.field input,.field textarea,.field select,.auth-card input{background:#0d1117!important;color:#e6edf3!important;border-color:#30363d!important}
+.toast{background:#21262d!important;color:#f0f6fc!important}
+@media(max-width:760px){.topbar{background:#161b22!important;box-shadow:none!important}.topbar:after{background:#0d1117!important}.content{background:#0d1117!important}}
+/* Keep the main create/primary action green as requested. */
+.primary-button,.create-order-button{background:#319b68!important;color:#fff!important;border-color:#319b68!important;box-shadow:0 4px 10px rgba(42,125,83,.15)!important}
+.primary-button:hover,.create-order-button:hover{background:#277f55!important;border-color:#277f55!important}

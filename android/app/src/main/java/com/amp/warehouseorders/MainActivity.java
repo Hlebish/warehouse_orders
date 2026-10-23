@@ -7,6 +7,7 @@ import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
+import android.view.Window;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
@@ -35,6 +36,13 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        // Android 15 enforces edge-to-edge for targetSdk 35; keep the WebView below system bars.
+        getWindow().getDecorView().setSystemUiVisibility(0);
+        if (Build.VERSION.SDK_INT >= 21) {
+            getWindow().setStatusBarColor(android.graphics.Color.rgb(17, 19, 21));
+            getWindow().setNavigationBarColor(android.graphics.Color.rgb(17, 19, 21));
+        }
+        androidx.core.view.WindowCompat.setDecorFitsSystemWindows(getWindow(), true);
         createNotificationChannel();
         requestNotificationPermission();
 

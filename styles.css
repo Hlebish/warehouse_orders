@@ -6205,16 +6205,16 @@ body.dark-theme #modalBody .modal-foot .primary-button:hover{background:#3b4755!
   body.dark-theme .orders-panel #ordersBody>tr.order-card-row:hover>td,
   body.dark-theme .orders-panel #ordersBody>tr.order-card-row:focus-visible>td{
     background:#222a2c!important;
-    border-top-color:#4b6655!important;
-    border-bottom-color:#4b6655!important;
+    border-top-color:#30363d!important;
+    border-bottom-color:#30363d!important;
   }
   body.dark-theme .orders-panel #ordersBody>tr.order-card-row:hover>td:first-child,
   body.dark-theme .orders-panel #ordersBody>tr.order-card-row:focus-visible>td:first-child{
-    border-left-color:#4b6655!important;
+    border-left-color:#30363d!important;
   }
   body.dark-theme .orders-panel #ordersBody>tr.order-card-row:hover>td:last-child,
   body.dark-theme .orders-panel #ordersBody>tr.order-card-row:focus-visible>td:last-child{
-    border-right-color:#4b6655!important;
+    border-right-color:#30363d!important;
   }
   body.dark-theme .orders-panel #ordersBody>tr.transferred-order-row>td{
     background:#1d2224!important;
@@ -6615,4 +6615,30 @@ body.dark-theme .sidebar .nav-item.active{
     outline-color:#3b434d!important;
     box-shadow:none!important;
   }
+}
+
+
+/* Hard override: clickable order-card frame must stay neutral graphite in every state. */
+body.dark-theme .orders-panel #ordersBody tr.order-card-row,
+body.dark-theme .orders-panel #ordersBody tr.order-card-row td,
+body.dark-theme .orders-panel #ordersBody tr.order-card-row td:first-child,
+body.dark-theme .orders-panel #ordersBody tr.order-card-row td:last-child,
+body.dark-theme .orders-panel #ordersBody tr.order-card-row:hover,
+body.dark-theme .orders-panel #ordersBody tr.order-card-row:hover td,
+body.dark-theme .orders-panel #ordersBody tr.order-card-row:hover td:first-child,
+body.dark-theme .orders-panel #ordersBody tr.order-card-row:hover td:last-child,
+body.dark-theme .orders-panel #ordersBody tr.order-card-row:focus,
+body.dark-theme .orders-panel #ordersBody tr.order-card-row:focus td,
+body.dark-theme .orders-panel #ordersBody tr.order-card-row:focus-visible,
+body.dark-theme .orders-panel #ordersBody tr.order-card-row:focus-visible td,
+body.dark-theme .orders-panel #ordersBody tr.order-card-row:focus-visible td:first-child,
+body.dark-theme .orders-panel #ordersBody tr.order-card-row:focus-visible td:last-child{
+  border-color:#30363d!important;
+  outline-color:#30363d!important;
+  box-shadow:none!important;
+}
+body.dark-theme .orders-panel #ordersBody tr.order-card-row:hover td,
+body.dark-theme .orders-panel #ordersBody tr.order-card-row:focus-visible td{
+  background-color:#262c34!important;
+  border-color:#3b434d!important;
 }

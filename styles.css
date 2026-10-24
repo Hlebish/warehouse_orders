@@ -6788,3 +6788,32 @@ body.dark-theme .orders-panel #ordersBody>tr:not(.date-separator) .order-number{
   background:transparent!important;
   background-image:none!important;
 }
+
+
+/* Status-independent order-row color: override every status-specific row class equally. */
+body.dark-theme #ordersBody>tr:not(.date-separator),
+body.dark-theme #ordersBody>tr:not(.date-separator).transferred-order-row,
+body.dark-theme #ordersBody>tr:not(.date-separator).current-order-row,
+body.dark-theme #ordersBody>tr:not(.date-separator).order-card-row,
+body.dark-theme #ordersBody>tr:not(.date-separator).order-card-row:not(.transferred-order-row),
+body.dark-theme #ordersBody>tr:not(.date-separator)>td,
+body.dark-theme #ordersBody>tr:not(.date-separator).transferred-order-row>td,
+body.dark-theme #ordersBody>tr:not(.date-separator).current-order-row>td,
+body.dark-theme #ordersBody>tr:not(.date-separator).order-card-row>td,
+body.dark-theme #ordersBody>tr:not(.date-separator)>td:first-child,
+body.dark-theme #ordersBody>tr:not(.date-separator)>td:last-child{
+  background:#161b22!important;
+  background-color:#161b22!important;
+  background-image:none!important;
+  border-color:#30363d!important;
+  box-shadow:none!important;
+}
+body.dark-theme #ordersBody>tr:not(.date-separator):hover,
+body.dark-theme #ordersBody>tr:not(.date-separator):hover>td,
+body.dark-theme #ordersBody>tr:not(.date-separator):hover>td:first-child,
+body.dark-theme #ordersBody>tr:not(.date-separator):hover>td:last-child{
+  background:#21262d!important;
+  background-color:#21262d!important;
+  background-image:none!important;
+  border-color:#3b434d!important;
+}

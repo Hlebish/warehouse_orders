@@ -7340,3 +7340,125 @@ body:not(.dark-theme) .chat-sidebar-button:hover{background:#f1f5f9!important;co
 body:not(.dark-theme) .demo-banner{background:#fffbeb!important;border-color:#f3dfad!important;color:#854d0e!important}
 body:not(.dark-theme) .demo-banner small,
 body:not(.dark-theme) .demo-banner a{color:#92400e!important}
+
+
+/* Light theme refinement: soften the large white areas with cool slate surfaces and restrained blue accents. */
+body:not(.dark-theme),
+body:not(.dark-theme) .app-shell,
+body:not(.dark-theme) .main-area,
+body:not(.dark-theme) .content{
+  background:#eef2f7!important;
+}
+body:not(.dark-theme) .sidebar,
+body:not(.dark-theme) .topbar{
+  background:#f8fafc!important;
+}
+body:not(.dark-theme) .orders-panel{
+  background:#f4f7fb!important;
+  border-color:#d4dce7!important;
+}
+body:not(.dark-theme) .panel-heading,
+body:not(.dark-theme) .table-toolbar,
+body:not(.dark-theme) .table-footer,
+body:not(.dark-theme) .table-pagination{
+  background:#edf2f8!important;
+  border-color:#d4dce7!important;
+}
+body:not(.dark-theme) .create-order-row,
+body:not(.dark-theme) .create-order-banner{
+  background:#f1f5fb!important;
+  border-color:#d4dce7!important;
+}
+body:not(.dark-theme) .orders-panel thead,
+body:not(.dark-theme) .orders-panel thead tr,
+body:not(.dark-theme) .orders-panel th{
+  background:#e8eef6!important;
+  background-color:#e8eef6!important;
+  color:#475569!important;
+  border-color:#d2dbe7!important;
+}
+body:not(.dark-theme) .orders-panel tbody tr:not(.date-separator)>td{
+  background:#f8fafc!important;
+  background-color:#f8fafc!important;
+  border-color:#e0e6ef!important;
+}
+body:not(.dark-theme) .orders-panel tbody tr:not(.date-separator):nth-child(even)>td{
+  background:#f1f5f9!important;
+  background-color:#f1f5f9!important;
+}
+body:not(.dark-theme) .orders-panel tbody tr:not(.date-separator):hover>td{
+  background:#e6efff!important;
+  background-color:#e6efff!important;
+}
+body:not(.dark-theme) .orders-panel .date-separator,
+body:not(.dark-theme) .orders-panel .date-separator>td{
+  background:#e8eef6!important;
+  background-color:#e8eef6!important;
+  border-color:#d2dbe7!important;
+}
+body:not(.dark-theme) .orders-panel .date-separator td,
+body:not(.dark-theme) .orders-panel .date-separator .date-label{
+  color:#52647b!important;
+}
+body:not(.dark-theme) .stat-card{
+  background:#f8fafc!important;
+  border-color:#d7e0eb!important;
+}
+body:not(.dark-theme) .stat-card:nth-child(4n+1){background:#f8fafc!important}
+body:not(.dark-theme) .stat-card:nth-child(4n+2){background:#f0f8f4!important}
+body:not(.dark-theme) .stat-card:nth-child(4n+3){background:#f1f5fb!important}
+body:not(.dark-theme) .stat-card:nth-child(4n){background:#f0f8fb!important}
+body:not(.dark-theme) .sidebar .nav-item.active,
+body:not(.dark-theme) .sidebar .nav-item.active:hover{
+  background:#e5edfb!important;
+  color:#1d4ed8!important;
+  box-shadow:inset 3px 0 #3b82f6!important;
+}
+body:not(.dark-theme) .sidebar .chat-entry,
+body:not(.dark-theme) .chat-sidebar-button{
+  background:#f1f5f9!important;
+  border-color:#d7e0eb!important;
+}
+body:not(.dark-theme) .chat-entry:hover,
+body:not(.dark-theme) .chat-sidebar-button:hover{
+  background:#e8eef6!important;
+}
+body:not(.dark-theme) .online-card{
+  background:#f0f7f3!important;
+  border-color:#d2e6d9!important;
+}
+body:not(.dark-theme) .profile-button{
+  background:#f8fafc!important;
+  border-color:#d7e0eb!important;
+}
+body:not(.dark-theme) .modal-head,
+body:not(.dark-theme) .modal-foot{
+  background:#f1f5f9!important;
+}
+body:not(.dark-theme) .chat-toolbar,
+body:not(.dark-theme) .chat-form,
+body:not(.dark-theme) .chat-input-wrap{
+  background:#f1f5f9!important;
+  border-color:#d7e0eb!important;
+}
+body:not(.dark-theme) .chat-messages{
+  background:#f8fafc!important;
+}
+body:not(.dark-theme) .chat-message,
+body:not(.dark-theme) #chatMessages .chat-message{
+  background:#eaf0f7!important;
+  border-color:#d6dfeb!important;
+}
+body:not(.dark-theme) .chat-message.mine,
+body:not(.dark-theme) #chatMessages .chat-message.mine{
+  background:#e6efff!important;
+  border-color:#c8d9fb!important;
+}
+body:not(.dark-theme) .search-box,
+body:not(.dark-theme) .filter-button,
+body:not(.dark-theme) .secondary-button,
+body:not(.dark-theme) .small-button:not(.good):not(.danger):not(.primary-soft),
+body:not(.dark-theme) .top-history-button{
+  background:#f8fafc!important;
+  border-color:#d1dae6!important;
+}

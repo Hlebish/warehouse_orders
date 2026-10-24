@@ -6338,3 +6338,98 @@ body{min-height:100%;min-height:100dvh}
 
 /* Native Android WebView: remove legacy double top offset on home screen. */
 @media(max-width:720px){html,body,body.dark-theme,.app-shell,body.dark-theme .main-area{background:#111315!important}body.dark-theme .main-area{padding-top:0!important;margin-top:0!important}body.dark-theme .topbar{margin-top:0!important;padding-top:8px!important;min-height:74px!important;height:auto!important;background:#191d20!important;border-bottom:1px solid #30363a!important}body.dark-theme .topbar:before,body.dark-theme .topbar:after{display:none!important;content:none!important}}
+
+
+/* GitHub-inspired dark navy palette. Color-only overrides: preserve existing layout and icons. */
+:root{
+  color-scheme:dark;
+  --muted:#8b949e;
+  --line:#30363d;
+  --blue:#2f81f7;
+  --navy:#0d1117;
+  --green:#3fb950;
+  --amber:#d29922;
+  --red:#f85149;
+}
+html,body,.app-shell,.main-area{background:#0d1117!important;color:#e6edf3!important}
+.sidebar,.topbar,.profile-button,.orders-panel,.stat-card,.modal,.search-box,
+.filter-button,.secondary-button,.small-button,.top-history-button,.field input,
+.field textarea,.field select,.shipment-day-current input,.role-choice button,
+.upload-box,.online-card,.timeline-item,.notice-item,.photo-grid img{
+  background-color:#161b22!important;color:#e6edf3!important;border-color:#30363d!important;
+}
+.sidebar{border-right-color:#30363d!important}
+.topbar,.profile-button,.modal-head,.modal-foot,.table-footer,.manifest-row,
+td,.timeline-item,.notice-item{border-color:#30363d!important}
+.brand,.breadcrumbs b,.page-heading h1,.panel-heading h2,.stat-card strong,
+td b,.client-name,.modal-head h2,.detail-number,.timeline-top b,
+.timeline-text,.field label,.field-label,.shipment-day-current label,
+.empty-state b,.profile-button b,.online-card b{color:#e6edf3!important}
+.breadcrumbs,.eyebrow,.page-heading p,.panel-heading p,.today,.top-actions,
+.nav-count,.brand-sub,.profile-button small,.online-card small,.stat-top,
+.stat-card small,th,td,.client-sub,.time-cell,.table-footer,.page-footer,
+.detail-client,.detail-meta,.detail-history-mini,.timeline-top,.field-hint,
+.empty-state,.empty-state b,.detail-section-title{color:#8b949e!important}
+.nav-item{color:#8b949e!important}
+.nav-item:hover,.small-button:hover,.top-history-button:hover,.shipment-day-nav:hover,
+.filter-menu button:hover{background:#21262d!important;color:#e6edf3!important}
+.nav-item.active{background:#1f2937!important;color:#58a6ff!important}
+.nav-item.active .nav-count,.nav-item.active .nav-icon{color:#58a6ff!important}
+.brand-mark{background:#2f81f7!important;box-shadow:none!important}
+.avatar{background:#1f2937!important;color:#79c0ff!important}
+.online-card,.orders-panel,.stat-card,.modal,.timeline-item,.notice-item,
+.search-box,.field input,.field textarea,.field select,.secondary-button,
+.filter-button,.small-button,.top-history-button,.upload-box,.photo-grid img{
+  border-color:#30363d!important;
+}
+thead{background:#161b22!important}
+th{background:#161b22!important;color:#8b949e!important}
+td{background:#0d1117!important;border-top-color:#21262d!important}
+.table-footer{background:#161b22!important;border-top-color:#30363d!important}
+.search-box input{background:transparent!important;color:#e6edf3!important}
+.search-box input::placeholder,.field input::placeholder,.field textarea::placeholder{color:#6e7681!important}
+.field input:focus,.field textarea:focus,.field select:focus{border-color:#2f81f7!important;box-shadow:0 0 0 3px #2f81f733!important}
+.primary-button{background:#238636!important;color:#fff!important;box-shadow:none!important}
+.primary-button:hover{background:#2ea043!important}
+.small-button.primary-soft,.role-choice button.selected{background:#1f2937!important;color:#58a6ff!important;border-color:#2f81f7!important}
+.small-button.good{background:#12261e!important;color:#3fb950!important;border-color:#244b35!important}
+.small-button.danger{background:#2d1618!important;color:#ff7b72!important;border-color:#5a2528!important}
+.filter-menu{background:#161b22!important;border-color:#30363d!important;box-shadow:0 14px 35px #0008!important}
+.filter-menu button{color:#c9d1d9!important}
+.filter-menu button::before{border-color:#6e7681!important}
+.filter-menu button.active{background:#1f2937!important;color:#58a6ff!important}
+.filter-menu button.active::before{background:#2f81f7!important;border-color:#2f81f7!important}
+.modal-backdrop{background:#010409cc!important}
+.modal-head,.modal-foot{border-color:#30363d!important}
+.close-button,.row-menu,.icon-button,.mobile-menu{color:#8b949e!important}
+.mobile-menu{background:#161b22!important;border-color:#30363d!important}
+.demo-banner{background:#2d230f!important;border-color:#5a4218!important;color:#e3b341!important}
+.demo-banner small{color:#c9a34d!important}
+.demo-banner a{color:#f0c674!important}
+.pale-blue,.pale-amber,.pale-violet,.pale-green,.pale-neutral,.pale-cyan{
+  background:#21262d!important;color:#8b949e!important;
+}
+.status-assembled,.status-ready{background:#12261e!important;color:#3fb950!important}
+.status-shipped,.status-transferred,.status-approval{background:#211b33!important;color:#bc8cff!important}
+.status-question,.status-payment{background:#2d230f!important;color:#e3b341!important}
+.status-pickup{background:#102a33!important;color:#56d4dd!important}
+.status-cancel,.shipment-revoked{background:#2d1618!important;color:#ff7b72!important}
+.status-neutral{background:#21262d!important;color:#8b949e!important}
+.status-pill{border-color:#30363d!important}
+.entry-count{background:#161b22!important;color:#8b949e!important;border-color:#30363d!important}
+.empty-icon{color:#6e7681!important}
+.decision-row{background:#161b22!important;color:#c9d1d9!important}
+.timeline-type{background:#1f2937!important;color:#58a6ff!important}
+.timeline-article{color:#d29922!important}
+.danger-note{background:#2d230f!important;color:#e3b341!important}
+.toast{background:#21262d!important;color:#e6edf3!important;border:1px solid #30363d!important}
+.toast-stack .mention-toast{border-color:#2f81f7!important}
+.image-viewer{background:#010409f2!important}
+.manifest-group{border-color:#30363d!important}
+.manifest-group h3{background:#161b22!important;color:#e6edf3!important}
+.manifest-row{background:#0d1117!important;border-top-color:#30363d!important}
+.stat-modal-hint{color:#8b949e!important}
+@media(max-width:720px){
+  .sidebar-backdrop:not([hidden]){background:#010409b8!important}
+  .sidebar{box-shadow:8px 0 28px #0008!important}
+}

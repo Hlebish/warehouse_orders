@@ -6433,3 +6433,32 @@ td{background:#0d1117!important;border-top-color:#21262d!important}
   .sidebar-backdrop:not([hidden]){background:#010409b8!important}
   .sidebar{box-shadow:8px 0 28px #0008!important}
 }
+
+
+/* Stronger GitHub Dark refinement: remove broad green-tinted surfaces, keep primary action buttons green. */
+:root{--navy:#0d1117;--line:#30363d}
+html,body,.app-shell,.main-area{background:#0d1117!important}
+.sidebar,.topbar,.orders-panel,.stat-card,.online-card,.modal,.search-box,
+.filter-button,.secondary-button,.small-button,.top-history-button,
+.field input,.field textarea,.field select,.upload-box,.timeline-item,.notice-item{
+  background-color:#161b22!important;
+}
+.sidebar{background:#010409!important}
+.topbar{background:#161b22!important;border-bottom:1px solid #30363d!important}
+.orders-panel{background:#0d1117!important;border:1px solid #30363d!important}
+.stat-card{background:#161b22!important;border-color:#30363d!important}
+.nav-item.active{background:#1f2937!important;color:#58a6ff!important;border-left-color:#2f81f7!important}
+.nav-item.active .nav-count,.nav-item.active .nav-icon{color:#58a6ff!important}
+.eyebrow{color:#58a6ff!important}
+.brand-mark{background:#21262d!important;border:1px solid #30363d!important}
+.new-order,.new-order-row,.create-order-row,.order-create-banner,.orders-create-row{
+  background:#161b22!important;border-color:#30363d!important;
+}
+.online-card{background:#161b22!important;border:1px solid #30363d!important}
+.online-card .online-dot{box-shadow:0 0 0 3px #21262d!important}
+th{background:#161b22!important}
+td{background:#0d1117!important}
+tr:hover td{background:#161b22!important}
+.panel-heading,.orders-panel-header,.table-toolbar{background:#161b22!important;border-color:#30363d!important}
+.primary-button,.create-order-button,.btn-primary{background:#238636!important;color:#fff!important}
+.primary-button:hover,.create-order-button:hover,.btn-primary:hover{background:#2ea043!important}

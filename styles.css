@@ -6957,3 +6957,171 @@ body.dark-theme .sidebar .nav-item.active .nav-icon,
 body.dark-theme .sidebar .nav-item.active .nav-count{
   color:#8b949e!important;
 }
+
+
+/* SITE-WIDE DARK GRAPHITE SYSTEM — final consistency pass.
+   Keep semantic status pills and primary action buttons colored; neutralize surfaces, borders and hover states. */
+body.dark-theme{
+  color-scheme:dark;
+  --wo-bg:#0d1117;
+  --wo-surface:#161b22;
+  --wo-surface-hover:#21262d;
+  --wo-line:#30363d;
+  --wo-text:#e6edf3;
+  --wo-muted:#8b949e;
+}
+body.dark-theme,
+body.dark-theme .app-shell,
+body.dark-theme .main-area,
+body.dark-theme .content{
+  background:#0d1117!important;
+  background-image:none!important;
+  color:#e6edf3!important;
+}
+body.dark-theme .sidebar,
+body.dark-theme .topbar,
+body.dark-theme .orders-panel,
+body.dark-theme .stat-card,
+body.dark-theme .online-card,
+body.dark-theme .profile-button,
+body.dark-theme .modal,
+body.dark-theme .modal-head,
+body.dark-theme .modal-body,
+body.dark-theme .modal-foot,
+body.dark-theme .panel-heading,
+body.dark-theme .table-footer,
+body.dark-theme .table-pagination,
+body.dark-theme .table-toolbar,
+body.dark-theme .create-order-row,
+body.dark-theme .create-order-banner,
+body.dark-theme .chat-toolbar,
+body.dark-theme .chat-messages,
+body.dark-theme .chat-form,
+body.dark-theme .chat-input-wrap,
+body.dark-theme .filter-menu,
+body.dark-theme .notice-item,
+body.dark-theme .timeline-item,
+body.dark-theme .upload-box,
+body.dark-theme .decision-row,
+body.dark-theme .role-choice button,
+body.dark-theme .field input,
+body.dark-theme .field textarea,
+body.dark-theme .field select,
+body.dark-theme .search-box,
+body.dark-theme .filter-button,
+body.dark-theme .secondary-button,
+body.dark-theme .small-button:not(.good):not(.danger):not(.primary-soft),
+body.dark-theme .top-history-button,
+body.dark-theme .shipment-day-current input,
+body.dark-theme .chat-sidebar-button,
+body.dark-theme .sidebar .chat-entry,
+body.dark-theme .sidebar .user-card,
+body.dark-theme .sidebar .online-card{
+  background:#161b22!important;
+  background-color:#161b22!important;
+  background-image:none!important;
+  border-color:#30363d!important;
+  box-shadow:none!important;
+  color:#c9d1d9;
+}
+body.dark-theme .stat-card:hover,
+body.dark-theme .online-card:hover,
+body.dark-theme .profile-button:hover,
+body.dark-theme .secondary-button:hover,
+body.dark-theme .small-button:not(.good):not(.danger):not(.primary-soft):hover,
+body.dark-theme .top-history-button:hover,
+body.dark-theme .chat-sidebar-button:hover,
+body.dark-theme .sidebar .chat-entry:hover,
+body.dark-theme .filter-menu button:hover,
+body.dark-theme .role-choice button:hover{
+  background:#21262d!important;
+  background-color:#21262d!important;
+  background-image:none!important;
+  border-color:#3b434d!important;
+  color:#e6edf3!important;
+}
+body.dark-theme .sidebar{background:#0d1117!important;border-right:1px solid #30363d!important}
+body.dark-theme .topbar,
+body.dark-theme .modal-head,
+body.dark-theme .modal-foot,
+body.dark-theme .table-footer,
+body.dark-theme .panel-heading,
+body.dark-theme .table-toolbar{
+  border-color:#30363d!important;
+}
+body.dark-theme .brand,
+body.dark-theme .page-heading h1,
+body.dark-theme .panel-heading h2,
+body.dark-theme .stat-card strong,
+body.dark-theme .modal-head h2,
+body.dark-theme .field label,
+body.dark-theme .field-label,
+body.dark-theme .client-name,
+body.dark-theme .timeline-text,
+body.dark-theme .detail-number,
+body.dark-theme .profile-button b{
+  color:#e6edf3!important;
+}
+body.dark-theme .breadcrumbs,
+body.dark-theme .breadcrumbs b,
+body.dark-theme .eyebrow,
+body.dark-theme .page-heading p,
+body.dark-theme .panel-heading p,
+body.dark-theme .today,
+body.dark-theme .top-actions,
+body.dark-theme .brand-sub,
+body.dark-theme .nav-count,
+body.dark-theme .profile-button small,
+body.dark-theme .online-card small,
+body.dark-theme .stat-top,
+body.dark-theme .stat-card small,
+body.dark-theme th,
+body.dark-theme td,
+body.dark-theme .client-sub,
+body.dark-theme .time-cell,
+body.dark-theme .table-footer,
+body.dark-theme .page-footer,
+body.dark-theme .field-hint,
+body.dark-theme .empty-state,
+body.dark-theme .detail-meta,
+body.dark-theme .detail-client,
+body.dark-theme .detail-section-title,
+body.dark-theme .timeline-top{
+  color:#8b949e!important;
+}
+body.dark-theme input,
+body.dark-theme textarea,
+body.dark-theme select{
+  color:#e6edf3!important;
+}
+body.dark-theme input::placeholder,
+body.dark-theme textarea::placeholder{
+  color:#6e7681!important;
+}
+body.dark-theme .field input:focus,
+body.dark-theme .field textarea:focus,
+body.dark-theme .field select:focus,
+body.dark-theme .search-box:focus-within{
+  border-color:#8b949e!important;
+  box-shadow:0 0 0 2px #8b949e22!important;
+}
+body.dark-theme .modal-backdrop{background:#010409cc!important}
+body.dark-theme .filter-menu{box-shadow:0 14px 35px #0008!important}
+body.dark-theme .filter-menu button{color:#c9d1d9!important}
+body.dark-theme .filter-menu button.active{background:#21262d!important;color:#e6edf3!important}
+body.dark-theme .toast{background:#21262d!important;color:#e6edf3!important;border:1px solid #30363d!important}
+body.dark-theme .demo-banner{background:#21262d!important;border-color:#30363d!important;color:#c9d1d9!important}
+body.dark-theme .demo-banner small,
+body.dark-theme .demo-banner a{color:#c9d1d9!important}
+body.dark-theme .sidebar .pulse{box-shadow:0 0 0 4px #3fb95022!important}
+/* Do not tint navigation, chat bubbles, or clickable order surfaces green. */
+body.dark-theme .sidebar .nav-item,
+body.dark-theme .sidebar .nav-item:not(.active){background:#161b22!important;background-image:none!important;color:#c9d1d9!important}
+body.dark-theme .sidebar .nav-item:hover,
+body.dark-theme .sidebar .nav-item:focus-visible,
+body.dark-theme .sidebar .nav-item.active,
+body.dark-theme .sidebar .nav-item.active:hover{background:#21262d!important;background-image:none!important;color:#e6edf3!important;box-shadow:inset 2px 0 #8b949e!important}
+body.dark-theme #modalBody:has(#chatMessages) .chat-message,
+body.dark-theme #modalBody:has(#chatMessages) #chatMessages .chat-message{background:#1c2128!important;background-image:none!important;border-color:#30363d!important}
+body.dark-theme #modalBody:has(#chatMessages) .chat-form textarea,
+body.dark-theme #modalBody:has(#chatMessages) #chatForm textarea{background:#0d1117!important;border-color:#30363d!important}

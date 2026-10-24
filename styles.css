@@ -6864,3 +6864,65 @@ body.dark-theme .orders-panel table thead th{
 body.dark-theme .orders-panel table thead th{
   color:#8b949e!important;
 }
+
+
+/* General chat modal: neutral GitHub graphite palette, remove green and brown surfaces. */
+body.dark-theme #modalBody:has(#chatMessages),
+body.dark-theme #modalBody:has(#chatMessages) .chat-modal,
+body.dark-theme #modalBody:has(#chatMessages) .chat-toolbar,
+body.dark-theme #modalBody:has(#chatMessages) .chat-messages,
+body.dark-theme #modalBody:has(#chatMessages) #chatMessages,
+body.dark-theme #modalBody:has(#chatMessages) .chat-form,
+body.dark-theme #modalBody:has(#chatMessages) .chat-input-wrap{
+  background:#161b22!important;
+  background-color:#161b22!important;
+  background-image:none!important;
+  border-color:#30363d!important;
+  box-shadow:none!important;
+}
+body.dark-theme #modalBody:has(#chatMessages) .chat-message,
+body.dark-theme #modalBody:has(#chatMessages) #chatMessages .chat-message,
+body.dark-theme #modalBody:has(#chatMessages) #chatMessages .chat-message.mine,
+body.dark-theme #modalBody:has(#chatMessages) #chatMessages .chat-message.chat-author-role-admin,
+body.dark-theme #modalBody:has(#chatMessages) #chatMessages .chat-message.chat-author-role-warehouse,
+body.dark-theme #modalBody:has(#chatMessages) #chatMessages .chat-message.chat-author-role-manager,
+body.dark-theme #modalBody:has(#chatMessages) #chatMessages .chat-message.chat-author-role-chief-accountant,
+body.dark-theme #modalBody:has(#chatMessages) #chatMessages .chat-message.chat-author-role-accountant,
+body.dark-theme #modalBody:has(#chatMessages) #chatMessages .chat-message.chat-author-role-director{
+  background:#1c2128!important;
+  background-color:#1c2128!important;
+  background-image:none!important;
+  border-color:#30363d!important;
+  box-shadow:none!important;
+}
+body.dark-theme #modalBody:has(#chatMessages) #chatMessages .chat-message:hover{
+  background:#21262d!important;border-color:#3b434d!important;
+}
+body.dark-theme #modalBody:has(#chatMessages) .chat-form textarea,
+body.dark-theme #modalBody:has(#chatMessages) #chatForm textarea,
+body.dark-theme #modalBody:has(#chatMessages) #chatForm .chat-input-wrap textarea{
+  background:#0d1117!important;color:#e6edf3!important;border-color:#30363d!important;
+  box-shadow:none!important;
+}
+body.dark-theme #modalBody:has(#chatMessages) .chat-form textarea:focus,
+body.dark-theme #modalBody:has(#chatMessages) #chatForm textarea:focus,
+body.dark-theme #modalBody:has(#chatMessages) #chatForm .chat-input-wrap textarea:focus{
+  border-color:#8b949e!important;outline:2px solid #8b949e22!important;box-shadow:none!important;
+}
+body.dark-theme #modalBody:has(#chatMessages) .chat-form .primary-button,
+body.dark-theme #modalBody:has(#chatMessages) #chatForm .primary-button,
+body.dark-theme #modalBody:has(#chatMessages) #chatForm button[type="submit"]{
+  background:#30363d!important;background-color:#30363d!important;background-image:none!important;
+  color:#e6edf3!important;border:1px solid #484f58!important;box-shadow:none!important;
+}
+body.dark-theme #modalBody:has(#chatMessages) .chat-form .primary-button:hover,
+body.dark-theme #modalBody:has(#chatMessages) #chatForm .primary-button:hover,
+body.dark-theme #modalBody:has(#chatMessages) #chatForm button[type="submit"]:hover{
+  background:#3b434d!important;color:#fff!important;
+}
+body.dark-theme #modalBody:has(#chatMessages) .chat-message-actions button:hover{
+  color:#c9d1d9!important;
+}
+body.dark-theme #modalBody:has(#chatMessages) .chat-order-comment{
+  background:#161b22!important;border-color:#30363d!important;
+}

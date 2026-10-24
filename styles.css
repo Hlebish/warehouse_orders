@@ -6817,3 +6817,32 @@ body.dark-theme #ordersBody>tr:not(.date-separator):hover>td:last-child{
   background-image:none!important;
   border-color:#3b434d!important;
 }
+
+
+/* Root fix: older, more-specific rules gave current orders a lighter fill than transferred orders.
+   Override the actual clickable-card selectors together, after all legacy status styles. */
+@media (min-width:721px){
+  body.dark-theme .orders-panel #ordersBody>tr.order-card-row:not(.date-separator)>td,
+  body.dark-theme .orders-panel #ordersBody>tr.order-card-row:not(.date-separator):not(.transferred-order-row)>td,
+  body.dark-theme .orders-panel #ordersBody>tr.current-order-row.order-card-row>td,
+  body.dark-theme .orders-panel #ordersBody>tr.transferred-order-row.order-card-row>td,
+  body.dark-theme .orders-panel #ordersBody>tr.order-card-row:not(.date-separator)>td:first-child,
+  body.dark-theme .orders-panel #ordersBody>tr.order-card-row:not(.date-separator)>td:last-child,
+  body.dark-theme .orders-panel #ordersBody>tr.current-order-row.order-card-row>td:first-child,
+  body.dark-theme .orders-panel #ordersBody>tr.current-order-row.order-card-row>td:last-child,
+  body.dark-theme .orders-panel #ordersBody>tr.transferred-order-row.order-card-row>td:first-child,
+  body.dark-theme .orders-panel #ordersBody>tr.transferred-order-row.order-card-row>td:last-child{
+    background:#161b22!important;
+    background-color:#161b22!important;
+    background-image:none!important;
+    box-shadow:none!important;
+  }
+  body.dark-theme .orders-panel #ordersBody>tr.order-card-row:not(.date-separator):hover>td,
+  body.dark-theme .orders-panel #ordersBody>tr.current-order-row.order-card-row:hover>td,
+  body.dark-theme .orders-panel #ordersBody>tr.transferred-order-row.order-card-row:hover>td,
+  body.dark-theme .orders-panel #ordersBody>tr.order-card-row:not(.date-separator):focus-visible>td{
+    background:#21262d!important;
+    background-color:#21262d!important;
+    background-image:none!important;
+  }
+}

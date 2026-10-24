@@ -6584,3 +6584,35 @@ body.dark-theme .sidebar .nav-item.active{
   background:#21262d!important;background-image:none!important;color:#c9d1d9!important;
   box-shadow:inset 2px 0 #8b949e!important;
 }
+
+
+/* Order card borders: replace olive-green hover/frame colors with neutral graphite. */
+@media(min-width:721px){
+  body.dark-theme .orders-panel #ordersBody>tr.order-card-row>td,
+  body.dark-theme .orders-panel #ordersBody>tr.transferred-order-row.order-card-row>td,
+  body.dark-theme .orders-panel #ordersBody>tr.current-order-row.order-card-row>td{
+    border-top-color:#30363d!important;
+    border-bottom-color:#30363d!important;
+    border-left-color:#30363d!important;
+    border-right-color:#30363d!important;
+    outline-color:#30363d!important;
+    box-shadow:none!important;
+  }
+  body.dark-theme .orders-panel #ordersBody>tr.order-card-row>td:first-child,
+  body.dark-theme .orders-panel #ordersBody>tr.order-card-row>td:last-child{
+    border-color:#30363d!important;
+  }
+  body.dark-theme .orders-panel #ordersBody>tr.order-card-row:hover>td,
+  body.dark-theme .orders-panel #ordersBody>tr.order-card-row:focus-visible>td,
+  body.dark-theme .orders-panel #ordersBody>tr.order-card-row:hover>td:first-child,
+  body.dark-theme .orders-panel #ordersBody>tr.order-card-row:hover>td:last-child,
+  body.dark-theme .orders-panel #ordersBody>tr.order-card-row:focus-visible>td:first-child,
+  body.dark-theme .orders-panel #ordersBody>tr.order-card-row:focus-visible>td:last-child{
+    border-top-color:#3b434d!important;
+    border-bottom-color:#3b434d!important;
+    border-left-color:#3b434d!important;
+    border-right-color:#3b434d!important;
+    outline-color:#3b434d!important;
+    box-shadow:none!important;
+  }
+}

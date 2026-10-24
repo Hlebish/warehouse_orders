@@ -6462,3 +6462,29 @@ tr:hover td{background:#161b22!important}
 .panel-heading,.orders-panel-header,.table-toolbar{background:#161b22!important;border-color:#30363d!important}
 .primary-button,.create-order-button,.btn-primary{background:#238636!important;color:#fff!important}
 .primary-button:hover,.create-order-button:hover,.btn-primary:hover{background:#2ea043!important}
+
+
+/* New-order strip: graphite surface only; keep the green create button unchanged. */
+body.dark-theme .orders-panel .create-order-row,
+body.dark-theme .orders-panel .create-order-row:hover,
+body.dark-theme .orders-panel .create-order-row:focus-within{
+  background:#1c2128!important;
+  background-image:none!important;
+  border-top-color:#30363d!important;
+  border-bottom-color:#30363d!important;
+  box-shadow:none!important;
+}
+body.dark-theme .orders-panel .create-order-row .create-order-hint,
+body.dark-theme .orders-panel .create-order-row .create-order-hint:hover,
+body.dark-theme .orders-panel .create-order-row .create-order-hint:focus-visible{
+  background:transparent!important;
+  background-image:none!important;
+  border-color:transparent!important;
+  box-shadow:none!important;
+}
+body.dark-theme .orders-panel .create-order-row .create-order-spark{
+  background:#292f36!important;
+  color:#c9d1d9!important;
+}
+body.dark-theme .orders-panel .create-order-row .create-order-hint b{color:#e6edf3!important}
+body.dark-theme .orders-panel .create-order-row .create-order-hint small{color:#8b949e!important}

@@ -6488,3 +6488,61 @@ body.dark-theme .orders-panel .create-order-row .create-order-spark{
 }
 body.dark-theme .orders-panel .create-order-row .create-order-hint b{color:#e6edf3!important}
 body.dark-theme .orders-panel .create-order-row .create-order-hint small{color:#8b949e!important}
+
+
+/* Final neutral graphite surfaces for the orders table and side drawer; no olive/green tint. */
+body.dark-theme .sidebar,
+body.dark-theme .sidebar .nav-item,
+body.dark-theme .sidebar .sidebar-section,
+body.dark-theme .sidebar .sidebar-footer,
+body.dark-theme .sidebar .user-card,
+body.dark-theme .sidebar .chat-entry{
+  background-color:#161b22!important;
+  background-image:none!important;
+}
+body.dark-theme .sidebar{background-color:#0d1117!important;border-right:1px solid #30363d!important}
+body.dark-theme .sidebar .nav-item.active{background:#21262d!important;color:#c9d1d9!important;box-shadow:inset 2px 0 #8b949e!important}
+body.dark-theme .orders-panel,
+body.dark-theme .orders-panel .table-wrap,
+body.dark-theme .orders-panel table,
+body.dark-theme .orders-panel thead,
+body.dark-theme .orders-panel tbody,
+body.dark-theme .orders-panel #ordersBody,
+body.dark-theme .orders-panel #ordersBody>tr,
+body.dark-theme .orders-panel #ordersBody>tr:not(.date-separator),
+body.dark-theme .orders-panel #ordersBody>tr.transferred-order-row,
+body.dark-theme .orders-panel #ordersBody>tr.current-order-row,
+body.dark-theme .orders-panel #ordersBody>tr.order-card-row{
+  background:#0d1117!important;
+  background-image:none!important;
+  box-shadow:none!important;
+}
+body.dark-theme .orders-panel #ordersBody>tr:not(.date-separator)>td,
+body.dark-theme .orders-panel #ordersBody>tr.order-card-row>td,
+body.dark-theme .orders-panel #ordersBody>tr.transferred-order-row>td,
+body.dark-theme .orders-panel #ordersBody>tr.current-order-row>td{
+  background:#0d1117!important;
+  background-image:none!important;
+  border-color:#30363d!important;
+}
+body.dark-theme .orders-panel #ordersBody>tr:not(.date-separator):hover>td,
+body.dark-theme .orders-panel #ordersBody>tr.order-card-row:hover>td,
+body.dark-theme .orders-panel #ordersBody>tr.order-card-row:focus-visible>td{
+  background:#161b22!important;
+  background-image:none!important;
+}
+body.dark-theme .orders-panel #ordersBody>tr.date-separator,
+body.dark-theme .orders-panel #ordersBody>tr.date-separator>td,
+body.dark-theme .orders-panel #ordersBody>tr.date-separator>td span{
+  background:#161b22!important;
+  background-image:none!important;
+  border-color:#30363d!important;
+}
+body.dark-theme .orders-panel .panel-heading,
+body.dark-theme .orders-panel .table-toolbar,
+body.dark-theme .orders-panel .table-footer,
+body.dark-theme .orders-panel .list-controls{
+  background:#161b22!important;
+  background-image:none!important;
+  border-color:#30363d!important;
+}

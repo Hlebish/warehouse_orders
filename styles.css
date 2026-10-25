@@ -7462,3 +7462,62 @@ body:not(.dark-theme) .top-history-button{
   background:#f8fafc!important;
   border-color:#d1dae6!important;
 }
+
+
+/* Order detail action layout: consistent neutral controls, distinct role colors, destructive actions last. */
+body.dark-theme .detail-actions .detail-action-roles .small-button.manager-category,
+body.dark-theme .detail-actions .detail-action-roles .small-button.manager-category:hover,
+body.dark-theme .detail-actions .detail-action-roles .small-button.manager-category:focus,
+body.dark-theme .detail-actions .detail-action-roles .small-button.manager-category:active {
+  color: #eaf2ff !important;
+  background: #1f4b99 !important;
+  border: 1px solid #3978e5 !important;
+}
+body.dark-theme .detail-actions .detail-action-roles .small-button.warehouse-category,
+body.dark-theme .detail-actions .detail-action-roles .small-button.warehouse-category:hover,
+body.dark-theme .detail-actions .detail-action-roles .small-button.warehouse-category:focus,
+body.dark-theme .detail-actions .detail-action-roles .small-button.warehouse-category:active {
+  color: #eafff1 !important;
+  background: #205b3b !important;
+  border: 1px solid #3da66b !important;
+}
+body.dark-theme .detail-actions .detail-action-edit .small-button,
+body.dark-theme .detail-actions .detail-action-utility .small-button,
+body.dark-theme .detail-actions .detail-action-utility .small-button:hover,
+body.dark-theme .detail-actions .detail-action-utility .small-button:focus,
+body.dark-theme .detail-actions .detail-action-utility .small-button:active {
+  color: #e2e8f0 !important;
+  background: #252b35 !important;
+  border: 1px solid #3b4554 !important;
+  box-shadow: none !important;
+}
+body.dark-theme .detail-actions .detail-action-roles,
+body.dark-theme .detail-actions .detail-action-utility {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: 8px !important;
+}
+body.dark-theme .detail-actions .detail-action-roles .small-button {
+  min-height: 44px !important;
+}
+body.dark-theme .detail-actions .detail-action-edit {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+}
+body.dark-theme .detail-actions .detail-action-bottom {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  gap: 8px !important;
+}
+body.dark-theme .detail-actions .detail-action-bottom .small-button.danger {
+  width: 100% !important;
+  min-height: 42px !important;
+}
+@media (max-width: 560px) {
+  body.dark-theme .detail-actions .detail-action-utility {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+  body.dark-theme .detail-actions .detail-action-utility .small-button[data-action="toggle-assembly"] {
+    grid-column: 1 / -1;
+  }
+}

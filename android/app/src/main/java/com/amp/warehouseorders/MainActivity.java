@@ -5,6 +5,7 @@ import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.content.SharedPreferences;
 import android.content.Intent;
+import android.content.ClipData;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
@@ -251,6 +252,19 @@ public class MainActivity extends AppCompatActivity {
                 Uri[] results = null;
                 if (resultCode == RESULT_OK && data != null) {
                     results = WebChromeClient.FileChooserParams.parseResult(resultCode, data);
+                    // Some Android photo-picker providers return the selected URI only
+                    // through Intent data/ClipData; preserve it if parseResult is empty.
+                    if (results == null || results.length == 0) {
+                        ClipData clipData = data.getClipData();
+                        if (clipData != null && clipData.getItemCount() > 0) {
+                            results = new Uri[clipData.getItemCount()];
+                            for (int i = 0; i < clipData.getItemCount(); i++) {
+                                results[i] = clipData.getItemAt(i).getUri();
+                            }
+                        } else if (data.getData() != null) {
+                            results = new Uri[]{data.getData()};
+                        }
+                    }
                 }
                 filePathCallback.onReceiveValue(results);
                 filePathCallback = null;

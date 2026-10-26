@@ -89,7 +89,7 @@ public class MainActivity extends AppCompatActivity {
         webView.setWebViewClient(new WebViewClient());
         webView.setWebChromeClient(new WebChromeClient());
         webView.addJavascriptInterface(new AndroidBridge(), "AndroidWarehouse");
-        webView.loadUrl(SITE_URL);
+        webView.loadUrl(notificationUrlFrom(getIntent()));
         installBackHandler();
         requestNativePushToken();
     }
@@ -106,6 +106,30 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         });
+    }
+
+    private String notificationUrlFrom(android.content.Intent intent) {
+        String candidate = intent == null ? null : intent.getStringExtra("notification_link");
+        if (candidate == null || candidate.isEmpty()) return SITE_URL;
+        try {
+            android.net.Uri uri = android.net.Uri.parse(candidate);
+            if ("https".equalsIgnoreCase(uri.getScheme())
+                    && "hlebish.github.io".equalsIgnoreCase(uri.getHost())
+                    && (uri.getPath() == null || uri.getPath().equals("/warehouse_orders/") || uri.getPath().equals("/warehouse_orders"))) {
+                return candidate;
+            }
+        } catch (Exception ignored) { }
+        return SITE_URL;
+    }
+
+    @Override
+    protected void onNewIntent(android.content.Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        String notificationUrl = notificationUrlFrom(intent);
+        if (webView != null) {
+            webView.post(() -> webView.loadUrl(notificationUrl));
+        }
     }
 
     @Override

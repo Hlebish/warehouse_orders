@@ -335,7 +335,8 @@ exports.sendWarehousePush = onDocumentCreated({ document: 'pushQueue/{eventId}',
             target,
             category,
             isMention: String(data.isMention === true || data.isMention === 'true'),
-            isReply: String(data.isReply === true || data.isReply === 'true')
+            isReply: String(data.isReply === true || data.isReply === 'true'),
+            createdAt: String(data.createdAt || '')
           }
         };
 

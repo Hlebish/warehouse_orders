@@ -783,6 +783,11 @@ function closeModal(fromPop=false){
     $('modalFoot').innerHTML=previous.foot;
     modal.hidden=false;
     document.body.style.overflow='hidden';
+    // Status summaries are snapshots of a filtered order list. Rebuild them
+    // from the latest state after returning from an order, otherwise the card
+    // whose status changed remains visible until the modal is reopened.
+    const statListKey=Object.keys(statOrderConfig).find(key=>statOrderConfig[key].title===previous.title);
+    if(statListKey)openStatOrders(statListKey);
     // A hardware/gesture Back consumes the current history entry. Restore an
     // entry for the list so the next Back closes the list, not the whole app.
     if(fromPop){

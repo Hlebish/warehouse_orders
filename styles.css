@@ -7541,3 +7541,48 @@ body.dark-theme .detail-actions .detail-action-roles > .small-button {
   justify-content: center !important;
   margin: 0 !important;
 }
+
+
+/* Mobile dark-theme cleanup: remove inherited rectangular fills behind text and controls
+   inside order cards so every area blends into the same graphite card surface. */
+@media (max-width:720px){
+  body.dark-theme .orders-panel #ordersBody>tr:not(.date-separator),
+  body.dark-theme .orders-panel #ordersBody>tr:not(.date-separator)>td,
+  body.dark-theme .orders-panel #ordersBody>tr:not(.date-separator)>td:nth-child(n),
+  body.dark-theme .orders-panel #ordersBody>tr:not(.date-separator)>td:first-child,
+  body.dark-theme .orders-panel #ordersBody>tr:not(.date-separator)>td:last-child{
+    background:#1b1f21!important;
+    background-color:#1b1f21!important;
+    background-image:none!important;
+    box-shadow:none!important;
+  }
+  body.dark-theme .orders-panel #ordersBody>tr:not(.date-separator)>td .client-name,
+  body.dark-theme .orders-panel #ordersBody>tr:not(.date-separator)>td .client-sub,
+  body.dark-theme .orders-panel #ordersBody>tr:not(.date-separator)>td .time-cell,
+  body.dark-theme .orders-panel #ordersBody>tr:not(.date-separator)>td .delivery-type-pill,
+  body.dark-theme .orders-panel #ordersBody>tr:not(.date-separator)>td .row-open-status,
+  body.dark-theme .orders-panel #ordersBody>tr:not(.date-separator)>td .row-open-comments,
+  body.dark-theme .orders-panel #ordersBody>tr:not(.date-separator)>td .order-number,
+  body.dark-theme .orders-panel #ordersBody>tr:not(.date-separator)>td .client-open,
+  body.dark-theme .orders-panel #ordersBody>tr:not(.date-separator)>td .assembly-indicator,
+  body.dark-theme .orders-panel #ordersBody>tr:not(.date-separator)>td .comment-icon,
+  body.dark-theme .orders-panel #ordersBody>tr:not(.date-separator)>td .entry-count{
+    background:transparent!important;
+    background-color:transparent!important;
+    background-image:none!important;
+    box-shadow:none!important;
+  }
+  body.dark-theme .orders-panel #ordersBody .row-menu{
+    background:#1b1f21!important;
+    background-color:#1b1f21!important;
+    background-image:none!important;
+    box-shadow:none!important;
+    border-color:#343c40!important;
+  }
+  body.dark-theme .orders-panel #ordersBody .row-menu:active,
+  body.dark-theme .orders-panel #ordersBody .row-menu:focus-visible{
+    background:#1b1f21!important;
+    background-color:#1b1f21!important;
+    box-shadow:none!important;
+  }
+}

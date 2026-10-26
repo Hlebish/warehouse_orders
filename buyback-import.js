@@ -19,19 +19,27 @@ const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;'
 
 function parseInvoice(raw) {
   const text = String(raw || '').replace(/\u00a0/g, ' ').replace(/\r/g, '');
-  const dateMatch = text.match(/(?:Прибуткова\s+накладна|Приходная\s+накладная)[^\n]*?\bвід\s*(\d{1,2})\s+([а-яіїєґ]+)\s+(\d{4})\s*(?:р\.?|г\.?)?/i)
-    || text.match(/(?:від|от)\s*(\d{1,2})\s+([а-яіїєґ]+)\s+(\d{4})\s*(?:р\.?|г\.?)?/i);
+  const dateMatch = text.match(/(?:Прибуткова\s+накладна|Приходная\s+накладная)[^\n]*?\b(?:від|от)\s*(\d{1,2})\s+([а-яіїєґ]+)\s+(\d{4})\s*(?:р\.?|г\.?)?/i)
+    || text.match(/\b(?:від|от)\s*(\d{1,2})\s+([а-яіїєґ]+)\s+(\d{4})\s*(?:р\.?|г\.?)?/i);
   let receivedAt = '';
   if (dateMatch) {
     const month = monthMap[dateMatch[2].toLowerCase()];
     if (month) receivedAt = dateMatch[3] + '-' + month + '-' + dateMatch[1].padStart(2, '0');
+  } else {
+    const numericDate = text.match(/(?:Прибуткова\s+накладна|Приходная\s+накладная)[^\n]*?\b(?:від|от)\s*(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{4})/i)
+      || text.match(/\b(?:від|от)\s*(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{4})/i);
+    if (numericDate) {
+      const day = Number(numericDate[1]), month = Number(numericDate[2]), year = Number(numericDate[3]);
+      const candidate = new Date(Date.UTC(year, month - 1, day));
+      if (year >= 2000 && year <= 2100 && candidate.getUTCFullYear() === year && candidate.getUTCMonth() === month - 1 && candidate.getUTCDate() === day) receivedAt = year + '-' + String(month).padStart(2, '0') + '-' + String(day).padStart(2, '0');
+    }
   }
   const supplierMatch = text.match(/Постачальник\s*:\s*([^\n\t]+)/i) || text.match(/Поставщик\s*:\s*([^\n\t]+)/i);
   const supplier = supplierMatch ? supplierMatch[1].replace(/[«»"“”]/g, '').trim().slice(0,160) : '';
   const rows = [];
   const articlePattern = /^[A-ZА-ЯІЇЄҐ0-9][A-ZА-ЯІЇЄҐ0-9.\/_-]{2,}$/i;
   const isQuantity = value => /^\d+(?:[,.]\d+)?$/.test(String(value || '').trim());
-  const isUnit = value => /^(?:шт\.?|штук(?:а|и)?|pcs|од\.?|одиниц(?:я|і|ь)?|штучн(?:ий|а|е))$/i.test(String(value || '').trim());
+  const isUnit = value => /^(?:шт\.?|штук(?:а|и)?|pcs?\.?|од\.?|одиниц(?:я|і|ь)?|штучн(?:ий|а|е)|компл\.?|комплект(?:и|ів)?|упак\.?|упаковк(?:а|и)|пара|пар|набір|набор(?:а|ів)|кг|г|л|м|м\.?п\.?|м2|м3)$/i.test(String(value || '').trim());
   for (const original of text.split('\n')) {
     const line = original.trim();
     if (!line) continue;
@@ -39,7 +47,7 @@ function parseInvoice(raw) {
       ? original.split('\t').map(x => x.trim())
       : line.split(/\s{2,}/).map(x => x.trim());
     // Preserve the printed 1C table columns: №, article, name, quantity, unit, prices.
-    let articleIndex = parts.findIndex((part, i) => i > 0 && /^\d{5,}$/.test(part));
+    let articleIndex = parts.findIndex((part, i) => i > 0 && /^(?=.*\d)[A-ZА-ЯІЇЄҐ0-9][A-ZА-ЯІЇЄҐ0-9.\/_-]{4,}$/i.test(part));
     if (articleIndex >= 0) {
       const article = parts[articleIndex];
       let name = '';
@@ -57,7 +65,7 @@ function parseInvoice(raw) {
       }
       // Also support text copied without tabs or with columns collapsed into spaces.
       if (!name || !parts.some(isUnit)) {
-        const compact = line.match(/^\s*\d+\s+(\d{5,})\s+(.+?)\s+(\d+(?:[,.]\d+)?)\s*(?:шт\.?|штук|pcs|од\.?|одиниц)\b/i);
+        const compact = line.match(/^\s*\d+\s+([A-ZА-ЯІЇЄҐ0-9][A-ZА-ЯІЇЄҐ0-9.\/_-]{4,})\s+(.+?)\s+(\d+(?:[,.]\d+)?)\s*(?:шт\.?|штук|pcs?\.?|од\.?|одиниц|компл\.?|комплект|упак\.?|упаковка|пара|кг|г|л|м)\b/i);
         if (compact) {
           name = compact[2].trim();
           quantity = Math.max(0.01, Number(compact[3].replace(',', '.')) || 1);
@@ -69,7 +77,7 @@ function parseInvoice(raw) {
       continue;
     }
     // Fallback for older pasted layouts where the article is not a standalone tab column.
-    const compact = line.match(/^\s*\d+\s+([A-ZА-ЯІЇЄҐ0-9][A-ZА-ЯІЇЄҐ0-9.\/_-]{4,})\s+(.+?)\s+(\d+(?:[,.]\d+)?)\s*(?:шт\.?|штук|pcs|од\.?|одиниц)\b/i);
+    const compact = line.match(/^\s*\d+\s+([A-ZА-ЯІЇЄҐ0-9][A-ZА-ЯІЇЄҐ0-9.\/_-]{4,})\s+(.+?)\s+(\d+(?:[,.]\d+)?)\s*(?:шт\.?|штук|pcs?\.?|од\.?|одиниц|компл\.?|комплект|упак\.?|упаковка|пара|кг|г|л|м)\b/i);
     if (compact) {
       rows.push({article:compact[1],name:compact[2].trim(),quantity:Math.max(0.01,Number(compact[3].replace(',','.')||1))});
     }

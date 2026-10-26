@@ -139,22 +139,10 @@ function shouldShowAttentionToast(n){return isMentionNotice(n)||flagOn(n,'isRepl
 function unreadMentionNotices(){return state.notices.filter(n=>!n.read&&isMentionNotice(n))}
 function paintMentionCenter(){const b=$('mentionCenterButton'),c=$('mentionCenterCount'),l=$('mentionCenterLabel');if(!b||!c||!l)return;const n=unreadMentionNotices().length;c.textContent=String(n);b.hidden=n===0;l.textContent=n===1?'Вас упомянули':`У вас ${n} новых упоминания`}
 const shownAttentionToastKeys=new Map();
-let notificationSoundUnlocked=false;
 const notificationSound=new Audio('./delivered-message-sound.mp3');
 notificationSound.preload='auto';
-function unlockNotificationSound(){
-  if(notificationSoundUnlocked)return;
-  const previousVolume=notificationSound.volume;
-  notificationSound.volume=0;
-  notificationSound.play().then(()=>{
-    notificationSound.pause();
-    notificationSound.currentTime=0;
-    notificationSound.volume=previousVolume;
-    notificationSoundUnlocked=true;
-  }).catch(()=>{
-    notificationSound.volume=previousVolume;
-  });
-}
+// Do not play a silent "unlock" sound on first interaction: even at volume 0,
+// WebView can briefly take audio focus and duck music in other apps.
 function playNotificationSound(){
   try{
     notificationSound.currentTime=0;
@@ -162,9 +150,6 @@ function playNotificationSound(){
     if(playback&&typeof playback.catch==='function')playback.catch(()=>{});
   }catch(_){}
 }
-['pointerdown','keydown','touchstart'].forEach(eventName=>{
-  document.addEventListener(eventName,unlockNotificationSound,{once:true,passive:true});
-});
 function showAttentionToast(n){
   const now=Date.now();
   for(const [key,time] of shownAttentionToastKeys){if(now-time>15000)shownAttentionToastKeys.delete(key);}

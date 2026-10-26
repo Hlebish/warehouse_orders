@@ -158,7 +158,6 @@ function showAttentionToast(n){
   const semanticKey='semantic:'+[`${n.target||''}`,sender,message,String(n.orderId||'')].join('|').toLocaleLowerCase('ru');
   const eventKey='event:'+String(n.eventId||n.id||semanticKey);
   if(shownAttentionToastKeys.has(eventKey)||shownAttentionToastKeys.has(semanticKey))return;
-  playNotificationSound();
   shownAttentionToastKeys.set(eventKey,now);
   shownAttentionToastKeys.set(semanticKey,now);
   while(shownAttentionToastKeys.size>600)shownAttentionToastKeys.delete(shownAttentionToastKeys.keys().next().value);
@@ -548,6 +547,9 @@ onMessage(messaging,payload=>{
     if((eventId&&recentPushEvents.has(`event:${eventId}`))||recentPushEvents.has(`msg:${signature}`))return;
     if(eventId)recentPushEvents.set(`event:${eventId}`,now);
     recentPushEvents.set(`msg:${signature}`,now);
+    // Play the site's custom MP3 for every foreground push, not only chat/mentions.
+    // Browsers may block playback until the user has interacted with the page.
+    playNotificationSound();
     const attention={...n,isMention:n.isMention==='true'||n.isMention===true,isReply:n.isReply==='true'||n.isReply===true};
     if(category==='mention'||category==='replies'||category==='chat'){showForegroundPushNotification(n);if(shouldShowAttentionToast(attention))showAttentionToast({...attention,id:eventId||signature})}
     notify(message,orderId,target,target==='chat'?'chat':'orders');

@@ -11,6 +11,8 @@ import android.graphics.Rect;
 import java.util.Collections;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebChromeClient;
+import android.webkit.ValueCallback;
+import android.net.Uri;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
@@ -38,10 +40,12 @@ public class MainActivity extends AppCompatActivity {
     private static final String PREF_TOKEN = "token";
     private static final String PREF_INSTALLATION = "installationId";
     private static final int GOOGLE_SIGN_IN_REQUEST = 1002;
+    private static final int FILE_CHOOSER_REQUEST = 1003;
     private static final String GOOGLE_WEB_CLIENT_ID = "329606730319-bqe5c2lkngq4jk87atifp6n9qnn3chfh.apps.googleusercontent.com";
 
     private WebView webView;
     private GoogleSignInClient googleSignInClient;
+    private ValueCallback<Uri[]> filePathCallback;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -87,7 +91,24 @@ public class MainActivity extends AppCompatActivity {
         settings.setDisplayZoomControls(false);
 
         webView.setWebViewClient(new WebViewClient());
-        webView.setWebChromeClient(new WebChromeClient());
+        webView.setWebChromeClient(new WebChromeClient() {
+            @Override
+            public boolean onShowFileChooser(WebView view, ValueCallback<Uri[]> callback,
+                    FileChooserParams fileChooserParams) {
+                if (MainActivity.this.filePathCallback != null) {
+                    MainActivity.this.filePathCallback.onReceiveValue(null);
+                }
+                MainActivity.this.filePathCallback = callback;
+                try {
+                    Intent chooserIntent = fileChooserParams.createIntent();
+                    startActivityForResult(chooserIntent, FILE_CHOOSER_REQUEST);
+                    return true;
+                } catch (Exception error) {
+                    MainActivity.this.filePathCallback = null;
+                    return false;
+                }
+            }
+        });
         webView.addJavascriptInterface(new AndroidBridge(), "AndroidWarehouse");
         webView.loadUrl(notificationUrlFrom(getIntent()));
         installBackHandler();
@@ -224,6 +245,17 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, android.content.Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == FILE_CHOOSER_REQUEST) {
+            if (filePathCallback != null) {
+                Uri[] results = null;
+                if (resultCode == RESULT_OK && data != null) {
+                    results = WebChromeClient.FileChooserParams.parseResult(resultCode, data);
+                }
+                filePathCallback.onReceiveValue(results);
+                filePathCallback = null;
+            }
+            return;
+        }
         if (requestCode != GOOGLE_SIGN_IN_REQUEST) return;
         try {
             GoogleSignInAccount account = GoogleSignIn.getSignedInAccountFromIntent(data).getResult(ApiException.class);
@@ -240,6 +272,10 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onDestroy() {
+        if (filePathCallback != null) {
+            filePathCallback.onReceiveValue(null);
+            filePathCallback = null;
+        }
         if (webView != null) {
             webView.removeJavascriptInterface("AndroidWarehouse");
             webView.destroy();

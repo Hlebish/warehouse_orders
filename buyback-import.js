@@ -19,15 +19,15 @@ const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;'
 
 function parseInvoice(raw) {
   const text = String(raw || '').replace(/\u00a0/g, ' ').replace(/\r/g, '');
-  const dateMatch = text.match(/(?:Прибуткова\s+накладна|Приходная\s+накладная)[^\n]*?\b(?:від|от)\s*(\d{1,2})\s+([а-яіїєґ]+)\s+(\d{4})\s*(?:р\.?|г\.?)?/i)
-    || text.match(/\b(?:від|от)\s*(\d{1,2})\s+([а-яіїєґ]+)\s+(\d{4})\s*(?:р\.?|г\.?)?/i);
+  const dateMatch = text.match(/(?:Прибуткова\s+накладна|Приходная\s+накладная)[^\n]*?(?:від|от)\s*(\d{1,2})\s+([а-яіїєґ]+)\s+(\d{4})\s*(?:р\.?|г\.?)?/i)
+    || text.match(/(?:від|от)\s*(\d{1,2})\s+([а-яіїєґ]+)\s+(\d{4})\s*(?:р\.?|г\.?)?/i);
   let receivedAt = '';
   if (dateMatch) {
     const month = monthMap[dateMatch[2].toLowerCase()];
     if (month) receivedAt = dateMatch[3] + '-' + month + '-' + dateMatch[1].padStart(2, '0');
   } else {
-    const numericDate = text.match(/(?:Прибуткова\s+накладна|Приходная\s+накладная)[^\n]*?\b(?:від|от)\s*(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{4})/i)
-      || text.match(/\b(?:від|от)\s*(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{4})/i);
+    const numericDate = text.match(/(?:Прибуткова\s+накладна|Приходная\s+накладная)[^\n]*?(?:від|от)\s*(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{4})/i)
+      || text.match(/(?:від|от)\s*(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{4})/i);
     if (numericDate) {
       const day = Number(numericDate[1]), month = Number(numericDate[2]), year = Number(numericDate[3]);
       const candidate = new Date(Date.UTC(year, month - 1, day));

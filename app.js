@@ -1552,6 +1552,43 @@ function appendClipboardImages(event,inputId,maxFiles=5,maxBytes=8*1024*1024){
   }catch(err){console.error('Не удалось добавить изображение из буфера',err);toast('Браузер не позволил прикрепить изображение из буфера. Используй кнопку «Фото».');}
   return true;
 }
+// Show selected attachments immediately so it's clear that Android returned the files.
+document.addEventListener('change',event=>{
+  const input=event.target;
+  if(!input || !['entryPhotos','editDefectPhotos'].includes(input.id))return;
+  const box=input.closest('.upload-box');
+  if(!box)return;
+  let preview=box.querySelector('.attachment-selection-preview');
+  if(!preview){
+    preview=document.createElement('div');
+    preview.className='attachment-selection-preview';
+    preview.setAttribute('aria-live','polite');
+    box.appendChild(preview);
+  }
+  const files=Array.from(input.files||[]);
+  preview.replaceChildren();
+  if(!files.length){preview.hidden=true;return;}
+  preview.hidden=false;
+  const summary=document.createElement('div');
+  summary.className='attachment-selection-summary';
+  summary.textContent=files.length===1?'Выбрано фото: '+files[0].name:'Выбрано фото: '+files.length;
+  preview.appendChild(summary);
+  files.forEach(file=>{
+    const item=document.createElement('div');
+    item.className='attachment-selection-item';
+    const name=document.createElement('span');
+    name.textContent=file.name||'Изображение';
+    item.appendChild(name);
+    if(file.type.startsWith('image/')){
+      const image=document.createElement('img');
+      image.alt='';
+      image.src=URL.createObjectURL(file);
+      image.onload=()=>URL.revokeObjectURL(image.src);
+      item.prepend(image);
+    }
+    preview.appendChild(item);
+  });
+});
 document.addEventListener('paste',event=>{
   const target=event.target;
   if(target?.id==='chatInput'){

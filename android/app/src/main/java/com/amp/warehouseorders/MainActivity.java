@@ -8,7 +8,6 @@ import android.content.Intent;
 import android.content.ClipData;
 import android.content.pm.PackageManager;
 import android.os.Build;
-import android.provider.Settings;
 import android.os.Bundle;
 import android.graphics.Rect;
 import java.util.Collections;
@@ -37,7 +36,7 @@ import com.google.firebase.messaging.FirebaseMessaging;
 
 public class MainActivity extends AppCompatActivity {
     private static final String SITE_URL = "https://hlebish.github.io/warehouse_orders/";
-    private static final String CHANNEL_ID = "warehouse_orders_v6_system_sound";
+    private static final String CHANNEL_ID = "warehouse_orders_v7_custom_sound";
     private static final int NOTIFICATION_PERMISSION_REQUEST = 1001;
     private static final String PREFS = "warehouse_push";
     private static final String PREF_TOKEN = "token";
@@ -172,13 +171,14 @@ public class MainActivity extends AppCompatActivity {
             );
             channel.setDescription("Уведомления заказов и чата");
             channel.enableVibration(true);
-            // Use Android's default notification sound so its volume and sound
-            // selection follow the system notification settings, not a quiet bundled MP3.
+            // Keep the app's original notification tone. A new channel ID ensures
+            // Android doesn't keep the previously saved system-sound channel settings.
+            Uri soundUri = Uri.parse("android.resource://" + getPackageName() + "/" + R.raw.delivered_message_sound);
             android.media.AudioAttributes audioAttributes = new android.media.AudioAttributes.Builder()
                 .setUsage(android.media.AudioAttributes.USAGE_NOTIFICATION)
                 .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
                 .build();
-            channel.setSound(Settings.System.DEFAULT_NOTIFICATION_URI, audioAttributes);
+            channel.setSound(soundUri, audioAttributes);
 
             NotificationManager manager = getSystemService(NotificationManager.class);
             manager.createNotificationChannel(channel);

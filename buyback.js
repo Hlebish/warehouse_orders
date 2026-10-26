@@ -7,7 +7,7 @@ const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 const $ = id => document.getElementById(id);
-let currentUser = null, unsubscribe = null, items = [], selectedStatus = 'active', selectedSupplier = '';
+let currentUser = null, unsubscribe = null, items = [], selectedStatus = 'active', selectedSupplier = '', selectedSearch = '';
 
 const style = document.createElement('style');
 style.textContent = `
@@ -460,7 +460,7 @@ overlay.className='buyback-overlay';overlay.hidden=true;overlay.innerHTML=`
 </div>
 </details>
 <div class="buyback-summary" id="buybackSummary"></div>
-<div class="buyback-supplier-filter"><label for="buybackSupplierFilter">Поставщик</label><select id="buybackSupplierFilter"><option value="">Все поставщики</option></select></div>
+<div class="buyback-supplier-filter"><label for="buybackSearch">Поиск</label><input id="buybackSearch" type="search" autocomplete="off" placeholder="Артикул или клиент" aria-label="Поиск по артикулу или клиенту"><label for="buybackSupplierFilter">Поставщик</label><select id="buybackSupplierFilter"><option value="">Все поставщики</option></select></div>
 <div class="buyback-summary"><button class="buyback-chip" data-status="active" type="button">В работе</button><button class="buyback-chip" data-status="returned" type="button">Возвращён</button><button class="buyback-chip" data-status="sold" type="button">Продан</button><button class="buyback-chip" data-status="cancelled" type="button">Отменён</button><button class="buyback-chip" data-status="expired" type="button">Просрочен</button><button class="buyback-chip" data-status="shipped" type="button">Отгружен просроченным</button></div>
 <div class="buyback-list" id="buybackList"><div class="buyback-empty">Загружаю перекупной товар…</div></div>
 </div></section>`;
@@ -502,7 +502,9 @@ function render(){
    const isExpired=x.status==='expired'||(x.status==='active'&&elapsedDays(x.receivedAt)>=14);
    return selectedStatus==='shipped'?x.status==='shipped':selectedStatus==='expired'?isExpired:selectedStatus==='approaching'?!isExpired&&x.status==='active'&&elapsedDays(x.receivedAt)>=6&&elapsedDays(x.receivedAt)<10:selectedStatus==='critical'?!isExpired&&x.status==='active'&&elapsedDays(x.receivedAt)>=10&&elapsedDays(x.receivedAt)<14:(selectedStatus==='active'?!isExpired&&x.status==='active':x.status===selectedStatus);
  }).sort((a,b)=>String(a.receivedAt).localeCompare(String(b.receivedAt)));
- if(!visible.length){$('buybackList').innerHTML='<div class="buyback-empty">Здесь пока нет записей.</div>';return}
+ const normalizedSearch=String(selectedSearch||'').trim().toLocaleLowerCase('ru');
+ const searched=normalizedSearch?visible.filter(x=>[x.article,x.clientName,x.soldToClient,x.soldByOrderNumber,x.orderNumber].some(value=>String(value||'').toLocaleLowerCase('ru').includes(normalizedSearch))):visible;
+ if(!searched.length){$('buybackList').innerHTML='<div class="buyback-empty">'+(normalizedSearch?'По вашему запросу ничего не найдено.':'Здесь пока нет записей.')+'</div>';return}
  const renderItem=item=>{
   const days=elapsedDays(item.receivedAt),left=14-days;
   const isExpired=item.status==='expired'||(item.status==='active'&&days>=14);
@@ -521,7 +523,7 @@ function render(){
   return normalized;
  };
  const supplierLabels=new Map();
- for(const item of visible){
+ for(const item of searched){
   const raw=String(item.supplier||'').trim();
   const key=supplierKey(raw);
   if(!groups.has(key))groups.set(key,[]);
@@ -617,6 +619,7 @@ window.addEventListener('popstate',()=>{
 });
 overlay.querySelectorAll('[data-status]').forEach(btn=>btn.addEventListener('click',()=>{selectedStatus=btn.dataset.status;render()}));
 $('buybackSupplierFilter').addEventListener('change',e=>{selectedSupplier=e.target.value;render()});
+$('buybackSearch').addEventListener('input',e=>{selectedSearch=e.target.value;const input=e.target;const pos=input.selectionStart;render();const next=$('buybackSearch');if(next){next.focus();try{next.setSelectionRange(pos,pos)}catch{}}});
 function closeBuybackEditor(){editOverlay.hidden=true;editingBuybackId=null}
 editOverlay.addEventListener('click',e=>{if(e.target===editOverlay||e.target.closest('[data-close-buyback-edit]'))closeBuybackEditor()});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!editOverlay.hidden)closeBuybackEditor()});

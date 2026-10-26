@@ -538,6 +538,9 @@ onMessage(messaging,payload=>{
   const orderId=String(n.orderId||'');
   const target=String(n.target||'site');
   if(n.title){
+    // Ignore delayed FCM messages instead of replaying a backlog on browser startup.
+    const createdAt=Date.parse(String(n.createdAt||''));
+    if(!Number.isFinite(createdAt)||createdAt>Date.now()+30000||Date.now()-createdAt>90000)return;
     const message=`${n.title}${n.body?`: ${n.body}`:''}`;
     const eventId=String(n.eventId||'');
     const category=String(n.category||'');

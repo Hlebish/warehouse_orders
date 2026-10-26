@@ -7627,3 +7627,110 @@ body.dark-theme .detail-actions .detail-action-roles > .small-button {
     box-shadow:none!important;
   }
 }
+
+
+/* Site-wide motion polish: gentle, fast transitions without changing layout or colors. */
+@keyframes uiFadeIn{
+  from{opacity:0}
+  to{opacity:1}
+}
+@keyframes uiModalEnter{
+  from{opacity:0;transform:translateY(14px) scale(.975)}
+  to{opacity:1;transform:translateY(0) scale(1)}
+}
+@keyframes uiPopupEnter{
+  from{opacity:0;transform:translateY(7px) scale(.985)}
+  to{opacity:1;transform:translateY(0) scale(1)}
+}
+@keyframes uiToastEnter{
+  from{opacity:0;transform:translateY(12px) scale(.98)}
+  to{opacity:1;transform:translateY(0) scale(1)}
+}
+@keyframes uiContentEnter{
+  from{opacity:0;transform:translateY(5px)}
+  to{opacity:1;transform:translateY(0)}
+}
+@keyframes uiImageEnter{
+  from{opacity:0;transform:scale(.97)}
+  to{opacity:1;transform:scale(1)}
+}
+
+/* Dialogs and image previews */
+.modal-backdrop:not([hidden]){
+  animation:uiFadeIn .18s ease-out both;
+}
+.modal-backdrop:not([hidden])>.modal{
+  transform-origin:center bottom;
+  animation:uiModalEnter .22s cubic-bezier(.2,.75,.25,1) both;
+}
+@media(min-width:721px){
+  .modal-backdrop:not([hidden])>.modal{transform-origin:center center}
+}
+.image-viewer:not([hidden]){
+  animation:uiFadeIn .18s ease-out both;
+}
+.image-viewer:not([hidden]) img{
+  animation:uiImageEnter .22s cubic-bezier(.2,.75,.25,1) both;
+}
+
+/* Menus, suggestions and floating controls */
+.filter-menu:not([hidden]),
+.client-suggestions:not([hidden]),
+.product-suggestions:not([hidden]),
+.chat-mention-suggestions:not([hidden]),
+.directory-suggestions:not([hidden]){
+  transform-origin:top center;
+  animation:uiPopupEnter .16s ease-out both;
+}
+.sidebar-backdrop:not([hidden]){
+  animation:uiFadeIn .18s ease-out both;
+}
+.toast-stack .toast{
+  animation:uiToastEnter .2s cubic-bezier(.2,.75,.25,1) both;
+}
+
+/* Newly rendered dialog content appears softly rather than all at once. */
+.modal-body>*{
+  animation:uiContentEnter .18s ease-out both;
+}
+.modal-body>*:nth-child(2){animation-delay:.015s}
+.modal-body>*:nth-child(3){animation-delay:.025s}
+.modal-body>*:nth-child(4){animation-delay:.035s}
+
+/* Small tactile feedback across interactive controls. Keep transforms subtle. */
+button,.nav-item,.stat-card,.stat-order-item,.notice-item,.timeline-item,.shipment-order-card{
+  transition:
+    background-color .16s ease,
+    border-color .16s ease,
+    color .16s ease,
+    box-shadow .16s ease,
+    transform .16s ease,
+    opacity .16s ease;
+}
+button:active:not(:disabled){
+  transform:scale(.985);
+}
+.stat-card,.stat-order-item,.notice-item,.timeline-item,.shipment-order-card{
+  transition:
+    background-color .16s ease,
+    border-color .16s ease,
+    box-shadow .16s ease,
+    transform .16s ease;
+}
+@media(hover:hover){
+  .stat-card:hover,.stat-order-item:hover,.shipment-order-card:hover{
+    transform:translateY(-1px);
+  }
+}
+.nav-item{transition:background-color .16s ease,color .16s ease,transform .16s ease}
+.nav-item:active{transform:translateX(1px)}
+
+/* Avoid motion for people who request reduced animation in their device settings. */
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{
+    scroll-behavior:auto!important;
+    animation-duration:.01ms!important;
+    animation-iteration-count:1!important;
+    transition-duration:.01ms!important;
+  }
+}

@@ -554,7 +554,7 @@ onMessage(messaging,payload=>{
     // Browsers may block playback until the user has interacted with the page.
     playNotificationSound();
     const attention={...n,isMention:n.isMention==='true'||n.isMention===true,isReply:n.isReply==='true'||n.isReply===true};
-    if(category==='mention'||category==='replies'||category==='chat'){showForegroundPushNotification(n);if(shouldShowAttentionToast(attention))showAttentionToast({...attention,id:eventId||signature})}
+    if(category==='mention'||category==='replies'||category==='chat'){if(shouldShowAttentionToast(attention))showAttentionToast({...attention,id:eventId||signature})}
     notify(message,orderId,target,target==='chat'?'chat':'orders');
   }
 });

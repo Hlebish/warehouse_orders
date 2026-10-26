@@ -711,12 +711,13 @@ function showWarehouseAnalytics(){
 function showReturns(dateFrom='',dateTo='',searchText=''){
   const queryText=String(searchText||'').trim().toLocaleLowerCase('ru');
   const inPeriod=r=>{const day=localDateKey(r.createdAt);return (!dateFrom||day>=dateFrom)&&(!dateTo||day<=dateTo);};
+  const matchesSearch=(o,r)=>!queryText||String(o.client||'').toLocaleLowerCase('ru').includes(queryText)||(r.items||[]).some(it=>String(it.article||'').toLocaleLowerCase('ru').includes(queryText));
   // Вкладка показывает только действующие возвраты. Отменённые остаются в истории заказа.
-  const orders=state.orders.filter(o=>Array.isArray(o.returns)&&o.returns.some(r=>r?.status!=='cancelled'&&inPeriod(r)&&(!queryText||String(o.client||'').toLocaleLowerCase('ru').includes(queryText)||(r.items||[]).some(it=>String(it.article||'').toLocaleLowerCase('ru').includes(queryText))))).sort((a,b)=>(asDate(b.updatedAt||b.createdAt)?.getTime()||0)-(asDate(a.updatedAt||a.createdAt)?.getTime()||0));
-  const all=orders.flatMap(order=>order.returns.filter(r=>r?.status!=='cancelled'&&inPeriod(r)).map(r=>({order,return:r})));
+  const orders=state.orders.filter(o=>Array.isArray(o.returns)&&o.returns.some(r=>r?.status!=='cancelled'&&inPeriod(r)&&matchesSearch(o,r))).sort((a,b)=>(asDate(b.updatedAt||b.createdAt)?.getTime()||0)-(asDate(a.updatedAt||a.createdAt)?.getTime()||0));
+  const all=orders.flatMap(order=>order.returns.filter(r=>r?.status!=='cancelled'&&inPeriod(r)&&matchesSearch(order,r)).map(r=>({order,return:r})));
   const totalItems=all.reduce((sum,x)=>sum+(x.return.items||[]).reduce((n,it)=>n+(Number(it.quantity)||0),0),0);
   const rows=orders.length?orders.map(o=>{
-    const records=o.returns.filter(r=>r?.status!=='cancelled'&&inPeriod(r));
+    const records=o.returns.filter(r=>r?.status!=='cancelled'&&inPeriod(r)&&matchesSearch(o,r));
     const returnsHtml=records.map(r=>{
       const cancelButton=canManageUsers?button('Отменить возврат','cancel-return:'+o.id+':'+r.id,'small-button danger'):'';
       return '<article class="timeline-item"><div class="timeline-top"><span><b>'+fmtDateTime(r.createdAt)+'</b> · '+esc(r.author||'Сотрудник')+'</span><span class="timeline-type">ВОЗВРАТ</span></div><div class="timeline-text">'+(r.items||[]).map(it=>esc(it.article)+' × '+(Number(it.quantity)||0)+' шт.').join('<br>')+(r.reason?'<br><span style="color:#89919d">Причина: '+esc(r.reason)+'</span>':'')+'</div>'+cancelButton+'</article>';

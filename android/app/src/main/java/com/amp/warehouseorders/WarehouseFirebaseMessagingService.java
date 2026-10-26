@@ -16,7 +16,7 @@ import com.google.firebase.messaging.RemoteMessage;
 import java.util.Map;
 
 public class WarehouseFirebaseMessagingService extends FirebaseMessagingService {
-    private static final String CHANNEL_ID = "warehouse_orders_v5_custom_sound";
+    private static final String CHANNEL_ID = "warehouse_orders_v6_system_sound";
 
     @Override
     public void onNewToken(@NonNull String token) {

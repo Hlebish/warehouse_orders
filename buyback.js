@@ -438,6 +438,9 @@ style.textContent = `
  .buyback-summary:has(button[data-status]){grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:6px!important;padding:7px!important;border-radius:12px!important}
  .buyback-chip[data-status]{min-height:39px!important;padding:8px 6px!important;font-size:11px!important;border-radius:8px!important}
 }
+.buyback-supplier-filter input{width:100%;min-width:0;flex:1;padding:10px 14px;border-radius:9px;border:1px solid #3a434e;background:#111519;color:#edf1f5;font-size:12px;min-height:44px;outline:none}
+.buyback-supplier-filter input:focus{border-color:#64748b;box-shadow:0 0 0 2px #64748b22}
+@media(max-width:700px){.buyback-supplier-filter input{min-height:38px;padding:8px 10px;font-size:13px}}
 
 `;
 document.head.append(style);

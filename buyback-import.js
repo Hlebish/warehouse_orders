@@ -65,7 +65,7 @@ function parseInvoice(raw) {
       }
       // Also support text copied without tabs or with columns collapsed into spaces.
       if (!name || !parts.some(isUnit)) {
-        const compact = line.match(/^\s*\d+\s+([A-ZА-ЯІЇЄҐ0-9][A-ZА-ЯІЇЄҐ0-9.\/_-]{4,})\s+(.+?)\s+(\d+(?:[,.]\d+)?)\s*(?:шт\.?|штук|pcs?\.?|од\.?|одиниц|компл\.?|комплект|упак\.?|упаковка|пара|кг|г|л|м)\b/i);
+        const compact = line.match(/^\s*\d+\s+([A-ZА-ЯІЇЄҐ0-9][A-ZА-ЯІЇЄҐ0-9.\/_-]{4,})\s+(.+?)\s+(\d+(?:[,.]\d+)?)\s*(?:шт\.?|штук|pcs?\.?|од\.?|одиниц|компл\.?|комплект|упак\.?|упаковка|пара|кг|г|л|м)(?=\s|$)/i);
         if (compact) {
           name = compact[2].trim();
           quantity = Math.max(0.01, Number(compact[3].replace(',', '.')) || 1);

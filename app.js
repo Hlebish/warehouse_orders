@@ -708,10 +708,11 @@ function showWarehouseAnalytics(){
     '</section></div>';
   showModal('Статистика работы склада',body,[button('Закрыть','close')],'АНАЛИТИКА');
 }
-function showReturns(dateFrom='',dateTo=''){
+function showReturns(dateFrom='',dateTo='',searchText=''){
+  const queryText=String(searchText||'').trim().toLocaleLowerCase('ru');
   const inPeriod=r=>{const day=localDateKey(r.createdAt);return (!dateFrom||day>=dateFrom)&&(!dateTo||day<=dateTo);};
   // Вкладка показывает только действующие возвраты. Отменённые остаются в истории заказа.
-  const orders=state.orders.filter(o=>Array.isArray(o.returns)&&o.returns.some(r=>r?.status!=='cancelled'&&inPeriod(r))).sort((a,b)=>(asDate(b.updatedAt||b.createdAt)?.getTime()||0)-(asDate(a.updatedAt||a.createdAt)?.getTime()||0));
+  const orders=state.orders.filter(o=>Array.isArray(o.returns)&&o.returns.some(r=>r?.status!=='cancelled'&&inPeriod(r)&&(!queryText||String(o.client||'').toLocaleLowerCase('ru').includes(queryText)||(r.items||[]).some(it=>String(it.article||'').toLocaleLowerCase('ru').includes(queryText))))).sort((a,b)=>(asDate(b.updatedAt||b.createdAt)?.getTime()||0)-(asDate(a.updatedAt||a.createdAt)?.getTime()||0));
   const all=orders.flatMap(order=>order.returns.filter(r=>r?.status!=='cancelled'&&inPeriod(r)).map(r=>({order,return:r})));
   const totalItems=all.reduce((sum,x)=>sum+(x.return.items||[]).reduce((n,it)=>n+(Number(it.quantity)||0),0),0);
   const rows=orders.length?orders.map(o=>{
@@ -722,7 +723,7 @@ function showReturns(dateFrom='',dateTo=''){
     }).join('');
     return '<section class="timeline-item"><div class="timeline-top"><span><b>Заказ № '+esc(o.number)+'</b></span><span class="timeline-type">'+esc(o.status||'')+'</span></div><div class="timeline-article">'+esc(o.client||'')+'</div><div class="timeline">'+returnsHtml+'</div><div style="margin-top:10px">'+button('Открыть заказ','open-return-order:'+o.id,'small-button primary-soft')+'</div></section>';
   }).join(''):'<div class="danger-note">За выбранный период действующих возвратов нет.</div>';
-  showModal('Заказы с возвратами',`<div class="history-controls" style="margin-bottom:14px"><label class="search-box"><span>С</span><input id="returnsDateFrom" type="date" value="${dateFrom}" aria-label="Дата от"></label><label class="search-box"><span>По</span><input id="returnsDateTo" type="date" value="${dateTo}" aria-label="Дата по"></label><button type="button" class="small-button primary-soft" data-action="returns-date">Показать</button></div><div class="analytics-kpi" style="margin-bottom:14px"><span>Заказов: ${orders.length} · действующих возвратов: ${all.length}</span><b>${totalItems}</b><small>шт. по действующим возвратам</small></div><div class="timeline">${rows}</div>`,[button('Закрыть','close')],'ВОЗВРАТЫ');
+  showModal('Заказы с возвратами',`<div class="history-controls" style="margin-bottom:14px"><label class="search-box"><span>С</span><input id="returnsDateFrom" type="date" value="${dateFrom}" aria-label="Дата от"></label><label class="search-box"><span>По</span><input id="returnsDateTo" type="date" value="${dateTo}" aria-label="Дата по"></label><label class="search-box" style="flex:1;min-width:220px"><span>⌕</span><input id="returnsSearch" type="search" value="${esc(searchText)}" placeholder="Поиск по артикулу или клиенту" aria-label="Поиск по артикулу или клиенту"></label><button type="button" class="small-button primary-soft" data-action="returns-date">Показать</button></div><div class="analytics-kpi" style="margin-bottom:14px"><span>Заказов: ${orders.length} · действующих возвратов: ${all.length}</span><b>${totalItems}</b><small>шт. по действующим возвратам</small></div><div class="timeline">${rows}</div>`,[button('Закрыть','close')],'ВОЗВРАТЫ');
 }
 async function cancelReturnAction(orderId,returnId){
   if(!canManageUsers){toast('Отменить возврат может только администратор или директор.');return;}
@@ -740,7 +741,7 @@ async function cancelReturnAction(orderId,returnId){
     serverCache.set(o.id,{...o,returns:JSON.parse(JSON.stringify(nextReturns)),status:restoredStatus,returnCancelled:true,entries:[...(o.entries||[])]});
     await writeAudit('Возврат отменён','Отменён возврат по заказу № '+o.number,o.id,{previousStatus:'Возврат',newStatus:restoredStatus});
     toast(hasOtherActive?'Возврат отменён. Остались другие действующие возвраты.':'Возврат отменён. Заказ восстановлен до статуса «'+restoredStatus+'».');
-    if(hasOtherActive)showReturns($('returnsDateFrom')?.value||'',$('returnsDateTo')?.value||'');else{closeModal();render();}
+    if(hasOtherActive)showReturns($('returnsDateFrom')?.value||'',$('returnsDateTo')?.value||'',$('returnsSearch')?.value||'');else{closeModal();render();}
   }catch(err){
     console.error('Не удалось сохранить отмену возврата',err);
     toast('Не удалось отменить возврат: '+String(err?.code||'ошибка').replace(/^.*?\//,''));

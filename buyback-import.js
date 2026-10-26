@@ -51,7 +51,7 @@ function parseInvoice(raw) {
       let quantity = 1;
       for (let i = articleIndex + 2; i < parts.length; i++) {
         if (isQuantity(parts[i]) && (isUnit(parts[i + 1]) || isUnit(parts[i - 1]))) {
-          quantity = Math.max(1, Math.floor(Number(parts[i].replace(',', '.')) || 1));
+          quantity = Math.max(0.01, Number(parts[i].replace(',', '.')) || 1);
           break;
         }
       }
@@ -60,7 +60,7 @@ function parseInvoice(raw) {
         const compact = line.match(/^\s*\d+\s+(\d{5,})\s+(.+?)\s+(\d+(?:[,.]\d+)?)\s*(?:шт\.?|штук|pcs|од\.?|одиниц)\b/i);
         if (compact) {
           name = compact[2].trim();
-          quantity = Math.max(1, Math.floor(Number(compact[3].replace(',', '.')) || 1));
+          quantity = Math.max(0.01, Number(compact[3].replace(',', '.')) || 1);
         }
       }
       if (articlePattern.test(article) && name && !/^(артикул|код|товар|найменування|наименование|кількість|количество)$/i.test(name)) {
@@ -71,7 +71,7 @@ function parseInvoice(raw) {
     // Fallback for older pasted layouts where the article is not a standalone tab column.
     const compact = line.match(/^\s*\d+\s+([A-ZА-ЯІЇЄҐ0-9][A-ZА-ЯІЇЄҐ0-9.\/_-]{4,})\s+(.+?)\s+(\d+(?:[,.]\d+)?)\s*(?:шт\.?|штук|pcs|од\.?|одиниц)\b/i);
     if (compact) {
-      rows.push({article:compact[1],name:compact[2].trim(),quantity:Math.max(1,Math.floor(Number(compact[3].replace(',','.'))||1))});
+      rows.push({article:compact[1],name:compact[2].trim(),quantity:Math.max(0.01,Number(compact[3].replace(',','.')||1))});
     }
   }
   const unique = [];
@@ -114,7 +114,7 @@ function install() {
     save.disabled = !parsed.rows.length || !parsed.receivedAt;
     save.style.opacity = save.disabled ? '.5' : '1';
     status.style.color = parsed.rows.length && parsed.receivedAt ? '#b7c8dd' : '#e5bd78';
-    status.textContent = !parsed.rows.length ? 'Не удалось найти позиции. Убедись, что скопирована вся таблица с артикулами, наименованиями и количеством.' : !parsed.receivedAt ? 'Позиции найдены, но не распознана дата документа. Проверь заголовок накладной.' : `Найдено позиций: ${parsed.rows.length}. Поставщик: ${parsed.supplier || 'не распознан'} · Дата: ${parsed.receivedAt}. Проверь список ниже.`;
+    status.textContent = !parsed.rows.length ? 'Не удалось найти позиции. Проверьте, что скопирована вся таблица и артикулы находятся отдельной колонкой. Если ошибка повторится, сохраните текст накладной для диагностики.' : !parsed.receivedAt ? 'Позиции найдены, но не распознана дата. Поддерживаются даты вида «23 жовтня 2026» и «23.10.2026». Проверьте заголовок документа.' : `Найдено позиций: ${parsed.rows.length}. Поставщик: ${parsed.supplier || 'не распознан'} · Дата: ${parsed.receivedAt}. Проверьте список ниже перед добавлением.`;
     preview.innerHTML = parsed.rows.length ? `<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr><th style="text-align:left;padding:7px;border-bottom:1px solid #3b4350">Артикул</th><th style="text-align:left;padding:7px;border-bottom:1px solid #3b4350">Наименование</th><th style="text-align:right;padding:7px;border-bottom:1px solid #3b4350">Кол-во</th></tr></thead><tbody>${parsed.rows.map(r => `<tr><td style="padding:7px;border-bottom:1px solid #303640;white-space:nowrap">${esc(r.article)}</td><td style="padding:7px;border-bottom:1px solid #303640">${esc(r.name)}</td><td style="padding:7px;text-align:right;border-bottom:1px solid #303640">${r.quantity}</td></tr>`).join('')}</tbody></table>` : '';
   });
   save.addEventListener('click', async () => {
@@ -144,7 +144,7 @@ function install() {
       parsed = null;
     } catch (error) {
       status.style.color = '#e5bd78';
-      status.textContent = `Добавлено ${added} из ${parsed.rows.length}. Ошибка: ${error?.message || error}. Не запускай импорт повторно, пока не проверишь список перекупного товара.`;
+      status.textContent = `ОШИБКА ИМПОРТА: добавлено ${added} из ${parsed.rows.length}. ${error?.code ? `Код: ${error.code}. ` : ''}${error?.message || error}. Проверьте список перекупного товара перед повторным запуском — уже добавленные позиции не удалены.`;
     } finally {
       panel.querySelector('#buybackInvoiceParse').disabled = false;
       save.disabled = true;

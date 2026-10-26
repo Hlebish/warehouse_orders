@@ -33,8 +33,12 @@ public class WarehouseFirebaseMessagingService extends FirebaseMessagingService 
         String body = value(data, "body", "Новое изменение в заказе.");
         String link = value(data, "link", "https://hlebish.github.io/warehouse_orders/");
 
-        Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(link));
-        intent.setPackage(getPackageName());
+        // Use an explicit Activity intent: ACTION_VIEW cannot resolve to MainActivity
+        // because the app intentionally does not register a browser/deep-link filter.
+        Intent intent = new Intent(this, MainActivity.class);
+        intent.setAction("com.amp.warehouseorders.OPEN_NOTIFICATION");
+        intent.putExtra("notification_link", link);
+        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
 
         PendingIntent pendingIntent = PendingIntent.getActivity(
             this,

@@ -7521,3 +7521,23 @@ body.dark-theme .detail-actions .detail-action-bottom .small-button.danger {
     grid-column: 1 / -1;
   }
 }
+
+
+/* Keep the two role actions stretched evenly across the entire order card. */
+body.dark-theme .detail-actions .detail-action-roles {
+  display: grid !important;
+  width: 100% !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 8px !important;
+  align-items: stretch !important;
+}
+body.dark-theme .detail-actions .detail-action-roles > button,
+body.dark-theme .detail-actions .detail-action-roles > .small-button {
+  display: flex !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  box-sizing: border-box !important;
+  justify-content: center !important;
+  margin: 0 !important;
+}

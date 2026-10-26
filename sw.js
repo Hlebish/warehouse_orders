@@ -4,7 +4,7 @@ importScripts(
 );
 
 const SITE_URL = 'https://hlebish.github.io/warehouse_orders/';
-const CACHE = 'order-desk-fcm-v80';
+const CACHE = 'order-desk-fcm-v81';
 // Version bump triggers install/activate; activate notifies open tabs to reload.
 const ASSETS = [
   './',
@@ -85,6 +85,9 @@ function showPushNotification(data={}){
   const eventId=String(data.eventId||'');
   const link=String(data.link||SITE_URL);
   const now=Date.now();
+  // Drop stale queued pushes instead of replaying a backlog when the browser reopens.
+  const createdAt=Date.parse(String(data.createdAt||''));
+  if(!Number.isFinite(createdAt)||createdAt>now+30000||now-createdAt>90000)return;
 
   for(const [key,time] of shownPushEvents){
     if(now-time>15000)shownPushEvents.delete(key);

@@ -1556,17 +1556,20 @@ async function toggleAssemblyProgress(){
   const now=isoNow();
   const patch={assemblyInProgress:next,assemblyStartedAt:o.assemblyStartedAt||(next?now:''),assemblyStartedBy:o.assemblyStartedBy||(next?signedInUser.uid:''),assemblyStartedByName:o.assemblyStartedByName||(next?(profileName||roles[state.role]):''),updatedAt:now,updatedBy:signedInUser.uid,updatedByName:profileName||roles[state.role]};
   Object.assign(o,patch);
+  render();
+  openOrder(o.id);
   try{
     await updateDoc(doc(db,'orders',o.id),patch);
     serverCache.set(o.id,{...serverCache.get(o.id),...o});
-    await writeAudit(next?'Начата сборка заказа':'Сборка заказа завершена',next?'Кладовщик начал сборку заказа.':'Кладовщик завершил сборку заказа.',o.id);
-    await queuePush(next?`Начата сборка заказа № ${o.number}`:`Сборка заказа № ${o.number} завершена`,next?'Кладовщик начал сборку заказа.':'Кладовщик завершил сборку заказа.',signedInUser.uid,o.id);
-    render();
-    openOrder(o.id);
+    pendingOrderData.delete(o.id);
+    void writeAudit(next?'Начата сборка заказа':'Сборка заказа завершена',next?'Кладовщик начал сборку заказа.':'Кладовщик завершил сборку заказа.',o.id);
+    void queuePush(next?`Начата сборка заказа № ${o.number}`:`Сборка заказа № ${o.number} завершена`,next?'Кладовщик начал сборку заказа.':'Кладовщик завершил сборку заказа.',signedInUser.uid,o.id);
   }catch(err){
     Object.assign(o,previous);
+    render();
+    openOrder(o.id);
     console.error('Не удалось изменить состояние сборки',err);
-    toast('Не удалось изменить сборку: '+(String(err?.code||'').replace(/^.*?\//,'')||'проверьте доступ и соединение'));
+    toast('Не удалось изменить сборку: '+(String(err?.code||'').replace(/^.*?\\//,'')||'проверьте доступ и соединение'));
   }
 }
 async function saveArticles(){

@@ -141,10 +141,48 @@ function paintMentionCenter(){const b=$('mentionCenterButton'),c=$('mentionCente
 const shownAttentionToastKeys=new Map();
 const notificationSound=new Audio('./delivered-message-sound.mp3');
 notificationSound.preload='auto';
-// Do not play a silent "unlock" sound on first interaction: even at volume 0,
-// WebView can briefly take audio focus and duck music in other apps.
+let notificationAudioContext=null,notificationGain=null,notificationAudioReady=false;
+const isAndroidApp=/Android/i.test(navigator.userAgent);
+function prepareNotificationAudio(){
+  if(!isAndroidApp||notificationAudioReady)return;
+  try{
+    const AudioContextClass=window.AudioContext||window.webkitAudioContext;
+    if(!AudioContextClass)return;
+    notificationAudioContext=new AudioContextClass();
+    const source=notificationAudioContext.createMediaElementSource(notificationSound);
+    const compressor=notificationAudioContext.createDynamicsCompressor();
+    compressor.threshold.value=-8;
+    compressor.knee.value=12;
+    compressor.ratio.value=5;
+    compressor.attack.value=0.003;
+    compressor.release.value=0.12;
+    notificationGain=notificationAudioContext.createGain();
+    notificationGain.gain.value=2.8;
+    source.connect(compressor);
+    compressor.connect(notificationGain);
+    notificationGain.connect(notificationAudioContext.destination);
+    notificationAudioReady=true;
+  }catch(err){
+    console.warn('Усиление звука уведомлений недоступно, используется обычная громкость',err);
+    notificationAudioContext=null;notificationGain=null;notificationAudioReady=false;
+  }
+}
+// Android WebView unlocks Web Audio after a real user gesture. No silent audio is played.
+if(isAndroidApp){
+  const unlockNotificationAudio=()=>{
+    prepareNotificationAudio();
+    if(notificationAudioContext?.state==='suspended')notificationAudioContext.resume().catch(()=>{});
+  };
+  document.addEventListener('pointerdown',unlockNotificationAudio,{once:true,passive:true});
+  document.addEventListener('touchstart',unlockNotificationAudio,{once:true,passive:true});
+  document.addEventListener('keydown',unlockNotificationAudio,{once:true});
+}
 function playNotificationSound(){
   try{
+    if(isAndroidApp){
+      prepareNotificationAudio();
+      if(notificationAudioContext?.state==='suspended')notificationAudioContext.resume().catch(()=>{});
+    }
     notificationSound.currentTime=0;
     const playback=notificationSound.play();
     if(playback&&typeof playback.catch==='function')playback.catch(()=>{});

@@ -1569,7 +1569,7 @@ async function toggleAssemblyProgress(){
     render();
     openOrder(o.id);
     console.error('Не удалось изменить состояние сборки',err);
-    toast('Не удалось изменить сборку: '+(String(err?.code||'').replace(/^.*?\\//,'')||'проверьте доступ и соединение'));
+    toast('Не удалось изменить сборку: '+(String(err?.code||'').split('/').pop()||'проверьте доступ и соединение'));
   }
 }
 async function saveArticles(){

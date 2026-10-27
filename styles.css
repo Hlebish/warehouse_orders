@@ -4226,22 +4226,24 @@ body.dark-theme .brand img.brand-logo{
 }
 
 
-/* Mobile toast positioning: keep notifications above the app's bottom controls. */
+/* Notifications share one stack and stay visible above dialogs; persistent defect notices sit at the normal bottom edge. */
+#toastStack, .toast-stack {
+  z-index: 20000 !important;
+}
 @media (max-width: 720px) {
-  .toast-stack {
+  #toastStack, .toast-stack {
     left: 12px !important;
     right: 12px !important;
-    bottom: calc(88px + env(safe-area-inset-bottom, 0px)) !important;
+    bottom: calc(12px + env(safe-area-inset-bottom, 0px)) !important;
     width: auto !important;
     max-width: none !important;
     transform: none !important;
-    max-height: min(26dvh, 190px) !important;
+    max-height: min(30dvh, 220px) !important;
     overflow: hidden;
     justify-items: stretch;
-    z-index: 15000;
     pointer-events: none;
   }
-  .toast-stack .toast {
+  #toastStack .toast, .toast-stack .toast {
     pointer-events: auto;
     width: 100%;
     min-width: 0;
@@ -4251,7 +4253,7 @@ body.dark-theme .brand img.brand-logo{
     word-break: normal;
     text-align: left;
     line-height: 1.35;
-    max-height: 22dvh;
+    max-height: 24dvh;
     overflow: auto;
     padding: 10px 12px;
   }
@@ -7740,10 +7742,9 @@ button:active:not(:disabled){
 }
 
 
-/* Hide persistent defect notifications while a modal or navigation drawer is open. */
-body.overlay-window-open #toastStack,
-body.overlay-window-open .toast-stack {
-  visibility: hidden !important;
-  opacity: 0 !important;
-  pointer-events: none !important;
+/* Hide only the persistent defect reminder while a modal or drawer is open.
+   Transient toasts (role changes, saves, errors and mentions) remain visible. */
+body.overlay-window-open #toastStack .defect-toast,
+body.overlay-window-open .toast-stack .defect-toast {
+  display: none !important;
 }

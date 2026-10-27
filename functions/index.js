@@ -76,7 +76,7 @@ async function createNotificationHistory(data, eventId) {
 
   for (const user of users) {
     const profile = user.data() || {};
-    if (!recipientUserId && user.id === authorId && profile.extraPhoneNotifications !== true) continue;
+    if (authorId && user.id === authorId && !(data.forceAll === true && recipientUserId === user.id)) continue;
     const settings = profile.notificationSettings || {};
     if (settings[category] === false && !data.buybackItemId && data.forceAll !== true) continue;
 
@@ -118,7 +118,7 @@ async function collectTokens(category='orders', recipientUserId='', authorId='',
 
   const eligibleUsers = users.filter(user => {
     const profile = user.data() || {};
-    if (!recipientUserId && authorId && user.id === authorId && profile.extraPhoneNotifications !== true) return false;
+    if (authorId && user.id === authorId && !(forceAll && recipientUserId === user.id)) return false;
     return forceAll || (profile.notificationSettings || {})[category] !== false;
   });
 

@@ -31,9 +31,13 @@ jobs:
 
       - name: Make the original notification tone louder
         run: |
-          sudo apt-get update
-          sudo apt-get install -y ffmpeg
-          ffmpeg -y -i delivered-message-sound.mp3 -af "volume=6dB" -codec:a libmp3lame -q:a 2 "$RUNNER_TEMP/delivered-message-sound-louder.mp3"
+          set -euo pipefail
+          if ! command -v ffmpeg >/dev/null 2>&1; then
+            echo "ffmpeg is not available on this runner; refusing to wait on apt repositories."
+            exit 1
+          fi
+          ffmpeg -hide_banner -loglevel error -y -i delivered-message-sound.mp3 -af "volume=6dB" -codec:a libmp3lame -q:a 2 "$RUNNER_TEMP/delivered-message-sound-louder.mp3"
+          test -s "$RUNNER_TEMP/delivered-message-sound-louder.mp3"
           mv "$RUNNER_TEMP/delivered-message-sound-louder.mp3" delivered-message-sound.mp3
 
       - name: Prepare signing key

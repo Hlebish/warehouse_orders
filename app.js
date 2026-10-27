@@ -142,12 +142,31 @@ const shownAttentionToastKeys=new Map();
 const notificationSound=new Audio('./delivered-message-sound.mp3');
 notificationSound.preload='auto';
 notificationSound.volume=1;
-// Keep notification audio completely idle between notifications. Creating or
-// resuming a WebAudio context on ordinary taps can make Android WebView retain
-// audio focus and duck music in other apps. Use a normal media element instead.
+const isAndroidForeground=/Android/i.test(navigator.userAgent);
+let notificationAudioContext=null,notificationAudioSource=null,notificationGain=null;
 function playNotificationSound(){
   try{
     notificationSound.volume=1;
+    if(isAndroidForeground){
+      try{
+        const AudioContextClass=window.AudioContext||window.webkitAudioContext;
+        if(AudioContextClass){
+          if(!notificationAudioContext){
+            notificationAudioContext=new AudioContextClass();
+            notificationAudioSource=notificationAudioContext.createMediaElementSource(notificationSound);
+            notificationGain=notificationAudioContext.createGain();
+            // Boost the actual signal without a compressor that can make the sound dull.
+            notificationGain.gain.value=3.0;
+            notificationAudioSource.connect(notificationGain);
+            notificationGain.connect(notificationAudioContext.destination);
+            notificationSound.addEventListener('ended',()=>{
+              if(notificationAudioContext?.state==='running')notificationAudioContext.suspend().catch(()=>{});
+            });
+          }
+          if(notificationAudioContext.state==='suspended')notificationAudioContext.resume().catch(()=>{});
+        }
+      }catch(err){console.warn('Не удалось усилить звук уведомления на Android',err);}
+    }
     notificationSound.currentTime=0;
     const playback=notificationSound.play();
     if(playback&&typeof playback.catch==='function')playback.catch(()=>{});

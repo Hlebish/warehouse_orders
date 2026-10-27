@@ -1489,32 +1489,61 @@ async function toggleArticleCollected(index){
   const previousStatus=o.status;
   const previousAssembledAt=o.assembledAt;
   const previousAssemblyInProgress=o.assemblyInProgress;
+  const previousUpdated={updatedAt:o.updatedAt,updatedBy:o.updatedBy,updatedByName:o.updatedByName};
+  const now=isoNow();
+  const nextCollected=!previousCollected;
+  item.collected=nextCollected;
 
-  item.collected=!previousCollected;
-
-  // Учитываем только позиции, которые действительно будут отгружаться.
   const articles=(o.articles||[]).map((article,articleIndex)=>({article,articleIndex}))
     .filter(({article,articleIndex})=>String(article?.article||'').trim()&&!isArticleRemovedByDefect(o,articleIndex,article));
   const allCollected=articles.length>0&&articles.every(({article})=>article.collected===true);
-
-  // Удалённые по дефекту позиции не должны мешать завершению сборки.
+  const patch={
+    articles:(o.articles||[]).map(article=>({
+      article:String(article.article||'').trim(),
+      quantity:Math.max(1,Number(article.quantity)||1),
+      collected:article.collected===true,
+      shipmentChecked:article.shipmentChecked===true
+    })).filter(article=>article.article),
+    updatedAt:now,
+    updatedBy:signedInUser.uid,
+    updatedByName:profileName||roles[state.role]
+  };
   if(allCollected){
-    if(previousStatus!=='Собран')o.assembledAt=isoNow();
+    if(previousStatus!=='Собран')o.assembledAt=now;
     o.status='Собран';
     o.assemblyInProgress=false;
+    patch.status='Собран';
+    patch.assembledAt=o.assembledAt||now;
+    patch.assemblyInProgress=false;
+  }else if(previousStatus==='Собран'){
+    // If a checked item is unchecked, the order is no longer fully assembled.
+    o.status='Создан';
+    o.assembledAt='';
+    patch.status='Создан';
+    patch.assembledAt='';
   }
-
+  Object.assign(o,{updatedAt:now,updatedBy:signedInUser.uid,updatedByName:profileName||roles[state.role]});
+  render();
+  openOrder(o.id);
   try{
-    await save();
-    render();
-    openOrder(o.id);
+    await updateDoc(doc(db,'orders',o.id),patch);
+    serverCache.set(o.id,{...(serverCache.get(o.id)||o),...o,articles:normalizeArticles(o.articles||[])});
+    pendingOrderData.delete(o.id);
+    // Keep non-critical logging and push delivery off the interaction's critical path.
+    void writeAudit('Отметка сборки изменена',`Артикул ${item.article}: ${nextCollected?'собран':'снята отметка сборки'}.`,o.id);
+    void queuePush(nextCollected?'Отметка сборки изменена':'Отметка сборки снята',
+      `Заказ № ${o.number}: артикул ${item.article} ${nextCollected?'отмечен собранным':'больше не отмечен собранным'}.`,
+      signedInUser.uid,o.id);
   }catch(err){
     item.collected=previousCollected;
     o.status=previousStatus;
     o.assembledAt=previousAssembledAt;
     o.assemblyInProgress=previousAssemblyInProgress;
+    Object.assign(o,previousUpdated);
+    render();
+    openOrder(o.id);
     console.error('Не удалось изменить отметку сборки',err);
-    toast('Не удалось изменить отметку сборки.');
+    toast('Не удалось сохранить отметку сборки.');
   }
 }
 async function toggleAssemblyProgress(){

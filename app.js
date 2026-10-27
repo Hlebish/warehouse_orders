@@ -548,7 +548,13 @@ async function showForegroundPushNotification(data={}){
       title:String(data.title||'Заказы · Склад'),
       body:String(data.body||'Новое изменение.'),
       eventId:String(data.eventId||''),
-      link:String(data.link||location.href)
+      link:String(data.link||location.href),
+      createdAt:String(data.createdAt||''),
+      orderId:String(data.orderId||''),
+      target:String(data.target||'site'),
+      category:String(data.category||'orders'),
+      isMention:String(data.isMention||'false'),
+      isReply:String(data.isReply||'false')
     });
   }catch(err){
     console.warn('Не удалось показать системное push-уведомление',err);
@@ -575,6 +581,9 @@ onMessage(messaging,payload=>{
     // Play the site's custom MP3 for every foreground push, not only chat/mentions.
     // Browsers may block playback until the user has interacted with the page.
     playNotificationSound();
+    // On web browsers, also show an OS-level notification while the page is
+    // foregrounded. Native Android handles its own foreground notification UI.
+    if(!window.AndroidWarehouse)showForegroundPushNotification(n);
     const attention={...n,isMention:n.isMention==='true'||n.isMention===true,isReply:n.isReply==='true'||n.isReply===true};
     if(category==='mention'||category==='replies'||category==='chat'){if(shouldShowAttentionToast(attention))showAttentionToast({...attention,id:eventId||signature})}
     notify(message,orderId,target,target==='chat'?'chat':'orders');
@@ -2765,7 +2774,7 @@ function showNotifications(){
   };
   const unread=state.notices.filter(n=>!n.read).length;
   const pushGranted=typeof Notification!=='undefined'&&Notification.permission==='granted';
-  const pushControls='<div class="push-device-controls"><div><b>Системные push-уведомления</b><small>'+((pushGranted)?'Разрешены в браузере':'Можно включить на этом устройстве')+'</small></div><div class="push-device-buttons"><button type="button" class="small-button good" data-action="enable-notifications">🔔 Включить уведомления</button><button type="button" class="small-button danger" data-action="disable-notifications">🔕 Отключить уведомления</button></div></div>'+'<button type="button" class="notification-setting '+(state.extraPhoneNotifications?'enabled':'disabled')+'" style="width:100%;margin:0 0 12px;text-align:left" data-action="toggle-extra-phone-notifications"><b>📱 Дополнительные уведомления на все устройства</b><small>'+(state.extraPhoneNotifications?'Включены — ваши действия тоже будут отправляться на все зарегистрированные устройства':'Выключены — ваши собственные действия не отправляют вам push')+'</small></button><p class="field-hint">Доставка на устройства независимая: открытый браузер на ПК не должен мешать уведомлениям на телефоне. На телефоне должны быть разрешены уведомления и зарегистрирован push-токен.</p>';
+  const pushControls='<div class="push-device-controls"><div><b>Системные push-уведомления</b><small>'+((pushGranted)?'Разрешены в браузере':'Можно включить на этом устройстве')+'</small></div><div class="push-device-buttons"><button type="button" class="small-button good" data-action="enable-notifications">🔔 Включить уведомления</button><button type="button" class="small-button danger" data-action="disable-notifications">🔕 Отключить уведомления</button></div></div>'+'<button type="button" class="notification-setting '+(state.extraPhoneNotifications?'enabled':'disabled')+'" style="width:100%;margin:0 0 12px;text-align:left" data-action="toggle-extra-phone-notifications"><b>📱 Дополнительные уведомления на все устройства</b><small>'+(state.extraPhoneNotifications?'Включены — уведомления от других сотрудников приходят на все зарегистрированные устройства. Ваши действия не уведомляют вас.':'Выключены — push приходит только на последнее активное устройство. Включите, чтобы получать уведомления на компьютере и телефоне одновременно.')+'</small></button><p class="field-hint">Доставка на устройства независимая: открытый браузер на ПК не должен мешать уведомлениям на телефоне. На телефоне должны быть разрешены уведомления и зарегистрирован push-токен.</p>';
   const body=pushControls+'<div class="notification-toolbar"><label class="search-box"><span>⌕</span><input id="notificationSearch" type="search" placeholder="Поиск уведомлений"></label><select id="notificationFilter"><option value="">Все</option><option value="orders">Заказы</option><option value="chat">Общий чат</option><option value="replies">Ответы и упоминания</option><option value="likes">Лайки</option></select></div><div class="notification-settings-grid">'+['chat','replies','likes','orders'].map(k=>'<button type="button" class="notification-setting '+(state.notificationSettings[k]?'enabled':'disabled')+'" data-action="toggle-notification:'+k+'"><b>'+({chat:'💬 Чат',replies:'↩ Ответы',likes:'👍 Лайки',orders:'📦 Заказы'}[k])+'</b><small>'+(state.notificationSettings[k]?'Включены':'Выключены')+'</small></button>').join('')+'</div><div class="notification-summary"><b>'+unread+'</b> непрочитанных уведомлений</div><div id="notificationList" class="notification-list"></div>';
   showModal('Уведомления',body,[button('Прочитать всё','mark-notifications-read','small-button good'),button('Закрыть','close')],'ЦЕНТР УВЕДОМЛЕНИЙ');
   $('notificationSearch')?.addEventListener('input',render);$('notificationFilter')?.addEventListener('change',render);render();

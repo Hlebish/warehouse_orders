@@ -7738,3 +7738,12 @@ button:active:not(:disabled){
     transition-duration:.01ms!important;
   }
 }
+
+
+/* Hide persistent defect notifications while a modal or navigation drawer is open. */
+body.overlay-window-open #toastStack,
+body.overlay-window-open .toast-stack {
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}

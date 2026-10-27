@@ -32,11 +32,9 @@ jobs:
       - name: Make the original notification tone louder
         run: |
           set -euo pipefail
-          # Use Python's standard library so this step needs no apt install.
-          # Decode MP3 to PCM via bundled JavaSound is not supported reliably;
-          # instead use a small Node script and the installed lame/ffmpeg only
-          # if present. If neither exists, preserve the original asset and let
-          # the Android WebAudio gain boost handle foreground playback.
+          # Do not install extra OS packages during the build.
+          # If FFmpeg is preinstalled, process the MP3; otherwise keep the
+          # original asset and rely on Android foreground audio gain in app.js.
           if command -v ffmpeg >/dev/null 2>&1; then
             ffmpeg -hide_banner -loglevel error -y -i delivered-message-sound.mp3 -af "volume=6dB" -codec:a libmp3lame -q:a 2 "$RUNNER_TEMP/delivered-message-sound-louder.mp3"
             test -s "$RUNNER_TEMP/delivered-message-sound-louder.mp3"

@@ -1531,9 +1531,13 @@ async function toggleArticleCollected(index){
     pendingOrderData.delete(o.id);
     // Keep non-critical logging and push delivery off the interaction's critical path.
     void writeAudit('Отметка сборки изменена',`Артикул ${item.article}: ${nextCollected?'собран':'снята отметка сборки'}.`,o.id);
-    void queuePush(nextCollected?'Отметка сборки изменена':'Отметка сборки снята',
-      `Заказ № ${o.number}: артикул ${item.article} ${nextCollected?'отмечен собранным':'больше не отмечен собранным'}.`,
-      signedInUser.uid,o.id);
+    // Individual article checkboxes are internal assembly progress, not push events.
+    // Notify colleagues only when this click transitions the whole order to "Собран".
+    if(allCollected&&previousStatus!=='Собран'){
+      void queuePush(`Заказ № ${o.number} собран`,
+        `Все позиции заказа № ${o.number} отмечены собранными.`,
+        signedInUser.uid,o.id,'site','orders');
+    }
   }catch(err){
     item.collected=previousCollected;
     o.status=previousStatus;

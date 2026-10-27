@@ -2352,6 +2352,31 @@ async function generateDailyReport(dateKey,endDateKey=dateKey){
     });
     const buybackDaysOnStock=(item,status)=>{const received=String(item.receivedAt||'').slice(0,10);if(!/^\d{4}-\d{2}-\d{2}$/.test(received))return '—';const sold=/sold|продан|отгружен|забрал/i.test(status);const cancelled=/cancel|отмен/i.test(status);const returned=/return|возврат|вернул/i.test(status);const closed=sold||cancelled||returned;const endValue=closed?(sold?(item.soldAt||item.updatedAt):cancelled?(item.cancelledAt||item.updatedAt):(item.returnedAt||item.updatedAt)):localDateKey(new Date());const end=String(endValue||'').slice(0,10);if(!/^\d{4}-\d{2}-\d{2}$/.test(end))return '—';const elapsed=Math.floor((Date.parse(end+'T00:00:00Z')-Date.parse(received+'T00:00:00Z'))/86400000);return Number.isFinite(elapsed)?Math.max(0,elapsed):'—';};
     const buybackRows=buybackRelevant.slice().sort((a,b)=>String(a.status||'active').localeCompare(String(b.status||'active'))||String(a.article||'').localeCompare(String(b.article||''))).map(item=>{const status=buybackStatus(item);const eventDate=/sold|продан|отгружен/i.test(status)?(item.soldAt||item.updatedAt):/cancel|отмен/i.test(status)?(item.cancelledAt||item.updatedAt):/return|возврат|вернул/i.test(status)?(item.returnedAt||item.updatedAt):(item.createdOn||item.createdAt||item.receivedAt);return [esc(item.article||'—'),esc(item.quantity??'—'),esc(item.supplier||'—'),esc(buybackStatusLabel(item)),esc(item.receivedAt||'—'),esc(buybackDaysOnStock(item,status)),esc(eventDate?fmtDateTime(eventDate):'—'),esc(item.createdByName||'—')];});
+    const buybackMonthlyEvents=buybackItems.map(item=>{
+      const status=buybackStatus(item);
+      const receivedDate=item.receivedAt||item.createdOn||item.createdAt;
+      const sold=/sold|продан|отгружен|забрал/i.test(status);
+      const cancelled=/cancel|отмен/i.test(status);
+      const returned=/return|возврат|вернул|returned/i.test(status);
+      const createdInPeriod=buybackDate(item.createdOn,item.createdAt);
+      const receivedInPeriod=!!receivedDate&&buybackDate(receivedDate);
+      const soldInPeriod=item.soldAt?buybackDate(item.soldAt):(!item.soldAt&&sold&&buybackDate(item.updatedAt));
+      const cancelledInPeriod=item.cancelledAt?buybackDate(item.cancelledAt):(!item.cancelledAt&&cancelled&&buybackDate(item.updatedAt));
+      const returnedInPeriod=item.returnedAt?buybackDate(item.returnedAt):(!item.returnedAt&&returned&&buybackDate(item.updatedAt));
+      return {item,status,createdInPeriod,receivedInPeriod,soldInPeriod,cancelledInPeriod,returnedInPeriod};
+    });
+    const buybackMonthlyCount=key=>buybackMonthlyEvents.filter(x=>x[key]).length;
+    const buybackMonthlyUnits=key=>buybackMonthlyEvents.filter(x=>x[key]).reduce((sum,x)=>sum+(Number(x.item.quantity)||0),0);
+    const buybackMonthlyRows=buybackMonthlyEvents.filter(x=>x.createdInPeriod||x.receivedInPeriod||x.soldInPeriod||x.cancelledInPeriod||x.returnedInPeriod).map(x=>{
+      const events=[];
+      if(x.createdInPeriod)events.push('Добавлен');
+      if(x.receivedInPeriod)events.push('Поступил');
+      if(x.soldInPeriod)events.push('Продан / отгружен');
+      if(x.cancelledInPeriod)events.push('Отменён');
+      if(x.returnedInPeriod)events.push('Возвращён');
+      const date=x.item.soldAt&&x.soldInPeriod?x.item.soldAt:x.item.cancelledAt&&x.cancelledInPeriod?x.item.cancelledAt:x.item.returnedAt&&x.returnedInPeriod?x.item.returnedAt:x.item.receivedAt||x.item.createdOn||x.item.createdAt||x.item.updatedAt;
+      return [esc(x.item.article||'—'),esc(x.item.quantity??'—'),esc(x.item.supplier||'—'),esc(events.join(', ')),esc(date?fmtDateTime(date):'—')];
+    });
     const eventEntries=state.orders.flatMap(o=>(Array.isArray(o.entries)?o.entries:[]).filter(e=>reportDateMatches(e.createdAt,dateKey,endDateKey)).map(e=>({order:o,entry:e})));
     const eventByOrder=re=>eventEntries.filter(x=>re.test(reportEntryText(x.order,x.entry)));
     const shippedEvents=eventByOrder(/отгруженн|отгрузил/i);
@@ -2495,7 +2520,7 @@ async function generateDailyReport(dateKey,endDateKey=dateKey){
       sections.push('<h2>Отгрузки по клиентам</h2><p class="section-note">Количество уникальных заказов, отгруженных каждому клиенту за выбранный месяц.</p>'+reportTable(['Клиент','Отгружено заказов','Деталей отгружено'],shippedByClientRows));
 
       sections.push('<h2>Динамика по неделям</h2><p class="section-note">Количество событий по неделям месяца. Данные показаны в сравнительном виде; шкала общая для всех серий.</p><div class="chart-legend"><span><i class="legend-created"></i>Создано</span><span><i class="legend-shipped"></i>Отгружено</span><span><i class="legend-pickup"></i>Самовывоз</span><span><i class="legend-cancelled"></i>Отменено</span></div>'+chartRows);
-      sections.push('<h2>Перекупной товар на складе</h2><div class="summary"><div class="kpi"><b>'+buybackOnStock.length+'</b>перекупных позиций</div><div class="kpi"><b>'+buybackUnits+'</b>единиц перекупного товара</div></div><p class="section-note">Это состояние склада на момент формирования отчёта, а не исторический остаток на конец выбранного периода.</p>');
+      sections.push('<h2>Перекупной товар — статистика за период</h2><div class="summary"><div class="kpi"><b>'+buybackMonthlyCount('receivedInPeriod')+'</b>позиций поступило</div><div class="kpi"><b>'+buybackMonthlyUnits('receivedInPeriod')+'</b>единиц поступило</div><div class="kpi"><b>'+buybackMonthlyCount('soldInPeriod')+'</b>позиций продано / отгружено</div><div class="kpi"><b>'+buybackMonthlyUnits('soldInPeriod')+'</b>единиц продано / отгружено</div><div class="kpi"><b>'+buybackMonthlyCount('cancelledInPeriod')+'</b>позиций отменено</div><div class="kpi"><b>'+buybackMonthlyCount('returnedInPeriod')+'</b>позиций возвращено</div><div class="kpi"><b>'+buybackOnStock.length+'</b>позиций на складе сейчас</div><div class="kpi"><b>'+buybackUnits+'</b>единиц на складе сейчас</div></div><p class="section-note">Статистика за выбранный период рассчитывается по датам поступления и закрытия, если они сохранены в записи. Остаток на складе — текущее состояние на момент формирования отчёта.</p>'+reportTable(['Артикул','Количество','Поставщик','События за период','Дата события'],buybackMonthlyRows));
       sections.push('<h2>Сравнение с предыдущим периодом</h2><p class="section-note">Сравнение '+esc(fmtDate(previousStart)+' — '+fmtDate(previousEnd))+' '+esc(comparisonLabel)+'.</p><div class="summary"><div class="kpi"><b>'+currentMetrics.created+'</b>создано заказов<br>'+countComparison(currentMetrics.created,previousMetrics.created)+'</div><div class="kpi"><b>'+currentMetrics.shipped+'</b>отгружено заказов<br>'+countComparison(currentMetrics.shipped,previousMetrics.shipped)+'</div><div class="kpi"><b>'+currentMetrics.pickup+'</b>самовывозов<br>'+countComparison(currentMetrics.pickup,previousMetrics.pickup)+'</div><div class="kpi"><b>'+currentMetrics.cancelled+'</b>отменено заказов<br>'+countComparison(currentMetrics.cancelled,previousMetrics.cancelled)+'</div></div>');
 
 

@@ -168,7 +168,24 @@ async function collectTokens(category='orders', recipientUserId='', authorId='',
     }
   }
 
-  return result;
+  // With all-device notifications enabled, send to every registered installation.
+  // Otherwise use only the most recently active installation for each recipient.
+  const tokensByUser = new Map();
+  for (const item of result) {
+    if (!tokensByUser.has(item.userId)) tokensByUser.set(item.userId, []);
+    tokensByUser.get(item.userId).push(item);
+  }
+  const selected = [];
+  for (const [userId, items] of tokensByUser) {
+    const profile = users.find(user => user.id === userId)?.data() || {};
+    if (profile.extraPhoneNotifications === true) {
+      selected.push(...items);
+    } else {
+      items.sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
+      if (items[0]) selected.push(items[0]);
+    }
+  }
+  return selected;
 }
 
 exports.import1COrder = onRequest(

@@ -7761,3 +7761,13 @@ body.overlay-window-open .toast-stack .defect-toast {
     max-width: min(380px, calc(100vw - 290px)) !important;
   }
 }
+
+
+/* Separate compact dashboard tile for Kamyanske orders. */
+.kamenskoye-stat-section{margin:14px 0 24px;display:flex;justify-content:flex-start}
+.kamenskoye-stat-card{width:min(100%,360px);min-height:76px;padding:12px 15px;grid-template-columns:auto minmax(0,1fr);gap:12px;border-color:var(--border-color,#30363d)}
+.kamenskoye-stat-card .stat-icon{width:34px;height:34px}
+.kamenskoye-stat-card .stat-label{font-size:12px}
+.kamenskoye-stat-card strong{font-size:20px}
+.kamenskoye-stat-card small{font-size:10px}
+@media(max-width:720px){.kamenskoye-stat-section{margin:10px 0 18px}.kamenskoye-stat-card{width:100%;min-height:70px}}

@@ -7753,11 +7753,11 @@ body.overlay-window-open .toast-stack .defect-toast {
 /* Desktop: keep persistent defect notices in the lower-left corner, away from centered dialogs and primary actions. */
 @media (min-width: 721px) {
   #toastStack, .toast-stack {
-    left: 16px !important;
+    left: 270px !important;
     right: auto !important;
     bottom: 14px !important;
     transform: none !important;
-    width: min(380px, calc(100vw - 32px)) !important;
-    max-width: min(380px, calc(100vw - 32px)) !important;
+    width: min(380px, calc(100vw - 290px)) !important;
+    max-width: min(380px, calc(100vw - 290px)) !important;
   }
 }

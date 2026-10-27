@@ -4226,21 +4226,23 @@ body.dark-theme .brand img.brand-logo{
 }
 
 
-/* Mobile toast positioning fix: keep notifications inside the viewport and above Android's system navigation area. */
+/* Mobile toast positioning: keep notifications above the app's bottom controls. */
 @media (max-width: 720px) {
   .toast-stack {
     left: 12px !important;
     right: 12px !important;
-    bottom: calc(16px + env(safe-area-inset-bottom, 0px)) !important;
+    bottom: calc(88px + env(safe-area-inset-bottom, 0px)) !important;
     width: auto !important;
     max-width: none !important;
     transform: none !important;
-    max-height: min(38dvh, 300px);
+    max-height: min(26dvh, 190px) !important;
     overflow: hidden;
     justify-items: stretch;
     z-index: 15000;
+    pointer-events: none;
   }
   .toast-stack .toast {
+    pointer-events: auto;
     width: 100%;
     min-width: 0;
     max-width: 100%;
@@ -4248,10 +4250,10 @@ body.dark-theme .brand img.brand-logo{
     overflow-wrap: anywhere;
     word-break: normal;
     text-align: left;
-    line-height: 1.4;
-    max-height: 30dvh;
+    line-height: 1.35;
+    max-height: 22dvh;
     overflow: auto;
-    padding: 12px 14px;
+    padding: 10px 12px;
   }
 }
 

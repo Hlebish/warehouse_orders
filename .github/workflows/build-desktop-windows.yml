@@ -27,6 +27,14 @@ jobs:
           cache-dependency-path: desktop/package.json
       - name: Set unique desktop release version
         run: npm version 1.0.${{ github.run_number }} --no-git-tag-version
+      - name: Create and push release tag
+        shell: pwsh
+        run: |
+          $tag = "v1.0.${{ github.run_number }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag $tag
+          git push origin $tag
       - name: Install dependencies
         run: npm install
       - name: Create Windows icon from AMP logo

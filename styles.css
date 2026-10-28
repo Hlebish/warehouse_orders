@@ -1612,7 +1612,8 @@ body.dark-theme .order-action-menu-list .manager-status-payment{color:#fff!impor
 /* Warehouse action buttons use the same centered typography and table status colors */
 .order-action-menu-list .warehouse-status-question,
 .order-action-menu-list .warehouse-status-pickup-waiting,
-.order-action-menu-list .warehouse-status-pickup-done{
+.order-action-menu-list .warehouse-status-pickup-done,
+.order-action-menu-list .warehouse-status-kamenskoye{
   display:flex!important;
   align-items:center!important;
   justify-content:center!important;

@@ -53,8 +53,8 @@ async function readPublishedAssetVersion() {
   const response = await fetch(APP_URL, { cache: 'no-store' });
   if (!response.ok) throw new Error(`Site check returned HTTP ${response.status}`);
   const html = await response.text();
-  const appVersion = html.match(/app\\.js\\?v=([^"'&]+)/)?.[1] || '';
-  const styleVersion = html.match(/styles\\.css\\?v=([^"'&]+)/)?.[1] || '';
+  const appVersion = html.match(/app\.js\?v=([^"'&]+)/)?.[1] || '';
+  const styleVersion = html.match(/styles\.css\?v=([^"'&]+)/)?.[1] || '';
   return `${appVersion}|${styleVersion}`;
 }
 

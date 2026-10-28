@@ -66,6 +66,12 @@ function createWindow() {
   });
 
   mainWindow.loadURL(APP_URL);
+  mainWindow.webContents.on('console-message', (_event, details) => {
+    if (details.level >= 2) console.warn('[Warehouse Orders renderer]', details.message);
+  });
+  mainWindow.webContents.on('did-fail-load', (_event, code, description, validatedURL) => {
+    console.error('[Warehouse Orders] Page load failed:', code, description, validatedURL);
+  });
   mainWindow.on('close', event => {
     if (!quitting) {
       event.preventDefault();
@@ -107,12 +113,27 @@ function createWindow() {
   });
 }
 
+
+function showTestNotification() {
+  if (!Notification.isSupported()) {
+    shell.openExternal('ms-settings:notifications');
+    return;
+  }
+  const notification = new Notification({
+    title: 'Заказы · Склад',
+    body: 'Проверка уведомлений Windows. Если ты видишь это сообщение, системные уведомления работают.',
+    silent: false
+  });
+  notification.show();
+}
+
 function createTray() {
   const image = nativeImage.createEmpty();
   tray = new Tray(image);
   tray.setToolTip('Заказы · Склад — уведомления работают в фоне');
   tray.setContextMenu(Menu.buildFromTemplate([
     { label: 'Открыть заказы', click: () => { if (mainWindow) { mainWindow.show(); mainWindow.focus(); } } },
+    { label: 'Проверить уведомления Windows', click: () => showTestNotification() },
     { label: 'Перезагрузить приложение', click: () => { if (mainWindow) mainWindow.webContents.reload(); } },
     { type: 'separator' },
     { label: 'Выйти полностью', click: () => { quitting = true; app.quit(); } }

@@ -2500,7 +2500,7 @@ async function generateDailyReport(dateKey,endDateKey=dateKey){
       const reason=(o.entries||[]).filter(e=>e.kind==='decision'&&reportDateMatches(e.createdAt,dateKey,endDateKey)).sort((a,b)=>(asDate(b.createdAt)?.getTime()||0)-(asDate(a.createdAt)?.getTime()||0))[0];
       return [esc(o.number||'—'),esc(o.client||'—'),esc(fmtDateTime(o.updatedAt)),esc(reason?reportEntryText(o,reason):'Причина в истории заказа не найдена')];
     });
-    const remainingRows=remaining.map(o=>[esc(o.number||'—'),esc(o.client||'—'),esc(o.status||'—'),esc(o.deliveryType==='pickup'?'Самовывоз':o.deliveryType==='post'?'Почта':'По городу'),esc(totalQty([o]))]);
+    const remainingRows=remaining.map(o=>[esc(o.number||'—'),esc(o.client||'—'),esc(o.status||'—'),esc(o.deliveryType==='pickup'?'Самовывоз':o.deliveryType==='post'?'Почта':o.deliveryType==='kamyanske'?'Камянское':'По городу'),esc(totalQty([o]))]);
     const createdRows=created.map(o=>[esc(o.number||'—'),esc(o.client||'—'),esc(o.status||'—'),esc(fmtDateTime(o.createdAt)),esc(totalQty([o]))]);
     const defectRows=defects.map(({order,entry})=>[esc(order.number||'—'),esc(order.client||'—'),esc(entry.article||'—'),esc(reportEntryText(order,entry)),esc(entry.author||'—'),esc(fmtDateTime(entry.createdAt))]);
     const returnRows=returns.map(({order,record})=>[esc(order.number||'—'),esc(order.client||'—'),esc((record.items||[]).map(i=>String(i.article||'')+' × '+(Number(i.quantity)||0)).join(', ')||'—'),esc(record.reason||'—'),esc(record.author||'—')]);

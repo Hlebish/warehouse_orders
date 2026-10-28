@@ -45,6 +45,53 @@ ipcMain.on('warehouse:show-notification', (event, payload = {}) => {
   notification.show();
 });
 
+
+let loadedAssetVersion = '';
+let checkingForSiteUpdates = false;
+
+async function readPublishedAssetVersion() {
+  const response = await fetch(APP_URL, { cache: 'no-store' });
+  if (!response.ok) throw new Error(`Site check returned HTTP ${response.status}`);
+  const html = await response.text();
+  const appVersion = html.match(/app\\.js\\?v=([^"'&]+)/)?.[1] || '';
+  const styleVersion = html.match(/styles\\.css\\?v=([^"'&]+)/)?.[1] || '';
+  return `${appVersion}|${styleVersion}`;
+}
+
+async function checkForSiteUpdates() {
+  if (!mainWindow || mainWindow.isDestroyed() || mainWindow.webContents.isLoading() || checkingForSiteUpdates) return;
+  checkingForSiteUpdates = true;
+  try {
+    const publishedVersion = await readPublishedAssetVersion();
+    if (!loadedAssetVersion) {
+      loadedAssetVersion = publishedVersion;
+      return;
+    }
+    if (publishedVersion === loadedAssetVersion) return;
+
+    // Never reload while the employee is editing a form or has an open modal;
+    // retry on the next check so unsaved work is not discarded.
+    const canReload = await mainWindow.webContents.executeJavaScript(`(() => {
+      const modal = document.getElementById('modal');
+      const active = document.activeElement;
+      const editing = active && (
+        ['INPUT', 'TEXTAREA', 'SELECT'].includes(active.tagName) ||
+        active.isContentEditable
+      );
+      return (!modal || modal.hidden) && !editing;
+    })()`).catch(() => false);
+
+    if (canReload) {
+      loadedAssetVersion = publishedVersion;
+      mainWindow.webContents.reload();
+    }
+  } catch (error) {
+    console.warn('[Warehouse Orders] Automatic update check failed:', String(error?.message || error));
+  } finally {
+    checkingForSiteUpdates = false;
+  }
+}
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1440,
@@ -150,6 +197,13 @@ app.whenReady().then(() => {
   });
   createWindow();
   createTray();
+  // Check for published site changes every two minutes. Reloads are deferred while editing.
+  mainWindow.webContents.once('did-finish-load', () => {
+    readPublishedAssetVersion().then(version => { loadedAssetVersion = version; }).catch(error => {
+      console.warn('[Warehouse Orders] Could not read initial site version:', String(error?.message || error));
+    });
+  });
+  setInterval(checkForSiteUpdates, 120000);
   app.on('activate', () => { if (mainWindow) { mainWindow.show(); mainWindow.focus(); } });
 });
 

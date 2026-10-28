@@ -8,8 +8,8 @@
         android:label="Заказы · Склад"
         android:usesCleartextTraffic="false"
         android:theme="@style/Theme.WarehouseOrders"
-        android:icon="@drawable/amp_logo"
-        android:roundIcon="@drawable/amp_logo">
+        android:icon="@drawable/amp_launcher"
+        android:roundIcon="@drawable/amp_launcher">
 
         <activity
             android:name=".MainActivity"

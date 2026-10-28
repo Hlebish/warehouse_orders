@@ -11,7 +11,8 @@
   },
   "devDependencies": {
     "electron": "^39.0.0",
-    "electron-builder": "^26.0.12"
+    "electron-builder": "^26.0.12",
+    "png-to-ico": "^2.1.8"
   },
   "build": {
     "appId": "ua.amp.warehouseorders",
@@ -22,7 +23,8 @@
     "files": [
       "main.cjs",
       "preload.cjs",
-      "package.json"
+      "package.json",
+      "icon.ico"
     ],
     "win": {
       "target": [
@@ -33,7 +35,8 @@
           ]
         }
       ],
-      "artifactName": "Warehouse-Orders-Setup-${version}.${ext}"
+      "artifactName": "Warehouse-Orders-Setup-${version}.${ext}",
+      "icon": "icon.ico"
     },
     "nsis": {
       "oneClick": false,

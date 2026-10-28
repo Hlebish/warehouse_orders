@@ -27,6 +27,8 @@ jobs:
           cache-dependency-path: desktop/package.json
       - name: Install dependencies
         run: npm install
+      - name: Create Windows icon from AMP logo
+        run: node -e "const fs=require('fs'); const pngToIco=require('png-to-ico'); pngToIco('../Минималистичная эмблема автозапчастей AMP.png').then(buf=>fs.writeFileSync('icon.ico',buf))"
       - name: Build Windows installer
         run: npm run dist
       - name: Upload installer

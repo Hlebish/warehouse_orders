@@ -7772,3 +7772,23 @@ body.overlay-window-open .toast-stack .defect-toast {
 .kamenskoye-stat-card strong{font-size:20px}
 .kamenskoye-stat-card small{font-size:10px}
 @media(max-width:720px){.kamenskoye-stat-section{margin:10px 0 18px}.kamenskoye-stat-card{width:100%;min-height:70px}}
+
+
+/* Fix scrolling inside the order card: keep its header/actions visible while the
+   long articles and comments area scrolls within the available window height. */
+#modal:has(#modalBody .order-detail-head) {
+  display: flex !important;
+  flex-direction: column !important;
+  max-height: calc(100dvh - 32px) !important;
+  overflow: hidden !important;
+  min-height: 0 !important;
+}
+#modal:has(#modalBody .order-detail-head) #modalBody {
+  display: block !important;
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}

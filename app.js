@@ -495,7 +495,7 @@ async function syncPushToken(requestPermission=false){
       if(
         data.userAgent===navigator.userAgent &&
         data.token!==token &&
-        data.installationId!==installationId
+        data.installationId===installationId
       ){
         batch.delete(tokenDoc.ref);
       }

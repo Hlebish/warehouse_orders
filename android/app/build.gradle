@@ -3,6 +3,15 @@ plugins {
     id 'com.google.gms.google-services'
 }
 
+
+// Copy the shared AMP emblem into Android resources for the installed app icon.
+def prepareAppLauncherIcon = tasks.register('prepareAppLauncherIcon', Copy) {
+    from(rootProject.file('../Минималистичная эмблема автозапчастей AMP.png'))
+    into(layout.projectDirectory.dir('src/main/res/drawable-nodpi'))
+    rename { 'amp_launcher.png' }
+}
+tasks.named('preBuild').configure { dependsOn(prepareAppLauncherIcon) }
+
 // Copy the custom notification sound from the repository root into Android resources before packaging.
 def prepareCustomNotificationSound = tasks.register('prepareCustomNotificationSound', Copy) {
     from(rootProject.file('../delivered-message-sound.mp3'))

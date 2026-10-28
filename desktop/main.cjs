@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Tray, Menu, nativeImage, shell, session } = require('electron');
+const { app, BrowserWindow, Tray, Menu, nativeImage, shell, session, Notification, ipcMain } = require('electron');
 const path = require('node:path');
 
 const APP_URL = 'https://hlebish.github.io/warehouse_orders/';
@@ -23,6 +23,27 @@ function isGoogleAuthUrl(rawUrl) {
     return false;
   }
 }
+
+
+ipcMain.on('warehouse:show-notification', (event, payload = {}) => {
+  if (!mainWindow || event.sender !== mainWindow.webContents) return;
+  const title = String(payload.title || 'Заказы · Склад').slice(0, 160);
+  const body = String(payload.body || 'Новое изменение.').slice(0, 1000);
+  const link = String(payload.link || APP_URL);
+  const safeLink = link.startsWith(APP_URL) ? link : APP_URL;
+  if (!Notification.isSupported()) {
+    if (mainWindow) mainWindow.webContents.send('warehouse:notification-fallback');
+    return;
+  }
+  const notification = new Notification({ title, body, silent: false });
+  notification.on('click', () => {
+    if (!mainWindow) return;
+    mainWindow.show();
+    mainWindow.focus();
+    if (safeLink !== APP_URL) mainWindow.loadURL(safeLink);
+  });
+  notification.show();
+});
 
 function createWindow() {
   mainWindow = new BrowserWindow({

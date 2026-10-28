@@ -2,12 +2,27 @@ const { app, BrowserWindow, Tray, Menu, nativeImage, shell, session } = require(
 const path = require('node:path');
 
 const APP_URL = 'https://hlebish.github.io/warehouse_orders/';
+const APP_ORIGIN = new URL(APP_URL).origin;
 let mainWindow = null;
 let tray = null;
 let quitting = false;
 
 app.setAppUserModelId('ua.amp.warehouseorders');
 app.setLoginItemSettings({ openAtLogin: true, path: process.execPath, args: ['--hidden'] });
+
+function isGoogleAuthUrl(rawUrl) {
+  try {
+    const url = new URL(rawUrl);
+    return url.protocol === 'https:' && (
+      url.hostname === 'accounts.google.com' ||
+      url.hostname === 'apis.google.com' ||
+      url.hostname === 'sklad-18f38.firebaseapp.com' ||
+      url.hostname === 'identitytoolkit.googleapis.com'
+    );
+  } catch {
+    return false;
+  }
+}
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -20,6 +35,8 @@ function createWindow() {
     backgroundColor: '#0a111d',
     title: 'Заказы · Склад',
     webPreferences: {
+      // A persistent partition keeps Firebase's local auth/session data between launches.
+      partition: 'persist:warehouse-orders',
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
       nodeIntegration: false,
@@ -35,17 +52,41 @@ function createWindow() {
     }
   });
   mainWindow.on('page-title-updated', event => event.preventDefault());
+
+  // OAuth needs its own in-app popup. All other off-site windows (including the
+  // warehouse map) are opened in the user's default browser, never inside this app.
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    if (url.startsWith('https://hlebish.github.io/warehouse_orders/')) {
-      return { action: 'allow' };
+    if (isGoogleAuthUrl(url)) {
+      return {
+        action: 'allow',
+        overrideBrowserWindowOptions: {
+          width: 520,
+          height: 720,
+          autoHideMenuBar: true,
+          title: 'Вход через Google',
+          webPreferences: {
+            partition: 'persist:warehouse-orders',
+            contextIsolation: true,
+            nodeIntegration: false,
+            sandbox: true
+          }
+        }
+      };
     }
-    shell.openExternal(url);
+    if (url.startsWith(APP_URL)) return { action: 'allow' };
+    if (url.startsWith('https://')) shell.openExternal(url);
     return { action: 'deny' };
+  });
+
+  // Links navigated in the main window must not replace the warehouse UI.
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    if (url.startsWith(APP_URL)) return;
+    event.preventDefault();
+    if (url.startsWith('https://')) shell.openExternal(url);
   });
 }
 
 function createTray() {
-  // Use the standard application icon when no packaged icon is supplied.
   const image = nativeImage.createEmpty();
   tray = new Tray(image);
   tray.setToolTip('Заказы · Склад — уведомления работают в фоне');
@@ -59,8 +100,7 @@ function createTray() {
 }
 
 app.whenReady().then(() => {
-  // Keep app notifications enabled and let Chromium use the installed site's service worker.
-  session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
+  session.fromPartition('persist:warehouse-orders').setPermissionRequestHandler((webContents, permission, callback) => {
     callback(['notifications', 'audio', 'media'].includes(permission));
   });
   createWindow();
@@ -69,4 +109,4 @@ app.whenReady().then(() => {
 });
 
 app.on('before-quit', () => { quitting = true; });
-app.on('window-all-closed', event => { /* Keep the tray app alive on Windows. */ });
+app.on('window-all-closed', () => { /* Keep the tray app alive on Windows. */ });

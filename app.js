@@ -128,7 +128,23 @@ function watchNotifications(){
   const q=query(collection(db,'users',signedInUser.uid,'notifications'),orderBy('createdAt','desc'),limit(100));
   notificationsUnsubscribe=onSnapshot(q,snap=>{
     const next=snap.docs.map(d=>({id:d.id,...d.data(),at:d.data().createdAt||d.data().at||isoNow()}));
-    if(!initialSnapshot){next.filter(n=>!knownNoticeIds.has(n.id)&&shouldShowAttentionToast(n)&&!n.read&&isFreshLiveNotice(n)).forEach(showAttentionToast)}
+    if(!initialSnapshot){
+      const freshNotices=next.filter(n=>!knownNoticeIds.has(n.id)&&!n.read&&isFreshLiveNotice(n));
+      freshNotices.filter(shouldShowAttentionToast).forEach(showAttentionToast);
+      if(window.warehouseDesktop?.isDesktopApp){
+        freshNotices.forEach(n=>{
+          const target=n.target==='chat'?'chat':'site';
+          const link=target==='chat'
+            ? 'https://hlebish.github.io/warehouse_orders/?chat=1'
+            : (n.orderId?'https://hlebish.github.io/warehouse_orders/?order='+encodeURIComponent(String(n.orderId)):'https://hlebish.github.io/warehouse_orders/');
+          showForegroundPushNotification({
+            title:String(n.title||'Заказы · Склад'),
+            body:String(n.message||n.body||'Новое изменение.'),
+            link
+          });
+        });
+      }
+    }
     initialSnapshot=false;
     knownNoticeIds=new Set(next.map(n=>n.id));state.notices=next;paintNotices();paintMentionCenter();
   },err=>console.error('Не удалось загрузить историю уведомлений',err));
@@ -446,6 +462,12 @@ async function registerNativePushToken(token,installationId='') {
 window.registerNativePushToken=registerNativePushToken;
 
 async function syncPushToken(requestPermission=false){
+  // Electron uses native Windows notifications driven by the signed-in Firestore listener.
+  // Web Push/FCM token registration is unreliable inside Electron and is not needed there.
+  if(window.warehouseDesktop?.isDesktopApp){
+    if(requestPermission)toast('Уведомления Windows для приложения обрабатываются автоматически.');
+    return;
+  }
   if(!('Notification' in window)||!('serviceWorker' in navigator)){
     if(requestPermission)toast('Этот браузер не поддерживает push-уведомления.');
     return;

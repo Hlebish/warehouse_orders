@@ -43,6 +43,12 @@ jobs:
             echo "FFmpeg is not installed; keeping original MP3. Android foreground gain is handled by app.js."
           fi
 
+      - name: Verify AMP launcher icon source
+        run: |
+          test -s "Минималистичная эмблема автозапчастей AMP.png"
+          grep -q "prepareAppLauncherIcon" android/app/build.gradle
+          grep -q '@drawable/amp_launcher' android/app/src/main/AndroidManifest.xml
+
       - name: Prepare signing key
         if: env.HAS_SIGNING_KEY == 'true'
         env:

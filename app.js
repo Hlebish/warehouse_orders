@@ -460,7 +460,9 @@ async function syncPushToken(requestPermission=false){
     let permission=Notification.permission;
 
     if(permission!=='granted'){
-      if(!requestPermission)return;
+      // The Electron desktop app should register itself on first sign-in instead
+      // of silently skipping push setup until the user finds the web settings.
+      if(!requestPermission&&!window.warehouseDesktop?.isDesktopApp)return;
       permission=await Notification.requestPermission();
     }
 
@@ -520,8 +522,8 @@ async function syncPushToken(requestPermission=false){
   }catch(err){
     console.error('Не удалось синхронизировать push-токен',err);
 
-    if(requestPermission){
-      toast('Не удалось включить push. Проверьте настройки Firebase и разрешения браузера.');
+    if(requestPermission||window.warehouseDesktop?.isDesktopApp){
+      toast('Не удалось включить уведомления на ПК. Проверьте подключение и разрешения Windows.');
     }
   }
 }

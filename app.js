@@ -540,6 +540,14 @@ async function enablePush(){
   await syncPushToken(true);
 }
 async function showForegroundPushNotification(data={}){
+  if(window.warehouseDesktop?.isDesktopApp&&typeof window.warehouseDesktop.showNotification==='function'){
+    window.warehouseDesktop.showNotification({
+      title:String(data.title||'Заказы · Склад'),
+      body:String(data.body||'Новое изменение.'),
+      link:String(data.link||location.href)
+    });
+    return;
+  }
   if(!('Notification' in window)||Notification.permission!=='granted'||!('serviceWorker' in navigator))return;
   try{
     const registration=await navigator.serviceWorker.ready;

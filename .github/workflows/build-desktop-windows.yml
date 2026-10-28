@@ -8,7 +8,7 @@ on:
       - '.github/workflows/build-desktop-windows.yml'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -25,12 +25,16 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: desktop/package.json
+      - name: Set unique desktop release version
+        run: npm version 1.0.${{ github.run_number }} --no-git-tag-version
       - name: Install dependencies
         run: npm install
       - name: Create Windows icon from AMP logo
         run: node -e "const fs=require('fs'); const pngToIco=require('png-to-ico'); pngToIco('../Минималистичная эмблема автозапчастей AMP.png').then(buf=>fs.writeFileSync('icon.ico',buf))"
-      - name: Build Windows installer
-        run: npm run dist
+      - name: Build and publish Windows installer
+        run: npm run dist -- --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Upload installer
         uses: actions/upload-artifact@v4
         with:

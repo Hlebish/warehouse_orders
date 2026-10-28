@@ -56,7 +56,7 @@ function createWindow() {
   // OAuth needs its own in-app popup. All other off-site windows (including the
   // warehouse map) are opened in the user's default browser, never inside this app.
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    if (isGoogleAuthUrl(url)) {
+    if (url === 'about:blank' || isGoogleAuthUrl(url)) {
       return {
         action: 'allow',
         overrideBrowserWindowOptions: {

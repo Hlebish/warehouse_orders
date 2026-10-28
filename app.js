@@ -752,7 +752,6 @@ function showWarehouseAnalytics(){
   showModal('Статистика работы склада',body,[button('Закрыть','close')],'АНАЛИТИКА');
 }
 function showReturns(dateFrom='',dateTo='',searchText=''){
-  const queryText=String(searchText||'').trim().toLocaleLowerCase('ru');
   const inPeriod=r=>{const day=localDateKey(r.createdAt);return (!dateFrom||day>=dateFrom)&&(!dateTo||day<=dateTo);};
   // Отменённые возвраты остаются в истории заказа, но не входят в реестр действующих.
   const orders=state.orders.filter(o=>Array.isArray(o.returns)&&o.returns.some(r=>r?.status!=='cancelled'&&inPeriod(r))).sort((a,b)=>(asDate(b.updatedAt||b.createdAt)?.getTime()||0)-(asDate(a.updatedAt||a.createdAt)?.getTime()||0));
@@ -768,7 +767,7 @@ function showReturns(dateFrom='',dateTo='',searchText=''){
   const body='<div class="returns-panel"><div class="returns-filters"><label class="search-box"><span>С</span><input id="returnsDateFrom" type="date" value="'+esc(dateFrom)+'" aria-label="Дата от"></label><label class="search-box"><span>По</span><input id="returnsDateTo" type="date" value="'+esc(dateTo)+'" aria-label="Дата до"></label><label class="search-box returns-search"><span>⌕</span><input id="returnsSearch" type="search" value="'+esc(searchText)+'" placeholder="Артикул, клиент или № заказа" aria-label="Поиск по возвратам"></label><button type="button" class="small-button primary-soft" data-action="returns-date">Показать</button></div><div class="returns-stats"><div class="returns-stat"><span>Заказы</span><b id="returnsOrdersCount">'+orders.length+'</b></div><div class="returns-stat"><span>Возвраты</span><b id="returnsCount">'+all.length+'</b></div><div class="returns-stat"><span>Товаров к возврату</span><b><span id="returnsItemsCount">'+totalItems+'</span> <small>шт.</small></b></div></div><div class="returns-list-head"><b>Список возвратов</b><span id="returnsListCount">'+all.length+' '+(all.length===1?'запись':'записей')+'</span></div><div class="returns-list">'+rows+'<div class="returns-empty" id="returnsNoMatches" hidden><b>Ничего не найдено</b><span>Попробуй изменить поисковый запрос.</span></div></div></div>';
   showModal('Заказы с возвратами',body,[button('Закрыть','close')],'ВОЗВРАТЫ');
   const searchInput=$('returnsSearch');
-  searchInput?.addEventListener('input',()=>{
+  const applyReturnsSearch=()=>{
     const query=String(searchInput.value||'').trim().toLocaleLowerCase('ru');
     const visibleRows=[];
     $('modalBody')?.querySelectorAll('.returns-row').forEach(row=>{
@@ -784,7 +783,9 @@ function showReturns(dateFrom='',dateTo='',searchText=''){
     if($('returnsListCount'))$('returnsListCount').textContent=visibleRows.length+' '+(visibleRows.length===1?'запись':'записей');
     const empty=$('returnsNoMatches');
     if(empty)empty.hidden=visibleRows.length>0;
-  });
+  };
+  searchInput?.addEventListener('input',applyReturnsSearch);
+  applyReturnsSearch();
 }
 async function cancelReturnAction(orderId,returnId){
   if(!canManageUsers){toast('Отменить возврат может только администратор или директор.');return;}

@@ -178,8 +178,9 @@ function showTestNotification() {
 }
 
 function createTray() {
-  const image = nativeImage.createEmpty();
-  tray = new Tray(image);
+  const iconPath = path.join(__dirname, 'icon.ico');
+  const image = nativeImage.createFromPath(iconPath);
+  tray = new Tray(image.isEmpty() ? nativeImage.createEmpty() : image);
   tray.setToolTip('Заказы · Склад — уведомления работают в фоне');
   tray.setContextMenu(Menu.buildFromTemplate([
     { label: 'Открыть заказы', click: () => { if (mainWindow) { mainWindow.show(); mainWindow.focus(); } } },

@@ -44,6 +44,17 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "Заказы · Склад"
-    }
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "Hlebish",
+        "repo": "warehouse_orders",
+        "releaseType": "release"
+      }
+    ]
+  },
+  "dependencies": {
+    "electron-updater": "^6.6.2"
   }
 }

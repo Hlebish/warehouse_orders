@@ -1,11 +1,13 @@
 const { app, BrowserWindow, Tray, Menu, nativeImage, shell, session, Notification, ipcMain } = require('electron');
 const path = require('node:path');
+const { autoUpdater } = require('electron-updater');
 
 const APP_URL = 'https://hlebish.github.io/warehouse_orders/';
 const APP_ORIGIN = new URL(APP_URL).origin;
 let mainWindow = null;
 let tray = null;
 let quitting = false;
+let updateDownloaded = false;
 
 app.setAppUserModelId('ua.amp.warehouseorders');
 app.setLoginItemSettings({ openAtLogin: true, path: process.execPath, args: ['--hidden'] });
@@ -177,18 +179,25 @@ function showTestNotification() {
   notification.show();
 }
 
+function refreshTrayMenu() {
+  if (!tray) return;
+  const items = [
+    { label: 'Открыть заказы', click: () => { if (mainWindow) { mainWindow.show(); mainWindow.focus(); } } },
+    ...(updateDownloaded ? [{ label: 'Перезапустить и установить обновление', click: () => { quitting = true; autoUpdater.quitAndInstall(); } }] : []),
+    { label: 'Проверить уведомления Windows', click: () => showTestNotification() },
+    { label: 'Перезагрузить приложение', click: () => { if (mainWindow) mainWindow.webContents.reload(); } },
+    { type: 'separator' },
+    { label: 'Выйти полностью', click: () => { quitting = true; app.quit(); } }
+  ];
+  tray.setContextMenu(Menu.buildFromTemplate(items));
+}
+
 function createTray() {
   const iconPath = path.join(__dirname, 'icon.ico');
   const image = nativeImage.createFromPath(iconPath);
   tray = new Tray(image.isEmpty() ? nativeImage.createEmpty() : image);
   tray.setToolTip('Заказы · Склад — уведомления работают в фоне');
-  tray.setContextMenu(Menu.buildFromTemplate([
-    { label: 'Открыть заказы', click: () => { if (mainWindow) { mainWindow.show(); mainWindow.focus(); } } },
-    { label: 'Проверить уведомления Windows', click: () => showTestNotification() },
-    { label: 'Перезагрузить приложение', click: () => { if (mainWindow) mainWindow.webContents.reload(); } },
-    { type: 'separator' },
-    { label: 'Выйти полностью', click: () => { quitting = true; app.quit(); } }
-  ]));
+  refreshTrayMenu();
   tray.on('double-click', () => { if (mainWindow) { mainWindow.show(); mainWindow.focus(); } });
 }
 
@@ -198,6 +207,16 @@ app.whenReady().then(() => {
   });
   createWindow();
   createTray();
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;
+  autoUpdater.on('error', error => console.warn('[Warehouse Orders] App update failed:', String(error?.message || error)));
+  autoUpdater.on('update-available', info => { console.info('[Warehouse Orders] Desktop update available:', info.version); });
+  autoUpdater.on('update-downloaded', info => {
+    updateDownloaded = true;
+    refreshTrayMenu();
+    if (Notification.isSupported()) new Notification({ title: 'Заказы · Склад', body: 'Обновление ' + info.version + ' скачано. Установить его можно через меню значка приложения.' }).show();
+  });
+  autoUpdater.checkForUpdatesAndNotify().catch(error => console.warn('[Warehouse Orders] Could not check desktop updates:', String(error?.message || error)));
   // Check for published site changes every two minutes. Reloads are deferred while editing.
   mainWindow.webContents.once('did-finish-load', () => {
     readPublishedAssetVersion().then(version => { loadedAssetVersion = version; }).catch(error => {

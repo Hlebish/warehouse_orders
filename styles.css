@@ -7847,3 +7847,8 @@ body.overlay-window-open .toast-stack .defect-toast {
 .returns-row-actions{flex-direction:row;flex-wrap:wrap}
 .returns-row-actions .small-button{flex:1}
 }
+
+
+/* Make the client the primary identifier in the returns register */
+.returns-client-primary{font-size:14px;font-weight:750;line-height:1.3;color:var(--text,#e7ebf0);overflow-wrap:anywhere}
+.returns-order-sub{margin-top:2px;font-size:9px;font-weight:500;color:var(--muted,#8993a0)}

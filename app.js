@@ -340,12 +340,12 @@ async function save(){
      const articleBody=normalizedArticles.length
        ?normalizedArticles.map(x=>`${x.article} × ${x.quantity}`).join(', ')
        :'Все артикулы удалены.';
-     const newOrderBody=newOrder
-       ?(o.articles?.length?`${o.client||'Создан новый заказ'} · ${articleBody}`:(o.client||'Создан новый заказ'))
-       :articlesChanged?articleBody:`Статус: ${next.status}`;
+     const clientLabel=o.client||'Клиент не указан';
+     const orderAction=newOrder?'Новый заказ':articlesChanged?'Изменены артикулы':`Статус: ${next.status}`;
      pushTasks.push(()=>queuePush(
-       newOrder?`Новый заказ · ${o.client||'Клиент не указан'}`:articlesChanged?`Артикулы изменены · ${o.client||'Клиент не указан'}`:`Заказ изменён · ${o.client||'Клиент не указан'}`,
-       newOrderBody,signedInUser.uid,o.id
+       clientLabel,
+       orderAction,
+       signedInUser.uid,o.id
      ));
    }
 
@@ -356,9 +356,9 @@ async function save(){
        saveStage='сохранение записи истории '+e.id+' заказа '+(o.number||o.id);
         await addBatchWrite(b=>b.set(doc(db,'orders',o.id,'entries',e.id),cloud));
        if(!newOrder&&e.kind!=='viewed'&&e.kind!=='system'){
-         const label=e.kind==='decision'?'Решение':e.kind==='defect'?'Дефект':e.kind==='question'?'Вопрос':'Комментарий';
-         const body=e.kind==='decision'&&e.decision?`Решение: ${e.decision}. ${e.decisionText||e.text||''}`:e.text||label;
-         pushTasks.push(()=>e.replyToEntryId&&e.replyToAuthorId?queuePush(profileName||roles[state.role],body,signedInUser.uid,o.id,'site','replies',e.replyToAuthorId):queuePush(`${o.client||'Клиент не указан'} · ${label}`,body,signedInUser.uid,o.id));
+         const actionLabel=e.kind==='decision'?'Добавлено решение':e.kind==='defect'?'Добавлен дефект':e.kind==='question'?'Добавлен вопрос':'Новый комментарий';
+         const clientLabel=o.client||'Клиент не указан';
+         pushTasks.push(()=>e.replyToEntryId&&e.replyToAuthorId?queuePush(clientLabel,'Новый ответ',signedInUser.uid,o.id,'site','replies',e.replyToAuthorId):queuePush(clientLabel,actionLabel,signedInUser.uid,o.id));
        }
        oldEntries.delete(e.id);
      }else oldEntries.delete(e.id);
@@ -367,7 +367,7 @@ async function save(){
    if(state.role==='director'||canManageUsers){
      for(const removedId of oldEntries.keys()){
        await addBatchWrite(b=>b.delete(doc(db,'orders',o.id,'entries',removedId)));
-       pushTasks.push(()=>queuePush(`${o.client||'Клиент не указан'} · заказ изменён`,'Запись из истории была удалена директором.',signedInUser.uid,o.id));
+       pushTasks.push(()=>queuePush(o.client||'Клиент не указан','Удалена запись из истории заказа',signedInUser.uid,o.id));
      }
    }
 
@@ -609,7 +609,7 @@ function watchOrders(){
      const order={id:d.id,number:pending?.number??data.number,client:pending?.client??(data.client||''),deliveryType:['city','pickup','post','kamyanske'].includes(data.deliveryType)?data.deliveryType:'city',status:pending?.status??data.status,returnCancelled:data.returnCancelled===true||(Array.isArray(data.returns)&&data.returns.some(r=>r?.status==='cancelled')),articles:pending?.articles??(Array.isArray(data.articles)?data.articles:[]),createdAt:data.createdAt,updatedAt:data.updatedAt,transferredAt:data.transferredAt,resumedAt:data.resumedAt,assembledAt:data.assembledAt,shippedAt:data.shippedAt,assemblyInProgress:data.assemblyInProgress===true,assemblyStartedAt:data.assemblyStartedAt,assemblyStartedBy:data.assemblyStartedBy,assemblyStartedByName:data.assemblyStartedByName,returns:Array.isArray(data.returns)?data.returns:[],author:data.createdByName||'Сотрудник',createdBy:data.createdBy,updatedBy:data.updatedBy,updatedByName:data.updatedByName,entries:prior?.entries||[],returns:Array.isArray(data.returns)?data.returns:[]};
      const at=state.orders.findIndex(o=>o.id===d.id);if(at<0)state.orders.push(order);else state.orders[at]={...order,entries:state.orders[at].entries||[]};serverCache.set(d.id,{...order,articles:(order.articles||[]).map(x=>({...x})),entries:(prior?.entries||[]).map(x=>({...x}))});
      if(!entryUnsubscribes.has(d.id)){let firstEntries=true;entryUnsubscribes.set(d.id,onSnapshot(collection(db,'orders',d.id,'entries'),es=>{const entries=es.docs.map(x=>entryFromCloud(x.id,x.data())).sort((a,b)=>(asDate(a.createdAt)?.getTime()||0)-(asDate(b.createdAt)?.getTime()||0)||String(a.id).localeCompare(String(b.id)));const item=state.orders.find(o=>o.id===d.id);if(!item)return;const before=JSON.stringify(item.entries||[]);item.entries=entries;serverCache.set(d.id,{...serverCache.get(d.id),entries:entries.map(x=>({...x}))});const entriesChanged=before!==JSON.stringify(entries);
-if(!initialCloudLoad&&!firstEntries&&entriesChanged){const last=entries.at(-1);if(last?.kind!=='system')toast(`Обновлён заказ № ${item.number}${last?`: ${last.author} добавил запись`:''}`);}
+if(!initialCloudLoad&&!firstEntries&&entriesChanged){const last=entries.at(-1);if(last?.kind!=='system')toast(`${item.client||'Клиент не указан'} · ${last?last.kind==='decision'?'Добавлено решение':last.kind==='defect'?'Добавлен дефект':last.kind==='question'?'Добавлен вопрос':'Новый комментарий':'Заказ обновлён'}`);}
 const wasFirstEntries=firstEntries;
 firstEntries=false;
 render();
@@ -762,7 +762,7 @@ function showReturns(dateFrom='',dateTo='',searchText=''){
   const rows=all.length?all.map(({order:o,return:r})=>{
     const items=(r.items||[]).map(it=>'<div class="returns-product"><b>'+esc(it.article)+'</b><span>× '+(Number(it.quantity)||0)+' шт.</span></div>').join('');
     const cancelButton=canManageUsers?button('Отменить возврат','cancel-return:'+o.id+':'+r.id,'small-button danger returns-cancel'):'';
-    return '<article class="returns-row"><div class="returns-row-main"><div class="returns-row-heading"><b class="returns-order-number">Заказ № '+esc(o.number)+'</b><span class="returns-status">Действующий возврат</span></div><div class="returns-client">'+esc(o.client||'Клиент не указан')+'</div><div class="returns-products">'+items+'</div>'+(r.reason?'<div class="returns-reason"><span>Причина</span><b>'+esc(r.reason)+'</b></div>':'')+'<div class="returns-meta"><span>'+fmtDateTime(r.createdAt)+'</span><span>Оформил: '+esc(r.author||'Сотрудник')+'</span></div></div><div class="returns-row-actions">'+button('Открыть заказ','open-return-order:'+o.id,'small-button primary-soft')+cancelButton+'</div></article>';
+    return '<article class="returns-row"><div class="returns-row-main"><div class="returns-row-heading"><b class="returns-client-primary">'+esc(o.client||'Клиент не указан')+'</b><span class="returns-status">Действующий возврат</span></div><div class="returns-order-sub">Заказ № '+esc(o.number)+'</div><div class="returns-products">'+items+'</div>'+(r.reason?'<div class="returns-reason"><span>Причина</span><b>'+esc(r.reason)+'</b></div>':'')+'<div class="returns-meta"><span>'+fmtDateTime(r.createdAt)+'</span><span>Оформил: '+esc(r.author||'Сотрудник')+'</span></div></div><div class="returns-row-actions">'+button('Открыть заказ','open-return-order:'+o.id,'small-button primary-soft')+cancelButton+'</div></article>';
   }).join(''):'<div class="returns-empty"><b>Возвраты не найдены</b><span>Измени период или поисковый запрос. Отменённые возвраты находятся в истории заказа.</span></div>';
   const body='<div class="returns-panel"><div class="returns-filters"><label class="search-box"><span>С</span><input id="returnsDateFrom" type="date" value="'+esc(dateFrom)+'" aria-label="Дата от"></label><label class="search-box"><span>По</span><input id="returnsDateTo" type="date" value="'+esc(dateTo)+'" aria-label="Дата до"></label><label class="search-box returns-search"><span>⌕</span><input id="returnsSearch" type="search" value="'+esc(searchText)+'" placeholder="Артикул, клиент или № заказа" aria-label="Поиск по возвратам"></label><button type="button" class="small-button primary-soft" data-action="returns-date">Показать</button></div><div class="returns-stats"><div class="returns-stat"><span>Заказы</span><b>'+orders.length+'</b></div><div class="returns-stat"><span>Возвраты</span><b>'+all.length+'</b></div><div class="returns-stat"><span>Товаров к возврату</span><b>'+totalItems+' <small>шт.</small></b></div></div><div class="returns-list-head"><b>Список возвратов</b><span>'+all.length+' '+(all.length===1?'запись':'записей')+'</span></div><div class="returns-list">'+rows+'</div></div>';
   showModal('Заказы с возвратами',body,[button('Закрыть','close')],'ВОЗВРАТЫ');

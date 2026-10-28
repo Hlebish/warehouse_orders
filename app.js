@@ -754,19 +754,37 @@ function showWarehouseAnalytics(){
 function showReturns(dateFrom='',dateTo='',searchText=''){
   const queryText=String(searchText||'').trim().toLocaleLowerCase('ru');
   const inPeriod=r=>{const day=localDateKey(r.createdAt);return (!dateFrom||day>=dateFrom)&&(!dateTo||day<=dateTo);};
-  const matchesSearch=(o,r)=>!queryText||String(o.client||'').toLocaleLowerCase('ru').includes(queryText)||String(o.number||'').toLocaleLowerCase('ru').includes(queryText)||(r.items||[]).some(it=>String(it.article||'').toLocaleLowerCase('ru').includes(queryText));
   // Отменённые возвраты остаются в истории заказа, но не входят в реестр действующих.
-  const orders=state.orders.filter(o=>Array.isArray(o.returns)&&o.returns.some(r=>r?.status!=='cancelled'&&inPeriod(r)&&matchesSearch(o,r))).sort((a,b)=>(asDate(b.updatedAt||b.createdAt)?.getTime()||0)-(asDate(a.updatedAt||a.createdAt)?.getTime()||0));
-  const all=orders.flatMap(order=>order.returns.filter(r=>r?.status!=='cancelled'&&inPeriod(r)&&matchesSearch(order,r)).map(r=>({order,return:r})));
+  const orders=state.orders.filter(o=>Array.isArray(o.returns)&&o.returns.some(r=>r?.status!=='cancelled'&&inPeriod(r))).sort((a,b)=>(asDate(b.updatedAt||b.createdAt)?.getTime()||0)-(asDate(a.updatedAt||a.createdAt)?.getTime()||0));
+  const all=orders.flatMap(order=>order.returns.filter(r=>r?.status!=='cancelled'&&inPeriod(r)).map(r=>({order,return:r})));
   const totalItems=all.reduce((sum,x)=>sum+(x.return.items||[]).reduce((n,it)=>n+(Number(it.quantity)||0),0),0);
   const rows=all.length?all.map(({order:o,return:r})=>{
+    const searchable=[o.client,o.number,r.reason,...(r.items||[]).map(it=>it.article)].filter(Boolean).join(' ').toLocaleLowerCase('ru');
+    const rowQuantity=(r.items||[]).reduce((n,it)=>n+(Number(it.quantity)||0),0);
     const items=(r.items||[]).map(it=>'<div class="returns-product"><b>'+esc(it.article)+'</b><span>× '+(Number(it.quantity)||0)+' шт.</span></div>').join('');
     const cancelButton=canManageUsers?button('Отменить возврат','cancel-return:'+o.id+':'+r.id,'small-button danger returns-cancel'):'';
-    return '<article class="returns-row"><div class="returns-row-main"><div class="returns-row-heading"><b class="returns-client-primary">'+esc(o.client||'Клиент не указан')+'</b></div><div class="returns-order-sub">Заказ № '+esc(o.number)+'</div><div class="returns-products">'+items+'</div>'+(r.reason?'<div class="returns-reason"><span>Причина</span><b>'+esc(r.reason)+'</b></div>':'')+'<div class="returns-meta"><span>'+fmtDateTime(r.createdAt)+'</span><span>Оформил: '+esc(r.author||'Сотрудник')+'</span></div></div><div class="returns-row-actions">'+button('Открыть заказ','open-return-order:'+o.id,'small-button primary-soft')+cancelButton+'</div></article>';
-  }).join(''):'<div class="returns-empty"><b>Возвраты не найдены</b><span>Измени период или поисковый запрос. Отменённые возвраты находятся в истории заказа.</span></div>';
-  const body='<div class="returns-panel"><div class="returns-filters"><label class="search-box"><span>С</span><input id="returnsDateFrom" type="date" value="'+esc(dateFrom)+'" aria-label="Дата от"></label><label class="search-box"><span>По</span><input id="returnsDateTo" type="date" value="'+esc(dateTo)+'" aria-label="Дата до"></label><label class="search-box returns-search"><span>⌕</span><input id="returnsSearch" type="search" value="'+esc(searchText)+'" placeholder="Артикул, клиент или № заказа" aria-label="Поиск по возвратам"></label><button type="button" class="small-button primary-soft" data-action="returns-date">Показать</button></div><div class="returns-stats"><div class="returns-stat"><span>Заказы</span><b>'+orders.length+'</b></div><div class="returns-stat"><span>Возвраты</span><b>'+all.length+'</b></div><div class="returns-stat"><span>Товаров к возврату</span><b>'+totalItems+' <small>шт.</small></b></div></div><div class="returns-list-head"><b>Список возвратов</b><span>'+all.length+' '+(all.length===1?'запись':'записей')+'</span></div><div class="returns-list">'+rows+'</div></div>';
+    return '<article class="returns-row" data-search="'+esc(searchable)+'" data-order-id="'+esc(o.id)+'" data-quantity="'+rowQuantity+'"><div class="returns-row-main"><div class="returns-row-heading"><b class="returns-client-primary">'+esc(o.client||'Клиент не указан')+'</b></div><div class="returns-order-sub">Заказ № '+esc(o.number)+'</div><div class="returns-products">'+items+'</div>'+(r.reason?'<div class="returns-reason"><span>Причина</span><b>'+esc(r.reason)+'</b></div>':'')+'<div class="returns-meta"><span>'+fmtDateTime(r.createdAt)+'</span><span>Оформил: '+esc(r.author||'Сотрудник')+'</span></div></div><div class="returns-row-actions">'+button('Открыть заказ','open-return-order:'+o.id,'small-button primary-soft')+cancelButton+'</div></article>';
+  }).join(''):'';
+  const body='<div class="returns-panel"><div class="returns-filters"><label class="search-box"><span>С</span><input id="returnsDateFrom" type="date" value="'+esc(dateFrom)+'" aria-label="Дата от"></label><label class="search-box"><span>По</span><input id="returnsDateTo" type="date" value="'+esc(dateTo)+'" aria-label="Дата до"></label><label class="search-box returns-search"><span>⌕</span><input id="returnsSearch" type="search" value="'+esc(searchText)+'" placeholder="Артикул, клиент или № заказа" aria-label="Поиск по возвратам"></label><button type="button" class="small-button primary-soft" data-action="returns-date">Показать</button></div><div class="returns-stats"><div class="returns-stat"><span>Заказы</span><b id="returnsOrdersCount">'+orders.length+'</b></div><div class="returns-stat"><span>Возвраты</span><b id="returnsCount">'+all.length+'</b></div><div class="returns-stat"><span>Товаров к возврату</span><b><span id="returnsItemsCount">'+totalItems+'</span> <small>шт.</small></b></div></div><div class="returns-list-head"><b>Список возвратов</b><span id="returnsListCount">'+all.length+' '+(all.length===1?'запись':'записей')+'</span></div><div class="returns-list">'+rows+'<div class="returns-empty" id="returnsNoMatches" hidden><b>Ничего не найдено</b><span>Попробуй изменить поисковый запрос.</span></div></div></div>';
   showModal('Заказы с возвратами',body,[button('Закрыть','close')],'ВОЗВРАТЫ');
-  $('returnsSearch')?.addEventListener('input',e=>{const value=e.target.value;const start=e.target.selectionStart;const from=$('returnsDateFrom')?.value||'';const to=$('returnsDateTo')?.value||'';showReturns(from,to,value);const next=$('returnsSearch');if(next){next.focus();try{next.setSelectionRange(start,start)}catch{}}});
+  const searchInput=$('returnsSearch');
+  searchInput?.addEventListener('input',()=>{
+    const query=String(searchInput.value||'').trim().toLocaleLowerCase('ru');
+    const visibleRows=[];
+    $('modalBody')?.querySelectorAll('.returns-row').forEach(row=>{
+      const match=!query||String(row.dataset.search||'').includes(query);
+      row.hidden=!match;
+      if(match)visibleRows.push(row);
+    });
+    const uniqueOrders=new Set(visibleRows.map(row=>row.dataset.orderId));
+    const quantity=visibleRows.reduce((sum,row)=>sum+(Number(row.dataset.quantity)||0),0);
+    if($('returnsOrdersCount'))$('returnsOrdersCount').textContent=String(uniqueOrders.size);
+    if($('returnsCount'))$('returnsCount').textContent=String(visibleRows.length);
+    if($('returnsItemsCount'))$('returnsItemsCount').textContent=String(quantity);
+    if($('returnsListCount'))$('returnsListCount').textContent=visibleRows.length+' '+(visibleRows.length===1?'запись':'записей');
+    const empty=$('returnsNoMatches');
+    if(empty)empty.hidden=visibleRows.length>0;
+  });
 }
 async function cancelReturnAction(orderId,returnId){
   if(!canManageUsers){toast('Отменить возврат может только администратор или директор.');return;}

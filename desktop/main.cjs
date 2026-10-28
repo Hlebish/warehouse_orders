@@ -49,6 +49,8 @@ function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1440,
     height: 920,
+    // Open the main warehouse window maximized so it uses the full desktop area.
+    autoHideMenuBar: true,
     minWidth: 980,
     minHeight: 680,
     show: !process.argv.includes('--hidden'),
@@ -65,6 +67,7 @@ function createWindow() {
     }
   });
 
+  mainWindow.maximize();
   mainWindow.loadURL(APP_URL);
   mainWindow.webContents.on('console-message', (_event, details) => {
     if (details.level >= 2) console.warn('[Warehouse Orders renderer]', details.message);

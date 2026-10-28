@@ -1830,7 +1830,10 @@ async function setStatus(status,text,kind='system'){
   // Show the saved status immediately; slower auxiliary tasks continue in the background.
   render();
   notify(`Заказ № ${o.number}: ${status}`,o.id);
-  openOrder(o.id);
+  // A manual status change should finish at the main orders screen, not reopen the order.
+  orderReturnModalSnapshot=null;
+  selectedId=null;
+  closeModal();
   void (async()=>{
    if(['Отгружен кладовщиком','Клиент забрал самовывозом'].includes(status)&&!['Отгружен кладовщиком','Клиент забрал самовывозом'].includes(previous)){
     try{

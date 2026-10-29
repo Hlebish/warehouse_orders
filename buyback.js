@@ -457,7 +457,7 @@ overlay.className='buyback-overlay';overlay.hidden=true;overlay.innerHTML=`
 <label class="buyback-field">Артикул<input id="buybackArticle" required maxlength="100" placeholder="Например, APAU1603"></label>
 <label class="buyback-field">Количество<input id="buybackQuantity" required type="number" min="1" step="1" value="1"></label>
 <label class="buyback-field">Дата приёма<input id="buybackDate" required type="date"></label>
-<label class="buyback-field">Поставщик<input id="buybackSupplier" maxlength="160" placeholder="Название поставщика"></label>
+<label class="buyback-field">Поставщик<input id="buybackSupplier" maxlength="160" list="buybackSupplierSuggestions" autocomplete="off" placeholder="Начните вводить название"></label><datalist id="buybackSupplierSuggestions"></datalist>
 <button class="buyback-add" type="submit">＋ Добавить</button>
 </form>
 </div>
@@ -480,7 +480,7 @@ editOverlay.innerHTML=`
 <label class="buyback-field">Артикул<input id="buybackEditArticle" required maxlength="100" autocomplete="off" placeholder="Например, APAU1603"></label>
 <label class="buyback-field">Количество<input id="buybackEditQuantity" required type="number" min="1" max="100000" step="1"></label>
 <label class="buyback-field">Дата приёмки<input id="buybackEditDate" required type="date"></label>
-<label class="buyback-field">Поставщик<input id="buybackEditSupplier" maxlength="160" autocomplete="off" placeholder="Название поставщика"></label>
+<label class="buyback-field">Поставщик<input id="buybackEditSupplier" maxlength="160" list="buybackEditSupplierSuggestions" autocomplete="off" placeholder="Начните вводить название"></label><datalist id="buybackEditSupplierSuggestions"></datalist>
 </div>
 <p class="buyback-edit-note">Последний день срока и оставшиеся дни пересчитаются автоматически по дате приёмки.</p>
 </div>
@@ -494,7 +494,20 @@ dateInput.value=(()=>{const d=new Date();return d.getFullYear()+'-'+String(d.get
 function showToast(message){const stack=$('toastStack');if(stack){const el=document.createElement('div');el.className='toast';el.textContent=message;stack.append(el);setTimeout(()=>el.remove(),3500)}}
 function elapsedDays(date){const d=new Date(date+'T00:00:00');const n=new Date();return Math.floor((Date.UTC(n.getFullYear(),n.getMonth(),n.getDate())-Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()))/86400000)}
 function deadline(item){const [year,month,day]=item.receivedAt.split('-').map(Number);return new Date(Date.UTC(year,month-1,day+13))}
+function refreshSupplierSuggestions(){
+ const names=[...new Set(items.map(item=>String(item.supplier||'').trim()).filter(Boolean))]
+  .sort((a,b)=>a.localeCompare(b,'ru',{sensitivity:'base'}));
+ for(const id of ['buybackSupplierSuggestions','buybackEditSupplierSuggestions']){
+  const list=$(id);if(!list)continue;
+  const current=list.dataset.signature||'';
+  const signature=names.join('\\u0000');
+  if(current===signature)continue;
+  list.dataset.signature=signature;
+  list.innerHTML=names.map(name=>'<option value="'+escapeHtml(name)+'"></option>').join('');
+ }
+}
 function render(){
+ refreshSupplierSuggestions();
  const active=items.filter(x=>x.status==='active'&&elapsedDays(x.receivedAt)<14);
  const expiredItems=items.filter(x=>x.status==='expired'||(x.status==='active'&&elapsedDays(x.receivedAt)>=14));
  const criticalItems=active.filter(x=>elapsedDays(x.receivedAt)>=10&&elapsedDays(x.receivedAt)<14);

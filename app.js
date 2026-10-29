@@ -240,7 +240,7 @@ function watchChatBadge(){
     }
     initialSnapshot=false;
     knownMessageIds=new Set(messages.map(m=>m.id));
-    knownChatPeople=[...new Map(messages.filter(m=>m.authorId&&m.authorName).map(m=>[m.authorId,{id:m.authorId,name:chatDisplayName(m.authorName)}])).values()];
+    // Do not derive mention targets from old messages; use the current users collection.
     chatUnread=messages.some(m=>m.authorId!==signedInUser.uid && Array.isArray(m.readBy) && !m.readBy.includes(signedInUser.uid));
     paintChatBadge();
   },err=>console.error('Не удалось проверить непрочитанный чат',err));
@@ -1931,6 +1931,21 @@ async function toggleExtraPhoneNotifications(){if(!signedInUser)return;const pre
 
 let chatMessages=[],olderChatMessages=[],chatOldestCursor=null,hasOlderChatMessages=false,loadingOlderChatMessages=false,chatPendingScrollRestore=null;
 let knownChatPeople=[];
+let chatMentionPeopleLoading=false;
+async function loadCurrentChatPeople(){
+  if(chatMentionPeopleLoading||!signedInUser)return;
+  chatMentionPeopleLoading=true;
+  try{
+    // Mentions must resolve against current accounts, never historical message authors.
+    const snap=await getDocs(collection(db,'users'));
+    knownChatPeople=snap.docs
+      .map(d=>({id:d.id,name:chatDisplayName(d.data()?.displayName||d.data()?.name||''),active:d.data()?.active!==false}))
+      .filter(p=>p.id&&p.name&&p.active&&p.id!==signedInUser.uid);
+    chatMentionSuggestions();
+  }catch(err){
+    console.warn('Не удалось обновить список сотрудников для упоминаний',err);
+  }finally{chatMentionPeopleLoading=false;}
+}
 
 function startChatReply(messageId){
   const message=chatMessages.find(m=>m.id===messageId);
@@ -1972,7 +1987,7 @@ function chatMentionSuggestions(){
   const match=value.match(/(?:^|[\s])@([\p{L}\p{N}_-]*)$/u);
   if(!match){list.hidden=true;list.innerHTML='';return;}
   const needle=match[1].toLocaleLowerCase('ru');
-  const people=[...new Map([...knownChatPeople,...chatMessages.filter(m=>m.authorId&&m.authorName).map(m=>({id:m.authorId,name:chatDisplayName(m.authorName)}))].filter(p=>p.id&&p.name).map(p=>[p.id,p])).values()]
+  const people=[...new Map(knownChatPeople.filter(p=>p.id&&p.name&&p.active!==false).map(p=>[p.id,p])).values()]
     .filter(p=>p.id!==signedInUser?.uid)
     .filter(p=>chatMentionToken(p.name).toLocaleLowerCase('ru').startsWith(needle))
     .slice(0,6);
@@ -2212,6 +2227,7 @@ function openChat(){
   if(!signedInUser)return;
   chatUnsubscribe?.();
   chatMessages=[];olderChatMessages=[];chatOldestCursor=null;hasOlderChatMessages=false;loadingOlderChatMessages=false;chatPendingScrollRestore=null;chatReplyTo=null;chatFilterText='';chatFilterMode='all';
+  knownChatPeople=[];loadCurrentChatPeople();
   showModal('Общий чат','<div class="chat-shell"><div class="chat-toolbar">'+(canManageUsers?'<button type="button" class="small-button primary-soft" data-action="test-push-notification">🔔 Проверка уведомления</button>':'')+'<label class="search-box"><span>⌕</span><input id="chatSearch" type="search" placeholder="Поиск по чату"></label><select id="chatFilter"><option value="all">Все сообщения</option><option value="mine">Мои</option><option value="replies">С ответами</option><option value="photos">С фото</option></select></div><div class="chat-messages" id="chatMessages"><div class="chat-empty">Загрузка сообщений…</div></div><form id="chatForm" class="chat-form"><div id="chatReplyPreview" class="chat-reply-preview" hidden></div><div class="chat-input-wrap"><textarea id="chatInput" maxlength="1000" rows="2" placeholder="Напишите сообщение… (можно вставить фото из буфера)" autocomplete="off"></textarea><div id="chatMentionSuggestions" class="chat-mention-suggestions" hidden></div></div><div class="chat-attach-row"><label class="chat-attach-button">📎 Фото<input id="chatPhotoInput" type="file" accept="image/*" multiple hidden></label><span id="chatPhotoHint">До 5 фото, по 8 МБ</span></div><div id="chatUploadProgress" class="chat-upload-progress" hidden><div class="chat-upload-progress-track"><div id="chatUploadProgressBar" class="chat-upload-progress-bar"></div></div><span id="chatUploadProgressText">Загрузка…</span></div><div id="chatPhotoPreview" class="chat-photo-preview"></div></form></div>',[button('Закрыть','close'),button('Отправить','send-chat','primary-button')],'ОБЩИЙ ЧАТ');
   // Load only the latest 100 messages initially; older messages are fetched on scroll.
   const initialChatQuery=query(collection(db,'chatMessages'),orderBy('createdAt','desc'),limit(50));

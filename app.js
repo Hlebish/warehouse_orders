@@ -2230,18 +2230,20 @@ function openChat(){
   chatMessages=[];olderChatMessages=[];chatOldestCursor=null;hasOlderChatMessages=false;loadingOlderChatMessages=false;chatPendingScrollRestore=null;chatReplyTo=null;chatFilterText='';chatFilterMode='all';
   knownChatPeople=[];loadCurrentChatPeople();
   showModal('Общий чат','<div class="chat-shell"><div class="chat-toolbar">'+(canManageUsers?'<button type="button" class="small-button primary-soft" data-action="test-push-notification">🔔 Проверка уведомления</button>':'')+'<label class="search-box"><span>⌕</span><input id="chatSearch" type="search" placeholder="Поиск по чату"></label><select id="chatFilter"><option value="all">Все сообщения</option><option value="mine">Мои</option><option value="replies">С ответами</option><option value="photos">С фото</option></select></div><div class="chat-messages" id="chatMessages"><div class="chat-empty">Загрузка сообщений…</div></div><form id="chatForm" class="chat-form"><div id="chatReplyPreview" class="chat-reply-preview" hidden></div><div class="chat-input-wrap"><textarea id="chatInput" maxlength="1000" rows="2" placeholder="Напишите сообщение… (можно вставить фото из буфера)" autocomplete="off"></textarea><div id="chatMentionSuggestions" class="chat-mention-suggestions" hidden></div></div><div class="chat-attach-row"><label class="chat-attach-button">📎 Фото<input id="chatPhotoInput" type="file" accept="image/*" multiple hidden></label><span id="chatPhotoHint">До 5 фото, по 8 МБ</span></div><div id="chatUploadProgress" class="chat-upload-progress" hidden><div class="chat-upload-progress-track"><div id="chatUploadProgressBar" class="chat-upload-progress-bar"></div></div><span id="chatUploadProgressText">Загрузка…</span></div><div id="chatPhotoPreview" class="chat-photo-preview"></div></form></div>',[button('Закрыть','close'),button('Отправить','send-chat','primary-button')],'ОБЩИЙ ЧАТ');
-  // Load only the latest 100 messages initially; older messages are fetched on scroll.
-  const initialChatQuery=query(collection(db,'chatMessages'),orderBy('createdAt','desc'),limit(50));
-  chatUnsubscribe=onSnapshot(initialChatQuery,snap=>{
-    const next=snap.docs.map(d=>{const data=d.data();return {id:d.id,...data,source:'chat-message',text:String(data.text??data.message??data.content??''),authorName:data.authorName??data.author??data.userName??'Сотрудник',createdAt:data.createdAt??data.timestamp??data.sentAt??data.date,photos:Array.isArray(data.photos)?data.photos:(Array.isArray(data.images)?data.images:[])};}).filter(m=>String(m.text||'').trim()||Array.isArray(m.photos)&&m.photos.length).sort((x,y)=>{const date=v=>v?.toMillis?v.toMillis():new Date(v||0).getTime();return date(x.createdAt)-date(y.createdAt)||String(x.id).localeCompare(String(y.id));});
+  // Listen to the full collection and sort client-side. This also handles legacy
+  // messages whose createdAt field has a different Firestore type; orderBy(createdAt)
+  // can otherwise push newly sent messages out of the limited result set.
+  chatUnsubscribe=onSnapshot(collection(db,'chatMessages'),snap=>{
+    const next=snap.docs.map(d=>{const data=d.data();return {id:d.id,...data,source:'chat-message',text:String(data.text??data.message??data.content??''),authorName:data.authorName??data.author??data.userName??'Сотрудник',createdAt:data.createdAt??data.timestamp??data.sentAt??data.date,photos:Array.isArray(data.photos)?data.photos:(Array.isArray(data.images)?data.images:[])};}).filter(m=>String(m.text||'').trim()||Array.isArray(m.photos)&&m.photos.length).sort((x,y)=>{const date=v=>{if(v?.toMillis)return v.toMillis();if(v instanceof Date)return v.getTime();if(typeof v==='number')return v;const parsed=Date.parse(v||'');return Number.isFinite(parsed)?parsed:0;};return date(x.createdAt)-date(y.createdAt)||String(x.id).localeCompare(String(y.id));});
     const box=$('chatMessages');
     const oldTop=box?.scrollTop||0, oldHeight=box?.scrollHeight||0;
     const wasAtBottom=!!box&&(box.scrollHeight-box.clientHeight-box.scrollTop<80);
-    const previousIds=new Set(chatMessages.map(m=>m.id));
+    const previousIds=new Set([...chatMessages,...olderChatMessages].map(m=>m.id));
     const hasNewIncoming=next.some(m=>!previousIds.has(m.id)&&m.authorId!==signedInUser?.uid);
-    chatMessages=next;
-    chatOldestCursor=snap.docs.length?snap.docs[snap.docs.length-1]:null;
-    hasOlderChatMessages=snap.docs.length===50;
+    chatMessages=next.slice(-50);
+    olderChatMessages=next.slice(0,-50);
+    chatOldestCursor=null;
+    hasOlderChatMessages=false;
     renderChatMessages({preserveScroll:true,oldTop,oldHeight,wasAtBottom,scrollToNew:hasNewIncoming&&wasAtBottom});
     markChatMessagesRead(chatMessages);
   },err=>{

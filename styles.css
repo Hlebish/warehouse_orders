@@ -7880,3 +7880,24 @@ body.overlay-window-open .toast-stack .defect-toast {
 .defect-work-photo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px}
 .defect-work-photo-grid img{width:100%;height:150px;object-fit:cover;border:1px solid var(--line,#303943);border-radius:8px;cursor:zoom-in}
 @media(max-width:600px){.defect-work-section{padding:9px}.defect-work-card{padding:9px}.defect-work-heading{align-items:flex-start}.defect-work-pending-count,.defect-work-all-done{font-size:9px}}
+
+
+/* Defects live directly inside the order comments/history timeline */
+.defect-comment-box{margin-top:10px;padding:12px;border:1px solid var(--line,#343d47);border-radius:10px;background:var(--surface-2,#1a2027)}
+.defect-comment-pending{border-left:3px solid #d7a64c}
+.defect-comment-resolved{border-left:3px solid #697786}
+.defect-comment-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.defect-comment-heading>b{font-size:12px;color:var(--text,#e8edf3)}
+.defect-comment-status{font-size:10px;font-weight:700;padding:4px 7px;border-radius:5px;background:#332a1d;color:#f1c36e}
+.defect-comment-resolved .defect-comment-status{background:#252c34;color:#b8c2cf}
+.defect-comment-article{font-size:12px;margin-top:9px;color:var(--muted,#9aa4b2)}
+.defect-comment-article b{color:var(--text,#e8edf3);overflow-wrap:anywhere}
+.defect-comment-photos{display:grid;grid-template-columns:repeat(auto-fill,minmax(105px,145px));gap:8px;margin-top:10px}
+.defect-comment-photos img{width:100%;height:115px;object-fit:cover;border-radius:7px;border:1px solid var(--line,#343d47);cursor:zoom-in}
+.defect-comment-no-photos{margin-top:9px;font-size:11px;color:var(--muted,#8994a2)}
+.defect-comment-hint{margin-top:10px;font-size:11px;color:var(--muted,#a6b0bd)}
+.defect-comment-decision{margin-top:10px;font-size:11px;line-height:1.5;color:var(--muted,#a6b0bd);padding-top:9px;border-top:1px solid var(--line,#343d47)}
+.defect-comment-decision p{margin:5px 0 0;white-space:pre-wrap;overflow-wrap:anywhere}
+.defect-comment-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}
+.defect-comment-actions .small-button{min-height:32px}
+@media(max-width:600px){.defect-comment-box{padding:9px}.defect-comment-photos{grid-template-columns:repeat(auto-fill,minmax(88px,1fr))}.defect-comment-photos img{height:100px}.defect-comment-actions .small-button{flex:1 1 130px}}

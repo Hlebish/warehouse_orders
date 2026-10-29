@@ -7901,3 +7901,5 @@ body.overlay-window-open .toast-stack .defect-toast {
 .defect-comment-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}
 .defect-comment-actions .small-button{min-height:32px}
 @media(max-width:600px){.defect-comment-box{padding:9px}.defect-comment-photos{grid-template-columns:repeat(auto-fill,minmax(88px,1fr))}.defect-comment-photos img{height:100px}.defect-comment-actions .small-button{flex:1 1 130px}}
+
+.defect-comment-description{font-size:12px;line-height:1.5;margin-top:8px;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--text,#dce2ea)}

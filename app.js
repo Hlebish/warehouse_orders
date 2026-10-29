@@ -125,7 +125,7 @@ function watchNotifications(){
     const created=asDate(n.createdAt||n.at)?.getTime();
     return Number.isFinite(created)&&created>=listenerStartedAt-5000&&Date.now()-created<=60000;
   };
-  const q=query(collection(db,'users',signedInUser.uid,'notifications'),orderBy('createdAt','desc'),limit(100));
+  const q=query(collection(db,'users',signedInUser.uid,'notifications'),orderBy('createdAt','desc'),limit(50));
   notificationsUnsubscribe=onSnapshot(q,snap=>{
     const next=snap.docs.map(d=>({id:d.id,...d.data(),at:d.data().createdAt||d.data().at||isoNow()}));
     if(!initialSnapshot){
@@ -2144,7 +2144,7 @@ function renderChatMessages(options={}){
   const previousScrollTop=Number.isFinite(options.oldTop)?options.oldTop:box.scrollTop;
   const queryText=chatFilterText.toLocaleLowerCase('ru');
   const activeChatFilter=$('chatFilter')?.value||chatFilterMode||'all';
-  const orderCommentMessages=state.orders.flatMap(o=>(o.entries||[]).filter(e=>e.kind==='comment'&&String(e.text||'').trim()).map(e=>({id:'order-comment-'+o.id+'-'+e.id,source:'order-comment',orderId:o.id,orderNumber:o.number,client:o.client||'',authorName:e.author||'Сотрудник',text:e.text||'',createdAt:e.createdAt||o.createdAt,photos:Array.isArray(e.photos)?e.photos:[]})));
+  const orderCommentMessages=state.orders.flatMap(o=>(o.entries||[]).filter(e=>e.kind==='comment'&&String(e.text||'').trim()).map(e=>({id:'order-comment-'+o.id+'-'+e.id,source:'order-comment',orderId:o.id,orderNumber:o.number,client:o.client||'',authorName:e.author||'Сотрудник',text:e.text||'',createdAt:e.createdAt||o.createdAt,photos:Array.isArray(e.photos)?e.photos:[]}))).sort((x,y)=>{const time=v=>v?.toMillis?v.toMillis():new Date(v||0).getTime();return time(y.createdAt)-time(x.createdAt)}).slice(0,30);
   // Always combine the latest snapshot with order comments; do not reuse a stale timeline cache.
   const combinedMessages=[...olderChatMessages,...chatMessages,...orderCommentMessages].sort((x,y)=>{const time=v=>v?.toMillis?v.toMillis():new Date(v||0).getTime();return time(x.createdAt)-time(y.createdAt)||String(x.id).localeCompare(String(y.id))});
   // Keep ordinary staff chat messages at the end of the default All timeline so order comments cannot push them out of the visible bottom area.
@@ -2224,7 +2224,7 @@ function openChat(){
     const hasNewIncoming=next.some(m=>!previousIds.has(m.id)&&m.authorId!==signedInUser?.uid);
     chatMessages=next;
     chatOldestCursor=snap.docs.length?snap.docs[snap.docs.length-1]:null;
-    hasOlderChatMessages=snap.docs.length===100;
+    hasOlderChatMessages=snap.docs.length===50;
     renderChatMessages({preserveScroll:true,oldTop,oldHeight,wasAtBottom,scrollToNew:hasNewIncoming&&wasAtBottom});
     markChatMessagesRead(chatMessages);
   },err=>{

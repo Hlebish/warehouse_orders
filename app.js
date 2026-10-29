@@ -125,7 +125,7 @@ function watchNotifications(){
     const created=asDate(n.createdAt||n.at)?.getTime();
     return Number.isFinite(created)&&created>=listenerStartedAt-5000&&Date.now()-created<=60000;
   };
-  const q=query(collection(db,'users',signedInUser.uid,'notifications'),orderBy('createdAt','desc'),limit(50));
+  const q=query(collection(db,'users',signedInUser.uid,'notifications'),orderBy('createdAt','desc'),limit(100));
   notificationsUnsubscribe=onSnapshot(q,snap=>{
     const next=snap.docs.map(d=>({id:d.id,...d.data(),at:d.data().createdAt||d.data().at||isoNow()}));
     if(!initialSnapshot){
@@ -218,7 +218,7 @@ function watchChatBadge(){
     const created=asDate(m.createdAt)?.getTime();
     return Number.isFinite(created)&&created>=listenerStartedAt-5000&&Date.now()-created<=60000;
   };
-  const q=query(collection(db,'chatMessages'),orderBy('createdAt','desc'),limit(100));
+  const q=query(collection(db,'chatMessages'),orderBy('createdAt','desc'),limit(50));
   chatBadgeUnsubscribe=onSnapshot(q,snap=>{
     const messages=snap.docs.map(d=>({id:d.id,...(d.data()||{})}));
     if(!initialSnapshot){
@@ -2214,7 +2214,7 @@ function openChat(){
   chatMessages=[];olderChatMessages=[];chatOldestCursor=null;hasOlderChatMessages=false;loadingOlderChatMessages=false;chatPendingScrollRestore=null;chatReplyTo=null;chatFilterText='';chatFilterMode='all';
   showModal('Общий чат','<div class="chat-shell"><div class="chat-toolbar">'+(canManageUsers?'<button type="button" class="small-button primary-soft" data-action="test-push-notification">🔔 Проверка уведомления</button>':'')+'<label class="search-box"><span>⌕</span><input id="chatSearch" type="search" placeholder="Поиск по чату"></label><select id="chatFilter"><option value="all">Все сообщения</option><option value="mine">Мои</option><option value="replies">С ответами</option><option value="photos">С фото</option></select></div><div class="chat-messages" id="chatMessages"><div class="chat-empty">Загрузка сообщений…</div></div><form id="chatForm" class="chat-form"><div id="chatReplyPreview" class="chat-reply-preview" hidden></div><div class="chat-input-wrap"><textarea id="chatInput" maxlength="1000" rows="2" placeholder="Напишите сообщение… (можно вставить фото из буфера)" autocomplete="off"></textarea><div id="chatMentionSuggestions" class="chat-mention-suggestions" hidden></div></div><div class="chat-attach-row"><label class="chat-attach-button">📎 Фото<input id="chatPhotoInput" type="file" accept="image/*" multiple hidden></label><span id="chatPhotoHint">До 5 фото, по 8 МБ</span></div><div id="chatUploadProgress" class="chat-upload-progress" hidden><div class="chat-upload-progress-track"><div id="chatUploadProgressBar" class="chat-upload-progress-bar"></div></div><span id="chatUploadProgressText">Загрузка…</span></div><div id="chatPhotoPreview" class="chat-photo-preview"></div></form></div>',[button('Закрыть','close'),button('Отправить','send-chat','primary-button')],'ОБЩИЙ ЧАТ');
   // Load only the latest 100 messages initially; older messages are fetched on scroll.
-  const initialChatQuery=query(collection(db,'chatMessages'),orderBy('createdAt','desc'),limit(100));
+  const initialChatQuery=query(collection(db,'chatMessages'),orderBy('createdAt','desc'),limit(50));
   chatUnsubscribe=onSnapshot(initialChatQuery,snap=>{
     const next=snap.docs.map(d=>{const data=d.data();return {id:d.id,...data,source:'chat-message',text:String(data.text??data.message??data.content??''),authorName:data.authorName??data.author??data.userName??'Сотрудник',createdAt:data.createdAt??data.timestamp??data.sentAt??data.date,photos:Array.isArray(data.photos)?data.photos:(Array.isArray(data.images)?data.images:[])};}).filter(m=>String(m.text||'').trim()||Array.isArray(m.photos)&&m.photos.length).sort((x,y)=>{const date=v=>v?.toMillis?v.toMillis():new Date(v||0).getTime();return date(x.createdAt)-date(y.createdAt)||String(x.id).localeCompare(String(y.id));});
     const box=$('chatMessages');

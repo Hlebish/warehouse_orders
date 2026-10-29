@@ -7852,3 +7852,31 @@ body.overlay-window-open .toast-stack .defect-toast {
 /* Make the client the primary identifier in the returns register */
 .returns-client-primary{font-size:14px;font-weight:750;line-height:1.3;color:var(--text,#e7ebf0);overflow-wrap:anywhere}
 .returns-order-sub{margin-top:2px;font-size:9px;font-weight:500;color:var(--muted,#8993a0)}
+
+
+/* Clear, grouped defect workflow inside the order card */
+.defect-work-section{margin:14px 0 16px;padding:13px;border:1px solid var(--line,#303943);border-radius:12px;background:var(--surface-2,#171c22)}
+.defect-work-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.defect-work-heading .detail-section-title{margin:0}
+.defect-work-heading p{margin:4px 0 0;color:var(--muted,#9aa4b2);font-size:11px}
+.defect-work-pending-count,.defect-work-all-done{display:inline-flex;align-items:center;border-radius:6px;padding:5px 8px;font-size:10px;font-weight:700}
+.defect-work-pending-count{color:#f1c36e;background:#332a1d;border:1px solid #5b4526}
+.defect-work-all-done{color:#8bd8b2;background:#1b3028;border:1px solid #2a5745}
+.defect-work-list{display:grid;gap:8px}
+.defect-work-card{padding:11px 12px;border:1px solid var(--line,#303943);border-radius:9px;background:var(--surface,#14191f);min-width:0}
+.defect-work-card.is-pending{border-left:3px solid #d7a64c}
+.defect-work-card.is-resolved{border-left:3px solid #65717e}
+.defect-work-top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.defect-work-title{display:flex;align-items:center;gap:7px;flex-wrap:wrap;min-width:0}
+.defect-work-title>b{font-size:12px;overflow-wrap:anywhere;color:var(--text,#e7ebf0)}
+.defect-work-top>small{font-size:10px;color:var(--muted,#8993a0)}
+.defect-work-status{font-size:9px;font-weight:700;border-radius:5px;padding:3px 6px}
+.defect-work-status.pending{color:#f1c36e;background:#332a1d}
+.defect-work-status.resolved{color:#aab4c0;background:#252c34}
+.defect-work-description{font-size:12px;line-height:1.45;white-space:pre-wrap;overflow-wrap:anywhere;margin-top:8px;color:var(--text,#d9dee6)}
+.defect-work-meta{display:flex;flex-wrap:wrap;gap:6px 12px;margin-top:7px;font-size:10px;color:var(--muted,#929daa)}
+.defect-work-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.defect-work-actions .small-button{min-height:30px}
+.defect-work-photo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px}
+.defect-work-photo-grid img{width:100%;height:150px;object-fit:cover;border:1px solid var(--line,#303943);border-radius:8px;cursor:zoom-in}
+@media(max-width:600px){.defect-work-section{padding:9px}.defect-work-card{padding:9px}.defect-work-heading{align-items:flex-start}.defect-work-pending-count,.defect-work-all-done{font-size:9px}}

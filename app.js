@@ -1932,7 +1932,7 @@ async function toggleExtraPhoneNotifications(){if(!signedInUser)return;const pre
 let chatMessages=[],olderChatMessages=[],chatOldestCursor=null,hasOlderChatMessages=false,loadingOlderChatMessages=false,chatPendingScrollRestore=null;
 let knownChatPeople=[];
 let chatMentionPeopleLoading=false;
-async async function loadCurrentChatPeople(){
+async function loadCurrentChatPeople(){
   if(chatMentionPeopleLoading||!signedInUser)return;
   chatMentionPeopleLoading=true;
   try{

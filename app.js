@@ -2031,7 +2031,7 @@ function entryMentionSuggestions(){
   const match=value.match(/(?:^|[\s])@([\p{L}\p{N}_-]*)$/u);
   if(!match){list.hidden=true;list.innerHTML='';return;}
   const needle=match[1].toLocaleLowerCase('ru');
-  const people=[...new Map([...knownChatPeople,...chatMessages.filter(m=>m.authorId&&m.authorName).map(m=>({id:m.authorId,name:chatDisplayName(m.authorName)}))].filter(p=>p.id&&p.name).map(p=>[p.id,p])).values()]
+  const people=[...new Map(knownChatPeople.filter(p=>p.id&&p.name&&p.active!==false).map(p=>[p.id,p])).values()]
     .filter(p=>p.id!==signedInUser?.uid)
     .filter(p=>chatMentionToken(p.name).toLocaleLowerCase('ru').startsWith(needle))
     .slice(0,6);
@@ -2312,7 +2312,7 @@ function openChat(){
       });
       if(chatReplyTo){await queuePush(profileName,text||'📷 Фото',signedInUser.uid,'','chat','replies',chatReplyTo.authorId,{isReply:true});}else{await queuePush(profileName,text||'📷 Фото',signedInUser.uid,'','chat','chat');}
       const mentionedTokens=[...text.matchAll(/(^|[\s])@([\p{L}\p{N}_-]{2,})/gu)].map(x=>x[2].toLocaleLowerCase('ru'));
-      const mentionedUsers=[...new Map(chatMessages.map(m=>[m.authorId,{id:m.authorId,name:chatDisplayName(m.authorName)}])).values()]
+      const mentionedUsers=[...new Map(knownChatPeople.filter(p=>p.id&&p.name&&p.active!==false).map(p=>[p.id,p])).values()]
         .filter(p=>p.id&&p.id!==signedInUser.uid&&mentionedTokens.includes(chatMentionToken(p.name).toLocaleLowerCase('ru')));
       for(const person of mentionedUsers){
         await queuePush(profileName,text||'📷 Фото',signedInUser.uid,'','chat','replies',person.id,{isMention:true});

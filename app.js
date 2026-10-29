@@ -2253,6 +2253,18 @@ function openChat(){
   chatScrollBox?.addEventListener('scroll',()=>{if(chatScrollBox.scrollTop<60)loadOlderChatMessages();},{passive:true});
   $('chatInput').addEventListener('input',chatMentionSuggestions);$('chatSearch')?.addEventListener('input',e=>{chatFilterText=e.target.value||'';renderChatMessages();});const chatFilterSelect=$('chatFilter');if(chatFilterSelect){chatFilterSelect.value='all';chatFilterMode='all';chatFilterSelect.addEventListener('change',e=>{chatFilterMode=e.target.value||'all';renderChatMessages();});}
   $('chatInput').addEventListener('keyup',chatMentionSuggestions);
+  // Enter sends a chat message; Shift+Enter keeps a line break.
+  $('chatInput').addEventListener('keydown',event=>{
+    if(event.key==='Enter'&&!event.shiftKey&&!event.isComposing){
+      event.preventDefault();
+      $('chatForm')?.requestSubmit();
+    }
+  });
+  // Keep the visible footer button wired directly to this form as a fallback.
+  document.querySelector('[data-action="send-chat"]')?.addEventListener('click',event=>{
+    event.preventDefault();
+    $('chatForm')?.requestSubmit();
+  });
   let chatSending=false;
   $('chatForm').addEventListener('submit',async e=>{
     e.preventDefault();

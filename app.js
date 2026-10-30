@@ -1,6 +1,6 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js';
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signInWithCredential, signOut, sendPasswordResetEmail, createUserWithEmailAndPassword, updatePassword, EmailAuthProvider, reauthenticateWithCredential, GoogleAuthProvider, signInWithPopup, linkWithCredential, setPersistence, browserLocalPersistence } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js';
-import { getFirestore, collection, doc, onSnapshot, setDoc, deleteDoc, getDocs, getDocsFromServer, getDoc, updateDoc, writeBatch, runTransaction, serverTimestamp, query, orderBy, limit, startAfter, arrayUnion, arrayRemove } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
+import { getFirestore, collection, doc, onSnapshot, setDoc, deleteDoc, getDocs, getDocsFromServer, getDoc, getDocFromServer, updateDoc, writeBatch, runTransaction, serverTimestamp, query, orderBy, limit, startAfter, arrayUnion, arrayRemove } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
 import { getStorage, ref as storageRef, uploadBytes, uploadBytesResumable, getDownloadURL, deleteObject } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-storage.js';
 import { getMessaging, getToken, deleteToken, onMessage } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-messaging.js';
 import { firebaseConfig, vapidKey } from './firebase-config.js';
@@ -1868,36 +1868,47 @@ async function setStatus(status,text,kind='system'){
  if(status==='Перенесен'){o.transferredAt=now;statusUpdate.transferredAt=now;}
  if(previous==='Перенесен'&&status!=='Перенесен'){o.resumedAt=now;statusUpdate.resumedAt=now;}
  try{
+  // A cached order can remain visible after it was deleted elsewhere while this
+  // device was offline. Verify against the server before attempting updateDoc.
+  const orderRef=doc(db,'orders',o.id);
+  const serverOrder=await getDocFromServer(orderRef);
+  if(!serverOrder.exists()){
+   state.orders=state.orders.filter(item=>item.id!==o.id);
+   serverCache.delete(o.id);
+   entryUnsubscribes.get(o.id)?.();
+   entryUnsubscribes.delete(o.id);
+   selectedId=null;
+   closeModal();
+   render();
+   toast('Этот заказ уже удалён или недоступен на сервере. Список обновлён.');
+   return;
+  }
+  await updateDoc(orderRef,statusUpdate);
   o.status=status;
-  // Save the order and its history entry concurrently; neither waits for the other.
-  await Promise.all([
-   updateDoc(doc(db,'orders',o.id),statusUpdate),
-   setDoc(doc(db,'orders',o.id,'entries',entry.id),entryToCloud(entry))
-  ]);
-  o.entries.push(entry);
-  serverCache.set(o.id,{...serverCache.get(o.id),...o});
-  // Show the saved status immediately; slower auxiliary tasks continue in the background.
+  Object.assign(o,statusUpdate);
+  serverCache.set(o.id,{...(serverCache.get(o.id)||o),...o});
   render();
   notify(`Заказ № ${o.number}: ${status}`,o.id);
-  // A manual status change should finish at the main orders screen, not reopen the order.
   orderReturnModalSnapshot=null;
   selectedId=null;
   closeModal();
+  // The status is the critical action. History, audit and push delivery must
+  // not keep the user waiting after Firestore confirms the status update.
   void (async()=>{
+   try{
+    await setDoc(doc(db,'orders',o.id,'entries',entry.id),entryToCloud(entry));
+    o.entries=Array.isArray(o.entries)?o.entries:[];
+    o.entries.push(entry);
+    serverCache.set(o.id,{...(serverCache.get(o.id)||o),entries:[...o.entries]});
+   }catch(historyErr){console.error('Не удалось записать историю изменения статуса',historyErr);toast('Статус сохранён, но запись в историю не добавилась.');}
    if(['Отгружен кладовщиком','Клиент забрал самовывозом'].includes(status)&&!['Отгружен кладовщиком','Клиент забрал самовывозом'].includes(previous)){
-    try{
-     await markBuybackArticlesSoldForOrder({...o,_previousStatusForBuyback:previous});
-    }catch(buybackErr){
-     console.error('Не удалось автоматически отметить перекупной товар проданным',buybackErr);
-     toast('Заказ сохранён, но перекупной товар не обновлён автоматически.');
-    }
+    try{await markBuybackArticlesSoldForOrder({...o,_previousStatusForBuyback:previous});}
+    catch(buybackErr){console.error('Не удалось автоматически отметить перекупной товар проданным',buybackErr);toast('Заказ сохранён, но перекупной товар не обновлён автоматически.');}
    }
-   try{
-    await writeAudit('Изменён статус заказа',text,o.id,{previousStatus:previous,newStatus:status});
-   }catch(auditErr){console.error('Не удалось записать аудит изменения статуса',auditErr);}
-   try{
-    await queuePush(`${o.client||'Клиент не указан'} · ${status}`,text,signedInUser.uid,o.id);
-   }catch(pushErr){console.error('Не удалось отправить уведомление об изменении статуса',pushErr);}
+   try{await writeAudit('Изменён статус заказа',text,o.id,{previousStatus:previous,newStatus:status});}
+   catch(auditErr){console.error('Не удалось записать аудит изменения статуса',auditErr);}
+   try{await queuePush(`${o.client||'Клиент не указан'} · ${status}`,text,signedInUser.uid,o.id);}
+   catch(pushErr){console.error('Не удалось отправить уведомление об изменении статуса',pushErr);}
   })();
  }catch(err){
   o.status=previous;

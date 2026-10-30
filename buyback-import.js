@@ -49,7 +49,7 @@ function parseInvoice(raw) {
     // 1C print-form copy often starts each row with one or more EMPTY tab cells.
     // Find the row number and the following non-empty article cell instead of
     // assuming they are parts[0] and parts[1].
-    if (parts.length >= 5 && /^\\d+$/.test(parts[0] || '')) {
+    if (parts.length >= 5 && parts.some((part, i) => i < 4 && /^\\d+$/.test(part || ''))) {
       const rowIndex = parts.findIndex(part => /^\\d+$/.test(part));
       if (rowIndex >= 0) {
         const articleIndex = parts.findIndex((part, i) => i > rowIndex && Boolean(part));

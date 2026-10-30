@@ -46,7 +46,35 @@ function parseInvoice(raw) {
     let parts = original.includes('\t')
       ? original.split('\t').map(x => x.trim())
       : line.split(/\s{2,}/).map(x => x.trim());
-    // Preserve the printed 1C table columns: №, article, name, quantity, unit, prices.
+    // 1C exports article cells as a single tab column, but some articles contain
+    // spaces (for example "MPM 05004" and "A HYA 2276"). Empty tab cells are
+    // meaningful separators, so locate the article by its position, not a token regex.
+    if (original.includes('\t') && /^\d+$/.test(parts[0] || '') && parts.length >= 5) {
+      const article = String(parts[1] || '').replace(/\s+/g, ' ').trim();
+      const articleValid = /^(?=.*\d)[A-ZА-ЯІЇЄҐ0-9][A-ZА-ЯІЇЄҐ0-9.\/_ -]{2,}$/i.test(article);
+      let name = '';
+      let nameIndex = -1;
+      for (let i = 2; i < parts.length; i++) {
+        if (!parts[i]) continue;
+        if (isQuantity(parts[i]) || isUnit(parts[i]) || /^\d+[,.]\d{2}$/.test(parts[i])) break;
+        name = name ? name + ' ' + parts[i] : parts[i];
+        nameIndex = i;
+      }
+      let quantity = 1;
+      if (nameIndex >= 0) {
+        for (let i = nameIndex + 1; i < parts.length; i++) {
+          if (isQuantity(parts[i])) {
+            quantity = Math.max(0.01, Number(parts[i].replace(',', '.')) || 1);
+            break;
+          }
+        }
+      }
+      if (articleValid && name && !/^(артикул|код|товар|найменування|наименование|кількість|количество)$/i.test(name)) {
+        rows.push({ article, name, quantity });
+      }
+      continue;
+    }
+    // Fallback for legacy copied layouts without tab separators.
     let articleIndex = parts.findIndex((part, i) => i > 0 && /^(?=.*\d)[A-ZА-ЯІЇЄҐ0-9][A-ZА-ЯІЇЄҐ0-9.\/_-]{4,}$/i.test(part));
     if (articleIndex >= 0) {
       const article = parts[articleIndex];
@@ -57,23 +85,10 @@ function parseInvoice(raw) {
         name = name ? name + ' ' + parts[i] : parts[i];
       }
       let quantity = 1;
-      for (let i = articleIndex + 2; i < parts.length; i++) {
-        if (isQuantity(parts[i]) && (isUnit(parts[i + 1]) || isUnit(parts[i - 1]))) {
-          quantity = Math.max(0.01, Number(parts[i].replace(',', '.')) || 1);
-          break;
-        }
+      for (let i = articleIndex + 1; i < parts.length; i++) {
+        if (isQuantity(parts[i])) { quantity = Math.max(0.01, Number(parts[i].replace(',', '.')) || 1); break; }
       }
-      // Also support text copied without tabs or with columns collapsed into spaces.
-      if (!name || !parts.some(isUnit)) {
-        const compact = line.match(/^\s*\d+\s+([A-ZА-ЯІЇЄҐ0-9][A-ZА-ЯІЇЄҐ0-9.\/_-]{4,})\s+(.+?)\s+(\d+(?:[,.]\d+)?)\s*(?:шт\.?|штук|pcs?\.?|од\.?|одиниц|компл\.?|комплект|упак\.?|упаковка|пара|кг|г|л|м)(?=\s|$)/i);
-        if (compact) {
-          name = compact[2].trim();
-          quantity = Math.max(0.01, Number(compact[3].replace(',', '.')) || 1);
-        }
-      }
-      if (articlePattern.test(article) && name && !/^(артикул|код|товар|найменування|наименование|кількість|количество)$/i.test(name)) {
-        rows.push({ article, name, quantity });
-      }
+      if (articlePattern.test(article) && name) rows.push({ article, name, quantity });
       continue;
     }
     // Fallback for older pasted layouts where the article is not a standalone tab column.

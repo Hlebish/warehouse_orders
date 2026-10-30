@@ -7930,8 +7930,8 @@ body:has(.buyback-overlay:not([hidden])) .toast-stack .defect-toast {
 .defect-comment-description{font-size:12px;line-height:1.5;margin-top:8px;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--text,#dce2ea)}
 
 
-/* Desktop/Electron: keep every dialog inside the visible window and scroll its content.
-   The page behind a dialog is locked, so the dialog itself must own the scroll area. */
+/* Desktop/Electron: dialogs scroll as a whole. Avoid flex-shrinking an
+   auto-height modal body to zero when the dialog is shorter than its content. */
 @media(min-width:761px){
   .modal-backdrop{
     display:flex!important;
@@ -7943,28 +7943,37 @@ body:has(.buyback-overlay:not([hidden])) .toast-stack .defect-toast {
     overscroll-behavior:contain;
   }
   .modal-backdrop>.modal{
-    display:flex!important;
-    flex-direction:column!important;
+    display:block!important;
     width:min(760px,100%)!important;
+    height:auto!important;
     max-height:calc(100vh - 36px)!important;
     max-height:calc(100dvh - 36px)!important;
     min-height:0!important;
     margin:auto!important;
-    overflow:hidden!important;
-  }
-  .modal-backdrop>.modal>.modal-head,
-  .modal-backdrop>.modal>.modal-foot{
-    flex:0 0 auto!important;
-  }
-  .modal-backdrop>.modal>.modal-body{
-    flex:1 1 auto!important;
-    min-height:0!important;
-    overflow-y:auto!important;
     overflow-x:hidden!important;
+    overflow-y:auto!important;
     overscroll-behavior:contain;
     scrollbar-gutter:stable;
   }
+  .modal-backdrop>.modal>.modal-head,
+  .modal-backdrop>.modal>.modal-foot{
+    flex:none!important;
+  }
+  .modal-backdrop>.modal>.modal-body{
+    display:block!important;
+    height:auto!important;
+    max-height:none!important;
+    min-height:0!important;
+    overflow:visible!important;
+  }
+  .modal-backdrop>.modal:has(.chat-shell){
+    display:flex!important;
+    flex-direction:column!important;
+    overflow:hidden!important;
+  }
   .modal-backdrop>.modal:has(.chat-shell)>.modal-body{
+    flex:1 1 0!important;
+    min-height:0!important;
     overflow:hidden!important;
   }
 }

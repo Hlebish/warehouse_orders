@@ -46,50 +46,50 @@ function parseInvoice(raw) {
     let parts = original.includes('\t')
       ? original.split('\t').map(x => x.trim())
       : line.split(/\s{2,}/).map(x => x.trim());
-    // 1C exports article cells as a single tab column, but some articles contain
-    // spaces (for example "MPM 05004" and "A HYA 2276"). Empty tab cells are
-    // meaningful separators, so locate the article by its position, not a token regex.
-    if (original.includes('\t') && /^\d+$/.test(parts[0] || '') && parts.length >= 5) {
-      const article = String(parts[1] || '').replace(/\s+/g, ' ').trim();
-      const articleValid = /^(?=.*\d)[A-ZА-ЯІЇЄҐ0-9][A-ZА-ЯІЇЄҐ0-9.\/_ -]{2,}$/i.test(article);
-      let name = '';
-      let nameIndex = -1;
-      for (let i = 2; i < parts.length; i++) {
-        if (!parts[i]) continue;
-        if (isQuantity(parts[i]) || isUnit(parts[i]) || /^\d+[,.]\d{2}$/.test(parts[i])) break;
-        name = name ? name + ' ' + parts[i] : parts[i];
-        nameIndex = i;
-      }
-      let quantity = 1;
-      if (nameIndex >= 0) {
-        // Quantity is the number immediately before the unit column ("шт"),
-        // while prices and totals later in the row are also numeric.
-        const unitIndex = parts.findIndex((part, i) => i > nameIndex && isUnit(part));
-        if (unitIndex > nameIndex) {
-          for (let i = unitIndex - 1; i > nameIndex; i--) {
-            if (parts[i] && isQuantity(parts[i])) {
-              quantity = Math.max(0.01, Number(parts[i].replace(',', '.')) || 1);
-              break;
+    // 1C print-form copy often starts each row with one or more EMPTY tab cells.
+    // Find the row number and the following non-empty article cell instead of
+    // assuming they are parts[0] and parts[1].
+    if (original.includes('\t') && parts.length >= 5) {
+      const rowIndex = parts.findIndex(part => /^\\d+$/.test(part));
+      if (rowIndex >= 0) {
+        const articleIndex = parts.findIndex((part, i) => i > rowIndex && Boolean(part));
+        const article = String(parts[articleIndex] || '').replace(/\\s+/g, ' ').trim();
+        const articleValid = /^(?=.*\\d)[A-ZА-ЯІЇЄҐ0-9][A-ZА-ЯІЇЄҐ0-9.\\/_ -]{2,}$/i.test(article);
+        let name = '';
+        let nameIndex = -1;
+        for (let i = articleIndex + 1; i < parts.length; i++) {
+          if (!parts[i]) continue;
+          if (isQuantity(parts[i]) || isUnit(parts[i]) || /^\\d+[,.]\\d{2}$/.test(parts[i])) break;
+          name = name ? name + ' ' + parts[i] : parts[i];
+          nameIndex = i;
+        }
+        let quantity = 1;
+        if (nameIndex >= 0) {
+          const unitIndex = parts.findIndex((part, i) => i > nameIndex && isUnit(part));
+          if (unitIndex > nameIndex) {
+            for (let i = unitIndex - 1; i > nameIndex; i--) {
+              if (parts[i] && isQuantity(parts[i])) {
+                quantity = Math.max(0.01, Number(parts[i].replace(',', '.')) || 1);
+                break;
+              }
+            }
+          }
+          if (quantity === 1) {
+            for (let i = nameIndex + 1; i < parts.length; i++) {
+              if (!parts[i]) continue;
+              if (/^\\d{1,3}(?:[ \\u00a0]\\d{3})*[,.]\\d{2}$/.test(parts[i])) break;
+              if (isQuantity(parts[i])) {
+                quantity = Math.max(0.01, Number(parts[i].replace(',', '.')) || 1);
+                break;
+              }
             }
           }
         }
-        // Fallback for exports where the unit column is blank or omitted:
-        // take the first numeric cell before the first price cell.
-        if (quantity === 1) {
-          for (let i = nameIndex + 1; i < parts.length; i++) {
-            if (!parts[i]) continue;
-            if (/^\d{1,3}(?:[ \u00a0]\d{3})*[,.]\d{2}$/.test(parts[i])) break;
-            if (isQuantity(parts[i])) {
-              quantity = Math.max(0.01, Number(parts[i].replace(',', '.')) || 1);
-              break;
-            }
-          }
+        if (articleValid && name && !/^(артикул|код|товар|найменування|наименование|кількість|количество)$/i.test(name)) {
+          rows.push({ article, name, quantity });
         }
+        continue;
       }
-      if (articleValid && name && !/^(артикул|код|товар|найменування|наименование|кількість|количество)$/i.test(name)) {
-        rows.push({ article, name, quantity });
-      }
-      continue;
     }
     // Fallback for legacy copied layouts without tab separators.
     let articleIndex = parts.findIndex((part, i) => i > 0 && /^(?=.*\d)[A-ZА-ЯІЇЄҐ0-9][A-ZА-ЯІЇЄҐ0-9.\/_-]{4,}$/i.test(part));

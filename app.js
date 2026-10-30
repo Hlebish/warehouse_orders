@@ -3082,7 +3082,9 @@ document.addEventListener('keydown',e=>{
 document.addEventListener('submit',e=>e.preventDefault());
 // Restore the already-running app without leaving the startup loader over it.
 window.addEventListener('warehouse-app-resumed',()=>{
- if(signedInUser){watchOrders();}
+ // Firestore onSnapshot listeners reconnect automatically after Android resumes.
+ // Restarting watchOrders here re-reads the entire orders collection and makes
+ // the shipment screen flash/reload on every app foreground transition.
  const shell=document.querySelector('.app-shell');
  const gate=$('authGate');
  if((signedInUser&&shell&&!shell.hidden)||(gate&&!gate.hidden))finishInitialLoading();

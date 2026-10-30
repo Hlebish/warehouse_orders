@@ -49,17 +49,17 @@ function parseInvoice(raw) {
     // 1C print-form copy often starts each row with one or more EMPTY tab cells.
     // Find the row number and the following non-empty article cell instead of
     // assuming they are parts[0] and parts[1].
-    if (parts.length >= 5 && parts.some((part, i) => i < 4 && /^\\d+$/.test(part || ''))) {
-      const rowIndex = parts.findIndex(part => /^\\d+$/.test(part));
+    if (parts.length >= 5 && parts.some((part, i) => i < 4 && /^\d+$/.test(part || ''))) {
+      const rowIndex = parts.findIndex(part => /^\d+$/.test(part));
       if (rowIndex >= 0) {
         const articleIndex = parts.findIndex((part, i) => i > rowIndex && Boolean(part));
-        const article = String(parts[articleIndex] || '').replace(/\\s+/g, ' ').trim();
-        const articleValid = /^(?=.*\\d)[A-ZА-ЯІЇЄҐ0-9][A-ZА-ЯІЇЄҐ0-9.\\/_ -]{2,}$/i.test(article);
+        const article = String(parts[articleIndex] || '').replace(/\s+/g, ' ').trim();
+        const articleValid = /^(?=.*\d)[A-ZА-ЯІЇЄҐ0-9][A-ZА-ЯІЇЄҐ0-9.\/_ -]{2,}$/i.test(article);
         let name = '';
         let nameIndex = -1;
         for (let i = articleIndex + 1; i < parts.length; i++) {
           if (!parts[i]) continue;
-          if (isQuantity(parts[i]) || isUnit(parts[i]) || /^\\d+[,.]\\d{2}$/.test(parts[i])) break;
+          if (isQuantity(parts[i]) || isUnit(parts[i]) || /^\d+[,.]\d{2}$/.test(parts[i])) break;
           name = name ? name + ' ' + parts[i] : parts[i];
           nameIndex = i;
         }
@@ -77,7 +77,7 @@ function parseInvoice(raw) {
           if (quantity === 1) {
             for (let i = nameIndex + 1; i < parts.length; i++) {
               if (!parts[i]) continue;
-              if (/^\\d{1,3}(?:[ \\u00a0]\\d{3})*[,.]\\d{2}$/.test(parts[i])) break;
+              if (/^\d{1,3}(?:[ \u00a0]\d{3})*[,.]\d{2}$/.test(parts[i])) break;
               if (isQuantity(parts[i])) {
                 quantity = Math.max(0.01, Number(parts[i].replace(',', '.')) || 1);
                 break;
@@ -89,6 +89,26 @@ function parseInvoice(raw) {
           rows.push({ article, name, quantity });
         }
         continue;
+      }
+    }
+    // Some clipboard paths collapse every column separator to a single space.
+    // In that case split from the right using quantity + unit + two monetary columns,
+    // then identify the article as the shortest leading code containing digits.
+    if (!original.includes('\t')) {
+      const looseRow = line.match(/^\s*(\d+)\s+(.+?)\s+(\d+(?:[,.]\d+)?)\s+(шт\.?|штук(?:а|и)?|pcs?\.?|од\.?|одиниц(?:я|і|ь)?|компл\.?|комплект(?:и|ів)?|упак\.?|упаковк(?:а|и)|пара|кг|г|л|м)\s+([\d ]+[,.]\d{2})\s+([\d ]+[,.]\d{2})\s*$/i);
+      if (looseRow) {
+        const tokens = looseRow[2].trim().split(/\s+/);
+        let articleCount = 1;
+        while (articleCount < tokens.length && !/\d/.test(tokens.slice(0, articleCount).join(' '))) articleCount++;
+        if (articleCount < tokens.length && /^\d+$/.test(tokens[articleCount] || '') && /\d/.test(tokens.slice(0, articleCount).join(' '))) articleCount++;
+        const article = tokens.slice(0, articleCount).join(' ');
+        const name = tokens.slice(articleCount).join(' ');
+        const articleValid = /^(?=.*\d)[A-ZА-ЯІЇЄҐ0-9][A-ZА-ЯІЇЄҐ0-9.\/_-]*(?:\s+[A-ZА-ЯІЇЄҐ0-9][A-ZА-ЯІЇЄҐ0-9.\/_-]*)*$/i.test(article);
+        const quantity = Math.max(0.01, Number(looseRow[3].replace(',', '.')) || 1);
+        if (articleValid && name) {
+          rows.push({ article, name, quantity });
+          continue;
+        }
       }
     }
     // Fallback for legacy copied layouts without tab separators.

@@ -7750,6 +7750,12 @@ body.overlay-window-open .toast-stack .defect-toast {
   display: none !important;
 }
 
+/* The buyback panel is a standalone overlay, not the shared modal; hide persistent defect reminders there too. */
+body:has(.buyback-overlay:not([hidden])) #toastStack .defect-toast,
+body:has(.buyback-overlay:not([hidden])) .toast-stack .defect-toast {
+  display: none !important;
+}
+
 
 /* Desktop: keep persistent defect notices in the lower-left corner, away from centered dialogs and primary actions. */
 @media (min-width: 721px) {

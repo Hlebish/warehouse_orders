@@ -62,10 +62,27 @@ function parseInvoice(raw) {
       }
       let quantity = 1;
       if (nameIndex >= 0) {
-        for (let i = nameIndex + 1; i < parts.length; i++) {
-          if (isQuantity(parts[i])) {
-            quantity = Math.max(0.01, Number(parts[i].replace(',', '.')) || 1);
-            break;
+        // Quantity is the number immediately before the unit column ("шт"),
+        // while prices and totals later in the row are also numeric.
+        const unitIndex = parts.findIndex((part, i) => i > nameIndex && isUnit(part));
+        if (unitIndex > nameIndex) {
+          for (let i = unitIndex - 1; i > nameIndex; i--) {
+            if (parts[i] && isQuantity(parts[i])) {
+              quantity = Math.max(0.01, Number(parts[i].replace(',', '.')) || 1);
+              break;
+            }
+          }
+        }
+        // Fallback for exports where the unit column is blank or omitted:
+        // take the first numeric cell before the first price cell.
+        if (quantity === 1) {
+          for (let i = nameIndex + 1; i < parts.length; i++) {
+            if (!parts[i]) continue;
+            if (/^\d{1,3}(?:[ \u00a0]\d{3})*[,.]\d{2}$/.test(parts[i])) break;
+            if (isQuantity(parts[i])) {
+              quantity = Math.max(0.01, Number(parts[i].replace(',', '.')) || 1);
+              break;
+            }
           }
         }
       }

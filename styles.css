@@ -7782,21 +7782,40 @@ body:has(.buyback-overlay:not([hidden])) .toast-stack .defect-toast {
 
 /* Fix scrolling inside the order card: keep its header/actions visible while the
    long articles and comments area scrolls within the available window height. */
+#modal-backdrop:has(#modalBody .order-detail-head),
+.modal-backdrop:has(#modalBody .order-detail-head) {
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  align-items: flex-start !important;
+  padding-top: 16px !important;
+  padding-bottom: 16px !important;
+}
 #modal:has(#modalBody .order-detail-head) {
   display: flex !important;
   flex-direction: column !important;
+  height: auto !important;
+  max-height: calc(100vh - 32px) !important;
   max-height: calc(100dvh - 32px) !important;
   overflow: hidden !important;
   min-height: 0 !important;
+  flex: 0 0 auto !important;
 }
 #modal:has(#modalBody .order-detail-head) #modalBody {
   display: block !important;
-  flex: 1 1 auto !important;
+  flex: 1 1 0% !important;
+  height: 0 !important;
   min-height: 0 !important;
-  overflow-y: auto !important;
+  max-height: none !important;
+  overflow-y: scroll !important;
   overflow-x: hidden !important;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
+  scrollbar-gutter: stable;
+  touch-action: pan-y;
+}
+#modal:has(#modalBody .order-detail-head) .modal-head,
+#modal:has(#modalBody .order-detail-head) .modal-foot {
+  flex: 0 0 auto !important;
 }
 
 

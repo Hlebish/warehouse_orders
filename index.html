@@ -28,25 +28,15 @@
     @media(prefers-reduced-motion:reduce){#siteLoader .loader-spinner{animation-duration:2s}#siteLoader{transition:none;animation:none}html:not(.app-booted) #siteLoader{transition:none!important}}
   </style>
   <script>
-  // Keep the loading screen in the page snapshot when mobile browsers suspend
-  // or restore this tab, preventing the stale app UI from flashing first.
+  // Keep the existing WebView page alive while the Android app is in the background.
+  // Showing the startup loader on every visibility change made returning to the app
+  // look like a full reload even though the same page was still running.
   (() => {
-    function prepareLoaderForRestore() {
-      const loader = document.getElementById('siteLoader');
-      if (!loader) return;
-      document.documentElement.classList.remove('app-booted');
-      loader.hidden = false;
-      loader.classList.remove('site-loader-hidden');
-      loader.setAttribute('aria-busy', 'true');
-    }
-    // Android may freeze a standalone/PWA window without firing pagehide.
-    // Prepare the loader as soon as the app leaves the foreground.
     document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'hidden') prepareLoaderForRestore();
-      else window.dispatchEvent(new Event('warehouse-app-resumed'));
-    }, {capture:true});
-    window.addEventListener('pagehide', prepareLoaderForRestore, {capture:true});
-    window.addEventListener('freeze', prepareLoaderForRestore, {capture:true});
+      if (document.visibilityState === 'visible') {
+        window.dispatchEvent(new Event('warehouse-app-resumed'));
+      }
+    });
   })();
   </script>
   <link rel="stylesheet" href="styles.css?v=2026.10.30.order-scroll-fix1">

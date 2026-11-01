@@ -3155,9 +3155,9 @@ document.addEventListener('keydown',e=>{
  }
 });
 document.addEventListener('submit',e=>e.preventDefault());
-// Restore the already-running app without leaving the startup loader over it.
+// Returning from the Android background must not recreate Firestore listeners.
+// The existing WebView and its live onSnapshot subscriptions remain active.
 window.addEventListener('warehouse-app-resumed',()=>{
- if(signedInUser){watchOrders();}
  const shell=document.querySelector('.app-shell');
  const gate=$('authGate');
  if((signedInUser&&shell&&!shell.hidden)||(gate&&!gate.hidden))finishInitialLoading();

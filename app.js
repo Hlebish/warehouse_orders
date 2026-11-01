@@ -635,12 +635,21 @@ function stopCloud(){profileUnsubscribe?.();ordersUnsubscribe?.();chatUnsubscrib
 function watchOrders(){
  ordersUnsubscribe?.();
  ordersUnsubscribe=onSnapshot(collection(db,'orders'),snap=>{
-   const oldIds=new Set(state.orders.map(o=>o.id)),remoteIds=new Set();
-   // Index existing orders once per snapshot instead of scanning the full array
-   // for every document. This keeps snapshot processing close to linear time.
+   // Firestore provides only the documents that changed after the initial snapshot.
+   // Keep a local index so each change can be applied without rescanning every order.
    const orderIndexById=new Map(state.orders.map((order,index)=>[order.id,index]));
    let openedOrderStatusChanged=false;
-   for(const d of snap.docs){remoteIds.add(d.id);const data=d.data(),prior=serverCache.get(d.id),pending=pendingOrderData.get(d.id);
+   for(const change of snap.docChanges()){
+     const d=change.doc;
+     if(change.type==='removed'){
+       if(!pendingWrites.has(d.id)){
+         state.orders=state.orders.filter(o=>o.id!==d.id);
+         entryUnsubscribes.get(d.id)?.();entryUnsubscribes.delete(d.id);serverCache.delete(d.id);
+         orderIndexById.clear();state.orders.forEach((order,index)=>orderIndexById.set(order.id,index));
+       }
+       continue;
+     }
+     const data=d.data(),prior=serverCache.get(d.id),pending=pendingOrderData.get(d.id);
      const existingIndex=orderIndexById.get(d.id);
      const existingOrder=existingIndex===undefined?null:state.orders[existingIndex];
      if(existingOrder&&existingOrder.status!==data.status&&selectedId===d.id&&!modal.hidden&&modal.dataset.orderDetail===d.id)openedOrderStatusChanged=true;
@@ -657,10 +666,9 @@ if(entriesChanged||wasFirstEntries)scheduleRender();
 // has arrived. Refresh the already-open card once that initial history
 // snapshot is available so comments, decisions, defects and photos appear.
 if(wasFirstEntries&&selectedId===d.id&&!modal.hidden&&modal.dataset.orderDetail===d.id)openOrder(d.id)}));}
-     if(!initialCloudLoad&&!oldIds.has(d.id)){const message=`Поступил заказ № ${order.number}`;toast(message);notify(message,d.id)}
+     if(!initialCloudLoad&&change.type==='added'){const message=`Поступил заказ № ${order.number}`;toast(message);notify(message,d.id)}
      if(pending && data.number===pending.number && data.client===pending.client && data.status===pending.status){pendingOrderData.delete(d.id);}
    }
-   for(const o of [...state.orders])if(!remoteIds.has(o.id)&&!pendingWrites.has(o.id)){state.orders=state.orders.filter(x=>x.id!==o.id);entryUnsubscribes.get(o.id)?.();entryUnsubscribes.delete(o.id);serverCache.delete(o.id)}
    if(!snap.metadata.fromCache)initialCloudLoad=false;render();restoreUiState();
    // Keep the open order card in sync when another employee changes its status.
    if(openedOrderStatusChanged&&selectedId&&!modal.hidden&&modal.dataset.orderDetail===selectedId)openOrder(selectedId);

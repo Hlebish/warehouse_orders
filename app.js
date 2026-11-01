@@ -2175,6 +2175,16 @@ async function loadOlderChatMessages(){
   }catch(err){console.error('Не удалось загрузить старые сообщения чата',err);toast('Не удалось загрузить старые сообщения. Проверьте соединение.');}
   finally{loadingOlderChatMessages=false;}
 }
+// Register chat-menu dismissal handlers once, not once for every rendered message.
+document.addEventListener('click',event=>{
+  document.querySelectorAll('.chat-message-menu[open]').forEach(menu=>{
+    if(!menu.contains(event.target))menu.removeAttribute('open');
+  });
+});
+document.addEventListener('keydown',event=>{
+  if(event.key!=='Escape')return;
+  document.querySelectorAll('.chat-message-menu[open]').forEach(menu=>menu.removeAttribute('open'));
+});
 function renderChatMessages(options={}){
   const box=$('chatMessages');
   if(!box)return;
@@ -2214,17 +2224,6 @@ function renderChatMessages(options={}){
       const photoHtml=photos.length?'<div class="chat-photo-grid">'+photos.map(p=>'<a href="'+esc(p)+'" target="_blank" rel="noopener"><img src="'+esc(p)+'" alt="Фото из общего чата" loading="lazy"></a>').join('')+'</div>':'';
       const replyHtml=m.replyToId?'<div class="chat-reply-quote"><b>Ответ на '+esc(m.replyToAuthorName||'сообщение')+'</b><span>'+esc(m.replyToText||'📷 Фото')+'</span></div>':'';
       const likeHtml='<button type="button" class="chat-like-button '+(liked?'active':'')+'" data-action="toggle-chat-like:'+esc(m.id)+'" aria-label="Нравится">👍 <span>'+likes.length+'</span></button>'; const readBy=Array.isArray(m.readBy)?m.readBy:[]; const receipt=mine?'<button type="button" class="chat-read-receipt" data-action="chat-readers:'+esc(m.id)+'" title="Кто прочитал">'+(readBy.some(id=>id!==signedInUser?.uid)?'✓✓':'✓')+'</button>':''; const menuHtml='<details class="chat-message-menu"><summary aria-label="Меню сообщения">⋯</summary><div class="chat-message-menu-items"><button type="button" data-action="reply-chat:'+esc(m.id)+'">↩ Ответить</button><button type="button" data-action="copy-chat:'+esc(m.id)+'">Копировать</button><button type="button" data-action="share-chat:'+esc(m.id)+'">Поделиться…</button><button type="button" data-action="viber-chat:'+esc(m.id)+'">Отправить через Viber</button></div></details>';
-
-// Close chat message action menus when tapping anywhere outside the opened menu.
-document.addEventListener('click', event => {
-  document.querySelectorAll('.chat-message-menu[open]').forEach(menu => {
-    if (!menu.contains(event.target)) menu.removeAttribute('open');
-  });
-});
-document.addEventListener('keydown', event => {
-  if (event.key !== 'Escape') return;
-  document.querySelectorAll('.chat-message-menu[open]').forEach(menu => menu.removeAttribute('open'));
-});
 
       const roleMeta=({admin:{label:'Администратор',icon:'⚙',tone:'admin'},administrator:{label:'Администратор',icon:'⚙',tone:'admin'},warehouse:{label:'Кладовщик',icon:'▦',tone:'warehouse'},manager:{label:'Менеджер',icon:'↗',tone:'manager'},chief_accountant:{label:'Главный бухгалтер',icon:'₴',tone:'chief-accountant'},accountant:{label:'Бухгалтер',icon:'▤',tone:'accountant'},director:{label:'Директор',icon:'♛',tone:'director'}})[m.authorRole]||{label:'Сотрудник',icon:'•',tone:'unknown'};
       const roleBadge='<span class="chat-role-badge chat-role-'+roleMeta.tone+'" title="'+esc(roleMeta.label)+'"><span aria-hidden="true">'+roleMeta.icon+'</span>'+esc(roleMeta.label)+'</span>';

@@ -626,17 +626,23 @@ function watchOrders(){
  ordersUnsubscribe?.();
  ordersUnsubscribe=onSnapshot(collection(db,'orders'),snap=>{
    const oldIds=new Set(state.orders.map(o=>o.id)),remoteIds=new Set();
+   // Index existing orders once per snapshot instead of scanning the full array
+   // for every document. This keeps snapshot processing close to linear time.
+   const orderIndexById=new Map(state.orders.map((order,index)=>[order.id,index]));
    let openedOrderStatusChanged=false;
    for(const d of snap.docs){remoteIds.add(d.id);const data=d.data(),prior=serverCache.get(d.id),pending=pendingOrderData.get(d.id);
-     const existingOrder=state.orders.find(o=>o.id===d.id);
+     const existingIndex=orderIndexById.get(d.id);
+     const existingOrder=existingIndex===undefined?null:state.orders[existingIndex];
      if(existingOrder&&existingOrder.status!==data.status&&selectedId===d.id&&!modal.hidden&&modal.dataset.orderDetail===d.id)openedOrderStatusChanged=true;
      const order={id:d.id,number:pending?.number??data.number,client:pending?.client??(data.client||''),deliveryType:['city','pickup','post','kamyanske'].includes(data.deliveryType)?data.deliveryType:'city',status:pending?.status??data.status,returnCancelled:data.returnCancelled===true||(Array.isArray(data.returns)&&data.returns.some(r=>r?.status==='cancelled')),articles:pending?.articles??(Array.isArray(data.articles)?data.articles:[]),createdAt:data.createdAt,updatedAt:data.updatedAt,transferredAt:data.transferredAt,resumedAt:data.resumedAt,assembledAt:data.assembledAt,shippedAt:data.shippedAt,assemblyInProgress:data.assemblyInProgress===true,assemblyStartedAt:data.assemblyStartedAt,assemblyStartedBy:data.assemblyStartedBy,assemblyStartedByName:data.assemblyStartedByName,returns:Array.isArray(data.returns)?data.returns:[],author:data.createdByName||'Сотрудник',createdBy:data.createdBy,updatedBy:data.updatedBy,updatedByName:data.updatedByName,entries:prior?.entries||[],returns:Array.isArray(data.returns)?data.returns:[]};
-     const at=state.orders.findIndex(o=>o.id===d.id);if(at<0)state.orders.push(order);else state.orders[at]={...order,entries:state.orders[at].entries||[]};serverCache.set(d.id,{...order,articles:(order.articles||[]).map(x=>({...x})),entries:(prior?.entries||[]).map(x=>({...x}))});
+     let at=orderIndexById.get(d.id);if(at===undefined){at=state.orders.length;state.orders.push(order);orderIndexById.set(d.id,at);}else state.orders[at]={...order,entries:state.orders[at].entries||[]};serverCache.set(d.id,{...order,articles:(order.articles||[]).map(x=>({...x})),entries:(prior?.entries||[]).map(x=>({...x}))});
      if(!entryUnsubscribes.has(d.id)){let firstEntries=true;entryUnsubscribes.set(d.id,onSnapshot(collection(db,'orders',d.id,'entries'),es=>{const entries=es.docs.map(x=>entryFromCloud(x.id,x.data())).sort((a,b)=>(asDate(a.createdAt)?.getTime()||0)-(asDate(b.createdAt)?.getTime()||0)||String(a.id).localeCompare(String(b.id)));const item=state.orders.find(o=>o.id===d.id);if(!item)return;const before=JSON.stringify(item.entries||[]);item.entries=entries;serverCache.set(d.id,{...serverCache.get(d.id),entries:entries.map(x=>({...x}))});const entriesChanged=before!==JSON.stringify(entries);
 if(!initialCloudLoad&&!firstEntries&&entriesChanged){const last=entries.at(-1);if(last?.kind!=='system')toast(`${item.client||'Клиент не указан'} · ${last?last.kind==='decision'?'Добавлено решение':last.kind==='defect'?'Добавлен дефект':last.kind==='question'?'Добавлен вопрос':'Новый комментарий':'Заказ обновлён'}`);}
 const wasFirstEntries=firstEntries;
 firstEntries=false;
-render();
+// Each order has its own history listener. Coalesce near-simultaneous snapshots
+// into one UI pass, and skip redraws when Firestore only refreshes metadata.
+if(entriesChanged||wasFirstEntries)scheduleRender();
 // A notification can open the order before its subcollection of entries
 // has arrived. Refresh the already-open card once that initial history
 // snapshot is available so comments, decisions, defects and photos appear.
@@ -837,6 +843,15 @@ let transferredInsightsExpanded=false;
 function notificationTone(n){
   const cat=n.category||(n.target==='chat'?'chat':'orders');
   return cat==='chat'?'blue':cat==='replies'?'violet':cat==='likes'?'pink':'green';
+}
+let renderScheduled=false;
+function scheduleRender(){
+  if(renderScheduled)return;
+  renderScheduled=true;
+  requestAnimationFrame(()=>{
+    renderScheduled=false;
+    render();
+  });
 }
 function render(){const search=$('searchInput').value.toLocaleLowerCase('ru');const dateFrom=$('dateFromFilter')?.value||'';const dateTo=$('dateToFilter')?.value||'';const statusPriority={'Создан':0,'Собран':1,'На согласовании':2,'Под вопросом':3,'Дефект':4,'Ожидает оплаты':5,'Одобрен на отгрузку клиенту':6,'Ожидает самовывоза':7,'Самовывоз':7,'Перенесен':8,'Отгружен кладовщиком':9,'Клиент забрал самовывозом':10,'Отменён':11};const dateValue=o=>o?.status==='Перенесен'?(o.createdAt||o.transferredAt||o.updatedAt):orderDisplayDate(o);const compareOrders=(a,b)=>{const dayA=localDateKey(dateValue(a)),dayB=localDateKey(dateValue(b));if(dayA!==dayB)return dayB.localeCompare(dayA);const pA=statusPriority[a.status]??8,pB=statusPriority[b.status]??8;if(pA!==pB)return pA-pB;return new Date(orderDisplayDate(b)||0)-new Date(orderDisplayDate(a)||0)};let orders=[...state.orders].filter(o=>activeFilter==='Камянское'||o.status!=='Камянское').sort((a,b)=>{const aTransferred=a.status==='Перенесен',bTransferred=b.status==='Перенесен';if(aTransferred!==bTransferred)return aTransferred?-1:1;if(aTransferred&&bTransferred){const d=localDateKey(a.createdAt||a.transferredAt||a.updatedAt).localeCompare(localDateKey(b.createdAt||b.transferredAt||b.updatedAt));return d||new Date(a.createdAt||a.transferredAt||0)-new Date(b.createdAt||b.transferredAt||0)}return compareOrders(a,b)});if(activeFilter!=='all')orders=orders.filter(o=>o.status===activeFilter);if(search)orders=orders.filter(o=>orderSearchText(o).includes(search));if(dateFrom||dateTo)orders=orders.filter(o=>isDateInRange(o,dateFrom,dateTo));const hasDateFilter=!!(dateFrom||dateTo);$('clearDateButton').hidden=!hasDateFilter;const filteredOrderCount=orders.length;const pageCount=Math.max(1,Math.ceil(filteredOrderCount/ordersPageSize));currentOrdersPage=Math.max(1,Math.min(currentOrdersPage,pageCount));const pageOrders=orders.slice((currentOrdersPage-1)*ordersPageSize,currentOrdersPage*ordersPageSize);const rows=[];let previousDate='',previousSection='';for(const o of pageOrders){const transferred=o.status==='Перенесен';const displayDate=transferred?(o.createdAt||o.transferredAt||o.updatedAt||o.createdAt):orderDisplayDate(o);const day=localDateKey(displayDate);const section=transferred?'transferred':'current';if(section!==previousSection){rows.push(`<tr class="date-separator ${transferred?'transferred-date-separator':'current-date-separator'}"><td colspan="7"><span>${transferred?'Перенесённые заказы · дата создания':'Текущие заказы · по дням'}</span></td></tr>`);previousSection=section;previousDate=''}if(day!==previousDate){rows.push(`<tr class="date-separator"><td colspan="7"><span>${esc(fmtDate(displayDate))}</span></td></tr>`);previousDate=day}rows.push(`<tr data-order="${esc(o.id)}" tabindex="0" role="button" aria-label="Открыть заказ № ${esc(o.number)}" class="order-card-row ${transferred?'transferred-order-row':''}"><td><a class="order-number" href="#" data-open="${esc(o.id)}">№ ${esc(o.number)}</a><span class="client-sub">создал ${esc(o.author||'Кладовщик')}</span></td><td><a class="client-name client-open" href="#" data-open="${esc(o.id)}">${esc(o.client)}</a><span class="client-sub">${fmtDateTime(displayDate)}</span></td><td><button type="button" class="row-open-status" data-open="${esc(o.id)}" title="Открыть заказ">${statusPill(o.status)}</button>${assemblyIndicator(o)}</td><td><button type="button" class="delivery-type-pill" data-open="${esc(o.id)}" title="Открыть карточку заказа"><span class="delivery-type-icon" aria-hidden="true">${o.deliveryType==='pickup'?'♧':o.deliveryType==='post'?'✉':o.deliveryType==='kamyanske'?'⌖':'↗'}</span><span>${o.deliveryType==='pickup'?'Самовывоз':o.deliveryType==='post'?'Доставка почтой':o.deliveryType==='kamyanske'?'Доставка в Камянское':'Доставка по городу'}</span></button></td><td><button type="button" class="row-open-comments" data-open="${esc(o.id)}" title="Открыть заказ"><span class="comment-icon">💬</span><span class="entry-count">${entriesCount(o)}</span></button></td><td class="time-cell">${fmtDate(displayDate)}</td><td><button class="row-menu" title="Открыть карточку" data-open="${esc(o.id)}">···</button></td></tr>`)}$('ordersBody').innerHTML=rows.join('');const empty=orders.length===0;$('emptyState').classList.toggle('visible',empty);$('ordersBody').style.display=empty?'none':'';$('statTotal').textContent=state.orders.filter(o=>o.status==='Собран').length;$('statCreated').textContent=state.orders.filter(o=>o.status==='Создан').length;$('statQuestions').textContent=state.orders.filter(o=>o.status==='Под вопросом').length;$('statApproval').textContent=state.orders.filter(o=>o.status==='На согласовании').length;$('statReady').textContent=state.orders.filter(o=>o.status==='Одобрен на отгрузку клиенту').length;$('statPayment').textContent=state.orders.filter(o=>o.status==='Ожидает оплаты').length;$('statPickup').textContent=state.orders.filter(o=>o.status==='Ожидает самовывоза').length;$('statTransferred').textContent=state.orders.filter(o=>o.status==='Перенесен').length;if($('statKamenskoye'))$('statKamenskoye').textContent=state.orders.filter(o=>o.status==='Камянское').length;$('listSummary').textContent=`${filteredOrderCount} ${plural(filteredOrderCount,'заказ','заказа','заказов')}`;const pagination=$('ordersPagination');if(pagination){const first=filteredOrderCount?(currentOrdersPage-1)*ordersPageSize+1:0;const last=Math.min(currentOrdersPage*ordersPageSize,filteredOrderCount);pagination.innerHTML=`<button type="button" class="secondary-button" data-orders-page="prev" ${currentOrdersPage<=1?'disabled':''}>← Назад</button><span>Страница ${currentOrdersPage} из ${pageCount} · ${first}–${last} из ${filteredOrderCount}</span><button type="button" class="secondary-button" data-orders-page="next" ${currentOrdersPage>=pageCount?'disabled':''}>Вперёд →</button>`;pagination.hidden=filteredOrderCount<=ordersPageSize;}$('userName').textContent=profileName||roles[state.role];$('userRole').textContent=canManageUsers?`Администратор · ${roles[state.role]}`:roles[state.role];$('modeLabel').textContent='Вы онлайн';$('modeSub').textContent='Подключено к облаку';$('today').textContent=new Intl.DateTimeFormat('ru-RU',{weekday:'short',day:'numeric',month:'long'}).format(new Date());document.querySelectorAll('.nav-item').forEach(b=>b.classList.toggle('active',b.dataset.filter===activeFilter));paintNotices();syncPendingDefectToasts()}
 function plural(n,a,b,c){n=Math.abs(n)%100;const d=n%10;return n>10&&n<20?c:d>1&&d<5?b:d===1?a:c}
@@ -2164,6 +2179,16 @@ async function loadOlderChatMessages(){
   }catch(err){console.error('Не удалось загрузить старые сообщения чата',err);toast('Не удалось загрузить старые сообщения. Проверьте соединение.');}
   finally{loadingOlderChatMessages=false;}
 }
+// Register chat-menu dismissal handlers once, not once for every rendered message.
+document.addEventListener('click',event=>{
+  document.querySelectorAll('.chat-message-menu[open]').forEach(menu=>{
+    if(!menu.contains(event.target))menu.removeAttribute('open');
+  });
+});
+document.addEventListener('keydown',event=>{
+  if(event.key!=='Escape')return;
+  document.querySelectorAll('.chat-message-menu[open]').forEach(menu=>menu.removeAttribute('open'));
+});
 function renderChatMessages(options={}){
   const box=$('chatMessages');
   if(!box)return;
@@ -2203,17 +2228,6 @@ function renderChatMessages(options={}){
       const photoHtml=photos.length?'<div class="chat-photo-grid">'+photos.map(p=>'<a href="'+esc(p)+'" target="_blank" rel="noopener"><img src="'+esc(p)+'" alt="Фото из общего чата" loading="lazy"></a>').join('')+'</div>':'';
       const replyHtml=m.replyToId?'<div class="chat-reply-quote"><b>Ответ на '+esc(m.replyToAuthorName||'сообщение')+'</b><span>'+esc(m.replyToText||'📷 Фото')+'</span></div>':'';
       const likeHtml='<button type="button" class="chat-like-button '+(liked?'active':'')+'" data-action="toggle-chat-like:'+esc(m.id)+'" aria-label="Нравится">👍 <span>'+likes.length+'</span></button>'; const readBy=Array.isArray(m.readBy)?m.readBy:[]; const receipt=mine?'<button type="button" class="chat-read-receipt" data-action="chat-readers:'+esc(m.id)+'" title="Кто прочитал">'+(readBy.some(id=>id!==signedInUser?.uid)?'✓✓':'✓')+'</button>':''; const menuHtml='<details class="chat-message-menu"><summary aria-label="Меню сообщения">⋯</summary><div class="chat-message-menu-items"><button type="button" data-action="reply-chat:'+esc(m.id)+'">↩ Ответить</button><button type="button" data-action="copy-chat:'+esc(m.id)+'">Копировать</button><button type="button" data-action="share-chat:'+esc(m.id)+'">Поделиться…</button><button type="button" data-action="viber-chat:'+esc(m.id)+'">Отправить через Viber</button></div></details>';
-
-// Close chat message action menus when tapping anywhere outside the opened menu.
-document.addEventListener('click', event => {
-  document.querySelectorAll('.chat-message-menu[open]').forEach(menu => {
-    if (!menu.contains(event.target)) menu.removeAttribute('open');
-  });
-});
-document.addEventListener('keydown', event => {
-  if (event.key !== 'Escape') return;
-  document.querySelectorAll('.chat-message-menu[open]').forEach(menu => menu.removeAttribute('open'));
-});
 
       const roleMeta=({admin:{label:'Администратор',icon:'⚙',tone:'admin'},administrator:{label:'Администратор',icon:'⚙',tone:'admin'},warehouse:{label:'Кладовщик',icon:'▦',tone:'warehouse'},manager:{label:'Менеджер',icon:'↗',tone:'manager'},chief_accountant:{label:'Главный бухгалтер',icon:'₴',tone:'chief-accountant'},accountant:{label:'Бухгалтер',icon:'▤',tone:'accountant'},director:{label:'Директор',icon:'♛',tone:'director'}})[m.authorRole]||{label:'Сотрудник',icon:'•',tone:'unknown'};
       const roleBadge='<span class="chat-role-badge chat-role-'+roleMeta.tone+'" title="'+esc(roleMeta.label)+'"><span aria-hidden="true">'+roleMeta.icon+'</span>'+esc(roleMeta.label)+'</span>';
@@ -2797,13 +2811,14 @@ async function toggleShipmentItemChecked(dateKey,orderId,article){
     toast('Не удалось сохранить отметку проверки.');
   }
 }
+let shipmentSearchDebounce=null;
 async function openShipmentManifest(dateKey=localDateKey(new Date()),categoryFilter='',searchQuery=''){
   const expandedOrderIds=new Set([...document.querySelectorAll('.shipment-order-card[open]')].map(el=>el.dataset.orderId).filter(Boolean));
   await loadShipmentCategoryMap();
   let confirmation=null;
   try{const snap=await getDoc(doc(db,'shipmentDays',dateKey));if(snap.exists())confirmation=snap.data();}catch(err){console.warn(err);}
-  const shipmentDaySnap=await getDoc(doc(db,'shipmentDays',dateKey)).catch(()=>null);
-  const dayData=shipmentDaySnap?.exists()?(shipmentDaySnap.data()||{}):{};
+  // The same document also contains the checked-article state; reuse this read.
+  const dayData=confirmation||{};
   const checkedOrderArticles=new Set(Array.isArray(dayData.checkedOrderArticles)?dayData.checkedOrderArticles.map(String):[]);
   const legacyCheckedArticles=new Set(Array.isArray(dayData.checkedArticles)?dayData.checkedArticles.map(x=>String(x).trim().toUpperCase()):[]);
   const query=String(searchQuery||'').trim().toLocaleLowerCase('ru');
@@ -2857,7 +2872,17 @@ async function openShipmentManifest(dateKey=localDateKey(new Date()),categoryFil
   }else if(canManageUsers||state.role==='warehouse'||state.role==='manager')html+=button('✓ Подтвердить список на отгрузку','confirm-shipment:'+dateKey,'small-button good');
   else html+='<div class="field-hint">Подтвердить список может кладовщик, менеджер или администратор.</div>';
   showModal('Список деталей на отгрузку',html,[button('Показать день','shipment-date','small-button primary-soft'),button('Закрыть','close')],'ОТГРУЗКА ПО ДНЯМ');
-  $('shipmentSearch')?.addEventListener('input',e=>{const pos=e.target.selectionStart;openShipmentManifest(dateKey,'',e.target.value).then(()=>{const input=$('shipmentSearch');if(input){input.focus();input.setSelectionRange(pos,pos);}});});
+  $('shipmentSearch')?.addEventListener('input',e=>{
+    const value=e.target.value;
+    const pos=e.target.selectionStart;
+    clearTimeout(shipmentSearchDebounce);
+    shipmentSearchDebounce=setTimeout(()=>{
+      openShipmentManifest(dateKey,'',value).then(()=>{
+        const input=$('shipmentSearch');
+        if(input){input.focus();input.setSelectionRange(pos,pos);}
+      });
+    },180);
+  });
 }
 async function confirmShipmentManifest(dateKey){
   if(!(canManageUsers||state.role==='warehouse'||state.role==='manager')){toast('У вас нет права подтверждать список.');return;}

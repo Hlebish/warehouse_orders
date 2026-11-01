@@ -219,7 +219,7 @@ function watchChatBadge(){
     const created=asDate(m.createdAt)?.getTime();
     return Number.isFinite(created)&&created>=listenerStartedAt-5000&&Date.now()-created<=60000;
   };
-  const q=query(collection(db,'chatMessages'),orderBy('createdAt','desc'),limit(50));
+  const q=query(collection(db,'chatMessages'),where('createdAt','>=',new Date(0)),orderBy('createdAt','desc'),limit(50));
   chatBadgeUnsubscribe=onSnapshot(q,snap=>{
     const messages=snap.docs.map(d=>({id:d.id,...(d.data()||{})}));
     if(!initialSnapshot){
@@ -2198,12 +2198,10 @@ async function loadOlderChatMessages(){
       chatLegacyHistoryLoading=true;
       const legacySnap=await getDocs(collection(db,'chatMessages'));
       const known=new Set([...chatMessages,...olderChatMessages].map(m=>m.id));
-      const legacy=legacySnap.docs.map(normalizeChatMessageDoc).filter(m=>{
-        const raw=legacySnap.docs.find(d=>d.id===m.id)?.data()||{};
-        const canonical=raw.createdAt;
-        const hasCanonicalTimestamp=canonical&&typeof canonical.toMillis==='function';
-        return !hasCanonicalTimestamp&&(m.text||m.photos.length)&&!known.has(m.id);
-      });
+      const legacy=legacySnap.docs.filter(d=>{
+        const canonical=d.data()?.createdAt;
+        return !(canonical&&typeof canonical.toMillis==='function');
+      }).map(normalizeChatMessageDoc).filter(m=>(m.text||m.photos.length)&&!known.has(m.id));
       chatPendingScrollRestore={top:box.scrollTop,height:box.scrollHeight};
       olderChatMessages=[...olderChatMessages,...legacy];
       chatLegacyHistoryLoaded=true;

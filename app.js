@@ -2298,10 +2298,13 @@ function openChat(){
     const previousIds=new Set([...chatMessages,...olderChatMessages].map(m=>m.id));
     const hasNewIncoming=next.some(m=>!previousIds.has(m.id)&&m.authorId!==signedInUser?.uid);
     chatMessages=next;
-    if(!chatOldestCursor&&snap.docs.length)chatOldestCursor=snap.docs.at(-1);
+    if(!chatOldestCursor&&snap.docs.length===50)chatOldestCursor=snap.docs.at(-1);
     hasOlderChatMessages=snap.docs.length===50||!chatLegacyHistoryLoaded;
     renderChatMessages({preserveScroll:true,oldTop,oldHeight,wasAtBottom,scrollToNew:hasNewIncoming&&wasAtBottom});
     markChatMessagesRead(chatMessages);
+    // If fewer than 50 canonical messages exist, load legacy history immediately
+    // so an otherwise non-scrollable empty/short chat still shows its old messages.
+    if(snap.docs.length<50&&!chatLegacyHistoryLoaded)requestAnimationFrame(()=>loadOlderChatMessages());
   },err=>{
     console.error('Не удалось загрузить общий чат',err);
     const box=$('chatMessages');

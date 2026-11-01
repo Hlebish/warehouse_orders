@@ -251,8 +251,17 @@ async function markChatMessagesRead(messages=[]){
   if(!signedInUser)return;
   const unread=messages.filter(m=>m.authorId!==signedInUser.uid && !(Array.isArray(m.readBy) && m.readBy.includes(signedInUser.uid)));
   if(!unread.length){chatUnread=false;paintChatBadge();return;}
-  await Promise.all(unread.map(m=>updateDoc(doc(db,'chatMessages',m.id),{readBy:arrayUnion(signedInUser.uid)}).catch(err=>console.warn('Не удалось отметить чат прочитанным',err))));
-  chatUnread=false;paintChatBadge();
+  try{
+    // A single Firestore batch replaces up to 50 individual network requests.
+    const batch=writeBatch(db);
+    unread.forEach(m=>batch.update(doc(db,'chatMessages',m.id),{readBy:arrayUnion(signedInUser.uid)}));
+    await batch.commit();
+    chatUnread=false;
+  }catch(err){
+    console.warn('Не удалось отметить чат прочитанным',err);
+    chatUnread=true;
+  }
+  paintChatBadge();
 }
 async function markNotificationItemsRead(items=[],showToast=false){
   if(!signedInUser)return {total:0,failed:0};

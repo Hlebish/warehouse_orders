@@ -2797,13 +2797,14 @@ async function toggleShipmentItemChecked(dateKey,orderId,article){
     toast('Не удалось сохранить отметку проверки.');
   }
 }
+let shipmentSearchDebounce=null;
 async function openShipmentManifest(dateKey=localDateKey(new Date()),categoryFilter='',searchQuery=''){
   const expandedOrderIds=new Set([...document.querySelectorAll('.shipment-order-card[open]')].map(el=>el.dataset.orderId).filter(Boolean));
   await loadShipmentCategoryMap();
   let confirmation=null;
   try{const snap=await getDoc(doc(db,'shipmentDays',dateKey));if(snap.exists())confirmation=snap.data();}catch(err){console.warn(err);}
-  const shipmentDaySnap=await getDoc(doc(db,'shipmentDays',dateKey)).catch(()=>null);
-  const dayData=shipmentDaySnap?.exists()?(shipmentDaySnap.data()||{}):{};
+  // The same document also contains the checked-article state; reuse this read.
+  const dayData=confirmation||{};
   const checkedOrderArticles=new Set(Array.isArray(dayData.checkedOrderArticles)?dayData.checkedOrderArticles.map(String):[]);
   const legacyCheckedArticles=new Set(Array.isArray(dayData.checkedArticles)?dayData.checkedArticles.map(x=>String(x).trim().toUpperCase()):[]);
   const query=String(searchQuery||'').trim().toLocaleLowerCase('ru');
@@ -2857,7 +2858,17 @@ async function openShipmentManifest(dateKey=localDateKey(new Date()),categoryFil
   }else if(canManageUsers||state.role==='warehouse'||state.role==='manager')html+=button('✓ Подтвердить список на отгрузку','confirm-shipment:'+dateKey,'small-button good');
   else html+='<div class="field-hint">Подтвердить список может кладовщик, менеджер или администратор.</div>';
   showModal('Список деталей на отгрузку',html,[button('Показать день','shipment-date','small-button primary-soft'),button('Закрыть','close')],'ОТГРУЗКА ПО ДНЯМ');
-  $('shipmentSearch')?.addEventListener('input',e=>{const pos=e.target.selectionStart;openShipmentManifest(dateKey,'',e.target.value).then(()=>{const input=$('shipmentSearch');if(input){input.focus();input.setSelectionRange(pos,pos);}});});
+  $('shipmentSearch')?.addEventListener('input',e=>{
+    const value=e.target.value;
+    const pos=e.target.selectionStart;
+    clearTimeout(shipmentSearchDebounce);
+    shipmentSearchDebounce=setTimeout(()=>{
+      openShipmentManifest(dateKey,'',value).then(()=>{
+        const input=$('shipmentSearch');
+        if(input){input.focus();input.setSelectionRange(pos,pos);}
+      });
+    },180);
+  });
 }
 async function confirmShipmentManifest(dateKey){
   if(!(canManageUsers||state.role==='warehouse'||state.role==='manager')){toast('У вас нет права подтверждать список.');return;}

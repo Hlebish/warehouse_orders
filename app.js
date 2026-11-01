@@ -1,11 +1,12 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js';
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signInWithCredential, signOut, sendPasswordResetEmail, createUserWithEmailAndPassword, updatePassword, EmailAuthProvider, reauthenticateWithCredential, GoogleAuthProvider, signInWithPopup, linkWithCredential, setPersistence, browserLocalPersistence } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js';
-import { getFirestore, collection, doc, onSnapshot, setDoc, deleteDoc, getDocs, getDocsFromServer, getDoc, getDocFromServer, updateDoc, writeBatch, runTransaction, serverTimestamp, query, orderBy, limit, startAfter, arrayUnion, arrayRemove } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
+import { getFirestore, collection, doc, onSnapshot, setDoc, deleteDoc, getDocs, getDocsFromServer, getDoc, getDocFromServer, updateDoc, writeBatch, runTransaction, serverTimestamp, query, where, orderBy, limit, startAfter, arrayUnion, arrayRemove } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
 import { getStorage, ref as storageRef, uploadBytes, uploadBytesResumable, getDownloadURL, deleteObject } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-storage.js';
 import { getMessaging, getToken, deleteToken, onMessage } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-messaging.js';
 import { firebaseConfig, vapidKey } from './firebase-config.js';
 const firebaseApp=initializeApp(firebaseConfig),auth=getAuth(firebaseApp),db=getFirestore(firebaseApp),messaging=getMessaging(firebaseApp),storage=getStorage(firebaseApp),staffAuth=getAuth(initializeApp(firebaseConfig,'amp-staff-provisioner'));
 let signedInUser=null,profileName='',canManageUsers=false,profileUnsubscribe=null,ordersUnsubscribe=null,chatUnsubscribe=null,chatBadgeUnsubscribe=null,notificationsUnsubscribe=null,serverCache=new Map(),entryUnsubscribes=new Map(),pendingWrites=new Set(),pendingOrderData=new Map(),initialCloudLoad=true;
+let chatLegacyHistoryLoaded=false,chatLegacyHistoryLoading=false;
 const roles={warehouse:'Кладовщик',manager:'Менеджер',chief_accountant:'Главный бухгалтер',accountant:'Бухгалтер',director:'Директор'};
 const isManagerRole=()=>['manager','chief_accountant','accountant'].includes(state.role);
 const isShipmentLocked=o=>['Отгружен кладовщиком','Клиент забрал самовывозом'].includes(o?.status)&&!canManageUsers;
@@ -2168,25 +2169,49 @@ function showChatReaders(id){
   const onKey=e=>{if(e.key==='Escape'){close();document.removeEventListener('keydown',onKey);}};
   document.addEventListener('keydown',onKey);
 }
+function normalizeChatMessageDoc(d){
+  const data=d.data()||{};
+  return {id:d.id,...data,source:'chat-message',text:String(data.text??data.message??data.content??''),authorName:data.authorName??data.author??data.userName??'Сотрудник',createdAt:data.createdAt??data.timestamp??data.sentAt??data.date,photos:Array.isArray(data.photos)?data.photos:(Array.isArray(data.images)?data.images:[])};
+}
 async function loadOlderChatMessages(){
-  if(loadingOlderChatMessages||!hasOlderChatMessages||!chatOldestCursor||!$('chatMessages'))return;
+  if(loadingOlderChatMessages||!hasOlderChatMessages||!$('chatMessages'))return;
   loadingOlderChatMessages=true;
   const box=$('chatMessages');
   try{
-    const olderQuery=query(collection(db,'chatMessages'),orderBy('createdAt','desc'),startAfter(chatOldestCursor),limit(50));
-    const snap=await getDocs(olderQuery);
-    if(!snap.empty){
-      chatPendingScrollRestore={top:box.scrollTop,height:box.scrollHeight};
+    if(chatOldestCursor){
+      const olderQuery=query(collection(db,'chatMessages'),where('createdAt','>=',new Date(0)),orderBy('createdAt','desc'),startAfter(chatOldestCursor),limit(50));
+      const snap=await getDocs(olderQuery);
+      if(!snap.empty){
+        chatPendingScrollRestore={top:box.scrollTop,height:box.scrollHeight};
+        const known=new Set([...chatMessages,...olderChatMessages].map(m=>m.id));
+        const loaded=snap.docs.map(normalizeChatMessageDoc).filter(m=>(m.text||m.photos.length)&&!known.has(m.id));
+        olderChatMessages=[...olderChatMessages,...loaded];
+        chatOldestCursor=snap.docs.length===50?snap.docs.at(-1):null;
+        hasOlderChatMessages=snap.docs.length===50||!chatLegacyHistoryLoaded;
+        renderChatMessages();
+        if(chatOldestCursor)return;
+      }else chatOldestCursor=null;
+    }
+    // Legacy records may use string dates or timestamp/sentAt/date instead of
+    // createdAt. Load them only when the user reaches the end of modern history.
+    if(!chatLegacyHistoryLoaded&&!chatLegacyHistoryLoading){
+      chatLegacyHistoryLoading=true;
+      const legacySnap=await getDocs(collection(db,'chatMessages'));
       const known=new Set([...chatMessages,...olderChatMessages].map(m=>m.id));
-      const loaded=snap.docs.map(d=>({id:d.id,...d.data()})).filter(m=>(m.text||Array.isArray(m.photos)&&m.photos.length)&&!known.has(m.id));
-      olderChatMessages=[...olderChatMessages,...loaded];
-      
-      chatOldestCursor=snap.docs.at(-1);
-      hasOlderChatMessages=snap.docs.length===50;
+      const legacy=legacySnap.docs.map(normalizeChatMessageDoc).filter(m=>{
+        const raw=legacySnap.docs.find(d=>d.id===m.id)?.data()||{};
+        const canonical=raw.createdAt;
+        const hasCanonicalTimestamp=canonical&&typeof canonical.toMillis==='function';
+        return !hasCanonicalTimestamp&&(m.text||m.photos.length)&&!known.has(m.id);
+      });
+      chatPendingScrollRestore={top:box.scrollTop,height:box.scrollHeight};
+      olderChatMessages=[...olderChatMessages,...legacy];
+      chatLegacyHistoryLoaded=true;
+      hasOlderChatMessages=false;
       renderChatMessages();
-    }else hasOlderChatMessages=false;
+    }
   }catch(err){console.error('Не удалось загрузить старые сообщения чата',err);toast('Не удалось загрузить старые сообщения. Проверьте соединение.');}
-  finally{loadingOlderChatMessages=false;}
+  finally{chatLegacyHistoryLoading=false;loadingOlderChatMessages=false;}
 }
 // Register chat-menu dismissal handlers once, not once for every rendered message.
 document.addEventListener('click',event=>{
@@ -2261,23 +2286,22 @@ function sendChatMessage(){ $('chatForm')?.requestSubmit(); }
 function openChat(){
   if(!signedInUser)return;
   chatUnsubscribe?.();
-  chatMessages=[];olderChatMessages=[];chatOldestCursor=null;hasOlderChatMessages=false;loadingOlderChatMessages=false;chatPendingScrollRestore=null;chatReplyTo=null;chatFilterText='';chatFilterMode='all';
+  chatMessages=[];olderChatMessages=[];chatOldestCursor=null;hasOlderChatMessages=true;loadingOlderChatMessages=false;chatLegacyHistoryLoaded=false;chatLegacyHistoryLoading=false;chatPendingScrollRestore=null;chatReplyTo=null;chatFilterText='';chatFilterMode='all';
   knownChatPeople=[];loadCurrentChatPeople();
   showModal('Общий чат','<div class="chat-shell"><div class="chat-toolbar">'+(canManageUsers?'<button type="button" class="small-button primary-soft" data-action="test-push-notification">🔔 Проверка уведомления</button>':'')+'<label class="search-box"><span>⌕</span><input id="chatSearch" type="search" placeholder="Поиск по чату"></label><select id="chatFilter"><option value="all">Все сообщения</option><option value="mine">Мои</option><option value="replies">С ответами</option><option value="photos">С фото</option></select></div><div class="chat-messages" id="chatMessages"><div class="chat-empty">Загрузка сообщений…</div></div><form id="chatForm" class="chat-form"><div id="chatReplyPreview" class="chat-reply-preview" hidden></div><div class="chat-input-wrap"><textarea id="chatInput" maxlength="1000" rows="2" placeholder="Напишите сообщение… (можно вставить фото из буфера)" autocomplete="off"></textarea><div id="chatMentionSuggestions" class="chat-mention-suggestions" hidden></div></div><div class="chat-attach-row"><label class="chat-attach-button">📎 Фото<input id="chatPhotoInput" type="file" accept="image/*" multiple hidden></label><span id="chatPhotoHint">До 5 фото, по 8 МБ</span></div><div id="chatUploadProgress" class="chat-upload-progress" hidden><div class="chat-upload-progress-track"><div id="chatUploadProgressBar" class="chat-upload-progress-bar"></div></div><span id="chatUploadProgressText">Загрузка…</span></div><div id="chatPhotoPreview" class="chat-photo-preview"></div></form></div>',[button('Закрыть','close'),button('Отправить','send-chat','primary-button')],'ОБЩИЙ ЧАТ');
-  // Listen to the full collection and sort client-side. This also handles legacy
-  // messages whose createdAt field has a different Firestore type; orderBy(createdAt)
-  // can otherwise push newly sent messages out of the limited result set.
-  chatUnsubscribe=onSnapshot(collection(db,'chatMessages'),snap=>{
-    const next=snap.docs.map(d=>{const data=d.data();return {id:d.id,...data,source:'chat-message',text:String(data.text??data.message??data.content??''),authorName:data.authorName??data.author??data.userName??'Сотрудник',createdAt:data.createdAt??data.timestamp??data.sentAt??data.date,photos:Array.isArray(data.photos)?data.photos:(Array.isArray(data.images)?data.images:[])};}).filter(m=>String(m.text||'').trim()||Array.isArray(m.photos)&&m.photos.length).sort((x,y)=>{const date=v=>{if(v?.toMillis)return v.toMillis();if(v instanceof Date)return v.getTime();if(typeof v==='number')return v;const parsed=Date.parse(v||'');return Number.isFinite(parsed)?parsed:0;};return date(x.createdAt)-date(y.createdAt)||String(x.id).localeCompare(String(y.id));});
+  // Subscribe only to recent canonical Timestamp records. Legacy messages are
+  // fetched on demand when the user scrolls back through the modern history.
+  const recentChatQuery=query(collection(db,'chatMessages'),where('createdAt','>=',new Date(0)),orderBy('createdAt','desc'),limit(50));
+  chatUnsubscribe=onSnapshot(recentChatQuery,snap=>{
+    const next=snap.docs.map(normalizeChatMessageDoc).filter(m=>String(m.text||'').trim()||m.photos.length).sort((x,y)=>{const date=v=>{if(v?.toMillis)return v.toMillis();if(v instanceof Date)return v.getTime();if(typeof v==='number')return v;const parsed=Date.parse(v||'');return Number.isFinite(parsed)?parsed:0;};return date(x.createdAt)-date(y.createdAt)||String(x.id).localeCompare(String(y.id));});
     const box=$('chatMessages');
     const oldTop=box?.scrollTop||0, oldHeight=box?.scrollHeight||0;
     const wasAtBottom=!!box&&(box.scrollHeight-box.clientHeight-box.scrollTop<80);
     const previousIds=new Set([...chatMessages,...olderChatMessages].map(m=>m.id));
     const hasNewIncoming=next.some(m=>!previousIds.has(m.id)&&m.authorId!==signedInUser?.uid);
-    chatMessages=next.slice(-50);
-    olderChatMessages=next.slice(0,-50);
-    chatOldestCursor=null;
-    hasOlderChatMessages=false;
+    chatMessages=next;
+    if(!chatOldestCursor&&snap.docs.length)chatOldestCursor=snap.docs.at(-1);
+    hasOlderChatMessages=snap.docs.length===50||!chatLegacyHistoryLoaded;
     renderChatMessages({preserveScroll:true,oldTop,oldHeight,wasAtBottom,scrollToNew:hasNewIncoming&&wasAtBottom});
     markChatMessagesRead(chatMessages);
   },err=>{

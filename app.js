@@ -626,12 +626,16 @@ function watchOrders(){
  ordersUnsubscribe?.();
  ordersUnsubscribe=onSnapshot(collection(db,'orders'),snap=>{
    const oldIds=new Set(state.orders.map(o=>o.id)),remoteIds=new Set();
+   // Index existing orders once per snapshot instead of scanning the full array
+   // for every document. This keeps snapshot processing close to linear time.
+   const orderIndexById=new Map(state.orders.map((order,index)=>[order.id,index]));
    let openedOrderStatusChanged=false;
    for(const d of snap.docs){remoteIds.add(d.id);const data=d.data(),prior=serverCache.get(d.id),pending=pendingOrderData.get(d.id);
-     const existingOrder=state.orders.find(o=>o.id===d.id);
+     const existingIndex=orderIndexById.get(d.id);
+     const existingOrder=existingIndex===undefined?null:state.orders[existingIndex];
      if(existingOrder&&existingOrder.status!==data.status&&selectedId===d.id&&!modal.hidden&&modal.dataset.orderDetail===d.id)openedOrderStatusChanged=true;
      const order={id:d.id,number:pending?.number??data.number,client:pending?.client??(data.client||''),deliveryType:['city','pickup','post','kamyanske'].includes(data.deliveryType)?data.deliveryType:'city',status:pending?.status??data.status,returnCancelled:data.returnCancelled===true||(Array.isArray(data.returns)&&data.returns.some(r=>r?.status==='cancelled')),articles:pending?.articles??(Array.isArray(data.articles)?data.articles:[]),createdAt:data.createdAt,updatedAt:data.updatedAt,transferredAt:data.transferredAt,resumedAt:data.resumedAt,assembledAt:data.assembledAt,shippedAt:data.shippedAt,assemblyInProgress:data.assemblyInProgress===true,assemblyStartedAt:data.assemblyStartedAt,assemblyStartedBy:data.assemblyStartedBy,assemblyStartedByName:data.assemblyStartedByName,returns:Array.isArray(data.returns)?data.returns:[],author:data.createdByName||'Сотрудник',createdBy:data.createdBy,updatedBy:data.updatedBy,updatedByName:data.updatedByName,entries:prior?.entries||[],returns:Array.isArray(data.returns)?data.returns:[]};
-     const at=state.orders.findIndex(o=>o.id===d.id);if(at<0)state.orders.push(order);else state.orders[at]={...order,entries:state.orders[at].entries||[]};serverCache.set(d.id,{...order,articles:(order.articles||[]).map(x=>({...x})),entries:(prior?.entries||[]).map(x=>({...x}))});
+     let at=orderIndexById.get(d.id);if(at===undefined){at=state.orders.length;state.orders.push(order);orderIndexById.set(d.id,at);}else state.orders[at]={...order,entries:state.orders[at].entries||[]};serverCache.set(d.id,{...order,articles:(order.articles||[]).map(x=>({...x})),entries:(prior?.entries||[]).map(x=>({...x}))});
      if(!entryUnsubscribes.has(d.id)){let firstEntries=true;entryUnsubscribes.set(d.id,onSnapshot(collection(db,'orders',d.id,'entries'),es=>{const entries=es.docs.map(x=>entryFromCloud(x.id,x.data())).sort((a,b)=>(asDate(a.createdAt)?.getTime()||0)-(asDate(b.createdAt)?.getTime()||0)||String(a.id).localeCompare(String(b.id)));const item=state.orders.find(o=>o.id===d.id);if(!item)return;const before=JSON.stringify(item.entries||[]);item.entries=entries;serverCache.set(d.id,{...serverCache.get(d.id),entries:entries.map(x=>({...x}))});const entriesChanged=before!==JSON.stringify(entries);
 if(!initialCloudLoad&&!firstEntries&&entriesChanged){const last=entries.at(-1);if(last?.kind!=='system')toast(`${item.client||'Клиент не указан'} · ${last?last.kind==='decision'?'Добавлено решение':last.kind==='defect'?'Добавлен дефект':last.kind==='question'?'Добавлен вопрос':'Новый комментарий':'Заказ обновлён'}`);}
 const wasFirstEntries=firstEntries;

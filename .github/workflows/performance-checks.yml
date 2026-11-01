@@ -1,0 +1,26 @@
+name: Performance branch syntax checks
+
+on:
+  push:
+    branches:
+      - performance-audit-2026-11
+    paths:
+      - 'app.js'
+      - '.github/workflows/performance-checks.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check app.js syntax
+        run: node --check app.js

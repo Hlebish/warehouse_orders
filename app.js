@@ -5,7 +5,7 @@ import { getStorage, ref as storageRef, uploadBytes, uploadBytesResumable, getDo
 import { getMessaging, getToken, deleteToken, onMessage } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-messaging.js';
 import { firebaseConfig, vapidKey } from './firebase-config.js';
 const firebaseApp=initializeApp(firebaseConfig),auth=getAuth(firebaseApp),db=getFirestore(firebaseApp),messaging=getMessaging(firebaseApp),storage=getStorage(firebaseApp),staffAuth=getAuth(initializeApp(firebaseConfig,'amp-staff-provisioner'));
-let signedInUser=null,profileName='',canManageUsers=false,profileUnsubscribe=null,ordersUnsubscribe=null,chatUnsubscribe=null,chatBadgeUnsubscribe=null,notificationsUnsubscribe=null,serverCache=new Map(),entryUnsubscribes=new Map(),pendingWrites=new Set(),pendingOrderData=new Map(),initialCloudLoad=true;
+let signedInUser=null,profileName='',canManageUsers=false,profileUnsubscribe=null,ordersUnsubscribe=null,chatUnsubscribe=null,chatBadgeUnsubscribe=null,notificationsUnsubscribe=null,serverCache=new Map(),entryUnsubscribes=new Map(),defectEntryUnsubscribes=new Map(),pendingWrites=new Set(),pendingOrderData=new Map(),initialCloudLoad=true;
 let chatLegacyHistoryLoaded=false,chatLegacyHistoryLoading=false;
 const roles={warehouse:'Кладовщик',manager:'Менеджер',chief_accountant:'Главный бухгалтер',accountant:'Бухгалтер',director:'Директор'};
 const isManagerRole=()=>['manager','chief_accountant','accountant'].includes(state.role);
@@ -131,7 +131,7 @@ function watchNotifications(){
     const next=snap.docs.map(d=>({id:d.id,...d.data(),at:d.data().createdAt||d.data().at||isoNow()}));
     if(!initialSnapshot){
       const freshNotices=next.filter(n=>!knownNoticeIds.has(n.id)&&!n.read&&isFreshLiveNotice(n));
-      freshNotices.filter(shouldShowAttentionToast).forEach(showAttentionToast);
+      const attentionNotices=freshNotices.filter(shouldShowAttentionToast);\n      if(attentionNotices.length===1)showAttentionToast(attentionNotices[0]);\n      else if(attentionNotices.length>1)showAttentionToastBatch(attentionNotices);
       if(window.warehouseDesktop?.isDesktopApp){
         freshNotices.forEach(n=>{
           const target=n.target==='chat'?'chat':'site';
@@ -193,7 +193,7 @@ function showAttentionToast(n){
   const now=Date.now();
   for(const [key,time] of shownAttentionToastKeys){if(now-time>15000)shownAttentionToastKeys.delete(key);}
   const sender=String(n.title||'Сотрудник');
-  const message=String(n.message||n.body||'Откройте, чтобы посмотреть сообщение');
+  const rawMessage=String(n.message||n.body||'Откройте, чтобы посмотреть сообщение');\n  const message=rawMessage.length>180?rawMessage.slice(0,177)+'…':rawMessage;
   const semanticKey='semantic:'+[`${n.target||''}`,sender,message,String(n.orderId||'')].join('|').toLocaleLowerCase('ru');
   const eventKey='event:'+String(n.eventId||n.id||semanticKey);
   if(shownAttentionToastKeys.has(eventKey)||shownAttentionToastKeys.has(semanticKey))return;
@@ -206,6 +206,19 @@ function showAttentionToast(n){
   t.setAttribute('aria-label',`${heading} от ${sender}. Открыть сообщение`);
   t.addEventListener('click',()=>openMentionNotice(n));
   t.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openMentionNotice(n)}});
+}
+function showAttentionToastBatch(items){
+ const mentions=items.filter(isMentionNotice).length;
+ const replies=items.filter(n=>flagOn(n,'isReply')).length;
+ const chats=items.length-mentions-replies;
+ const parts=[];
+ if(mentions)parts.push(`упоминаний: ${mentions}`);
+ if(replies)parts.push(`ответов: ${replies}`);
+ if(chats)parts.push(`сообщений: ${chats}`);
+ const t=toast(`Новые уведомления · ${parts.join(', ')}`);
+ t.classList.add('mention-toast');t.setAttribute('role','button');t.tabIndex=0;
+ t.addEventListener('click',()=>openMentionCenter());
+ t.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openMentionCenter()}});
 }
 function openMentionNotice(n){if(n?.orderId){closeModal();openOrder(String(n.orderId));return}if(n?.target==='chat'||n?.category==='chat'||n?.category==='replies'){openChat();return}showNotifications()}
 function openMentionCenter(){const items=unreadMentionNotices();if(!items.length){showNotifications();return}const body='<div class="mention-center-list">'+items.map(n=>'<button type="button" class="mention-center-item" data-mention-notice="'+esc(n.id)+'"><b>'+esc(n.title||'Вас упомянули')+'</b><span>'+esc(n.message||n.body||'Новое упоминание')+'</span><small>'+esc(fmtDateTime(n.createdAt||n.at))+'</small></button>').join('')+'</div>';showModal('Новые упоминания',body,[button('Все уведомления','show-notifications','small-button'),button('Закрыть','close')],'ВАС УПОМЯНУЛИ')}
@@ -631,7 +644,7 @@ onMessage(messaging,payload=>{
     notify(message,orderId,target,target==='chat'?'chat':'orders');
   }
 });
-function stopCloud(){profileUnsubscribe?.();ordersUnsubscribe?.();chatUnsubscribe?.();chatBadgeUnsubscribe?.();notificationsUnsubscribe?.();profileUnsubscribe=ordersUnsubscribe=chatUnsubscribe=chatBadgeUnsubscribe=notificationsUnsubscribe=null;for(const stop of entryUnsubscribes.values())stop();entryUnsubscribes.clear();serverCache.clear();state.orders=[];state.notices=[];paintMentionCenter()}
+function stopCloud(){profileUnsubscribe?.();ordersUnsubscribe?.();chatUnsubscribe?.();chatBadgeUnsubscribe?.();notificationsUnsubscribe?.();profileUnsubscribe=ordersUnsubscribe=chatUnsubscribe=chatBadgeUnsubscribe=notificationsUnsubscribe=null;for(const stop of entryUnsubscribes.values())stop();entryUnsubscribes.clear();for(const stop of defectEntryUnsubscribes.values())stop();defectEntryUnsubscribes.clear();serverCache.clear();state.orders=[];state.notices=[];paintMentionCenter()}
 function watchOrderEntries(id){
  if(!id||entryUnsubscribes.has(id))return;
  let firstEntries=true;
@@ -646,6 +659,20 @@ function watchOrderEntries(id){
   if(entriesChanged||wasFirstEntries)scheduleRender();
   if(wasFirstEntries&&selectedId===id&&!modal.hidden&&modal.dataset.orderDetail===id)openOrder(id);
  }));
+}
+function watchPendingDefectOrders(){
+ const candidates=new Set(state.orders.filter(o=>o.status==='Дефект').map(o=>o.id));
+ for(const [id,stop] of defectEntryUnsubscribes){if(!candidates.has(id)){stop();defectEntryUnsubscribes.delete(id);}}
+ for(const id of candidates){
+  if(defectEntryUnsubscribes.has(id))continue;
+  defectEntryUnsubscribes.set(id,onSnapshot(collection(db,'orders',id,'entries'),es=>{
+   const item=state.orders.find(o=>o.id===id);if(!item)return;
+   const entries=es.docs.map(x=>entryFromCloud(x.id,x.data())).sort((a,b)=>(asDate(a.createdAt)?.getTime()||0)-(asDate(b.createdAt)?.getTime()||0)||String(a.id).localeCompare(String(b.id)));
+   const before=JSON.stringify(item.entries||[]);item.entries=entries;
+   serverCache.set(id,{...serverCache.get(id),entries:entries.map(x=>({...x}))});
+   if(before!==JSON.stringify(entries))scheduleRender();
+  },err=>console.error('Не удалось проверить дефекты заказа',id,err)));
+ }
 }
 function watchOrders(){
  ordersUnsubscribe?.();
@@ -673,7 +700,7 @@ function watchOrders(){
      if(!initialCloudLoad&&change.type==='added'){const message=`Поступил заказ № ${order.number}`;toast(message);notify(message,d.id)}
      if(pending && data.number===pending.number && data.client===pending.client && data.status===pending.status){pendingOrderData.delete(d.id);}
    }
-   if(!snap.metadata.fromCache)initialCloudLoad=false;render();restoreUiState();
+   if(!snap.metadata.fromCache)initialCloudLoad=false;watchPendingDefectOrders();render();restoreUiState();
    // Keep the open order card in sync when another employee changes its status.
    if(openedOrderStatusChanged&&selectedId&&!modal.hidden&&modal.dataset.orderDetail===selectedId)openOrder(selectedId);
    if(pendingNotificationOrderId){const target=pendingNotificationOrderId;pendingNotificationOrderId='';history.replaceState({},'',location.pathname+location.hash);if(state.orders.some(o=>o.id===target))openOrder(target);}
@@ -878,7 +905,21 @@ function scheduleRender(){
 function render(){const search=$('searchInput').value.toLocaleLowerCase('ru');const dateFrom=$('dateFromFilter')?.value||'';const dateTo=$('dateToFilter')?.value||'';const statusPriority={'Создан':0,'Собран':1,'На согласовании':2,'Под вопросом':3,'Дефект':4,'Ожидает оплаты':5,'Одобрен на отгрузку клиенту':6,'Ожидает самовывоза':7,'Самовывоз':7,'Перенесен':8,'Отгружен кладовщиком':9,'Клиент забрал самовывозом':10,'Отменён':11};const dateValue=o=>o?.status==='Перенесен'?(o.createdAt||o.transferredAt||o.updatedAt):orderDisplayDate(o);const compareOrders=(a,b)=>{const dayA=localDateKey(dateValue(a)),dayB=localDateKey(dateValue(b));if(dayA!==dayB)return dayB.localeCompare(dayA);const pA=statusPriority[a.status]??8,pB=statusPriority[b.status]??8;if(pA!==pB)return pA-pB;return new Date(orderDisplayDate(b)||0)-new Date(orderDisplayDate(a)||0)};let orders=[...state.orders].filter(o=>activeFilter==='Камянское'||o.status!=='Камянское').sort((a,b)=>{const aTransferred=a.status==='Перенесен',bTransferred=b.status==='Перенесен';if(aTransferred!==bTransferred)return aTransferred?-1:1;if(aTransferred&&bTransferred){const d=localDateKey(a.createdAt||a.transferredAt||a.updatedAt).localeCompare(localDateKey(b.createdAt||b.transferredAt||b.updatedAt));return d||new Date(a.createdAt||a.transferredAt||0)-new Date(b.createdAt||b.transferredAt||0)}return compareOrders(a,b)});if(activeFilter!=='all')orders=orders.filter(o=>o.status===activeFilter);if(search)orders=orders.filter(o=>orderSearchText(o).includes(search));if(dateFrom||dateTo)orders=orders.filter(o=>isDateInRange(o,dateFrom,dateTo));const hasDateFilter=!!(dateFrom||dateTo);$('clearDateButton').hidden=!hasDateFilter;const filteredOrderCount=orders.length;const pageCount=Math.max(1,Math.ceil(filteredOrderCount/ordersPageSize));currentOrdersPage=Math.max(1,Math.min(currentOrdersPage,pageCount));const pageOrders=orders.slice((currentOrdersPage-1)*ordersPageSize,currentOrdersPage*ordersPageSize);const rows=[];let previousDate='',previousSection='';for(const o of pageOrders){const transferred=o.status==='Перенесен';const displayDate=transferred?(o.createdAt||o.transferredAt||o.updatedAt||o.createdAt):orderDisplayDate(o);const day=localDateKey(displayDate);const section=transferred?'transferred':'current';if(section!==previousSection){rows.push(`<tr class="date-separator ${transferred?'transferred-date-separator':'current-date-separator'}"><td colspan="7"><span>${transferred?'Перенесённые заказы · дата создания':'Текущие заказы · по дням'}</span></td></tr>`);previousSection=section;previousDate=''}if(day!==previousDate){rows.push(`<tr class="date-separator"><td colspan="7"><span>${esc(fmtDate(displayDate))}</span></td></tr>`);previousDate=day}rows.push(`<tr data-order="${esc(o.id)}" tabindex="0" role="button" aria-label="Открыть заказ № ${esc(o.number)}" class="order-card-row ${transferred?'transferred-order-row':''}"><td><a class="order-number" href="#" data-open="${esc(o.id)}">№ ${esc(o.number)}</a><span class="client-sub">создал ${esc(o.author||'Кладовщик')}</span></td><td><a class="client-name client-open" href="#" data-open="${esc(o.id)}">${esc(o.client)}</a><span class="client-sub">${fmtDateTime(displayDate)}</span></td><td><button type="button" class="row-open-status" data-open="${esc(o.id)}" title="Открыть заказ">${statusPill(o.status)}</button>${assemblyIndicator(o)}</td><td><button type="button" class="delivery-type-pill" data-open="${esc(o.id)}" title="Открыть карточку заказа"><span class="delivery-type-icon" aria-hidden="true">${o.deliveryType==='pickup'?'♧':o.deliveryType==='post'?'✉':o.deliveryType==='kamyanske'?'⌖':'↗'}</span><span>${o.deliveryType==='pickup'?'Самовывоз':o.deliveryType==='post'?'Доставка почтой':o.deliveryType==='kamyanske'?'Доставка в Камянское':'Доставка по городу'}</span></button></td><td><button type="button" class="row-open-comments" data-open="${esc(o.id)}" title="Открыть заказ"><span class="comment-icon">💬</span><span class="entry-count">${entriesCount(o)}</span></button></td><td class="time-cell">${fmtDate(displayDate)}</td><td><button class="row-menu" title="Открыть карточку" data-open="${esc(o.id)}">···</button></td></tr>`)}$('ordersBody').innerHTML=rows.join('');const empty=orders.length===0;$('emptyState').classList.toggle('visible',empty);$('ordersBody').style.display=empty?'none':'';$('statTotal').textContent=state.orders.filter(o=>o.status==='Собран').length;$('statCreated').textContent=state.orders.filter(o=>o.status==='Создан').length;$('statQuestions').textContent=state.orders.filter(o=>o.status==='Под вопросом').length;$('statApproval').textContent=state.orders.filter(o=>o.status==='На согласовании').length;$('statReady').textContent=state.orders.filter(o=>o.status==='Одобрен на отгрузку клиенту').length;$('statPayment').textContent=state.orders.filter(o=>o.status==='Ожидает оплаты').length;$('statPickup').textContent=state.orders.filter(o=>o.status==='Ожидает самовывоза').length;$('statTransferred').textContent=state.orders.filter(o=>o.status==='Перенесен').length;if($('statKamenskoye'))$('statKamenskoye').textContent=state.orders.filter(o=>o.status==='Камянское').length;$('listSummary').textContent=`${filteredOrderCount} ${plural(filteredOrderCount,'заказ','заказа','заказов')}`;const pagination=$('ordersPagination');if(pagination){const first=filteredOrderCount?(currentOrdersPage-1)*ordersPageSize+1:0;const last=Math.min(currentOrdersPage*ordersPageSize,filteredOrderCount);pagination.innerHTML=`<button type="button" class="secondary-button" data-orders-page="prev" ${currentOrdersPage<=1?'disabled':''}>← Назад</button><span>Страница ${currentOrdersPage} из ${pageCount} · ${first}–${last} из ${filteredOrderCount}</span><button type="button" class="secondary-button" data-orders-page="next" ${currentOrdersPage>=pageCount?'disabled':''}>Вперёд →</button>`;pagination.hidden=filteredOrderCount<=ordersPageSize;}$('userName').textContent=profileName||roles[state.role];$('userRole').textContent=canManageUsers?`Администратор · ${roles[state.role]}`:roles[state.role];$('modeLabel').textContent='Вы онлайн';$('modeSub').textContent='Подключено к облаку';$('today').textContent=new Intl.DateTimeFormat('ru-RU',{weekday:'short',day:'numeric',month:'long'}).format(new Date());document.querySelectorAll('.nav-item').forEach(b=>b.classList.toggle('active',b.dataset.filter===activeFilter));paintNotices();syncPendingDefectToasts()}
 function plural(n,a,b,c){n=Math.abs(n)%100;const d=n%10;return n>10&&n<20?c:d>1&&d<5?b:d===1?a:c}
 function toast(msg,orderId='',options={}){const t=document.createElement('div');t.className='toast'+(orderId?' toast-clickable':'');t.textContent=msg;if(orderId)t.addEventListener('click',()=>{if(!t.classList.contains('defect-toast'))t.remove();openOrder(orderId)});$('toastStack').append(t);if(!options.persistent)setTimeout(()=>t.remove(),3500);return t}
-function syncPendingDefectToasts(){const stack=$('toastStack');if(!stack)return;const pending=state.orders.flatMap(o=>(o.entries||[]).filter(e=>e.kind==='defect'&&!e.decision).map(e=>({id:`${o.id}:${e.id}`,orderId:o.id,number:o.number,article:e.article})));const active=new Set(pending.map(x=>x.id));stack.querySelectorAll('.defect-toast[data-defect-key]').forEach(t=>{if(!active.has(t.dataset.defectKey))t.remove()});for(const d of pending){if(stack.querySelector(`[data-defect-key="${CSS.escape(d.id)}"]`))continue;const t=toast(`⚠️ ДЕФЕКТ · Заказ № ${d.number} · ${d.article||'Артикул не указан'} — ожидает решения`,d.orderId,{persistent:true});t.classList.add('defect-toast');t.dataset.defectKey=d.id;t.setAttribute('role','button');t.tabIndex=0;t.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openOrder(d.orderId)}})}}
+function syncPendingDefectToasts(){
+ const stack=$('toastStack');if(!stack)return;
+ const pending=state.orders.flatMap(o=>(o.entries||[]).filter(e=>e.kind==='defect'&&!e.decision).map(e=>({orderId:o.id})));
+ const summary=stack.querySelector('[data-defect-summary]');
+ if(!pending.length){summary?.remove();return;}
+ const count=pending.length,orders=new Set(pending.map(x=>x.orderId)).size;
+ const message=`⚠️ Незакрытые дефекты: ${count} · заказов: ${orders}`;
+ if(summary){summary.textContent=message;return;}
+ const t=toast(message,'',{persistent:true});
+ t.classList.add('defect-toast');t.dataset.defectSummary='true';t.setAttribute('role','button');t.tabIndex=0;
+ const open=()=>{activeFilter='Дефект';currentOrdersPage=1;render();};
+ t.addEventListener('click',open);
+ t.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open()}});
+}
+
 let modalHistoryEntry=false;
 let orderReturnModalSnapshot=null;
 function showModal(title,body,buttons=[],eyebrow='КАРТОЧКА ЗАКАЗА'){

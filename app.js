@@ -384,6 +384,7 @@ async function save(){
  for(const o of state.orders){
    const pushTasks=[];
    const base=serverCache.get(o.id),newOrder=!base;
+   let defectNotificationQueued=false;
    const next=orderToCloud(o,newOrder),prev=base?orderToCloud(base):null;
    const orderChanged=!base||!equal(next,prev);
    const articlesChanged=!!base&&!articlesContentEqual(base.articles||[],o.articles||[]);
@@ -423,9 +424,17 @@ async function save(){
        saveStage='сохранение записи истории '+e.id+' заказа '+(o.number||o.id);
         await addBatchWrite(b=>b.set(doc(db,'orders',o.id,'entries',e.id),cloud));
        if(!newOrder&&e.kind!=='viewed'&&e.kind!=='system'){
-         const actionLabel=e.kind==='decision'?'Добавлено решение':e.kind==='defect'?'Добавлен дефект':e.kind==='question'?'Добавлен вопрос':'Новый комментарий';
          const clientLabel=o.client||'Клиент не указан';
-         pushTasks.push(()=>e.replyToEntryId&&e.replyToAuthorId?queuePush(clientLabel,'Новый ответ',signedInUser.uid,o.id,'site','replies',e.replyToAuthorId):queuePush(clientLabel,actionLabel,signedInUser.uid,o.id));
+         if(e.kind==='defect'){
+           // One push per order even when one defect action creates several per-article entries.
+           if(!defectNotificationQueued){
+             pushTasks.push(()=>queuePush(clientLabel,'Добавлен дефект',signedInUser.uid,o.id));
+             defectNotificationQueued=true;
+           }
+         }else{
+           const actionLabel=e.kind==='decision'?'Добавлено решение':e.kind==='question'?'Добавлен вопрос':'Новый комментарий';
+           pushTasks.push(()=>e.replyToEntryId&&e.replyToAuthorId?queuePush(clientLabel,'Новый ответ',signedInUser.uid,o.id,'site','replies',e.replyToAuthorId):queuePush(clientLabel,actionLabel,signedInUser.uid,o.id));
+         }
        }
        oldEntries.delete(e.id);
      }else oldEntries.delete(e.id);

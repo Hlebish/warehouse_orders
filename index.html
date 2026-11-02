@@ -87,7 +87,7 @@
       <nav class="nav" aria-label="Основная навигация">
         <button class="nav-item active" type="button" data-filter="all"><span class="nav-icon">▤</span><span>Все заказы</span></button>
         <button class="nav-item" type="button" data-action="returns"><span class="nav-icon">↩</span><span>Возвраты</span></button>
-        <button class="nav-item" id="buybackNavButton" type="button"><span class="nav-icon">⏳</span><span>Перекупной товар</span><span id="buybackNavAlert" class="buyback-nav-alert" hidden>!</span></button>
+        <button class="nav-item" id="buybackNavButton" type="button" hidden><span class="nav-icon">⏳</span><span>Перекупной товар</span><span id="buybackNavAlert" class="buyback-nav-alert" hidden>!</span></button>
         <button class="nav-item" type="button" data-action="clients"><span class="nav-icon">👥</span><span>Клиенты</span></button>
         <button class="nav-item" type="button" data-action="products"><span class="nav-icon">▦</span><span>База артикулов</span></button>
 
@@ -178,8 +178,8 @@
   <button type="button" id="mentionCenterButton" class="mention-center-button" hidden aria-live="polite"><span class="mention-center-icon">＠</span><span id="mentionCenterLabel">Вас упомянули</span><b id="mentionCenterCount">0</b></button>
   <div class="toast-stack" id="toastStack" aria-live="polite"></div>
   <script src="./vendor/xlsx.full.min.js?v=0.18.5"></script>
-  <script type="module" src="app.js?v=2026.11.02.notification-quality1"></script>
-  <script type="module" src="buyback.js?v=1.2.10"></script>
-  <script type="module" src="buyback-import.js?v=2026.10.30.invoice-final-parser-fix4"></script>
+  <script type="module" src="app.js?v=2026.11.02.buyback-access1"></script>
+  <script type="module" src="buyback.js?v=2026.11.02.buyback-access1"></script>
+  <script type="module" src="buyback-import.js?v=2026.11.02.buyback-access1"></script>
 </body>
 </html>

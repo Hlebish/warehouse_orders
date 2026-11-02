@@ -1,4 +1,4 @@
-const { onDocumentCreated } = require('firebase-functions/v2/firestore');
+const { onDocumentCreated, onDocumentUpdated } = require('firebase-functions/v2/firestore');
 const { onSchedule } = require('firebase-functions/v2/scheduler');
 const { onRequest, onCall, HttpsError } = require('firebase-functions/v2/https');
 const { defineSecret } = require('firebase-functions/params');
@@ -14,6 +14,9 @@ const db = getFirestore();
 const messaging = getMessaging();
 const ORDER_NOTIFICATION_CATEGORIES = new Set(['assembly', 'defects', 'status', 'editing', 'comments', 'questions', 'decisions']);
 const IMMEDIATE_NOTIFICATION_CATEGORIES = new Set(['defects', 'questions', 'decisions', 'replies']);
+function canAccessBuybackProfile(profile = {}) {
+  return profile.active === true && (profile.admin === true || ['accountant', 'chief_accountant', 'director'].includes(profile.role));
+}
 function timestampKey(value) {
   if (value instanceof Timestamp) return value.toDate().toISOString();
   if (value instanceof Date) return value.toISOString();
@@ -147,6 +150,7 @@ async function createNotificationHistory(data, eventId) {
 
   for (const user of users) {
     const profile = user.data() || {};
+    if (data.buybackItemId && !canAccessBuybackProfile(profile)) continue;
     if (authorId && user.id === authorId && !(data.forceAll === true && recipientUserId === user.id)) continue;
     const settings = profile.notificationSettings || {};
     if (!notificationCategoryEnabled(settings, category) && !data.buybackItemId && data.forceAll !== true) continue;
@@ -183,7 +187,7 @@ async function createNotificationHistory(data, eventId) {
   return count;
 }
 
-async function collectTokens(category='orders', recipientUserId='', authorId='', forceAll=false) {
+async function collectTokens(category='orders', recipientUserId='', authorId='', forceAll=false, buybackOnly=false) {
   // Direct notifications should never enumerate every employee's devices.
   const users = recipientUserId
     ? await db.collection('users').doc(recipientUserId).get().then(user =>
@@ -192,8 +196,9 @@ async function collectTokens(category='orders', recipientUserId='', authorId='',
 
   const eligibleUsers = users.filter(user => {
     const profile = user.data() || {};
+    if (buybackOnly && !canAccessBuybackProfile(profile)) return false;
     if (authorId && user.id === authorId && !(forceAll && recipientUserId === user.id)) return false;
-    return forceAll || notificationCategoryEnabled(profile.notificationSettings || {}, category);
+    return forceAll || buybackOnly || notificationCategoryEnabled(profile.notificationSettings || {}, category);
   });
 
   // Only read push-token subcollections for users who can receive this event.
@@ -498,7 +503,7 @@ exports.sendWarehousePush = onDocumentCreated({ document: 'pushQueue/{eventId}',
     : (orderId ? `${siteUrl}?order=${encodeURIComponent(orderId)}` : siteUrl);
 
   try {
-    const tokenDocs = await collectTokens(category, recipientUserId, String(data.authorId || ''), Boolean(data.buybackItemId) || data.forceAll === true);
+    const tokenDocs = await collectTokens(category, recipientUserId, String(data.authorId || ''), data.forceAll === true, Boolean(data.buybackItemId));
 
     if (!tokenDocs.length) {
       await historyPromise;
@@ -643,6 +648,187 @@ exports.sendWarehousePush = onDocumentCreated({ document: 'pushQueue/{eventId}',
 });
 
 
+function normalizeBuybackArticle(value) {
+  const text = String(value || '').trim().toUpperCase();
+  const code = text.match(/^(AP[A-Z]{2}\d+)/);
+  return code ? code[1] : text.replace(/[^A-Z0-9]/g, '');
+}
+
+function buybackArticleQuantities(articles) {
+  const result = new Map();
+  for (const line of Array.isArray(articles) ? articles : []) {
+    const article = normalizeBuybackArticle(line?.article);
+    const quantity = Math.max(1, Math.floor(Number(line?.quantity) || 1));
+    if (article) result.set(article, (result.get(article) || 0) + quantity);
+  }
+  return result;
+}
+
+function buybackEventDocId(prefix, eventId) {
+  return `${prefix}_${createHash('sha256').update(String(eventId)).digest('hex').slice(0, 40)}`;
+}
+
+async function syncBuybackOrderReferences(order) {
+  const quantities = buybackArticleQuantities(order.articles);
+  if (!quantities.size) return;
+  const snap = await db.collection('buybackItems').where('status', 'in', ['active', 'expired']).get();
+  const today = new Date().toISOString().slice(0, 10);
+  let batch = db.batch();
+  let writes = 0;
+  for (const item of snap.docs) {
+    if (!quantities.has(normalizeBuybackArticle(item.get('article')))) continue;
+    const data = item.data();
+    if (data.orderId && data.orderId !== order.id) continue;
+    batch.update(item.ref, {
+      orderId: order.id,
+      orderNumber: String(order.number || ''),
+      clientName: String(order.client || 'Клиент не указан'),
+      reservedAt: data.reservedAt || today,
+      updatedAt: FieldValue.serverTimestamp()
+    });
+    writes++;
+    if (writes === 450) { await batch.commit(); batch = db.batch(); writes = 0; }
+  }
+  if (writes) await batch.commit();
+}
+
+async function markBuybackItemsSold(order, eventId) {
+  const needed = buybackArticleQuantities(order.articles);
+  if (!needed.size) return;
+  const markerRef = db.collection('orders').doc(order.id).collection('buybackSync').doc(buybackEventDocId('shipment', eventId));
+  await db.runTransaction(async transaction => {
+    if ((await transaction.get(markerRef)).exists) return;
+    const snap = await transaction.get(db.collection('buybackItems').where('status', 'in', ['active', 'expired']));
+    const remaining = new Map(needed);
+    const today = new Date().toISOString().slice(0, 10);
+    let writes = 0;
+    for (const itemDoc of snap.docs) {
+      const item = itemDoc.data();
+      const article = normalizeBuybackArticle(item.article);
+      const quantityNeeded = remaining.get(article) || 0;
+      const available = Math.max(0, Math.floor(Number(item.quantity) || 0));
+      if (!article || !quantityNeeded || !available) continue;
+      const sold = Math.min(available, quantityNeeded);
+      const patch = {
+        status: 'sold', soldAt: today, updatedAt: FieldValue.serverTimestamp(),
+        soldByOrderId: order.id, soldByOrderNumber: String(order.number || ''),
+        soldToClient: String(order.client || 'Клиент не указан'), orderId: order.id,
+        orderNumber: String(order.number || ''), clientName: String(order.client || 'Клиент не указан')
+      };
+      if (sold === available) transaction.update(itemDoc.ref, patch);
+      else {
+        const soldRef = db.collection('buybackItems').doc(buybackEventDocId(`sold_${itemDoc.id}`, eventId));
+        transaction.set(soldRef, { ...item, quantity: sold, ...patch, createdAt: FieldValue.serverTimestamp() });
+        transaction.update(itemDoc.ref, { quantity: available - sold, updatedAt: FieldValue.serverTimestamp() });
+      }
+      remaining.set(article, quantityNeeded - sold);
+      writes += sold === available ? 1 : 2;
+    }
+    if (writes > 450) throw new Error('Buyback shipment exceeds the safe transaction write limit');
+    transaction.set(markerRef, { processedAt: FieldValue.serverTimestamp(), kind: 'shipment' });
+  });
+}
+
+async function restoreBuybackItemsForReturn(order, returnEntry, eventId) {
+  const markerRef = db.collection('orders').doc(order.id).collection('buybackSync').doc(buybackEventDocId('return', eventId));
+  await db.runTransaction(async transaction => {
+    if ((await transaction.get(markerRef)).exists) return;
+    const soldQuery = db.collection('buybackItems').where('soldByOrderId', '==', order.id);
+    const soldSnap = await transaction.get(soldQuery);
+    const remaining = new Map();
+    for (const entry of Array.isArray(returnEntry.items) ? returnEntry.items : []) {
+      const article = normalizeBuybackArticle(entry?.article);
+      const quantity = Math.max(0, Math.floor(Number(entry?.quantity) || 0));
+      if (article && quantity) remaining.set(article, (remaining.get(article) || 0) + quantity);
+    }
+    const today = String(returnEntry.createdAt || new Date().toISOString()).slice(0, 10);
+    let writes = 0;
+    for (const itemDoc of soldSnap.docs) {
+      const item = itemDoc.data(), article = normalizeBuybackArticle(item.article);
+      if (item.status !== 'sold') continue;
+      const needed = remaining.get(article) || 0, available = Math.max(0, Math.floor(Number(item.quantity) || 0));
+      if (!needed || !available) continue;
+      const quantity = Math.min(needed, available);
+      const returnedFields = {
+        status: 'active', returnedAt: today, returnedFromOrderId: order.id,
+        returnedFromOrderNumber: String(order.number || ''), returnedFromReturnId: returnEntry.id,
+        returnedFromClient: String(order.client || ''), updatedAt: FieldValue.serverTimestamp()
+      };
+      if (quantity === available) transaction.update(itemDoc.ref, returnedFields);
+      else {
+        const splitRef = db.collection('buybackItems').doc(buybackEventDocId(`returned_${itemDoc.id}`, eventId));
+        transaction.set(splitRef, { ...item, quantity, status: 'active', ...returnedFields, returnedFromBuybackId: itemDoc.id, createdAt: FieldValue.serverTimestamp() });
+        transaction.update(itemDoc.ref, { quantity: available - quantity, updatedAt: FieldValue.serverTimestamp() });
+      }
+      remaining.set(article, needed - quantity);
+      writes += quantity === available ? 1 : 2;
+    }
+    if (writes > 450) throw new Error('Buyback return exceeds the safe transaction write limit');
+    transaction.set(markerRef, { processedAt: FieldValue.serverTimestamp(), kind: 'return', returnId: returnEntry.id });
+  });
+}
+
+async function reverseBuybackReturn(orderId, returnId, eventId) {
+  const markerRef = db.collection('orders').doc(orderId).collection('buybackSync').doc(buybackEventDocId('cancel', eventId));
+  await db.runTransaction(async transaction => {
+    if ((await transaction.get(markerRef)).exists) return;
+    const returnedSnap = await transaction.get(db.collection('buybackItems').where('returnedFromReturnId', '==', returnId));
+    const sourceRefs = new Map();
+    for (const itemDoc of returnedSnap.docs) {
+      const item = itemDoc.data();
+      if (item.status === 'active' && item.returnedFromBuybackId) sourceRefs.set(item.returnedFromBuybackId, db.collection('buybackItems').doc(item.returnedFromBuybackId));
+    }
+    const sources = new Map();
+    for (const [id, ref] of sourceRefs) { const snap = await transaction.get(ref); if (snap.exists) sources.set(id, snap); }
+    let writes = 0;
+    for (const itemDoc of returnedSnap.docs) {
+      const item = itemDoc.data();
+      if (item.status !== 'active') continue;
+      if (item.returnedFromBuybackId) {
+        const source = sources.get(item.returnedFromBuybackId);
+        if (!source) continue;
+        transaction.update(source.ref, { quantity: (Number(source.get('quantity')) || 0) + (Number(item.quantity) || 0), updatedAt: FieldValue.serverTimestamp() });
+        transaction.delete(itemDoc.ref);
+      } else {
+        transaction.update(itemDoc.ref, {
+          status: 'sold', returnedAt: FieldValue.delete(), returnedFromOrderId: FieldValue.delete(),
+          returnedFromOrderNumber: FieldValue.delete(), returnedFromReturnId: FieldValue.delete(),
+          returnedFromClient: FieldValue.delete(), updatedAt: FieldValue.serverTimestamp()
+        });
+      }
+      writes++;
+    }
+    if (writes > 450) throw new Error('Buyback return cancellation exceeds the safe transaction write limit');
+    transaction.set(markerRef, { processedAt: FieldValue.serverTimestamp(), kind: 'return-cancel', returnId });
+  });
+}
+
+exports.syncBuybackFromOrder = onDocumentUpdated({ document: 'orders/{orderId}', retry: true }, async event => {
+  const before = event.data?.before.data() || {}, after = event.data?.after.data() || {};
+  const order = { id: event.params.orderId, ...after };
+  const shipped = ['Отгружен кладовщиком', 'Клиент забрал самовывозом'];
+  if (shipped.includes(after.status) && !shipped.includes(before.status)) await markBuybackItemsSold(order, event.id);
+
+  const previousReturns = new Map((Array.isArray(before.returns) ? before.returns : []).map(item => [item?.id, item]));
+  for (const entry of Array.isArray(after.returns) ? after.returns : []) {
+    if (!entry?.id) continue;
+    const previous = previousReturns.get(entry.id);
+    if (!previous || JSON.stringify(previous) !== JSON.stringify(entry)) {
+      if (entry.status === 'cancelled' && previous?.status !== 'cancelled') await reverseBuybackReturn(order.id, entry.id, event.id);
+      else if (entry.status !== 'cancelled') await restoreBuybackItemsForReturn(order, entry, event.id);
+    }
+  }
+
+  const referenceFieldsChanged = ['number', 'client'].some(key => before[key] !== after[key])
+    || JSON.stringify(before.articles || []) !== JSON.stringify(after.articles || []);
+  if (referenceFieldsChanged) await syncBuybackOrderReferences(order);
+});
+
+exports.linkBuybackToNewOrder = onDocumentCreated({ document: 'orders/{orderId}', retry: true }, async event => {
+  const data = event.data?.data() || {};
+  await syncBuybackOrderReferences({ id: event.params.orderId, ...data });
+});
+
 // Ежедневная проверка сроков перекупного товара. Отправляем каждую контрольную отметку один раз.
 exports.checkBuybackDeadlines = onSchedule({
   schedule: 'every day 09:00',
@@ -651,6 +837,9 @@ exports.checkBuybackDeadlines = onSchedule({
 }, async () => {
   const snap = await db.collection('buybackItems').where('status', '==', 'active').get();
   const now = new Date();
+  const kyivParts = Object.fromEntries(new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Kyiv', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(now).map(part => [part.type, part.value]));
+  const kyivDateKey = `${kyivParts.year}-${kyivParts.month}-${kyivParts.day}`;
+  const todayUtc = Date.parse(`${kyivDateKey}T00:00:00Z`);
   const milestones = {
     3: { title: 'Перекупной товар залежался', body: article => `Артикул ${article}: товар находится на складе уже 3 дня. Проверьте дальнейшие действия.` },
     6: { title: 'Внимание: подходит срок возврата', body: article => `Артикул ${article}: прошло 6 из 14 дней. Срок возврата приближается — пора принять решение.` },
@@ -658,9 +847,12 @@ exports.checkBuybackDeadlines = onSchedule({
   };
   for (const itemDoc of snap.docs) {
     const data = itemDoc.data() || {};
-    const received = new Date(String(data.receivedAt || '') + 'T00:00:00');
-    if (Number.isNaN(received.getTime())) continue;
-    const elapsed = Math.floor((Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()) - Date.UTC(received.getFullYear(), received.getMonth(), received.getDate())) / 86400000);
+    const receivedAt = String(data.receivedAt || '');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(receivedAt)) continue;
+    const receivedUtc = Date.parse(`${receivedAt}T00:00:00Z`);
+    if (!Number.isFinite(receivedUtc)) continue;
+    const elapsed = Math.floor((todayUtc - receivedUtc) / 86400000);
+    if (elapsed >= 14) await itemDoc.ref.update({ status: 'expired', updatedAt: FieldValue.serverTimestamp() });
     const sent = Array.isArray(data.sentMilestones) ? data.sentMilestones : [];
     const due = Object.keys(milestones).map(Number).filter(day => elapsed >= day && !sent.includes(day));
     for (const day of due) {

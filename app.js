@@ -462,7 +462,6 @@ async function save(){
    // Persist the order and its changed history entries together, reducing
    // round-trips while ensuring push notifications are queued only after data commits.
    await flushBatch();
-   if(!base||articlesChanged||base.client!==o.client||base.number!==o.number){try{await syncBuybackOrderReferences(o);}catch(linkErr){console.error('Не удалось связать перекупной товар с заказом',linkErr);}}
    await Promise.all(pushTasks.map(task=>task()));
    pendingWrites.delete(o.id);
    serverCache.set(o.id,{...(serverCache.get(o.id)||o),...o,articles:normalizeArticles(o.articles||[]),entries:[...(o.entries||[])]});
@@ -994,24 +993,6 @@ function showReturns(dateFrom='',dateTo='',searchText=''){
   searchInput?.addEventListener('input',applyReturnsSearch);
   applyReturnsSearch();
 }
-async function reverseBuybackItemsForCancelledReturn(order,returnId){
-  const snapshot=await getDocs(collection(db,'buybackItems'));
-  const returned=snapshot.docs.map(d=>({id:d.id,...(d.data()||{})})).filter(item=>item.returnedFromReturnId===returnId);
-  for(const item of returned){
-    if(item.status!=='active'){console.warn('Возвращённый перекупной товар уже изменил статус; автоматический откат пропущен',item.id);continue;}
-    if(item.returnedFromBuybackId){
-      const sourceRef=doc(db,'buybackItems',item.returnedFromBuybackId);
-      const sourceSnap=await getDoc(sourceRef);
-      if(sourceSnap.exists())await updateDoc(sourceRef,{quantity:(Number(sourceSnap.data().quantity)||0)+(Number(item.quantity)||0),updatedAt:serverTimestamp()});
-      await deleteDoc(doc(db,'buybackItems',item.id));
-    }else{
-      await updateDoc(doc(db,'buybackItems',item.id),{
-        status:'sold',returnedAt:null,returnedFromOrderId:null,returnedFromOrderNumber:null,
-        returnedFromReturnId:null,returnedFromClient:null,updatedAt:serverTimestamp()
-      });
-    }
-  }
-}
 async function cancelReturnAction(orderId,returnId){
   if(!canManageUsers){toast('Отменить возврат может только администратор или директор.');return;}
   const o=state.orders.find(x=>x.id===orderId),r=o?.returns?.find(x=>x.id===returnId);
@@ -1024,8 +1005,6 @@ async function cancelReturnAction(orderId,returnId){
   const restoredStatus=hasOtherActive?'Возврат':(r.previousStatus||'Собран');
   try{
     await updateDoc(doc(db,'orders',o.id),{returns:nextReturns,status:restoredStatus,returnCancelled:true,updatedAt:cancelledAt,updatedBy:signedInUser.uid,updatedByName:profileName||''});
-    try{await reverseBuybackItemsForCancelledReturn(o,returnId);}
-    catch(buybackRollbackError){console.error('Возврат отменён, но перекупной товар не удалось вернуть в проданное состояние',buybackRollbackError);toast('Возврат отменён, но статус перекупного товара нужно проверить вручную.');}
     o.returns=nextReturns;o.status=restoredStatus;o.returnCancelled=true;o.updatedAt=cancelledAt;o.updatedBy=signedInUser.uid;o.updatedByName=profileName||'';
     serverCache.set(o.id,{...o,returns:JSON.parse(JSON.stringify(nextReturns)),status:restoredStatus,returnCancelled:true,entries:[...(o.entries||[])]});
     await writeAudit('Возврат отменён','Отменён возврат по заказу № '+o.number,o.id,{previousStatus:'Возврат',newStatus:restoredStatus});
@@ -1658,31 +1637,6 @@ function openReturnForm(){
   const rows=items.map(x=>'<div class="return-row" style="display:grid;grid-template-columns:minmax(0,1fr) 90px;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line,#2a2a2a)"><label><b>'+esc(x.article)+'</b><small style="display:block;color:#89919d">В заказе: '+x.ordered+' шт. · уже возвращено: '+x.returned+' · доступно: '+x.available+'</small></label><input class="return-qty" data-article="'+esc(x.article)+'" data-max="'+x.available+'" type="number" min="0" max="'+x.available+'" step="1" value="0" aria-label="Количество к возврату"></div>').join('');
   showModal('Возврат заказа № '+esc(o.number),'<div class="field"><span class="field-hint">Укажите количество только у тех позиций, которые возвращаются. Можно вернуть часть заказа.</span></div><div>'+rows+'</div><div class="field" style="margin-top:14px"><label for="returnReason">Причина возврата (необязательно)</label><textarea id="returnReason" placeholder="Например: клиент отказался от детали"></textarea></div>',[button('Назад','back-detail'),button('Оформить возврат','save-return','primary-button')],'ВОЗВРАТ');
 }
-async function restoreBuybackItemsFromOrderReturn(order,returnEntry){
-  const normalize=value=>String(value||'').trim().toUpperCase().replace(/[^A-Z0-9]/g,'');
-  const snapshot=await getDocs(collection(db,'buybackItems'));
-  const stock=snapshot.docs.map(d=>({id:d.id,...(d.data()||{})}))
-    .filter(item=>item.status==='sold'&&item.soldByOrderId===order.id&&normalize(item.article));
-  for(const returned of returnEntry.items||[]){
-    let remaining=Number(returned.quantity)||0;
-    const key=normalize(returned.article);
-    for(const soldItem of stock.filter(item=>normalize(item.article)===key&&Number(item.quantity)>0)){
-      if(remaining<=0)break;
-      const available=Number(soldItem.quantity)||0;
-      const quantity=Math.min(available,remaining);
-      const returnedFields={status:'active',returnedAt:String(returnEntry.createdAt||isoNow()).slice(0,10),returnedFromOrderId:order.id,returnedFromOrderNumber:String(order.number||''),returnedFromReturnId:returnEntry.id,returnedFromClient:String(order.client||''),updatedAt:serverTimestamp()};
-      if(quantity===available){
-        await updateDoc(doc(db,'buybackItems',soldItem.id),returnedFields);
-      }else{
-        const {id:sourceId,...source}=soldItem;
-        await setDoc(doc(collection(db,'buybackItems')),{...source,quantity,status:'active',...returnedFields,returnedFromBuybackId:soldItem.id,createdAt:serverTimestamp()});
-        await updateDoc(doc(db,'buybackItems',soldItem.id),{quantity:available-quantity,updatedAt:serverTimestamp()});
-      }
-      remaining-=quantity;
-    }
-    if(remaining>0)console.warn('Не удалось сопоставить с перекупным товаром все возвращённые единицы',returned.article,remaining);
-  }
-}
 async function saveReturn(){
   const o=state.orders.find(x=>x.id===selectedId);if(!o)return;
   if(o.returnCancelled&&!canManageUsers){toast('После отмены возврата повторно оформить его может только администратор или директор.');return;}
@@ -1698,8 +1652,6 @@ async function saveReturn(){
     await updateDoc(doc(db,'orders',o.id),{returns:nextReturns,status:'Возврат',updatedAt:createdAt,updatedBy:signedInUser.uid,updatedByName:profileName||''});
     o.returns=nextReturns;o.status='Возврат';o.updatedAt=createdAt;o.updatedBy=signedInUser.uid;o.updatedByName=profileName||'';
     serverCache.set(o.id,{...o,returns:JSON.parse(JSON.stringify(nextReturns)),articles:(o.articles||[]).map(x=>({...x})),entries:[...(o.entries||[])]});
-    try{await restoreBuybackItemsFromOrderReturn(o,entry);}
-    catch(buybackReturnError){console.error('Возврат заказа сохранён, но перекупной товар не удалось вернуть в работу',buybackReturnError);toast('Возврат оформлен, но перекупной товар не обновлён автоматически.');}
     const historyEntry={id:crypto.randomUUID(),kind:'return',text:'Оформлен возврат: '+items.map(x=>x.article+' × '+x.quantity).join(', ')+(reason?' · '+reason:''),authorId:signedInUser.uid,author:profileName||roles[state.role],createdAt,photos:[]};
     try{
       await setDoc(doc(db,'orders',o.id,'entries',historyEntry.id),entryToCloud(historyEntry));
@@ -2059,58 +2011,6 @@ if(kind==='defect'){o.status='Дефект';articleIndexes.forEach((idx,n)=>{con
 }catch(e){if(kind==='defect'&&o?.status==='Дефект'&&previousStatus){o.status=previousStatus;}toast(e.message)}
 finally{entrySending=false;if(sendButton){sendButton.disabled=false;sendButton.textContent=kind==='defect'?'Добавить дефект':'Отправить';}}}
 
-function normalizeBuybackArticle(value){
- const text=String(value||'').trim().toUpperCase();
- const code=text.match(/^(AP[A-Z]{2}\\d+)/);
- return code?code[1]:text.replace(/[^A-Z0-9]/g,'');
-}
-async function syncBuybackOrderReferences(order){
- if(!order?.id||!Array.isArray(order.articles)||!order.articles.length)return;
- const snapshot=await getDocs(collection(db,'buybackItems'));
- const articleSet=new Set(normalizeArticles(order.articles).map(x=>normalizeBuybackArticle(x.article)).filter(Boolean));
- if(!articleSet.size)return;
- const sold=['Отгружен кладовщиком','Клиент забрал самовывозом'].includes(order.status);
- const today=new Date().toISOString().slice(0,10);
- for(const snap of snapshot.docs){
-  const item=snap.data(),article=normalizeBuybackArticle(item.article);
-  if(!articleSet.has(article)||!['active','expired'].includes(item.status))continue;
-  if(item.orderId&&item.orderId!==order.id)continue;
-  const patch={orderId:order.id,orderNumber:String(order.number||''),clientName:String(order.client||'Клиент не указан'),reservedAt:item.reservedAt||today,updatedAt:serverTimestamp()};
-  if(sold)Object.assign(patch,{status:'sold',soldAt:today,soldByOrderId:order.id,soldByOrderNumber:String(order.number||''),soldToClient:String(order.client||'Клиент не указан')});
-  await updateDoc(doc(db,'buybackItems',snap.id),patch);
- }
-}
-async function markBuybackArticlesSoldForOrder(order){
- const soldStatuses=['Отгружен кладовщиком','Клиент забрал самовывозом'];
- if(!order||!soldStatuses.includes(order.status)||soldStatuses.includes(order._previousStatusForBuyback))return;
- const orderQty=new Map();
- for(const line of normalizeArticles(order.articles||[])){
-  const article=normalizeBuybackArticle(line.article);
-  if(article)orderQty.set(article,(orderQty.get(article)||0)+line.quantity);
- }
- if(!orderQty.size)return;
- const snapshot=await getDocs(collection(db,'buybackItems'));
- const stock=snapshot.docs.map(d=>({id:d.id,...d.data()}))
-  .filter(item=>['active','expired'].includes(item.status)&&normalizeBuybackArticle(item.article)&&orderQty.has(normalizeBuybackArticle(item.article)));
- const today=new Date().toISOString().slice(0,10);
- let changed=0;
- for(const item of stock){
-  const article=normalizeBuybackArticle(item.article),needed=orderQty.get(article)||0;
-  if(needed<=0)continue;
-  const available=Math.max(0,Number(item.quantity)||1);
-  if(!available)continue;
-  const sold=Math.min(available,needed);
-  const patch={status:'sold',soldAt:today,updatedAt:serverTimestamp(),soldByOrderId:order.id,soldByOrderNumber:String(order.number||''),soldToClient:String(order.client||'Клиент не указан'),orderId:order.id,orderNumber:String(order.number||''),clientName:String(order.client||'Клиент не указан')};
-  if(sold===available)await updateDoc(doc(db,'buybackItems',item.id),patch);
-  else{
-   const soldId=crypto.randomUUID();
-   const {id:sourceId,...itemData}=item;await setDoc(doc(db,'buybackItems',soldId),{...itemData,quantity:sold,...patch,createdAt:serverTimestamp()});
-   await updateDoc(doc(db,'buybackItems',item.id),{quantity:available-sold,updatedAt:serverTimestamp()});
-  }
-  orderQty.set(article,needed-sold);changed++;
- }
- if(changed)toast('Перекупной товар из заказа № '+order.number+' отмечен проданным.');
-}
 async function setStatus(status,text,kind='system'){
  const o=state.orders.find(x=>x.id===selectedId);
  if(!o||!signedInUser)return;
@@ -2167,10 +2067,6 @@ async function setStatus(status,text,kind='system'){
     o.entries.push(entry);
     serverCache.set(o.id,{...(serverCache.get(o.id)||o),entries:[...o.entries]});
    }catch(historyErr){console.error('Не удалось записать историю изменения статуса',historyErr);toast('Статус сохранён, но запись в историю не добавилась.');}
-   if(['Отгружен кладовщиком','Клиент забрал самовывозом'].includes(status)&&!['Отгружен кладовщиком','Клиент забрал самовывозом'].includes(previous)){
-    try{await markBuybackArticlesSoldForOrder({...o,_previousStatusForBuyback:previous});}
-    catch(buybackErr){console.error('Не удалось автоматически отметить перекупной товар проданным',buybackErr);toast('Заказ сохранён, но перекупной товар не обновлён автоматически.');}
-   }
    try{await writeAudit('Изменён статус заказа',text,o.id,{previousStatus:previous,newStatus:status});}
    catch(auditErr){console.error('Не удалось записать аудит изменения статуса',auditErr);}
    try{await queuePush(`${o.client||'Клиент не указан'} · ${status}`,text,signedInUser.uid,o.id,'site',status==='Собран'?'assembly':'status');}
@@ -2826,11 +2722,13 @@ async function generateDailyReport(dateKey,endDateKey=dateKey){
   try{
     const created=state.orders.filter(o=>reportDateMatches(o.createdAt,dateKey,endDateKey));
     let buybackItems=[];
+    const canViewBuybackReport=canManageUsers||['accountant','chief_accountant'].includes(state.role);
     try{
+      if(!canViewBuybackReport)throw new Error('Перекупной товар не включён: нет доступа по роли.');
       const buybackSnap=await getDocs(collection(db,'buybackItems'));
       buybackItems=buybackSnap.docs.map(d=>({id:d.id,...(d.data()||{})}));
     }catch(error){
-      console.warn('Не удалось загрузить перекупной товар для отчёта',error);
+      if(canViewBuybackReport)console.warn('Не удалось загрузить перекупной товар для отчёта',error);
     }
     const buybackStatusLabel=item=>{const status=String(item.status||'').trim();if(!status||status.toLowerCase()==='active')return 'На складе';if(/sold|продан|отгружен|забрал/i.test(status))return 'Продан / отгружен';if(/cancel|отмен/i.test(status))return 'Отменён';if(/return|возврат|вернул|returned/i.test(status))return 'Возвращён';return status;};
     const buybackStatus=item=>String(item.status||'active').trim().toLowerCase();
@@ -3020,7 +2918,7 @@ async function generateDailyReport(dateKey,endDateKey=dateKey){
       sections.push('<h2>Отгрузки по клиентам</h2><p class="section-note">Количество уникальных заказов, отгруженных каждому клиенту за выбранный месяц.</p>'+reportTable(['Клиент','Отгружено заказов','Деталей отгружено'],shippedByClientRows));
 
       sections.push('<h2>Динамика по неделям</h2><p class="section-note">Количество событий по неделям месяца. Данные показаны в сравнительном виде; шкала общая для всех серий.</p><div class="chart-legend"><span><i class="legend-created"></i>Создано</span><span><i class="legend-shipped"></i>Отгружено</span><span><i class="legend-pickup"></i>Самовывоз</span><span><i class="legend-cancelled"></i>Отменено</span></div>'+chartRows);
-      sections.push('<h2>Перекупной товар — статистика за период</h2><div class="summary"><div class="kpi"><b>'+buybackMonthlyCount('receivedInPeriod')+'</b>позиций поступило</div><div class="kpi"><b>'+buybackMonthlyUnits('receivedInPeriod')+'</b>единиц поступило</div><div class="kpi"><b>'+buybackMonthlyCount('soldInPeriod')+'</b>позиций продано / отгружено</div><div class="kpi"><b>'+buybackMonthlyUnits('soldInPeriod')+'</b>единиц продано / отгружено</div><div class="kpi"><b>'+buybackMonthlyCount('cancelledInPeriod')+'</b>позиций отменено</div><div class="kpi"><b>'+buybackMonthlyCount('returnedInPeriod')+'</b>позиций возвращено</div><div class="kpi"><b>'+buybackOnStock.length+'</b>позиций на складе сейчас</div><div class="kpi"><b>'+buybackUnits+'</b>единиц на складе сейчас</div></div><p class="section-note">Статистика за выбранный период рассчитывается по датам поступления и закрытия, если они сохранены в записи. Остаток на складе — текущее состояние на момент формирования отчёта.</p>'+reportTable(['Артикул','Количество','Поставщик','События за период','Дата события'],buybackMonthlyRows));
+      if(canViewBuybackReport)sections.push('<h2>Перекупной товар — статистика за период</h2><div class="summary"><div class="kpi"><b>'+buybackMonthlyCount('receivedInPeriod')+'</b>позиций поступило</div><div class="kpi"><b>'+buybackMonthlyUnits('receivedInPeriod')+'</b>единиц поступило</div><div class="kpi"><b>'+buybackMonthlyCount('soldInPeriod')+'</b>позиций продано / отгружено</div><div class="kpi"><b>'+buybackMonthlyUnits('soldInPeriod')+'</b>единиц продано / отгружено</div><div class="kpi"><b>'+buybackMonthlyCount('cancelledInPeriod')+'</b>позиций отменено</div><div class="kpi"><b>'+buybackMonthlyCount('returnedInPeriod')+'</b>позиций возвращено</div><div class="kpi"><b>'+buybackOnStock.length+'</b>позиций на складе сейчас</div><div class="kpi"><b>'+buybackUnits+'</b>единиц на складе сейчас</div></div><p class="section-note">Статистика за выбранный период рассчитывается по датам поступления и закрытия, если они сохранены в записи. Остаток на складе — текущее состояние на момент формирования отчёта.</p>'+reportTable(['Артикул','Количество','Поставщик','События за период','Дата события'],buybackMonthlyRows));
       sections.push('<h2>Сравнение с предыдущим периодом</h2><p class="section-note">Сравнение '+esc(fmtDate(previousStart)+' — '+fmtDate(previousEnd))+' '+esc(comparisonLabel)+'.</p><div class="summary"><div class="kpi"><b>'+currentMetrics.created+'</b>создано заказов<br>'+countComparison(currentMetrics.created,previousMetrics.created)+'</div><div class="kpi"><b>'+currentMetrics.shipped+'</b>отгружено заказов<br>'+countComparison(currentMetrics.shipped,previousMetrics.shipped)+'</div><div class="kpi"><b>'+currentMetrics.pickup+'</b>самовывозов<br>'+countComparison(currentMetrics.pickup,previousMetrics.pickup)+'</div><div class="kpi"><b>'+currentMetrics.cancelled+'</b>отменено заказов<br>'+countComparison(currentMetrics.cancelled,previousMetrics.cancelled)+'</div></div>');
 
 
@@ -3035,7 +2933,7 @@ async function generateDailyReport(dateKey,endDateKey=dateKey){
       sections.push('<h2>6. Отменённые заказы</h2>'+reportTable(['Номер заказа','Клиент','Дата изменения','Причина отмены'],cancelledRows));
       sections.push('<h2>7. Незакрытые заказы на момент формирования отчёта</h2><p class="section-note">Это текущий остаток по базе на момент печати, а не исторический снимок на конец выбранного периода.</p>'+reportTable(['Номер заказа','Клиент','Текущий статус','Доставка','Кол-во деталей'],remainingRows));
       sections.push('<h2>8. Дефекты и возвраты за выбранный период</h2><div class="report-subsection"><h3>Дефекты</h3>'+reportTable(['Номер заказа','Клиент','Артикул','Описание / решение','Автор','Дата'],defectRows)+'</div><div class="report-subsection"><h3>Возвраты</h3>'+reportTable(['Номер заказа','Клиент','Детали','Причина','Автор'],returnRows)+'</div>');
-      sections.push('<h2>9. Перекупной товар</h2><p><b>Всего позиций:</b> '+buybackRelevant.length+' · <b>на складе сейчас:</b> '+buybackOnStock.length+' · <b>единиц на складе:</b> '+buybackOnStock.reduce((sum,item)=>sum+(Number(item.quantity)||0),0)+'</p><p class="section-note">Показаны товары, оставшиеся на складе на момент печати, добавленные в выбранный день, а также проданные или отменённые за выбранный период. Старые отменённые и проданные записи не включаются.</p>'+reportTable(['Артикул','Количество','Поставщик','Статус','Дата поступления','Дней на складе','Дата события / добавления','Кто добавил'],buybackRows));
+      if(canViewBuybackReport)sections.push('<h2>9. Перекупной товар</h2><p><b>Всего позиций:</b> '+buybackRelevant.length+' · <b>на складе сейчас:</b> '+buybackOnStock.length+' · <b>единиц на складе:</b> '+buybackOnStock.reduce((sum,item)=>sum+(Number(item.quantity)||0),0)+'</p><p class="section-note">Показаны товары, оставшиеся на складе на момент печати, добавленные в выбранный день, а также проданные или отменённые за выбранный период. Старые отменённые и проданные записи не включаются.</p>'+reportTable(['Артикул','Количество','Поставщик','Статус','Дата поступления','Дней на складе','Дата события / добавления','Кто добавил'],buybackRows));
       sections.push('<h2>10. Проверка списка отгрузки</h2><p><b>Заказов в списке:</b> '+new Set(shippedForManifest.map(x=>x.order.id)).size+' · <b>позиций:</b> '+shippedForManifest.length+' · <b>проверено позиций:</b> '+checkedCount+' · <b>не проверено:</b> '+Math.max(0,shippedForManifest.length-checkedCount)+'</p><p class="section-note">Позиция считается проверенной по отметкам вкладки «Отгрузка» за выбранный период.</p>'+reportTable(['Номер заказа','Клиент','Артикул','Количество','Проверка'],shippedForManifest.map(x=>[esc(x.order.number||'—'),esc(x.order.client||'—'),esc(x.item.article||'—'),esc(x.item.quantity||1),esc(checked.has(x.key)?'Проверено':'Не проверено')])));
       sections.push('<div class="signatures"><div class="sign">Кладовщик: __________________________</div><div class="sign">Проверил: __________________________</div></div>');
   

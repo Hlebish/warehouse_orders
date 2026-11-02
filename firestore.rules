@@ -33,6 +33,9 @@ service cloud.firestore {
     function hasManagerPermissions() { return isManager(); }
     function canManageUsers() { return activeUser() && (userDoc().data.admin == true || role() == 'director'); }
     function canViewDeletedOrders() { return activeUser() && (userDoc().data.admin == true || role() in ['director', 'chief_accountant']); }
+    function canAccessBuyback() {
+      return activeUser() && (userDoc().data.admin == true || role() in ['director', 'chief_accountant', 'accountant']);
+    }
     function chatLikes(data) { return data.keys().hasAll(['likes']) ? data.likes : []; }
     function chatReadBy(data) { return data.keys().hasAll(['readBy']) ? data.readBy : []; }
 
@@ -487,13 +490,14 @@ service cloud.firestore {
     }
 
     match /buybackItems/{itemId} {
-      allow read: if activeUser();
-      allow create: if activeUser()
+      allow read: if canAccessBuyback();
+      allow create: if canAccessBuyback()
         && request.resource.data.keys().hasOnly(['article','name','quantity','receivedAt','supplier','comment','createdAt','createdOn','createdBy','createdByName','status','soldAt','cancelledAt','returnedAt','shippedAt','sentMilestones','updatedAt','orderId','orderNumber','clientName','reservedAt','soldByOrderId','soldByOrderNumber','soldToClient','shippedLate','overdueDaysAtShipment'])
         && request.resource.data.article is string
         && request.resource.data.article.size() > 0
         && request.resource.data.quantity is number
         && request.resource.data.quantity >= 1
+        && request.resource.data.quantity <= 100000
         && request.resource.data.receivedAt is string
         && (!request.resource.data.keys().hasAny(['supplier']) || request.resource.data.supplier is string && request.resource.data.supplier.size() <= 160)
         && (!request.resource.data.keys().hasAny(['name']) || request.resource.data.name is string && request.resource.data.name.size() <= 300)
@@ -504,10 +508,10 @@ service cloud.firestore {
         && request.resource.data.sentMilestones is list;
       // For updates, validate fields when they are changed. This lets older
       // records with legacy/missing optional fields have their status restored.
-      allow update: if activeUser()
+      allow update: if canAccessBuyback()
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['article','name','quantity','receivedAt','supplier','comment','status','soldAt','cancelledAt','returnedAt','shippedAt','sentMilestones','updatedAt','orderId','orderNumber','clientName','reservedAt','soldByOrderId','soldByOrderNumber','soldToClient','shippedLate','overdueDaysAtShipment'])
         && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['article']) || request.resource.data.article is string && request.resource.data.article.size() > 0)
-        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['quantity']) || request.resource.data.quantity is number && request.resource.data.quantity >= 1)
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['quantity']) || request.resource.data.quantity is number && request.resource.data.quantity >= 1 && request.resource.data.quantity <= 100000)
         && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['receivedAt']) || request.resource.data.receivedAt is string)
         && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['supplier']) || !request.resource.data.keys().hasAny(['supplier']) || request.resource.data.supplier is string && request.resource.data.supplier.size() <= 160)
         && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['name']) || !request.resource.data.keys().hasAny(['name']) || request.resource.data.name is string && request.resource.data.name.size() <= 300)

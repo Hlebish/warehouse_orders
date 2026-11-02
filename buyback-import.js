@@ -1,13 +1,22 @@
 import { initializeApp, getApps } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js';
 import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js';
-import { getFirestore, collection, addDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
+import { getFirestore, collection, doc, onSnapshot, serverTimestamp, writeBatch } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
 import { firebaseConfig } from './firebase-config.js';
 
 const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 let currentUser = null;
-onAuthStateChanged(auth, user => { currentUser = user; });
+let canAccessBuyback = false, profileUnsubscribe = null;
+onAuthStateChanged(auth, user => {
+  currentUser = user; profileUnsubscribe?.(); profileUnsubscribe = null; canAccessBuyback = false;
+  if (!user) { install(); return; }
+  profileUnsubscribe = onSnapshot(doc(db, 'users', user.uid), snap => {
+    const profile = snap.data() || {};
+    canAccessBuyback = profile.active === true && (profile.admin === true || ['accountant', 'chief_accountant', 'director'].includes(profile.role));
+    install();
+  }, () => { canAccessBuyback = false; install(); });
+});
 
 const monthMap = {
   'січня':'01','лютого':'02','березня':'03','квітня':'04','травня':'05','червня':'06',
@@ -146,7 +155,9 @@ function parseInvoice(raw) {
 function install() {
   const form = document.getElementById('buybackForm');
   const summary = document.getElementById('buybackSummary');
-  if (!form || !summary || document.getElementById('buybackInvoiceImport')) return;
+  const existingPanel = document.getElementById('buybackInvoiceImport');
+  if (existingPanel) { existingPanel.hidden = !canAccessBuyback; return; }
+  if (!canAccessBuyback || !form || !summary) return;
   const panel = document.createElement('details');
   panel.id = 'buybackInvoiceImport';
   panel.innerHTML = `
@@ -178,7 +189,7 @@ function install() {
     preview.innerHTML = parsed.rows.length ? `<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr><th style="text-align:left;padding:7px;border-bottom:1px solid #3b4350">Артикул</th><th style="text-align:left;padding:7px;border-bottom:1px solid #3b4350">Наименование</th><th style="text-align:right;padding:7px;border-bottom:1px solid #3b4350">Кол-во</th></tr></thead><tbody>${parsed.rows.map(r => `<tr><td style="padding:7px;border-bottom:1px solid #303640;white-space:nowrap">${esc(r.article)}</td><td style="padding:7px;border-bottom:1px solid #303640">${esc(r.name)}</td><td style="padding:7px;text-align:right;border-bottom:1px solid #303640">${r.quantity}</td></tr>`).join('')}</tbody></table>` : '';
   });
   save.addEventListener('click', async () => {
-    if (!parsed?.rows.length || !parsed.receivedAt || !currentUser) {
+    if (!parsed?.rows.length || !parsed.receivedAt || !currentUser || !canAccessBuyback) {
       status.textContent = !currentUser ? 'Нет активной авторизации. Обнови страницу и войди заново.' : 'Сначала разбери накладную и проверь позиции.';
       return;
     }
@@ -186,16 +197,21 @@ function install() {
     panel.querySelector('#buybackInvoiceParse').disabled = true;
     let added = 0;
     try {
-      for (const row of parsed.rows) {
-        await addDoc(collection(db, 'buybackItems'), {
+      for (let offset = 0; offset < parsed.rows.length; offset += 450) {
+        const batch = writeBatch(db);
+        for (const row of parsed.rows.slice(offset, offset + 450)) {
+          const ref = doc(collection(db, 'buybackItems'));
+          batch.set(ref, {
           article: row.article, name: row.name, quantity: row.quantity,
           receivedAt: parsed.receivedAt, supplier: parsed.supplier, comment: '',
           createdAt: serverTimestamp(), createdBy: currentUser.uid,
           createdByName: currentUser.displayName || currentUser.email || 'Сотрудник',
           status: 'active', soldAt: null, cancelledAt: null, returnedAt: null,
           createdOn: new Date().toISOString().slice(0,10), sentMilestones: [], updatedAt: serverTimestamp()
-        });
-        added++;
+          });
+        }
+        await batch.commit();
+        added += Math.min(450, parsed.rows.length - offset);
       }
       status.style.color = '#b7c8dd';
       status.textContent = `Готово: добавлено ${added} позиций. Таймер хранения рассчитывается от даты приёма ${parsed.receivedAt}.`;

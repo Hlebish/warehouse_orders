@@ -1,13 +1,13 @@
 import { initializeApp, getApps } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js';
 import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js';
-import { getFirestore, collection, doc, onSnapshot, addDoc, updateDoc, serverTimestamp, query, orderBy } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
+import { getFirestore, collection, doc, onSnapshot, addDoc, updateDoc, serverTimestamp, query, orderBy, writeBatch } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
 import { firebaseConfig } from './firebase-config.js';
 
 const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 const $ = id => document.getElementById(id);
-let currentUser = null, unsubscribe = null, items = [], selectedStatus = 'active', selectedSupplier = '', selectedSearch = '';
+let currentUser = null, unsubscribe = null, profileUnsubscribe = null, hasBuybackAccess = false, items = [], selectedStatus = 'active', selectedSupplier = '', selectedSearch = '';
 
 const style = document.createElement('style');
 style.textContent = `
@@ -489,6 +489,7 @@ editOverlay.innerHTML=`
 document.body.append(editOverlay);
 let editingBuybackId=null;
 const nav=$('buybackNavButton');
+nav.hidden=true;
 const dateInput=$('buybackDate');
 dateInput.value=(()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')})();
 function showToast(message){const stack=$('toastStack');if(stack){const el=document.createElement('div');el.className='toast';el.textContent=message;stack.append(el);setTimeout(()=>el.remove(),3500)}}
@@ -576,6 +577,7 @@ function render(){
 function escapeHtml(value){return String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 let buybackHistoryEntry=false;
 function open(){
+ if(!hasBuybackAccess)return;
  if(!overlay.hidden)return;
  overlay.hidden=false;
  nav?.classList.add('active');
@@ -663,7 +665,7 @@ $('buybackEditForm').addEventListener('submit',async e=>{
  finally{if(!editOverlay.hidden){save.disabled=false;save.textContent='Сохранить изменения'}}
 });
 $('buybackForm').addEventListener('submit',async e=>{
- e.preventDefault();if(!currentUser){showToast('Сначала войдите в систему.');return}
+ e.preventDefault();if(!currentUser||!hasBuybackAccess){showToast('Доступ к разделу недоступен для вашей учётной записи.');return}
  const article=$('buybackArticle').value.trim(),quantity=Number($('buybackQuantity').value),receivedAt=$('buybackDate').value,supplier=$('buybackSupplier').value.trim();
  if(!article||!Number.isInteger(quantity)||quantity<1||!receivedAt){showToast('Проверьте артикул, количество и дату.');return}
  const submit=$('buybackForm').querySelector('button[type="submit"]');submit.disabled=true;
@@ -717,8 +719,10 @@ overlay.addEventListener('click',async e=>{
     if(nextStatus==='sold')patch.soldAt=eventDate;else if(nextStatus==='cancelled')patch.cancelledAt=eventDate;else if(nextStatus==='shipped'){patch.shippedAt=eventDate;patch.shippedLate=isExpired;patch.overdueDaysAtShipment=Math.max(0,elapsedDays(item.receivedAt)-14)}else patch.returnedAt=eventDate;
     if(qty===Number(item.quantity))await updateDoc(doc(db,'buybackItems',item.id),patch);
     else{
-      await addDoc(collection(db,'buybackItems'),{article:item.article,quantity:qty,receivedAt:item.receivedAt,supplier:item.supplier||'',comment:item.comment||'',createdAt:serverTimestamp(),createdOn:item.createdOn||eventDate,createdBy:item.createdBy||currentUser.uid,createdByName:item.createdByName||currentUser.displayName||currentUser.email||'Сотрудник',status:nextStatus,soldAt:nextStatus==='sold'?eventDate:null,cancelledAt:nextStatus==='cancelled'?eventDate:null,returnedAt:nextStatus==='returned'?eventDate:null,shippedAt:nextStatus==='shipped'?eventDate:null,shippedLate:nextStatus==='shipped'?isExpired:false,overdueDaysAtShipment:nextStatus==='shipped'?Math.max(0,elapsedDays(item.receivedAt)-14):0,sentMilestones:Array.isArray(item.sentMilestones)?item.sentMilestones:[],updatedAt:serverTimestamp()});
-      await updateDoc(doc(db,'buybackItems',item.id),{quantity:Number(item.quantity)-qty,updatedAt:serverTimestamp()});
+      const batch=writeBatch(db),splitRef=doc(collection(db,'buybackItems'));
+      batch.set(splitRef,{article:item.article,quantity:qty,receivedAt:item.receivedAt,supplier:item.supplier||'',comment:item.comment||'',createdAt:serverTimestamp(),createdOn:item.createdOn||eventDate,createdBy:item.createdBy||currentUser.uid,createdByName:item.createdByName||currentUser.displayName||currentUser.email||'Сотрудник',status:nextStatus,soldAt:nextStatus==='sold'?eventDate:null,cancelledAt:nextStatus==='cancelled'?eventDate:null,returnedAt:nextStatus==='returned'?eventDate:null,shippedAt:nextStatus==='shipped'?eventDate:null,shippedLate:nextStatus==='shipped'?isExpired:false,overdueDaysAtShipment:nextStatus==='shipped'?Math.max(0,elapsedDays(item.receivedAt)-14):0,sentMilestones:Array.isArray(item.sentMilestones)?item.sentMilestones:[],updatedAt:serverTimestamp()});
+      batch.update(doc(db,'buybackItems',item.id),{quantity:Number(item.quantity)-qty,updatedAt:serverTimestamp()});
+      await batch.commit();
     }
     showToast(qty===Number(item.quantity)?'Статус перекупного товара обновлён.':'Часть товара перенесена в категорию «'+(nextStatus==='returned'?'Возвращён':nextStatus==='sold'?'Продан':nextStatus==='shipped'?'Отгружен':'Отменён')+'».');
   }else{
@@ -730,10 +734,17 @@ overlay.addEventListener('click',async e=>{
 });
 onAuthStateChanged(auth,user=>{
  currentUser=user;
- unsubscribe?.();unsubscribe=null;items=[];
- if(!user){nav.hidden=true;overlay.hidden=true;return}
- nav.hidden=false;
- unsubscribe=onSnapshot(query(collection(db,'buybackItems'),orderBy('receivedAt','desc')),snap=>{
-  items=snap.docs.map(d=>({id:d.id,...d.data()}));render();items.filter(x=>x.status==='active'&&elapsedDays(x.receivedAt)>=14).forEach(x=>updateDoc(doc(db,'buybackItems',x.id),{status:'expired',updatedAt:serverTimestamp()}).catch(err=>console.error('Не удалось отметить товар просроченным',x.id,err)));
- },err=>{console.error('buybackItems snapshot failed',err);const code=String(err?.code||'unknown');const message=String(err?.message||'').replace(/[&<>\"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[ch]));$('buybackList').innerHTML='<div class="buyback-empty">Нет доступа к перекупному товару.<br><b>Код:</b> '+code+'<br><b>Детали:</b> '+message+'</div>';});
+ unsubscribe?.();unsubscribe=null;profileUnsubscribe?.();profileUnsubscribe=null;items=[];hasBuybackAccess=false;
+ nav.hidden=true;overlay.hidden=true;
+ if(!user)return;
+ profileUnsubscribe=onSnapshot(doc(db,'users',user.uid),profileSnap=>{
+  const profile=profileSnap.data()||{};
+  hasBuybackAccess=profile.active===true&&(profile.admin===true||['accountant','chief_accountant','director'].includes(profile.role));
+  nav.hidden=!hasBuybackAccess;
+  if(!hasBuybackAccess){unsubscribe?.();unsubscribe=null;items=[];close();return}
+  if(unsubscribe)return;
+  unsubscribe=onSnapshot(query(collection(db,'buybackItems'),orderBy('receivedAt','desc')),snap=>{
+   items=snap.docs.map(d=>({id:d.id,...d.data()}));render();
+  },err=>{unsubscribe=null;console.error('buybackItems snapshot failed',err);$('buybackList').innerHTML='<div class="buyback-empty">Нет доступа к перекупному товару. Обновите страницу или обратитесь к администратору.</div>';});
+ },err=>{console.error('Не удалось проверить доступ к перекупному товару',err);nav.hidden=true;close()});
 });

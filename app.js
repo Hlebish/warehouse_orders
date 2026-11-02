@@ -385,6 +385,7 @@ async function save(){
    const pushTasks=[];
    const base=serverCache.get(o.id),newOrder=!base;
    let defectNotificationQueued=false;
+   const hasNewDefectEntry=!newOrder&&(o.entries||[]).some(e=>e.kind==='defect'&&!(base?.entries||[]).some(old=>old.id===e.id));
    const next=orderToCloud(o,newOrder),prev=base?orderToCloud(base):null;
    const orderChanged=!base||!equal(next,prev);
    const articlesChanged=!!base&&!articlesContentEqual(base.articles||[],o.articles||[]);
@@ -410,11 +411,13 @@ async function save(){
        :'Все артикулы удалены.';
      const clientLabel=o.client||'Клиент не указан';
      const orderAction=newOrder?'Новый заказ':articlesChanged?'Изменены артикулы':`Статус: ${next.status}`;
+     if(!(next.status==='Дефект'&&hasNewDefectEntry)){
      pushTasks.push(()=>queuePush(
        clientLabel,
        orderAction,
        signedInUser.uid,o.id
      ));
+     }
    }
 
    const oldEntries=new Map((base?.entries||[]).map(e=>[e.id,e]));

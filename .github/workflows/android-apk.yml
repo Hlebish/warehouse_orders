@@ -36,9 +36,9 @@ jobs:
           # If FFmpeg is preinstalled, process the MP3; otherwise keep the
           # original asset and rely on Android foreground audio gain in app.js.
           if command -v ffmpeg >/dev/null 2>&1; then
-            ffmpeg -hide_banner -loglevel error -y -i delivered-message-sound.mp3 -af "volume=6dB" -codec:a libmp3lame -q:a 2 "$RUNNER_TEMP/delivered-message-sound-louder.mp3"
+            ffmpeg -hide_banner -loglevel error -y -i elivered-message-sound.mp3 -af "volume=6dB" -codec:a libmp3lame -q:a 2 "$RUNNER_TEMP/delivered-message-sound-louder.mp3"
             test -s "$RUNNER_TEMP/delivered-message-sound-louder.mp3"
-            mv "$RUNNER_TEMP/delivered-message-sound-louder.mp3" delivered-message-sound.mp3
+            mv "$RUNNER_TEMP/delivered-message-sound-louder.mp3" elivered-message-sound.mp3
           else
             echo "FFmpeg is not installed; keeping original MP3. Android foreground gain is handled by app.js."
           fi

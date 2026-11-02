@@ -73,6 +73,12 @@ public class MainActivity extends AppCompatActivity {
 
         webView = new WebView(this);
         webView.setBackgroundColor(android.graphics.Color.rgb(17, 19, 21));
+        // Keep the WebView renderer at a bound priority while this Activity is
+        // backgrounded. Android may still reclaim it under severe memory pressure,
+        // but this reduces avoidable renderer eviction on supported Android versions.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            webView.setRendererPriorityPolicy(WebView.RENDERER_PRIORITY_BOUND, true);
+        }
         setContentView(webView);
         if (Build.VERSION.SDK_INT >= 29) {
             webView.addOnLayoutChangeListener((view, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) -> {
@@ -177,8 +183,17 @@ public class MainActivity extends AppCompatActivity {
     }
 
     @Override
+    protected void onPause() {
+        // Notify WebView that the Activity is leaving the foreground without
+        // globally stopping WebView timers or tearing down Firebase page listeners.
+        if (webView != null) webView.onPause();
+        super.onPause();
+    }
+
+    @Override
     protected void onResume() {
         super.onResume();
+        if (webView != null) webView.onResume();
         sendCachedTokenToSite();
         requestNativePushToken();
     }

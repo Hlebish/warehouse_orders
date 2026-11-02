@@ -910,7 +910,7 @@ function plural(n,a,b,c){n=Math.abs(n)%100;const d=n%10;return n>10&&n<20?c:d>1&
 function toast(msg,orderId='',options={}){const t=document.createElement('div');t.className='toast'+(orderId?' toast-clickable':'');t.textContent=msg;if(orderId)t.addEventListener('click',()=>{if(!t.classList.contains('defect-toast'))t.remove();openOrder(orderId)});$('toastStack').append(t);if(!options.persistent)setTimeout(()=>t.remove(),3500);return t}
 function syncPendingDefectToasts(){
  const stack=$('toastStack');if(!stack)return;
- const pending=state.orders.flatMap(o=>(o.entries||[]).filter(e=>e.kind==='defect'&&!e.decision).map(e=>({orderId:o.id})));
+ const pending=state.orders.flatMap(o=>(o.entries||[]).filter(e=>e.kind==='defect'&&!e.decision).map(e=>({orderId:o.id,number:o.number,client:o.client,entry:e})));
  const summary=stack.querySelector('[data-defect-summary]');
  if(!pending.length){summary?.remove();return;}
  const count=pending.length,orders=new Set(pending.map(x=>x.orderId)).size;
@@ -918,7 +918,15 @@ function syncPendingDefectToasts(){
  if(summary){summary.textContent=message;return;}
  const t=toast(message,'',{persistent:true});
  t.classList.add('defect-toast');t.dataset.defectSummary='true';t.setAttribute('role','button');t.tabIndex=0;
- const open=()=>{activeFilter='Дефект';currentOrdersPage=1;render();};
+ const open=()=>{
+  const grouped=new Map();
+  pending.forEach(item=>{if(!grouped.has(item.orderId))grouped.set(item.orderId,{...item,entries:[]});grouped.get(item.orderId).entries.push(item.entry);});
+  const body='<p class="modal-description">Выберите заказ, чтобы открыть карточку и вынести решение по каждому дефекту.</p><div class="mention-center-list defect-pending-list">'+Array.from(grouped.values()).map(order=>{
+   const details=order.entries.map(e=>String(e.text||e.description||e.comment||e.note||'Причина не указана')).join(' · ');
+   return '<button type="button" class="mention-center-item" data-open="'+esc(order.orderId)+'"><b>Заказ № '+esc(order.number||'—')+' · '+esc(order.client||'Клиент не указан')+'</b><span>'+esc(details)+'</span><small>Незакрытых дефектов: '+order.entries.length+' · Нажмите, чтобы открыть заказ</small></button>';
+  }).join('')+'</div>';
+  showModal('Незакрытые дефекты',body,[button('Закрыть','close')],'ТРЕБУЮТ РЕШЕНИЯ');
+ };
  t.addEventListener('click',open);
  t.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open()}});
 }

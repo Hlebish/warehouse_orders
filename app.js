@@ -1545,6 +1545,31 @@ function openReturnForm(){
   const rows=items.map(x=>'<div class="return-row" style="display:grid;grid-template-columns:minmax(0,1fr) 90px;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line,#2a2a2a)"><label><b>'+esc(x.article)+'</b><small style="display:block;color:#89919d">В заказе: '+x.ordered+' шт. · уже возвращено: '+x.returned+' · доступно: '+x.available+'</small></label><input class="return-qty" data-article="'+esc(x.article)+'" data-max="'+x.available+'" type="number" min="0" max="'+x.available+'" step="1" value="0" aria-label="Количество к возврату"></div>').join('');
   showModal('Возврат заказа № '+esc(o.number),'<div class="field"><span class="field-hint">Укажите количество только у тех позиций, которые возвращаются. Можно вернуть часть заказа.</span></div><div>'+rows+'</div><div class="field" style="margin-top:14px"><label for="returnReason">Причина возврата (необязательно)</label><textarea id="returnReason" placeholder="Например: клиент отказался от детали"></textarea></div>',[button('Назад','back-detail'),button('Оформить возврат','save-return','primary-button')],'ВОЗВРАТ');
 }
+async function restoreBuybackItemsFromOrderReturn(order,returnEntry){
+  const normalize=value=>String(value||'').trim().toUpperCase().replace(/[^A-Z0-9]/g,'');
+  const snapshot=await getDocs(collection(db,'buybackItems'));
+  const stock=snapshot.docs.map(d=>({id:d.id,...(d.data()||{})}))
+    .filter(item=>item.status==='sold'&&item.soldByOrderId===order.id&&normalize(item.article));
+  for(const returned of returnEntry.items||[]){
+    let remaining=Number(returned.quantity)||0;
+    const key=normalize(returned.article);
+    for(const soldItem of stock.filter(item=>normalize(item.article)===key&&Number(item.quantity)>0)){
+      if(remaining<=0)break;
+      const available=Number(soldItem.quantity)||0;
+      const quantity=Math.min(available,remaining);
+      const returnedFields={status:'active',returnedAt:String(returnEntry.createdAt||isoNow()).slice(0,10),returnedFromOrderId:order.id,returnedFromOrderNumber:String(order.number||''),returnedFromReturnId:returnEntry.id,returnedFromClient:String(order.client||''),updatedAt:serverTimestamp()};
+      if(quantity===available){
+        await updateDoc(doc(db,'buybackItems',soldItem.id),returnedFields);
+      }else{
+        const {id:sourceId,...source}=soldItem;
+        await setDoc(doc(collection(db,'buybackItems')),{...source,quantity,status:'active',...returnedFields,returnedFromBuybackId:soldItem.id,createdAt:serverTimestamp()});
+        await updateDoc(doc(db,'buybackItems',soldItem.id),{quantity:available-quantity,updatedAt:serverTimestamp()});
+      }
+      remaining-=quantity;
+    }
+    if(remaining>0)console.warn('Не удалось сопоставить с перекупным товаром все возвращённые единицы',returned.article,remaining);
+  }
+}
 async function saveReturn(){
   const o=state.orders.find(x=>x.id===selectedId);if(!o)return;
   if(o.returnCancelled&&!canManageUsers){toast('После отмены возврата повторно оформить его может только администратор или директор.');return;}
@@ -1560,6 +1585,8 @@ async function saveReturn(){
     await updateDoc(doc(db,'orders',o.id),{returns:nextReturns,status:'Возврат',updatedAt:createdAt,updatedBy:signedInUser.uid,updatedByName:profileName||''});
     o.returns=nextReturns;o.status='Возврат';o.updatedAt=createdAt;o.updatedBy=signedInUser.uid;o.updatedByName=profileName||'';
     serverCache.set(o.id,{...o,returns:JSON.parse(JSON.stringify(nextReturns)),articles:(o.articles||[]).map(x=>({...x})),entries:[...(o.entries||[])]});
+    try{await restoreBuybackItemsFromOrderReturn(o,entry);}
+    catch(buybackReturnError){console.error('Возврат заказа сохранён, но перекупной товар не удалось вернуть в работу',buybackReturnError);toast('Возврат оформлен, но перекупной товар не обновлён автоматически.');}
     const historyEntry={id:crypto.randomUUID(),kind:'return',text:'Оформлен возврат: '+items.map(x=>x.article+' × '+x.quantity).join(', ')+(reason?' · '+reason:''),authorId:signedInUser.uid,author:profileName||roles[state.role],createdAt,photos:[]};
     try{
       await setDoc(doc(db,'orders',o.id,'entries',historyEntry.id),entryToCloud(historyEntry));

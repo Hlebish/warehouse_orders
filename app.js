@@ -5,7 +5,7 @@ import { getStorage, ref as storageRef, uploadBytes, uploadBytesResumable, getDo
 import { getMessaging, getToken, deleteToken, onMessage } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-messaging.js';
 import { firebaseConfig, vapidKey } from './firebase-config.js';
 const firebaseApp=initializeApp(firebaseConfig),auth=getAuth(firebaseApp),db=getFirestore(firebaseApp),messaging=getMessaging(firebaseApp),storage=getStorage(firebaseApp),staffAuth=getAuth(initializeApp(firebaseConfig,'amp-staff-provisioner'));
-let signedInUser=null,profileName='',canManageUsers=false,profileUnsubscribe=null,ordersUnsubscribe=null,chatUnsubscribe=null,chatBadgeUnsubscribe=null,notificationsUnsubscribe=null,serverCache=new Map(),entryUnsubscribes=new Map(),defectEntryUnsubscribes=new Map(),pendingWrites=new Set(),pendingOrderData=new Map(),initialCloudLoad=true;
+let signedInUser=null,profileName='',canManageUsers=false,profileUnsubscribe=null,ordersUnsubscribe=null,chatUnsubscribe=null,chatBadgeUnsubscribe=null,notificationsUnsubscribe=null,suppressOrderAddedToasts=false,lastForegroundListenerRefresh=0,serverCache=new Map(),entryUnsubscribes=new Map(),defectEntryUnsubscribes=new Map(),pendingWrites=new Set(),pendingOrderData=new Map(),initialCloudLoad=true;
 let chatLegacyHistoryLoaded=false,chatLegacyHistoryLoading=false;
 const roles={warehouse:'Кладовщик',manager:'Менеджер',chief_accountant:'Главный бухгалтер',accountant:'Бухгалтер',director:'Директор'};
 const isManagerRole=()=>['manager','chief_accountant','accountant'].includes(state.role);
@@ -749,10 +749,10 @@ function watchOrders(){
      if(existingOrder&&existingOrder.status!==data.status&&selectedId===d.id&&!modal.hidden&&modal.dataset.orderDetail===d.id)openedOrderStatusChanged=true;
      const order={id:d.id,number:pending?.number??data.number,client:pending?.client??(data.client||''),deliveryType:['city','pickup','post','kamyanske'].includes(data.deliveryType)?data.deliveryType:'city',status:pending?.status??data.status,returnCancelled:data.returnCancelled===true||(Array.isArray(data.returns)&&data.returns.some(r=>r?.status==='cancelled')),articles:pending?.articles??(Array.isArray(data.articles)?data.articles:[]),createdAt:data.createdAt,updatedAt:data.updatedAt,transferredAt:data.transferredAt,resumedAt:data.resumedAt,assembledAt:data.assembledAt,shippedAt:data.shippedAt,assemblyInProgress:data.assemblyInProgress===true,assemblyStartedAt:data.assemblyStartedAt,assemblyStartedBy:data.assemblyStartedBy,assemblyStartedByName:data.assemblyStartedByName,returns:Array.isArray(data.returns)?data.returns:[],author:data.createdByName||'Сотрудник',createdBy:data.createdBy,updatedBy:data.updatedBy,updatedByName:data.updatedByName,entries:prior?.entries||[],returns:Array.isArray(data.returns)?data.returns:[]};
      let at=orderIndexById.get(d.id);if(at===undefined){at=state.orders.length;state.orders.push(order);orderIndexById.set(d.id,at);}else state.orders[at]={...order,entries:state.orders[at].entries||[]};serverCache.set(d.id,{...order,articles:(order.articles||[]).map(x=>({...x})),entries:(prior?.entries||[]).map(x=>({...x}))});
-     if(!initialCloudLoad&&change.type==='added'){const message=`Поступил заказ № ${order.number}`;toast(message);notify(message,d.id)}
+     if(!initialCloudLoad&&!suppressOrderAddedToasts&&change.type==='added'){const message=`Поступил заказ № ${order.number}`;toast(message);notify(message,d.id)}
      if(pending && data.number===pending.number && data.client===pending.client && data.status===pending.status){pendingOrderData.delete(d.id);}
    }
-   if(!snap.metadata.fromCache)initialCloudLoad=false;saveOrdersCache();watchPendingDefectOrders();render();restoreUiState();
+   if(!snap.metadata.fromCache){initialCloudLoad=false;suppressOrderAddedToasts=false;}saveOrdersCache();watchPendingDefectOrders();render();restoreUiState();
    // Keep the open order card in sync when another employee changes its status.
    if(openedOrderStatusChanged&&selectedId&&!modal.hidden&&modal.dataset.orderDetail===selectedId)openOrder(selectedId);
    if(pendingNotificationOrderId){const target=pendingNotificationOrderId;pendingNotificationOrderId='';history.replaceState({},'',location.pathname+location.hash);if(state.orders.some(o=>o.id===target))openOrder(target);}
@@ -1204,6 +1204,40 @@ function watchClients(){
     clients=snap.docs.map(d=>({id:d.id,...d.data()}));
   },err=>console.warn('Не удалось загрузить клиентов',err));
 }
+
+// Android WebView may spend a long time suspended in the background. Recreate
+// the long-lived listeners on foreground so a stale subscription cannot leave
+// the order list and notification indicators frozen until a full app restart.
+function refreshForegroundListeners(){
+  if(!signedInUser||document.visibilityState!=='visible')return;
+  const now=Date.now();
+  if(now-lastForegroundListenerRefresh<1500)return;
+  lastForegroundListenerRefresh=now;
+
+  const activeEntryIds=[...entryUnsubscribes.keys()];
+  ordersUnsubscribe?.();notificationsUnsubscribe?.();chatBadgeUnsubscribe?.();clientsUnsubscribe?.();
+  ordersUnsubscribe=notificationsUnsubscribe=chatBadgeUnsubscribe=clientsUnsubscribe=null;
+
+  for(const stop of entryUnsubscribes.values())stop();
+  entryUnsubscribes.clear();
+  for(const stop of defectEntryUnsubscribes.values())stop();
+  defectEntryUnsubscribes.clear();
+
+  // The first snapshot after reattaching contains existing documents as "added";
+  // suppress those synthetic additions so users do not get duplicate new-order toasts.
+  suppressOrderAddedToasts=true;
+  watchOrders();
+  watchNotifications();
+  watchChatBadge();
+  watchClients();
+  activeEntryIds.forEach(watchOrderEntries);
+  watchPendingDefectOrders();
+}
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='visible')setTimeout(refreshForegroundListeners,300);
+});
+window.addEventListener('focus',()=>setTimeout(refreshForegroundListeners,300));
+window.addEventListener('online',()=>setTimeout(refreshForegroundListeners,300));
 
 async function loadProductsCatalog(){
   if(productsLoaded||!signedInUser)return;

@@ -8,7 +8,8 @@ contextBridge.exposeInMainWorld('warehouseDesktop', {
     ipcRenderer.send('warehouse:show-notification', {
       title: String(data.title || 'Заказы · Склад'),
       body: String(data.body || 'Новое изменение.'),
-      link: String(data.link || '')
+      link: String(data.link || ''),
+      notificationTag: String(data.notificationTag || '')
     });
   }
 });

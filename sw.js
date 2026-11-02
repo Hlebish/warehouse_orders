@@ -4,7 +4,7 @@ importScripts(
 );
 
 const SITE_URL = 'https://hlebish.github.io/warehouse_orders/';
-const CACHE = 'order-desk-fcm-v83';
+const CACHE = 'order-desk-fcm-v84';
 // Version bump triggers install/activate; activate notifies open tabs to reload.
 const ASSETS = [
   './',
@@ -83,11 +83,14 @@ function showPushNotification(data={}){
   const title=String(data.title||'Заказы · Склад');
   const body=String(data.body||'Новое изменение в заказе.');
   const eventId=String(data.eventId||'');
+  const notificationTag=String(data.notificationTag||eventId||'warehouse-push').slice(0,64);
   const link=String(data.link||SITE_URL);
   const now=Date.now();
   // Drop stale queued pushes instead of replaying a backlog when the browser reopens.
   const createdAt=Date.parse(String(data.createdAt||''));
-  if(!Number.isFinite(createdAt)||createdAt>now+30000||now-createdAt>90000)return;
+  const expiresAt=Number(data.expiresAt);
+  if(Number.isFinite(expiresAt)&&expiresAt>0){if(now>expiresAt)return;}
+  else if(!Number.isFinite(createdAt)||createdAt>now+30000||now-createdAt>90000)return;
 
   for(const [key,time] of shownPushEvents){
     if(now-time>15000)shownPushEvents.delete(key);
@@ -100,11 +103,11 @@ function showPushNotification(data={}){
     body,
     icon:'./%D0%9C%D0%B8%D0%BD%D0%B8%D0%BC%D0%B0%D0%BB%D0%B8%D1%81%D1%82%D0%B8%D1%87%D0%BD%D0%B0%D1%8F%20%D1%8D%D0%BC%D0%B1%D0%BB%D0%B5%D0%BC%D0%B0%20%D0%B0%D0%B2%D1%82%D0%BE%D0%B7%D0%B0%D0%BF%D1%87%D0%B0%D1%81%D1%82%D0%B5%D0%B9%20AMP.png?v=20261020-4',
     badge:'./%D0%9C%D0%B8%D0%BD%D0%B8%D0%BC%D0%B0%D0%BB%D0%B8%D1%81%D1%82%D0%B8%D1%87%D0%BD%D0%B0%D1%8F%20%D1%8D%D0%BC%D0%B1%D0%BB%D0%B5%D0%BC%D0%B0%20%D0%B0%D0%B2%D1%82%D0%BE%D0%B7%D0%B0%D0%BF%D1%87%D0%B0%D1%81%D1%82%D0%B5%D0%B9%20AMP.png?v=20261020-4',
-    tag:eventId||'warehouse-push',
+    tag:notificationTag,
     renotify:false,
     silent:false,
     vibrate:[200,100,200],
-    data:{link,eventId}
+    data:{link,eventId,notificationTag}
   });
 }
 

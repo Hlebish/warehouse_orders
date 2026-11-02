@@ -8,6 +8,7 @@ let mainWindow = null;
 let tray = null;
 let quitting = false;
 let updateDownloaded = false;
+const activeNotifications = new Map();
 
 app.setAppUserModelId('ua.amp.warehouseorders');
 app.setLoginItemSettings({ openAtLogin: true, path: process.execPath, args: ['--hidden'] });
@@ -32,12 +33,19 @@ ipcMain.on('warehouse:show-notification', (event, payload = {}) => {
   const title = String(payload.title || 'Заказы · Склад').slice(0, 160);
   const body = String(payload.body || 'Новое изменение.').slice(0, 1000);
   const link = String(payload.link || APP_URL);
+  const notificationTag = String(payload.notificationTag || '');
   const safeLink = link.startsWith(APP_URL) ? link : APP_URL;
   if (!Notification.isSupported()) {
     if (mainWindow) mainWindow.webContents.send('warehouse:notification-fallback');
     return;
   }
-  const notification = new Notification({ title, body, silent: false });
+  const previous = notificationTag ? activeNotifications.get(notificationTag) : null;
+  previous?.close();
+  const notification = new Notification({ title, body, silent: Boolean(previous) });
+  if (notificationTag) activeNotifications.set(notificationTag, notification);
+  notification.on('close', () => {
+    if (notificationTag && activeNotifications.get(notificationTag) === notification) activeNotifications.delete(notificationTag);
+  });
   notification.on('click', () => {
     if (!mainWindow) return;
     mainWindow.show();

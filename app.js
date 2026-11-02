@@ -154,6 +154,8 @@ function watchNotifications(){
   // Firestore can replay changes accumulated during sleep/offline; keep those in history, not as a toast flood.
   const listenerStartedAt=Date.now();
   const isFreshLiveNotice=n=>{
+    const expiresAt=Number(n.expiresAt);
+    if(Number.isFinite(expiresAt)&&expiresAt>0&&Date.now()>expiresAt)return false;
     const created=asDate(n.createdAt||n.at)?.getTime();
     return Number.isFinite(created)&&created>=listenerStartedAt-5000&&Date.now()-created<=60000;
   };
@@ -174,7 +176,10 @@ function watchNotifications(){
           showForegroundPushNotification({
             title:String(n.title||'Заказы · Склад'),
             body:String(n.message||n.body||'Новое изменение.'),
-            link
+            link,
+            eventId:String(n.eventId||n.id||''),
+            notificationTag:String(n.notificationTag||''),
+            expiresAt:String(n.expiresAt||'')
           });
         });
       }
@@ -185,7 +190,7 @@ function watchNotifications(){
 }
 function flagOn(n,key){return n?.[key]===true||n?.[key]==='true'||n?.[key]===1}
 function isMentionNotice(n){const t=String(n?.title||'').toLocaleLowerCase('ru');return flagOn(n,'isMention')||t.includes('упомянули вас')||t.includes('вас упомянули')||n?.category==='mention'||(n?.category==='replies'&&n?.target==='chat'&&!flagOn(n,'isReply'))}
-function shouldShowAttentionToast(n){return isMentionNotice(n)||flagOn(n,'isReply')||n?.category==='chat'}
+function shouldShowAttentionToast(n){return isMentionNotice(n)||flagOn(n,'isReply')}
 function unreadMentionNotices(){return state.notices.filter(n=>!n.read&&isMentionNotice(n))}
 function paintMentionCenter(){const b=$('mentionCenterButton'),c=$('mentionCenterCount'),l=$('mentionCenterLabel');if(!b||!c||!l)return;const n=unreadMentionNotices().length;c.textContent=String(n);b.hidden=n===0;l.textContent=n===1?'Вас упомянули':`У вас ${n} новых упоминания`}
 const shownAttentionToastKeys=new Map();
@@ -498,6 +503,14 @@ async function submitWarehousePush(payload){
     return false;
   }
 }
+function orderVersionForPush(orderId){
+  const order=state.orders.find(item=>item.id===orderId);
+  if(!order)return '';
+  const updatedAt=asDate(order.updatedAt);
+  if(updatedAt)return updatedAt.toISOString();
+  const createdAt=asDate(order.createdAt);
+  return `${createdAt?.toISOString()||''}|${String(order.status||'')}`;
+}
 function flushPushBatch(key){
   const batch=pendingPushBatches.get(key);
   if(!batch)return;
@@ -507,18 +520,17 @@ function flushPushBatch(key){
   if(signedInUser?.uid!==batch.authorId)return;
   const orderIds=[...new Set(batch.events.map(item=>item.orderId).filter(Boolean))];
   const eventCount=batch.events.length;
+  const categoryTitles={orders:'Новые заказы',assembly:'Сборка заказов',status:'Изменения статусов',editing:'Изменения заказов',comments:'Новые комментарии',chat:'Общий чат',likes:'Реакции в чате'};
   const summaryBody=batch.target==='chat'
-    ?`За короткое время — ${eventCount} ${plural(eventCount,'новое сообщение','новых сообщения','новых сообщений')}.`
-    :orderIds.length===1
-      ?`За короткое время — ${eventCount} ${plural(eventCount,'изменение','изменения','изменений')} в одном заказе.`
-      :orderIds.length>1
-        ?`За короткое время — ${eventCount} ${plural(eventCount,'событие','события','событий')} в ${orderIds.length} ${plural(orderIds.length,'заказе','заказах','заказах')}.`
-        :`За короткое время — ${eventCount} ${plural(eventCount,'новое событие','новых события','новых событий')}.`;
+    ?`За короткое время: ${eventCount} ${plural(eventCount,'новое сообщение','новых сообщения','новых сообщений')}.`
+    :`За короткое время: ${eventCount} ${plural(eventCount,'изменение','изменения','изменений')}${batch.events[0].orderNumber?` в заказе № ${batch.events[0].orderNumber}`:''}.`;
   const payload=batch.events.length===1?batch.events[0]:{
     ...batch.events[0],
-    title:batch.target==='chat'?'Новые сообщения в общем чате':'Обновления по заказам',
+    title:categoryTitles[batch.events[0].category]||'Обновления заказов',
     body:summaryBody,
     orderId:orderIds.length===1?orderIds[0]:'',
+    orderNumber:batch.events[batch.events.length-1].orderNumber||'',
+    orderVersion:batch.events[batch.events.length-1].orderVersion||'',
     isMention:false,
     isReply:false
   };
@@ -531,6 +543,8 @@ function queuePush(title,body,authorId,orderId='',target='site',category='',reci
     title:String(title||'Заказы · Склад'),
     body:String(body||'Новое изменение в заказе.'),
     orderId:String(orderId||''),
+    orderNumber:String(state.orders.find(item=>item.id===String(orderId||''))?.number||''),
+    orderVersion:orderVersionForPush(String(orderId||'')),
     target:normalizedTarget,
     category:normalizedCategory,
     recipientUserId:String(recipientUserId||''),
@@ -543,7 +557,7 @@ function queuePush(title,body,authorId,orderId='',target='site',category='',reci
   if(attention.isMention===true||attention.isReply===true||attention.forceAll===true||IMMEDIATE_PUSH_CATEGORIES.has(normalizedCategory)){
     return submitWarehousePush(payload);
   }
-  const key=JSON.stringify([authorId,normalizedTarget,normalizedCategory,payload.recipientUserId]);
+  const key=JSON.stringify([authorId,normalizedTarget,normalizedCategory,payload.recipientUserId,normalizedTarget==='site'?payload.orderId:'']);
   const now=Date.now();
   let batch=pendingPushBatches.get(key);
   if(!batch){batch={authorId,target:normalizedTarget,events:[],startedAt:now,timer:null};pendingPushBatches.set(key,batch);}
@@ -685,7 +699,8 @@ async function showForegroundPushNotification(data={}){
     window.warehouseDesktop.showNotification({
       title:String(data.title||'Заказы · Склад'),
       body:String(data.body||'Новое изменение.'),
-      link:String(data.link||location.href)
+      link:String(data.link||location.href),
+      notificationTag:String(data.notificationTag||'')
     });
     return;
   }
@@ -697,8 +712,10 @@ async function showForegroundPushNotification(data={}){
       title:String(data.title||'Заказы · Склад'),
       body:String(data.body||'Новое изменение.'),
       eventId:String(data.eventId||''),
+      notificationTag:String(data.notificationTag||''),
       link:String(data.link||location.href),
       createdAt:String(data.createdAt||''),
+      expiresAt:String(data.expiresAt||''),
       orderId:String(data.orderId||''),
       target:String(data.target||'site'),
       category:String(data.category||'orders'),
@@ -710,26 +727,38 @@ async function showForegroundPushNotification(data={}){
   }
 }
 const recentPushEvents=new Map();
+const recentPushSounds=new Map();
+function shouldPlayPushSound(n,now=Date.now()){
+  const category=String(n.category||'');
+  if(flagOn(n,'isMention')||flagOn(n,'isReply')||['defects','questions','decisions','replies'].includes(category))return true;
+  for(const[key,time]of recentPushSounds){if(now-time>60000)recentPushSounds.delete(key)}
+  const key=String(n.notificationTag||`${n.target||'site'}:${category}`);
+  const previous=recentPushSounds.get(key)||0;
+  if(now-previous<15000)return false;
+  recentPushSounds.set(key,now);
+  return true;
+}
 onMessage(messaging,payload=>{
   const n=payload.data||payload.notification||{};
   const orderId=String(n.orderId||'');
   const target=String(n.target||'site');
   if(n.title){
     // Ignore delayed FCM messages instead of replaying a backlog on browser startup.
-    const createdAt=Date.parse(String(n.createdAt||''));
-    if(!Number.isFinite(createdAt)||createdAt>Date.now()+30000||Date.now()-createdAt>90000)return;
+    const now=Date.now();
+    const expiresAt=Number(n.expiresAt);
+    if(Number.isFinite(expiresAt)&&expiresAt>0){if(now>expiresAt)return;}
+    else{const createdAt=Date.parse(String(n.createdAt||''));if(!Number.isFinite(createdAt)||createdAt>now+30000||now-createdAt>90000)return;}
     const message=`${n.title}${n.body?`: ${n.body}`:''}`;
     const eventId=String(n.eventId||'');
     const category=String(n.category||'');
     const signature=`${target}|${category}|${orderId}|${message}`;
-    const now=Date.now();
     for(const [key,time] of recentPushEvents){if(now-time>10000)recentPushEvents.delete(key)}
     if((eventId&&recentPushEvents.has(`event:${eventId}`))||recentPushEvents.has(`msg:${signature}`))return;
     if(eventId)recentPushEvents.set(`event:${eventId}`,now);
     recentPushEvents.set(`msg:${signature}`,now);
     // Play the site's custom MP3 for every foreground push, not only chat/mentions.
     // Browsers may block playback until the user has interacted with the page.
-    playNotificationSound();
+    if(shouldPlayPushSound(n,now))playNotificationSound();
     // On web browsers, also show an OS-level notification while the page is
     // foregrounded. Native Android handles its own foreground notification UI.
     if(!window.AndroidWarehouse)showForegroundPushNotification(n);

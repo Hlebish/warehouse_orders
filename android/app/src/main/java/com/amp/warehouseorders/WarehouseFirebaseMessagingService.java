@@ -32,6 +32,13 @@ public class WarehouseFirebaseMessagingService extends FirebaseMessagingService 
         String title = value(data, "title", "Заказы · Склад");
         String body = value(data, "body", "Новое изменение в заказе.");
         String link = value(data, "link", "https://hlebish.github.io/warehouse_orders/");
+        String expiresAtValue = value(data, "expiresAt", "");
+        try {
+            long expiresAt = Long.parseLong(expiresAtValue);
+            if (expiresAt > 0 && System.currentTimeMillis() > expiresAt) return;
+        } catch (NumberFormatException ignored) {
+            // Older pushes use the server's short FCM TTL and remain compatible.
+        }
 
         // Use an explicit Activity intent: ACTION_VIEW cannot resolve to MainActivity
         // because the app intentionally does not register a browser/deep-link filter.
@@ -53,13 +60,15 @@ public class WarehouseFirebaseMessagingService extends FirebaseMessagingService 
             .setContentText(body)
             .setStyle(new NotificationCompat.BigTextStyle().bigText(body))
             .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setOnlyAlertOnce(true)
             .setAutoCancel(true)
             .setContentIntent(pendingIntent)
             .setCategory(NotificationCompat.CATEGORY_MESSAGE)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC);
 
         NotificationManager manager = getSystemService(NotificationManager.class);
-        manager.notify(value(data, "eventId", String.valueOf(System.currentTimeMillis())).hashCode(), builder.build());
+        String notificationTag = value(data, "notificationTag", value(data, "eventId", String.valueOf(System.currentTimeMillis())));
+        manager.notify(notificationTag, 0, builder.build());
     }
 
     private String value(Map<String, String> data, String key, String fallback) {

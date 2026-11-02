@@ -7,11 +7,77 @@ const { logger } = require('firebase-functions');
 const { initializeApp } = require('firebase-admin/app');
 const { getFirestore, FieldValue, Timestamp } = require('firebase-admin/firestore');
 const { getMessaging } = require('firebase-admin/messaging');
+const { createHash } = require('crypto');
 
 initializeApp();
 const db = getFirestore();
 const messaging = getMessaging();
 const ORDER_NOTIFICATION_CATEGORIES = new Set(['assembly', 'defects', 'status', 'editing', 'comments', 'questions', 'decisions']);
+const IMMEDIATE_NOTIFICATION_CATEGORIES = new Set(['defects', 'questions', 'decisions', 'replies']);
+function timestampKey(value) {
+  if (value instanceof Timestamp) return value.toDate().toISOString();
+  if (value instanceof Date) return value.toISOString();
+  return String(value || '');
+}
+function orderVersionKey(order = {}) {
+  return timestampKey(order.updatedAt) || `${timestampKey(order.createdAt)}|${String(order.status || '')}`;
+}
+function notificationTagFor(data, eventId, category, target, recipientUserId) {
+  const urgent = data.forceAll === true || data.isMention === true || data.isReply === true || data.buybackItemId || IMMEDIATE_NOTIFICATION_CATEGORIES.has(category);
+  if (urgent) return `event-${eventId}`;
+  const scope = recipientUserId ? `recipient:${recipientUserId}` : 'broadcast';
+  const digest = createHash('sha1').update(`${target}:${category}:${scope}`).digest('hex').slice(0, 24);
+  return `warehouse-${digest}`;
+}
+async function registerNotificationBurst(notificationTag, eventId, category) {
+  if (notificationTag.startsWith('event-')) return 1;
+  const ref = db.collection('pushNotificationState').doc(notificationTag);
+  return db.runTransaction(async tx => {
+    const snap = await tx.get(ref);
+    const data = snap.data() || {};
+    const recent = Date.now() - (Number(data.lastAt) || 0) <= 60000;
+    const seenEvents = Array.isArray(data.eventIds) ? data.eventIds : [];
+    const alreadyCounted = seenEvents.includes(eventId);
+    const count = alreadyCounted ? Number(data.eventCount) || 1 : recent ? (Number(data.eventCount) || 0) + 1 : 1;
+    tx.set(ref, {
+      category,
+      eventCount: count,
+      eventIds: alreadyCounted ? seenEvents : [...seenEvents, eventId].slice(-50),
+      lastAt: alreadyCounted ? Number(data.lastAt) || Date.now() : Date.now(),
+      expiresAt: Date.now() + 60000,
+      updatedAt: FieldValue.serverTimestamp()
+    }, { merge: true });
+    return count;
+  });
+}
+function pluralRu(value, one, few, many) {
+  const n = Math.abs(Number(value) || 0) % 100;
+  const last = n % 10;
+  return n > 10 && n < 20 ? many : last > 1 && last < 5 ? few : last === 1 ? one : many;
+}
+function notificationCopy(data, count, category) {
+  const titles = { orders: 'Новые заказы', assembly: 'Сборка заказов', status: 'Изменения статусов', editing: 'Изменения заказов', comments: 'Новые комментарии', chat: 'Общий чат', likes: 'Реакции в чате' };
+  const counts = {
+    orders: ['новый заказ', 'новых заказа', 'новых заказов'],
+    assembly: ['обновление сборки', 'обновления сборки', 'обновлений сборки'],
+    status: ['изменение статуса', 'изменения статуса', 'изменений статуса'],
+    editing: ['изменение заказа', 'изменения заказа', 'изменений заказа'],
+    comments: ['новый комментарий', 'новых комментария', 'новых комментариев'],
+    chat: ['новое сообщение', 'новых сообщения', 'новых сообщений'],
+    likes: ['новая реакция', 'новых реакции', 'новых реакций']
+  };
+  if (count <= 1) return { title: String(data.title || 'Заказы · Склад'), body: String(data.body || 'Новое изменение в заказе.') };
+  const forms = counts[category] || ['обновление', 'обновления', 'обновлений'];
+  const orderNumber = String(data.orderNumber || '').trim();
+  const lastBody = String(data.body || '').trim();
+  const detail = lastBody && !lastBody.startsWith('За короткое время:')
+    ? ` Последнее: ${orderNumber ? `заказ № ${orderNumber} · ` : ''}${lastBody}`
+    : orderNumber ? ` Последнее изменение — заказ № ${orderNumber}.` : '';
+  return {
+    title: titles[category] || 'Обновления заказов',
+    body: `За последнюю минуту: ${count} ${pluralRu(count, ...forms)}.${detail}`.slice(0, 500)
+  };
+}
 function notificationCategoryEnabled(settings = {}, category = 'orders') {
   if (settings[category] !== undefined) return settings[category] !== false;
   return !(ORDER_NOTIFICATION_CATEGORIES.has(category) && settings.orders === false);
@@ -91,10 +157,13 @@ async function createNotificationHistory(data, eventId) {
       message: String(data.body || 'Новое изменение.').slice(0, 500),
       body: String(data.body || 'Новое изменение.').slice(0, 500),
       orderId: String(data.orderId || ''),
+      orderNumber: String(data.orderNumber || ''),
       target: data.target === 'chat' ? 'chat' : 'site',
       category,
       isMention: data.isMention === true || data.isMention === 'true',
       isReply: data.isReply === true || data.isReply === 'true',
+      notificationTag: notificationTagFor(data, eventId, category, data.target === 'chat' ? 'chat' : 'site', recipientUserId),
+      expiresAt: Number(data.expiresAt) || null,
       eventId,
       createdAt: FieldValue.serverTimestamp(),
       read: false
@@ -318,6 +387,7 @@ exports.enqueueWarehousePush = onCall(async request => {
   const body = String(input.body || 'Новое изменение в заказе.');
   const orderId = String(input.orderId || '');
   const recipientUserId = String(input.recipientUserId || '');
+  const requestedOrderVersion = String(input.orderVersion || '').slice(0, 200);
   const forceAll = input.forceAll === true;
 
   if (!target || !allowedCategories.has(category) || title.length < 1 || title.length > 120 || body.length > 500 || recipientUserId.length > 128) {
@@ -335,12 +405,17 @@ exports.enqueueWarehousePush = onCall(async request => {
   }
 
   const orderCategories = new Set(['orders', 'assembly', 'defects', 'status', 'editing', 'comments', 'questions', 'decisions']);
+  let orderVersion = '';
+  let orderNumber = '';
   if (orderCategories.has(category)) {
     if (target !== 'site' || !orderId || recipientUserId) {
       throw new HttpsError('invalid-argument', 'Для уведомления по заказу нужны сайт и действующий заказ.');
     }
     const orderSnap = await db.collection('orders').doc(orderId).get();
     if (!orderSnap.exists) throw new HttpsError('failed-precondition', 'Заказ для уведомления не найден.');
+    const orderData = orderSnap.data() || {};
+    orderVersion = requestedOrderVersion || orderVersionKey(orderData);
+    orderNumber = String(orderData.number || '').slice(0, 80);
   } else if (category === 'replies') {
     if (!recipientUserId || (target === 'site' && !orderId) || (target === 'chat' && orderId)) {
       throw new HttpsError('invalid-argument', 'Для ответа необходимо указать получателя и корректную цель.');
@@ -359,6 +434,7 @@ exports.enqueueWarehousePush = onCall(async request => {
   }
 
   const ref = db.collection('pushQueue').doc();
+  const now = Date.now();
   await ref.create({
     title,
     body,
@@ -367,10 +443,13 @@ exports.enqueueWarehousePush = onCall(async request => {
     target,
     category,
     recipientUserId,
+    orderNumber,
     isMention: input.isMention === true,
     isReply: input.isReply === true,
     forceAll,
-    createdAt: new Date().toISOString(),
+    orderVersion,
+    createdAt: new Date(now).toISOString(),
+    expiresAt: now + 60000,
     sentAt: null
   });
   return { ok: true, eventId: ref.id };
@@ -384,14 +463,29 @@ exports.sendWarehousePush = onDocumentCreated({ document: 'pushQueue/{eventId}',
   if (!claimed) return;
 
   const data = snapshot.data() || {};
-  const title = String(data.title || 'Заказы · Склад').slice(0, 120);
-  const body = String(data.body || 'Новое изменение в заказе.').slice(0, 500);
   const eventId = event.params.eventId;
   const siteUrl = 'https://hlebish.github.io/warehouse_orders/';
   const orderId = String(data.orderId || '');
   const target = data.target === 'chat' ? 'chat' : 'site';
   const category = ['orders', 'assembly', 'defects', 'status', 'editing', 'comments', 'questions', 'decisions', 'chat', 'replies', 'likes'].includes(data.category) ? data.category : (target === 'chat' ? 'chat' : 'orders');
   const recipientUserId = String(data.recipientUserId || '');
+  const expiresAt = Number(data.expiresAt) || (Date.parse(String(data.createdAt || '')) + 60000);
+  if (Number.isFinite(expiresAt) && expiresAt > 0 && Date.now() > expiresAt) {
+    await markDone(snapshot.ref, { deliveryStatus: 'expired', acceptedCount: 0, failedCount: 0 });
+    logger.info('Push skipped: expired before delivery', { eventId });
+    return;
+  }
+  const alwaysRelevant = data.forceAll === true || data.isMention === true || data.isReply === true;
+  if (orderId && data.orderVersion && !alwaysRelevant) {
+    const currentOrder = await db.collection('orders').doc(orderId).get();
+    const currentVersion = currentOrder.exists ? orderVersionKey(currentOrder.data()) : '';
+    if (!currentOrder.exists || currentVersion !== String(data.orderVersion)) {
+      await markDone(snapshot.ref, { deliveryStatus: 'stale', acceptedCount: 0, failedCount: 0 });
+      logger.info('Push skipped: order changed after notification was queued', { eventId, orderId });
+      return;
+    }
+  }
+  const notificationTag = notificationTagFor(data, eventId, category, target, recipientUserId);
   // Start notification history immediately, but do not make push delivery wait for it.
   const historyPromise = createNotificationHistory(data, eventId).catch(error => {
     logger.error('Notification history write failed', {
@@ -418,6 +512,9 @@ exports.sendWarehousePush = onDocumentCreated({ document: 'pushQueue/{eventId}',
       return;
     }
 
+    const burstCount = await registerNotificationBurst(notificationTag, eventId, category);
+    const pushCopy = notificationCopy(data, burstCount, category);
+
     let accepted = 0;
     let failed = 0;
     const failureCodes = new Map();
@@ -432,16 +529,18 @@ exports.sendWarehousePush = onDocumentCreated({ document: 'pushQueue/{eventId}',
         const baseMessage = {
           tokens: platformGroup.map(item => item.token),
           data: {
-            title,
-            body,
+            title: pushCopy.title,
+            body: pushCopy.body,
             eventId,
             link,
             orderId,
             target,
             category,
+            notificationTag,
             isMention: String(data.isMention === true || data.isMention === 'true'),
             isReply: String(data.isReply === true || data.isReply === 'true'),
-            createdAt: String(data.createdAt || '')
+            createdAt: String(data.createdAt || ''),
+            expiresAt: String(expiresAt || '')
           }
         };
 

@@ -899,6 +899,24 @@ function showReturns(dateFrom='',dateTo='',searchText=''){
   searchInput?.addEventListener('input',applyReturnsSearch);
   applyReturnsSearch();
 }
+async function reverseBuybackItemsForCancelledReturn(order,returnId){
+  const snapshot=await getDocs(collection(db,'buybackItems'));
+  const returned=snapshot.docs.map(d=>({id:d.id,...(d.data()||{})})).filter(item=>item.returnedFromReturnId===returnId);
+  for(const item of returned){
+    if(item.status!=='active'){console.warn('Возвращённый перекупной товар уже изменил статус; автоматический откат пропущен',item.id);continue;}
+    if(item.returnedFromBuybackId){
+      const sourceRef=doc(db,'buybackItems',item.returnedFromBuybackId);
+      const sourceSnap=await getDoc(sourceRef);
+      if(sourceSnap.exists())await updateDoc(sourceRef,{quantity:(Number(sourceSnap.data().quantity)||0)+(Number(item.quantity)||0),updatedAt:serverTimestamp()});
+      await deleteDoc(doc(db,'buybackItems',item.id));
+    }else{
+      await updateDoc(doc(db,'buybackItems',item.id),{
+        status:'sold',returnedAt:null,returnedFromOrderId:null,returnedFromOrderNumber:null,
+        returnedFromReturnId:null,returnedFromClient:null,updatedAt:serverTimestamp()
+      });
+    }
+  }
+}
 async function cancelReturnAction(orderId,returnId){
   if(!canManageUsers){toast('Отменить возврат может только администратор или директор.');return;}
   const o=state.orders.find(x=>x.id===orderId),r=o?.returns?.find(x=>x.id===returnId);
@@ -911,6 +929,8 @@ async function cancelReturnAction(orderId,returnId){
   const restoredStatus=hasOtherActive?'Возврат':(r.previousStatus||'Собран');
   try{
     await updateDoc(doc(db,'orders',o.id),{returns:nextReturns,status:restoredStatus,returnCancelled:true,updatedAt:cancelledAt,updatedBy:signedInUser.uid,updatedByName:profileName||''});
+    try{await reverseBuybackItemsForCancelledReturn(o,returnId);}
+    catch(buybackRollbackError){console.error('Возврат отменён, но перекупной товар не удалось вернуть в проданное состояние',buybackRollbackError);toast('Возврат отменён, но статус перекупного товара нужно проверить вручную.');}
     o.returns=nextReturns;o.status=restoredStatus;o.returnCancelled=true;o.updatedAt=cancelledAt;o.updatedBy=signedInUser.uid;o.updatedByName=profileName||'';
     serverCache.set(o.id,{...o,returns:JSON.parse(JSON.stringify(nextReturns)),status:restoredStatus,returnCancelled:true,entries:[...(o.entries||[])]});
     await writeAudit('Возврат отменён','Отменён возврат по заказу № '+o.number,o.id,{previousStatus:'Возврат',newStatus:restoredStatus});

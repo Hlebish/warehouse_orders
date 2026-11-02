@@ -362,7 +362,7 @@ async function markNotificationsRead(){
 }
 
 let authRevealTimer=null;
-function finishInitialLoading(){if(authRevealTimer!==null){clearTimeout(authRevealTimer);authRevealTimer=null;}document.documentElement.classList.add('app-booted');try{if(/WarehouseOrdersAndroid/.test(navigator.userAgent))localStorage.setItem('warehouse_android_initialized','1');}catch{}const loader=$('siteLoader');if(loader){loader.classList.add('site-loader-hidden');setTimeout(()=>{if(loader.classList.contains('site-loader-hidden'))loader.hidden=true;},380);}}
+function finishInitialLoading(){window.__warehouseAppBootComplete=true;const startupFailure=$('appStartupFailure');if(startupFailure)startupFailure.hidden=true;if(authRevealTimer!==null){clearTimeout(authRevealTimer);authRevealTimer=null;}document.documentElement.classList.add('app-booted');try{if(/WarehouseOrdersAndroid/.test(navigator.userAgent))localStorage.setItem('warehouse_android_initialized','1');}catch{}const loader=$('siteLoader');if(loader){loader.classList.add('site-loader-hidden');setTimeout(()=>{if(loader.classList.contains('site-loader-hidden'))loader.hidden=true;},380);}}
 function showAuth(message='Войдите с рабочей учётной записью.'){ $('authGate').hidden=false;document.querySelector('.app-shell').hidden=true;$('authMessage').textContent=message;const loader=$('siteLoader');if(loader&&!loader.hidden&&!loader.classList.contains('site-loader-hidden')){if(authRevealTimer!==null)clearTimeout(authRevealTimer);authRevealTimer=setTimeout(()=>{authRevealTimer=null;if(!$('authGate').hidden&&document.querySelector('.app-shell').hidden)finishInitialLoading();},1800);}else{finishInitialLoading();} }
 function hideAuth(){ finishInitialLoading();$('authGate').hidden=true;document.querySelector('.app-shell').hidden=false }
 // Keep the existing screen and state when returning to an already-open app.
@@ -3391,12 +3391,60 @@ document.addEventListener('keydown',e=>{
  }
 });
 document.addEventListener('submit',e=>e.preventDefault());
+let lastSiteVersionCheck=0,siteVersionCheckPromise=null,siteUpdateNotice=null;
+function isNewerSiteVersion(candidate,current){
+ const next=String(candidate||'').split('.'),loaded=String(current||'').split('.');
+ if(!next.length||next.length!==loaded.length||![...next,...loaded].every(part=>/^\d+$/.test(part)))return false;
+ for(let i=0;i<next.length;i++){const a=Number(next[i]),b=Number(loaded[i]);if(a!==b)return a>b}
+ return false;
+}
+function showSiteUpdateNotice(){
+ if(siteUpdateNotice?.isConnected)return;
+ siteUpdateNotice=toast('Новая версия готова. Обновите приложение, когда закончите текущую работу.','',{persistent:true});
+ siteUpdateNotice.classList.add('site-update-notice');
+ const button=document.createElement('button');
+ button.type='button';button.className='small-button primary-soft';button.textContent='Обновить';
+ button.addEventListener('click',reloadToLatestSite);
+ siteUpdateNotice.append(button);
+}
+function reloadToLatestSite(){
+ saveUiState();
+ const url=new URL('./index.html',location.href);
+ url.searchParams.set('_app_refresh',String(Date.now()));
+ location.replace(url.href);
+}
+window.checkWarehouseSiteUpdate=async function(){
+ if(!isAndroidWarehouse()||siteVersionCheckPromise)return;
+ const now=Date.now();if(now-lastSiteVersionCheck<60000)return;
+ lastSiteVersionCheck=now;
+ siteVersionCheckPromise=(async()=>{
+  try{
+   const current=document.querySelector('meta[name="app-version"]')?.content||'';
+   const checkUrl=new URL('./index.html',location.href);checkUrl.searchParams.set('_app_check',String(now));
+   const response=await fetch(checkUrl,{cache:'no-store',credentials:'same-origin'});
+   if(!response.ok)return;
+   const html=await response.text();
+   const latest=new DOMParser().parseFromString(html,'text/html').querySelector('meta[name="app-version"]')?.content||'';
+   if(!isNewerSiteVersion(latest,current))return;
+   const editing=document.activeElement?.matches?.('input:not([type="button"]):not([type="submit"]),textarea,select');
+   const buybackOpen=!!document.querySelector('.buyback-overlay:not([hidden])');
+   if(modal.hidden&&!editing&&!buybackOpen){reloadToLatestSite();return}
+   showSiteUpdateNotice();
+  }catch(error){console.debug('Не удалось проверить обновление Android-приложения',error)}
+ })();
+ try{await siteVersionCheckPromise}finally{siteVersionCheckPromise=null}
+};
+window.addEventListener('load',()=>{
+ void window.checkWarehouseSiteUpdate();
+ window.setInterval(()=>{if(document.visibilityState==='visible')void window.checkWarehouseSiteUpdate()},5*60*1000);
+},{once:true});
 // Returning from the Android background must not recreate Firestore listeners.
 // The existing WebView and its live onSnapshot subscriptions remain active.
 window.addEventListener('warehouse-app-resumed',()=>{
  const shell=document.querySelector('.app-shell');
  const gate=$('authGate');
  if((signedInUser&&shell&&!shell.hidden)||(gate&&!gate.hidden))finishInitialLoading();
+ void window.checkWarehouseSiteUpdate?.();
 });
 if('serviceWorker'in navigator){
   navigator.serviceWorker.addEventListener('message',event=>{

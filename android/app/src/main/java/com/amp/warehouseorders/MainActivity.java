@@ -10,6 +10,14 @@ import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.graphics.Rect;
+import android.graphics.Color;
+import android.view.Gravity;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.Button;
+import android.widget.FrameLayout;
+import android.widget.LinearLayout;
+import android.widget.TextView;
 import java.util.Collections;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -54,6 +62,8 @@ public class MainActivity extends AppCompatActivity {
     private static final String GOOGLE_WEB_CLIENT_ID = "329606730319-bqe5c2lkngq4jk87atifp6n9qnn3chfh.apps.googleusercontent.com";
 
     private WebView webView;
+    private View networkErrorView;
+    private String lastPageUrl = SITE_URL;
     private GoogleSignInClient googleSignInClient;
     private ValueCallback<Uri[]> filePathCallback;
     private final ExecutorService shareExecutor = Executors.newSingleThreadExecutor();
@@ -80,9 +90,18 @@ public class MainActivity extends AppCompatActivity {
             .build();
         googleSignInClient = GoogleSignIn.getClient(this, googleOptions);
 
+        FrameLayout root = new FrameLayout(this);
         webView = new WebView(this);
         webView.setBackgroundColor(android.graphics.Color.rgb(17, 19, 21));
-        setContentView(webView);
+        root.addView(webView, new FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
+        ));
+        networkErrorView = createNetworkErrorView();
+        FrameLayout.LayoutParams errorParams = new FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
+        );
+        root.addView(networkErrorView, errorParams);
+        setContentView(root);
         if (Build.VERSION.SDK_INT >= 29) {
             webView.addOnLayoutChangeListener((view, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) -> {
                 int edgeWidth = (int) (32 * getResources().getDisplayMetrics().density);
@@ -101,7 +120,28 @@ public class MainActivity extends AppCompatActivity {
         settings.setBuiltInZoomControls(false);
         settings.setDisplayZoomControls(false);
 
-        webView.setWebViewClient(new WebViewClient());
+        webView.setWebViewClient(new WebViewClient() {
+            @Override
+            public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
+                super.onPageStarted(view, url, favicon);
+                lastPageUrl = url == null || url.isEmpty() ? SITE_URL : url;
+                if (networkErrorView != null) networkErrorView.setVisibility(View.GONE);
+            }
+
+            @Override
+            public void onReceivedError(WebView view, android.webkit.WebResourceRequest request,
+                    android.webkit.WebResourceError error) {
+                super.onReceivedError(view, request, error);
+                if (request.isForMainFrame()) showNetworkError();
+            }
+
+            @Override
+            public void onReceivedHttpError(WebView view, android.webkit.WebResourceRequest request,
+                    android.webkit.WebResourceResponse errorResponse) {
+                super.onReceivedHttpError(view, request, errorResponse);
+                if (request.isForMainFrame() && errorResponse.getStatusCode() >= 400) showNetworkError();
+            }
+        });
         webView.setWebChromeClient(new WebChromeClient() {
             @Override
             public boolean onShowFileChooser(WebView view, ValueCallback<Uri[]> callback,
@@ -123,7 +163,12 @@ public class MainActivity extends AppCompatActivity {
         webView.addJavascriptInterface(new AndroidBridge(), "AndroidWarehouse");
         // Restore the page after Android recreates this Activity to avoid a fresh startup.
         boolean restoredWebView = savedInstanceState != null && webView.restoreState(savedInstanceState) != null;
-        if (!restoredWebView) webView.loadUrl(notificationUrlFrom(getIntent()));
+        if (!restoredWebView) {
+            lastPageUrl = notificationUrlFrom(getIntent());
+            webView.loadUrl(lastPageUrl);
+        } else if (webView.getUrl() != null) {
+            lastPageUrl = webView.getUrl();
+        }
         installBackHandler();
         requestNativePushToken();
     }
@@ -140,6 +185,64 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         });
+    }
+
+    private View createNetworkErrorView() {
+        LinearLayout panel = new LinearLayout(this);
+        panel.setOrientation(LinearLayout.VERTICAL);
+        panel.setGravity(Gravity.CENTER);
+        int padding = (int) (28 * getResources().getDisplayMetrics().density);
+        panel.setPadding(padding, padding, padding, padding);
+        panel.setBackgroundColor(Color.rgb(17, 19, 21));
+        panel.setVisibility(View.GONE);
+
+        TextView title = new TextView(this);
+        title.setText("Нет соединения с приложением");
+        title.setTextColor(Color.WHITE);
+        title.setTextSize(20);
+        title.setGravity(Gravity.CENTER);
+        panel.addView(title, new LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+        ));
+
+        TextView detail = new TextView(this);
+        detail.setText("Проверьте интернет. Заказы и уведомления обновятся после подключения.");
+        detail.setTextColor(Color.rgb(174, 188, 188));
+        detail.setTextSize(14);
+        detail.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams detailParams = new LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+        );
+        detailParams.topMargin = (int) (12 * getResources().getDisplayMetrics().density);
+        panel.addView(detail, detailParams);
+
+        Button retry = new Button(this);
+        retry.setText("Повторить");
+        retry.setAllCaps(false);
+        retry.setOnClickListener(view -> retryMainPage());
+        LinearLayout.LayoutParams buttonParams = new LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT
+        );
+        buttonParams.topMargin = (int) (20 * getResources().getDisplayMetrics().density);
+        panel.addView(retry, buttonParams);
+        return panel;
+    }
+
+    private void showNetworkError() {
+        runOnUiThread(() -> {
+            if (networkErrorView != null) networkErrorView.setVisibility(View.VISIBLE);
+        });
+    }
+
+    private void retryMainPage() {
+        if (webView == null) return;
+        if (networkErrorView != null) networkErrorView.setVisibility(View.GONE);
+        String target = lastPageUrl == null || lastPageUrl.isEmpty() ? SITE_URL : lastPageUrl;
+        String retryUrl = Uri.parse(target).buildUpon()
+            .appendQueryParameter("_native_retry", String.valueOf(System.currentTimeMillis()))
+            .build()
+            .toString();
+        webView.loadUrl(retryUrl);
     }
 
     private String notificationUrlFrom(android.content.Intent intent) {
@@ -190,6 +293,18 @@ public class MainActivity extends AppCompatActivity {
         super.onResume();
         sendCachedTokenToSite();
         requestNativePushToken();
+        if (webView != null) {
+            webView.postDelayed(() -> {
+                if (networkErrorView != null && networkErrorView.getVisibility() == View.VISIBLE) {
+                    retryMainPage();
+                    return;
+                }
+                webView.evaluateJavascript(
+                    "window.checkWarehouseSiteUpdate && window.checkWarehouseSiteUpdate()",
+                    null
+                );
+            }, 500);
+        }
     }
 
     private void downloadAndSharePhoto(String imageUrl, String caption) {

@@ -34,7 +34,18 @@ const isoNow=()=>new Date().toISOString();
 const asDate=d=>{if(!d)return null;if(typeof d.toDate==='function')return d.toDate();if(typeof d.toMillis==='function')return new Date(d.toMillis());if(d instanceof Date)return d;const out=new Date(d);return Number.isNaN(out.getTime())?null:out};
 const fmtDate=d=>{const date=asDate(d);return date?new Intl.DateTimeFormat('ru-RU',{day:'2-digit',month:'short',year:'numeric'}).format(date):'—'};
 const fmtDateTime=d=>{const date=asDate(d);return date?new Intl.DateTimeFormat('ru-RU',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}).format(date):'—'};
-let state={orders:[],notices:[],role:'warehouse',seen:{},extraPhoneNotifications:false,notificationSettings:{chat:true,replies:true,likes:true,orders:true}};
+const NOTIFICATION_CATEGORIES={orders:'Новые заказы',assembly:'Сборка',defects:'Дефекты',status:'Изменения статуса',editing:'Редактирование',comments:'Комментарии',questions:'Вопросы',decisions:'Решения',chat:'Общий чат',replies:'Ответы и упоминания',likes:'Лайки'};
+const NOTIFICATION_CATEGORY_KEYS=Object.keys(NOTIFICATION_CATEGORIES);
+function normalizeNotificationSettings(raw={}){
+ const source=raw&&typeof raw==='object'?raw:{},settings={};
+ for(const key of NOTIFICATION_CATEGORY_KEYS){
+  const legacyOrderCategory=['assembly','defects','status','editing','comments','questions','decisions'].includes(key);
+  const fallback=legacyOrderCategory&&Object.prototype.hasOwnProperty.call(source,'orders')?source.orders!==false:true;
+  settings[key]=Object.prototype.hasOwnProperty.call(source,key)?source[key]!==false:fallback;
+ }
+ return settings;
+}
+let state={orders:[],notices:[],role:'warehouse',seen:{},extraPhoneNotifications:false,notificationSettings:normalizeNotificationSettings()};
 let activeFilter='all', selectedId=null, pendingDefectId=null, pendingNotificationOrderId='', pendingNotificationChat=false, chatReplyTo=null, chatUnread=false, chatFilterText='', chatFilterMode='all', currentOrdersPage=1;
 const ordersPageSize=50;
 const notificationParams=new URLSearchParams(location.search);
@@ -384,6 +395,8 @@ async function save(){
  for(const o of state.orders){
    const pushTasks=[];
    const base=serverCache.get(o.id),newOrder=!base;
+   const hasNewDefectEntry=!newOrder&&(o.entries||[]).some(e=>e.kind==='defect'&&!(base?.entries||[]).some(old=>old.id===e.id));
+   let defectNotificationQueued=false;
    const next=orderToCloud(o,newOrder),prev=base?orderToCloud(base):null;
    const orderChanged=!base||!equal(next,prev);
    const articlesChanged=!!base&&!articlesContentEqual(base.articles||[],o.articles||[]);
@@ -409,11 +422,11 @@ async function save(){
        :'Все артикулы удалены.';
      const clientLabel=o.client||'Клиент не указан';
      const orderAction=newOrder?'Новый заказ':articlesChanged?'Изменены артикулы':`Статус: ${next.status}`;
-     pushTasks.push(()=>queuePush(
-       clientLabel,
-       orderAction,
-       signedInUser.uid,o.id
-     ));
+     // A new defect has its own event and must not also emit a status-change push.
+     if(!(next.status==='Дефект'&&hasNewDefectEntry)){
+       const orderCategory=newOrder?'orders':(base?.status!==o.status?'status':'editing');
+       pushTasks.push(()=>queuePush(clientLabel,orderAction,signedInUser.uid,o.id,'site',orderCategory));
+     }
    }
 
    const oldEntries=new Map((base?.entries||[]).map(e=>[e.id,e]));
@@ -423,9 +436,17 @@ async function save(){
        saveStage='сохранение записи истории '+e.id+' заказа '+(o.number||o.id);
         await addBatchWrite(b=>b.set(doc(db,'orders',o.id,'entries',e.id),cloud));
        if(!newOrder&&e.kind!=='viewed'&&e.kind!=='system'){
-         const actionLabel=e.kind==='decision'?'Добавлено решение':e.kind==='defect'?'Добавлен дефект':e.kind==='question'?'Добавлен вопрос':'Новый комментарий';
          const clientLabel=o.client||'Клиент не указан';
-         pushTasks.push(()=>e.replyToEntryId&&e.replyToAuthorId?queuePush(clientLabel,'Новый ответ',signedInUser.uid,o.id,'site','replies',e.replyToAuthorId):queuePush(clientLabel,actionLabel,signedInUser.uid,o.id));
+         if(e.kind==='defect'){
+           if(!defectNotificationQueued){
+             pushTasks.push(()=>queuePush(clientLabel,'Добавлен дефект',signedInUser.uid,o.id,'site','defects'));
+             defectNotificationQueued=true;
+           }
+         }else{
+           const actionLabel=e.kind==='decision'?'Добавлено решение':e.kind==='question'?'Добавлен вопрос':'Новый комментарий';
+           const category=e.replyToEntryId&&e.replyToAuthorId?'replies':e.kind==='decision'?'decisions':e.kind==='question'?'questions':'comments';
+           pushTasks.push(()=>e.replyToEntryId&&e.replyToAuthorId?queuePush(clientLabel,'Новый ответ',signedInUser.uid,o.id,'site','replies',e.replyToAuthorId):queuePush(clientLabel,actionLabel,signedInUser.uid,o.id,'site',category));
+         }
        }
        oldEntries.delete(e.id);
      }else oldEntries.delete(e.id);
@@ -434,7 +455,7 @@ async function save(){
    if(state.role==='director'||canManageUsers){
      for(const removedId of oldEntries.keys()){
        await addBatchWrite(b=>b.delete(doc(db,'orders',o.id,'entries',removedId)));
-       pushTasks.push(()=>queuePush(o.client||'Клиент не указан','Удалена запись из истории заказа',signedInUser.uid,o.id));
+       pushTasks.push(()=>queuePush(o.client||'Клиент не указан','Удалена запись из истории заказа',signedInUser.uid,o.id,'site','editing'));
      }
    }
 
@@ -750,7 +771,7 @@ onAuthStateChanged(auth,user=>{
   restoreOrdersCache(user.uid);
   state.role=cachedProfile.role;canManageUsers=cachedProfile.admin===true||cachedProfile.role==='director';
   profileName=cachedProfile.displayName||user.email||roles[cachedProfile.role];
-  state.notificationSettings={chat:cachedProfile.notificationSettings?.chat!==false,replies:cachedProfile.notificationSettings?.replies!==false,likes:cachedProfile.notificationSettings?.likes!==false,orders:cachedProfile.notificationSettings?.orders!==false};
+  state.notificationSettings=normalizeNotificationSettings(cachedProfile.notificationSettings);
   state.extraPhoneNotifications=cachedProfile.extraPhoneNotifications===true;
   $('userName').textContent=profileName;$('userRole').textContent=canManageUsers?`Администратор · ${roles[cachedProfile.role]}`:roles[cachedProfile.role];
   // Reveal the shell immediately on repeat visits; profile verification continues in parallel.
@@ -762,7 +783,7 @@ onAuthStateChanged(auth,user=>{
    if(!snap.exists()){startedWithCache=false;try{localStorage.removeItem(profileCacheKey)}catch{}stopCloud();showAuth('Учётная запись создана, но профиль не найден. Обратитесь к администратору.');$('authError').textContent=`UID: ${user.uid}`;return}
    const profile=snap.data();if(profile.active!==true||!roles[profile.role]){startedWithCache=false;try{localStorage.removeItem(profileCacheKey)}catch{}stopCloud();showAuth('Доступ отключён или роль не назначена. Обратитесь к администратору.');return}
    try{localStorage.setItem(profileCacheKey,JSON.stringify(profile))}catch{}
-   state.role=profile.role;canManageUsers=profile.admin===true||profile.role==='director';profileName=profile.displayName||user.email||roles[profile.role];state.notificationSettings={chat:profile.notificationSettings?.chat!==false,replies:profile.notificationSettings?.replies!==false,likes:profile.notificationSettings?.likes!==false,orders:profile.notificationSettings?.orders!==false};state.extraPhoneNotifications=profile.extraPhoneNotifications===true;$('userName').textContent=profileName;$('userRole').textContent=canManageUsers?`Администратор · ${roles[profile.role]}`:roles[profile.role];
+   state.role=profile.role;canManageUsers=profile.admin===true||profile.role==='director';profileName=profile.displayName||user.email||roles[profile.role];state.notificationSettings=normalizeNotificationSettings(profile.notificationSettings);state.extraPhoneNotifications=profile.extraPhoneNotifications===true;$('userName').textContent=profileName;$('userRole').textContent=canManageUsers?`Администратор · ${roles[profile.role]}`:roles[profile.role];
    if(!startedWithCache){
     hideAuth();watchOrders();watchNotifications();watchChatBadge();watchClients();loadProductsCatalog();render();
    }else{
@@ -944,7 +965,11 @@ async function cancelReturnAction(orderId,returnId){
 let transferredInsightsExpanded=false;
 function notificationTone(n){
   const cat=n.category||(n.target==='chat'?'chat':'orders');
-  return cat==='chat'?'blue':cat==='replies'?'violet':cat==='likes'?'pink':'green';
+  if(cat==='chat')return 'blue';
+  if(cat==='replies'||cat==='decisions')return 'violet';
+  if(cat==='likes')return 'pink';
+  if(cat==='defects'||cat==='questions')return 'amber';
+  return 'green';
 }
 let renderScheduled=false;
 function scheduleRender(){
@@ -1760,7 +1785,7 @@ async function toggleArticleCollected(index){
     if(allCollected&&previousStatus!=='Собран'){
       void queuePush(`Заказ № ${o.number} собран`,
         `Все позиции заказа № ${o.number} отмечены собранными.`,
-        signedInUser.uid,o.id,'site','orders');
+        signedInUser.uid,o.id,'site','assembly');
     }
   }catch(err){
     item.collected=previousCollected;
@@ -1791,7 +1816,7 @@ async function toggleAssemblyProgress(){
     serverCache.set(o.id,{...serverCache.get(o.id),...o});
     pendingOrderData.delete(o.id);
     void writeAudit(next?'Начата сборка заказа':'Сборка заказа завершена',next?'Кладовщик начал сборку заказа.':'Кладовщик завершил сборку заказа.',o.id);
-    void queuePush(next?`Начата сборка заказа № ${o.number}`:`Сборка заказа № ${o.number} завершена`,next?'Кладовщик начал сборку заказа.':'Кладовщик завершил сборку заказа.',signedInUser.uid,o.id);
+    void queuePush(next?`Начата сборка заказа № ${o.number}`:`Сборка заказа № ${o.number} завершена`,next?'Кладовщик начал сборку заказа.':'Кладовщик завершил сборку заказа.',signedInUser.uid,o.id,'site','assembly');
   }catch(err){
     Object.assign(o,previous);
     render();
@@ -2081,7 +2106,7 @@ async function setStatus(status,text,kind='system'){
    }
    try{await writeAudit('Изменён статус заказа',text,o.id,{previousStatus:previous,newStatus:status});}
    catch(auditErr){console.error('Не удалось записать аудит изменения статуса',auditErr);}
-   try{await queuePush(`${o.client||'Клиент не указан'} · ${status}`,text,signedInUser.uid,o.id);}
+   try{await queuePush(`${o.client||'Клиент не указан'} · ${status}`,text,signedInUser.uid,o.id,'site','status');}
    catch(pushErr){console.error('Не удалось отправить уведомление об изменении статуса',pushErr);}
   })();
  }catch(err){
@@ -2106,12 +2131,18 @@ function confirmDefectCancel(){const reason=$('defectReason').value.trim();if(!r
 function deleteOrder(){if(!canManageUsers)return;const current=state.orders.find(x=>x.id===selectedId);if(current&&hasPendingDefect(current)){toast('Нельзя удалить заказ, пока не рассмотрен дефект.');return;}const o=state.orders.find(x=>x.id===selectedId);if(!o)return;showModal('Удалить карточку?',`<div class="danger-note">Заказ № ${esc(o.number)} и его записи сначала сохранятся в отдельной истории удалённых заказов, а затем исчезнут из общего списка.</div>`,[button('Назад','back-detail'),button('Удалить карточку','confirm-delete','small-button danger')],'УДАЛЕНИЕ ЗАКАЗА')}
 function deleteEntry(entryId){const o=state.orders.find(x=>x.id===selectedId),entry=o.entries.find(x=>x.id===entryId);if(!entry||state.role!=='director')return;showModal('Удалить запись?',`<div class="danger-note">Комментарий и прикреплённые к нему фото будут удалены. Действие попадёт в журнал директора.</div>`,[button('Назад','back-detail'),button('Удалить запись','confirm-delete-entry:'+entryId,'small-button danger')],'ДЕЙСТВИЕ ДИРЕКТОРА')}
 function confirmDeleteEntry(entryId){const o=state.orders.find(x=>x.id===selectedId),entry=o.entries.find(x=>x.id===entryId);if(!entry)return;const label=entry.article?`дефект артикула ${entry.article}`:({comment:'комментарий',question:'вопрос',decision:'решение',viewed:'отметку о просмотре'})[entry.kind]||'запись';o.entries=o.entries.filter(x=>x.id!==entryId);state.notices.unshift({id:crypto.randomUUID(),message:`Директор удалил ${label} из заказа № ${o.number}`,orderId:null,at:isoNow(),read:false,kind:'audit'});save();render();toast('Удаление внесено в журнал действий.');openOrder(o.id)}
-async function confirmDelete(){if(!canManageUsers)return;const o=state.orders.find(x=>x.id===selectedId);if(!o)return;let archived=false;try{const sourceRef=doc(db,'orders',o.id),sourceSnap=await getDoc(sourceRef);if(!sourceSnap.exists()){toast('Заказ уже удалён или недоступен.');return}const sourceEntries=await getDocs(collection(db,'orders',o.id,'entries')),archiveRef=doc(db,'deletedOrders',o.id),archiveSnap=await getDoc(archiveRef);if(!archiveSnap.exists()||archiveSnap.data().complete!==true){if(!archiveSnap.exists()){const data=sourceSnap.data();await setDoc(archiveRef,{sourceOrderId:o.id,number:data.number||o.number,client:data.client||o.client||'',status:data.status||o.status,createdAt:data.createdAt||o.createdAt,createdBy:data.createdBy||'',createdByName:data.createdByName||o.author||'',entriesCount:sourceEntries.size,deletedAt:isoNow(),deletedBy:signedInUser.uid,deletedByName:profileName,deletedByEmail:signedInUser.email||'',complete:false})}for(let i=0;i<sourceEntries.docs.length;i+=450){const batch=writeBatch(db);for(const entrySnap of sourceEntries.docs.slice(i,i+450)){const entry=entryFromCloud(entrySnap.id,entrySnap.data());batch.set(doc(db,'deletedOrders',o.id,'entries',entrySnap.id),entryToCloud(entry))}await batch.commit()}await updateDoc(archiveRef,{complete:true})}archived=true;for(let i=0;i<sourceEntries.docs.length;i+=450){const batch=writeBatch(db);for(const entrySnap of sourceEntries.docs.slice(i,i+450))batch.delete(entrySnap.ref);await batch.commit()}await writeAudit('Удалён заказ',`Заказ № ${o.number}; статус: ${o.status}`,o.id);await queuePush(`Заказ № ${o.number} удалён`,`Заказ удалён администратором ${profileName || 'сотрудником'}.`,signedInUser.uid,o.id);await deleteDoc(sourceRef);entryUnsubscribes.get(o.id)?.();entryUnsubscribes.delete(o.id);serverCache.delete(o.id);state.orders=state.orders.filter(x=>x.id!==o.id);state.notices.unshift({id:crypto.randomUUID(),message:`Администратор ${profileName} удалил заказ № ${o.number}`,orderId:null,at:isoNow(),read:false,kind:'audit'});closeModal();render();toast('Заказ удалён и сохранён в истории.')}catch(err){console.error('Не удалось удалить заказ с архивированием',err);toast(archived?'Заказ сохранён в истории, но оригинал удалить не удалось. Повторите операцию позже.':'Не удалось заархивировать заказ. Оригинал сохранён. Проверьте правила Firestore и повторите попытку.')}}
+async function confirmDelete(){if(!canManageUsers)return;const o=state.orders.find(x=>x.id===selectedId);if(!o)return;let archived=false;try{const sourceRef=doc(db,'orders',o.id),sourceSnap=await getDoc(sourceRef);if(!sourceSnap.exists()){toast('Заказ уже удалён или недоступен.');return}const sourceEntries=await getDocs(collection(db,'orders',o.id,'entries')),archiveRef=doc(db,'deletedOrders',o.id),archiveSnap=await getDoc(archiveRef);if(!archiveSnap.exists()||archiveSnap.data().complete!==true){if(!archiveSnap.exists()){const data=sourceSnap.data();await setDoc(archiveRef,{sourceOrderId:o.id,number:data.number||o.number,client:data.client||o.client||'',status:data.status||o.status,createdAt:data.createdAt||o.createdAt,createdBy:data.createdBy||'',createdByName:data.createdByName||o.author||'',entriesCount:sourceEntries.size,deletedAt:isoNow(),deletedBy:signedInUser.uid,deletedByName:profileName,deletedByEmail:signedInUser.email||'',complete:false})}for(let i=0;i<sourceEntries.docs.length;i+=450){const batch=writeBatch(db);for(const entrySnap of sourceEntries.docs.slice(i,i+450)){const entry=entryFromCloud(entrySnap.id,entrySnap.data());batch.set(doc(db,'deletedOrders',o.id,'entries',entrySnap.id),entryToCloud(entry))}await batch.commit()}await updateDoc(archiveRef,{complete:true})}archived=true;for(let i=0;i<sourceEntries.docs.length;i+=450){const batch=writeBatch(db);for(const entrySnap of sourceEntries.docs.slice(i,i+450))batch.delete(entrySnap.ref);await batch.commit()}await writeAudit('Удалён заказ',`Заказ № ${o.number}; статус: ${o.status}`,o.id);await queuePush(`Заказ № ${o.number} удалён`,`Заказ удалён администратором ${profileName || 'сотрудником'}.`,signedInUser.uid,o.id,'site','editing');await deleteDoc(sourceRef);entryUnsubscribes.get(o.id)?.();entryUnsubscribes.delete(o.id);serverCache.delete(o.id);state.orders=state.orders.filter(x=>x.id!==o.id);state.notices.unshift({id:crypto.randomUUID(),message:`Администратор ${profileName} удалил заказ № ${o.number}`,orderId:null,at:isoNow(),read:false,kind:'audit'});closeModal();render();toast('Заказ удалён и сохранён в истории.')}catch(err){console.error('Не удалось удалить заказ с архивированием',err);toast(archived?'Заказ сохранён в истории, но оригинал удалить не удалось. Повторите операцию позже.':'Не удалось заархивировать заказ. Оригинал сохранён. Проверьте правила Firestore и повторите попытку.')}}
 async function showDeletedOrders(){if(!canManageUsers)return;try{const snap=await getDocs(collection(db,'deletedOrders')),archives=snap.docs.map(d=>({id:d.id,...d.data()})).filter(x=>x.complete===true).sort((a,b)=>String(b.deletedAt||'').localeCompare(String(a.deletedAt||'')));const rows=archives.map(a=>`<div class="notice-item"><b>Заказ № ${esc(a.number||'—')} · ${esc(a.client||'без клиента')}</b><small>${esc(a.status||'')} · удалил ${esc(a.deletedByName||a.deletedByEmail||'администратор')} · ${fmtDateTime(a.deletedAt)} · записей: ${Number(a.entriesCount)||0}</small>${button('Открыть историю','view-deleted-order:'+esc(a.id),'small-button primary-soft')}</div>`).join('');showModal('История удалённых заказов',`<div class="notice-list">${rows||'<div class="danger-note">Удалённых заказов пока нет.</div>'}</div>`,[button('Назад','back-profile'),button('Закрыть','close')],'АРХИВ');}catch(err){console.error('Не удалось загрузить архив заказов',err);toast('Не удалось загрузить историю. Проверьте опубликованные правила Firestore.')}}
 async function showDeletedOrder(id){if(!canManageUsers)return;try{const archiveSnap=await getDoc(doc(db,'deletedOrders',id));if(!archiveSnap.exists()||archiveSnap.data().complete!==true){toast('Запись истории не найдена.');showDeletedOrders();return}const a=archiveSnap.data(),entriesSnap=await getDocs(collection(db,'deletedOrders',id,'entries')),entries=entriesSnap.docs.map(d=>({id:d.id,...entryFromCloud(d.id,d.data())})).sort((x,y)=>new Date(x.createdAt)-new Date(y.createdAt)),timeline=entries.map(e=>`<article class="timeline-item"><div class="timeline-top"><span><b>${esc(e.author||'Сотрудник')}</b> · ${fmtDateTime(e.createdAt)}</span><span class="timeline-type">${esc(({defect:'ДЕФЕКТ',question:'ВОПРОС',decision:'РЕШЕНИЕ',comment:'КОММЕНТАРИЙ',viewed:'ПРОСМОТРЕНО',system:'СИСТЕМА'})[e.kind]||'ЗАПИСЬ')}</span></div>${e.kind==='comment'?button('↩ Ответить','reply-entry:'+e.id,'small-button primary-soft'):''}${replyTarget?`<div class="timeline-reply-reference"><b>Ответ на комментарий · ${esc(e.replyToAuthorName||replyTarget.author||'Сотрудник')}</b><div>${esc(String(e.replyToText||replyTarget.text||'').slice(0,220))}${String(e.replyToText||replyTarget.text||'').length>220?'…':''}</div></div>`:''}${e.article?`<div class="timeline-article">Артикул: ${esc(e.article)}</div>`:''}<div class="timeline-text">${esc(e.text||'')}</div>${e.photos?.length?`<div class="photo-grid">${e.photos.map(p=>`<img src="${esc(p)}" alt="Фото из удалённого заказа" data-photo="${esc(p)}">`).join('')}</div>`:''}</article>`).join('');showModal(`Архив · заказ № ${a.number||'—'}`,`<div class="order-detail-head"><div><div class="detail-number">${esc(a.client||'')}</div><div class="detail-meta">Создан ${fmtDateTime(a.createdAt)} · удалил ${esc(a.deletedByName||a.deletedByEmail||'администратор')} · ${fmtDateTime(a.deletedAt)}</div></div><div>${statusPill(a.status||'Удалён')}</div></div><div class="timeline">${timeline||'<div class="danger-note">У заказа не было записей.</div>'}</div>`,[button('Назад к архиву','deleted-orders'),button('Закрыть','close')],'ИСТОРИЯ УДАЛЁННЫХ ЗАКАЗОВ')}catch(err){console.error('Не удалось открыть архивный заказ',err);toast('Не удалось открыть заказ из истории.')}}
 function paintNotices(){const unread=state.notices.some(n=>!n.read&&state.notificationSettings[n.category||(n.target==='chat'?'chat':'orders')]!==false);$('notificationButton').classList.toggle('has-notice',unread);paintChatBadge()}
 async function disablePush(){try{if(!signedInUser)throw new Error('User is not signed in');const installationId=localStorage.getItem('ampPushInstallationId');const tokensRef=collection(db,'users',signedInUser.uid,'pushTokens');const snap=await getDocs(tokensRef);const batch=writeBatch(db);for(const tokenDoc of snap.docs){const data=tokenDoc.data()||{};if(installationId&&data.installationId===installationId)batch.delete(tokenDoc.ref)}await batch.commit();await deleteToken(messaging).catch(()=>{});toast('Push-уведомления выключены на этом устройстве.')}catch(err){console.error('Не удалось выключить push',err);toast('Не удалось выключить уведомления. Попробуйте ещё раз.')}}
-async function toggleNotificationSetting(category){if(!signedInUser||!['chat','replies','likes','orders'].includes(category))return;const next=state.notificationSettings[category]===false;try{state.notificationSettings[category]=next;await updateDoc(doc(db,'users',signedInUser.uid),{notificationSettings:state.notificationSettings});toast(next?'Уведомления включены.':'Уведомления выключены.');showNotifications()}catch(err){console.error('Не удалось изменить настройку уведомлений',err);state.notificationSettings[category]=!next;toast('Не удалось сохранить настройку уведомлений.')}}
+async function toggleNotificationSetting(category){
+ if(!signedInUser||!NOTIFICATION_CATEGORY_KEYS.includes(category))return;
+ const previous={...state.notificationSettings},next=state.notificationSettings[category]===false;
+ const updated={...state.notificationSettings,[category]:next};
+ try{await updateDoc(doc(db,'users',signedInUser.uid),{notificationSettings:updated});state.notificationSettings=updated;toast(next?'Уведомления включены.':'Уведомления выключены.');showNotifications();}
+ catch(err){console.error('Не удалось изменить настройку уведомлений',err);state.notificationSettings=previous;toast('Не удалось сохранить настройку уведомлений. Проверьте подключение и правила Firestore.');showNotifications();}
+}
 async function toggleExtraPhoneNotifications(){if(!signedInUser)return;const previous=state.extraPhoneNotifications;const next=!previous;try{await updateDoc(doc(db,'users',signedInUser.uid),{extraPhoneNotifications:next});state.extraPhoneNotifications=next;toast(next?'Дополнительные уведомления на все устройства включены.':'Дополнительные уведомления на все устройства выключены.');showNotifications()}catch(err){console.error('Не удалось сохранить настройку дополнительных уведомлений на все устройства',err);state.extraPhoneNotifications=previous;toast('Не удалось сохранить настройку. Проверьте подключение и права доступа.');showNotifications()}}
 
 let chatMessages=[],olderChatMessages=[],chatOldestCursor=null,hasOlderChatMessages=false,loadingOlderChatMessages=false,chatPendingScrollRestore=null;
@@ -3114,7 +3145,7 @@ function showNotifications(){
   const unread=state.notices.filter(n=>!n.read).length;
   const pushGranted=typeof Notification!=='undefined'&&Notification.permission==='granted';
   const pushControls='<div class="push-device-controls"><div><b>Системные push-уведомления</b><small>'+((pushGranted)?'Разрешены в браузере':'Можно включить на этом устройстве')+'</small></div><div class="push-device-buttons"><button type="button" class="small-button good" data-action="enable-notifications">🔔 Включить уведомления</button><button type="button" class="small-button danger" data-action="disable-notifications">🔕 Отключить уведомления</button></div></div>'+'<button type="button" class="notification-setting '+(state.extraPhoneNotifications?'enabled':'disabled')+'" style="width:100%;margin:0 0 12px;text-align:left" data-action="toggle-extra-phone-notifications"><b>📱 Дополнительные уведомления на все устройства</b><small>'+(state.extraPhoneNotifications?'Включены — уведомления от других сотрудников приходят на все зарегистрированные устройства. Ваши действия не уведомляют вас.':'Выключены — push приходит только на последнее активное устройство. Включите, чтобы получать уведомления на компьютере и телефоне одновременно.')+'</small></button><p class="field-hint">Доставка на устройства независимая: открытый браузер на ПК не должен мешать уведомлениям на телефоне. На телефоне должны быть разрешены уведомления и зарегистрирован push-токен.</p>';
-  const body=pushControls+'<div class="notification-toolbar"><label class="search-box"><span>⌕</span><input id="notificationSearch" type="search" placeholder="Поиск уведомлений"></label><select id="notificationFilter"><option value="">Все</option><option value="orders">Заказы</option><option value="chat">Общий чат</option><option value="replies">Ответы и упоминания</option><option value="likes">Лайки</option></select></div><div class="notification-settings-grid">'+['chat','replies','likes','orders'].map(k=>'<button type="button" class="notification-setting '+(state.notificationSettings[k]?'enabled':'disabled')+'" data-action="toggle-notification:'+k+'"><b>'+({chat:'💬 Чат',replies:'↩ Ответы',likes:'👍 Лайки',orders:'📦 Заказы'}[k])+'</b><small>'+(state.notificationSettings[k]?'Включены':'Выключены')+'</small></button>').join('')+'</div><div class="notification-summary"><b>'+unread+'</b> непрочитанных уведомлений</div><div id="notificationList" class="notification-list"></div>';
+  const body=pushControls+'<div class="notification-toolbar"><label class="search-box"><span>⌕</span><input id="notificationSearch" type="search" placeholder="Поиск уведомлений"></label><select id="notificationFilter"><option value="">Все категории</option>'+NOTIFICATION_CATEGORY_KEYS.map(k=>'<option value="'+k+'">'+esc(NOTIFICATION_CATEGORIES[k])+'</option>').join('')+'</select></div><h3 class="notification-settings-title">Персональные настройки · каждое действие отдельно</h3><div class="notification-settings-grid">'+NOTIFICATION_CATEGORY_KEYS.map(k=>'<button type="button" class="notification-setting '+(state.notificationSettings[k]?'enabled':'disabled')+'" data-action="toggle-notification:'+k+'"><b>'+esc(NOTIFICATION_CATEGORIES[k])+'</b><small>'+(state.notificationSettings[k]?'Включены':'Выключены')+'</small></button>').join('')+'</div><div class="notification-summary"><b>'+unread+'</b> непрочитанных уведомлений</div><div id="notificationList" class="notification-list"></div>';
   showModal('Уведомления',body,[button('Прочитать всё','mark-notifications-read','small-button good'),button('Закрыть','close')],'ЦЕНТР УВЕДОМЛЕНИЙ');
   $('notificationSearch')?.addEventListener('input',render);$('notificationFilter')?.addEventListener('change',render);render();
   // Opening the notification center counts as viewing the notifications.

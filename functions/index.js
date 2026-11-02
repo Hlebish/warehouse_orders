@@ -1,6 +1,6 @@
 const { onDocumentCreated } = require('firebase-functions/v2/firestore');
 const { onSchedule } = require('firebase-functions/v2/scheduler');
-const { onRequest } = require('firebase-functions/v2/https');
+const { onRequest, onCall, HttpsError } = require('firebase-functions/v2/https');
 const { defineSecret } = require('firebase-functions/params');
 const { setGlobalOptions } = require('firebase-functions/v2/options');
 const { logger } = require('firebase-functions');
@@ -292,6 +292,84 @@ exports.import1COrder = onRequest(
     }
   }
 );
+
+
+// All client notification requests pass through this callable. Admin SDK writes
+// avoid brittle client-side pushQueue rule evaluation while preserving strict
+// authentication, recipient, category and administrator checks.
+exports.enqueueWarehousePush = onCall(async request => {
+  if (!request.auth?.uid) throw new HttpsError('unauthenticated', 'Требуется авторизация.');
+  const uid = request.auth.uid;
+  const profileSnap = await db.collection('users').doc(uid).get();
+  if (!profileSnap.exists || profileSnap.data()?.active !== true) {
+    throw new HttpsError('permission-denied', 'Активный профиль сотрудника не найден.');
+  }
+
+  const input = request.data || {};
+  const allowedCategories = new Set(['orders', 'assembly', 'defects', 'status', 'editing', 'comments', 'questions', 'decisions', 'chat', 'replies', 'likes']);
+  const target = input.target === 'chat' ? 'chat' : input.target === 'site' ? 'site' : '';
+  const category = String(input.category || '');
+  const title = String(input.title || 'Заказы · Склад');
+  const body = String(input.body || 'Новое изменение в заказе.');
+  const orderId = String(input.orderId || '');
+  const recipientUserId = String(input.recipientUserId || '');
+  const forceAll = input.forceAll === true;
+
+  if (!target || !allowedCategories.has(category) || title.length < 1 || title.length > 120 || body.length > 500 || recipientUserId.length > 128) {
+    throw new HttpsError('invalid-argument', 'Некорректные данные уведомления.');
+  }
+  if (forceAll && !(profileSnap.data()?.admin === true || profileSnap.data()?.role === 'director')) {
+    throw new HttpsError('permission-denied', 'Тестовые уведомления доступны только администратору.');
+  }
+
+  if (recipientUserId) {
+    const recipientSnap = await db.collection('users').doc(recipientUserId).get();
+    if (!recipientSnap.exists || recipientSnap.data()?.active !== true) {
+      throw new HttpsError('failed-precondition', 'Получатель не найден или отключён.');
+    }
+  }
+
+  const orderCategories = new Set(['orders', 'assembly', 'defects', 'status', 'editing', 'comments', 'questions', 'decisions']);
+  if (orderCategories.has(category)) {
+    if (target !== 'site' || !orderId || recipientUserId) {
+      throw new HttpsError('invalid-argument', 'Для уведомления по заказу нужны сайт и действующий заказ.');
+    }
+    const orderSnap = await db.collection('orders').doc(orderId).get();
+    if (!orderSnap.exists) throw new HttpsError('failed-precondition', 'Заказ для уведомления не найден.');
+  } else if (category === 'replies') {
+    if (!recipientUserId || (target === 'site' && !orderId) || (target === 'chat' && orderId)) {
+      throw new HttpsError('invalid-argument', 'Для ответа необходимо указать получателя и корректную цель.');
+    }
+    if (target === 'site' && !(await db.collection('orders').doc(orderId).get()).exists) {
+      throw new HttpsError('failed-precondition', 'Заказ для ответа не найден.');
+    }
+  } else if (category === 'chat') {
+    if (target !== 'chat' || (recipientUserId && !(forceAll && recipientUserId === uid))) {
+      throw new HttpsError('invalid-argument', 'Некорректная цель чат-уведомления.');
+    }
+  } else if (category === 'likes') {
+    if (target !== 'chat' || !recipientUserId) {
+      throw new HttpsError('invalid-argument', 'Для лайка необходимо указать получателя чата.');
+    }
+  }
+
+  const ref = db.collection('pushQueue').doc();
+  await ref.create({
+    title,
+    body,
+    authorId: uid,
+    orderId,
+    target,
+    category,
+    recipientUserId,
+    isMention: input.isMention === true,
+    isReply: input.isReply === true,
+    forceAll,
+    createdAt: new Date().toISOString(),
+    sentAt: null
+  });
+  return { ok: true, eventId: ref.id };
+});
 
 exports.sendWarehousePush = onDocumentCreated({ document: 'pushQueue/{eventId}', retry: true }, async event => {
   const snapshot = event.data;

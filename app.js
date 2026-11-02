@@ -1433,9 +1433,20 @@ async function deleteClient(id){
     await openClientsDirectory();
   }catch(err){console.error('Ошибка удаления клиента',err);toast('Не удалось удалить клиента: '+(err?.code||err?.message||'нет доступа'))}
 }
-function importClientsExcel(file){
+let xlsxLoaderPromise=null;
+function ensureXlsxLoaded(){
+ if(window.XLSX)return Promise.resolve(window.XLSX);
+ if(!xlsxLoaderPromise)xlsxLoaderPromise=new Promise((resolve,reject)=>{
+  const script=document.createElement('script');script.src='./vendor/xlsx.full.min.js?v=0.18.5';script.async=true;
+  script.onload=()=>window.XLSX?resolve(window.XLSX):reject(new Error('Excel-модуль загружен некорректно.'));
+  script.onerror=()=>reject(new Error('Не удалось загрузить модуль Excel. Проверьте соединение.'));
+  document.head.append(script);
+ }).catch(error=>{xlsxLoaderPromise=null;throw error});
+ return xlsxLoaderPromise;
+}
+async function importClientsExcel(file){
   if(!file)return;
-  if(!window.XLSX){toast('Не удалось загрузить модуль Excel. Обновите страницу и попробуйте снова.');return;}
+  try{await ensureXlsxLoaded()}catch(error){toast(error.message);return}
   const reader=new FileReader();
   reader.onerror=()=>toast('Не удалось прочитать выбранный Excel-файл.');
   reader.onload=async e=>{
@@ -1598,9 +1609,9 @@ function importClientsExcel(file){
   reader.readAsArrayBuffer(file);
 }
 
-function importProductsExcel(file){
+async function importProductsExcel(file){
   if(!file)return;
-  if(!window.XLSX){toast('Не удалось загрузить модуль Excel. Обновите страницу и попробуйте снова.');return;}
+  try{await ensureXlsxLoaded()}catch(error){toast(error.message);return}
   const reader=new FileReader();
   reader.onerror=()=>toast('Не удалось прочитать выбранный Excel-файл.');
   reader.onload=async e=>{

@@ -183,7 +183,7 @@ function shouldShowAttentionToast(n){return isMentionNotice(n)||flagOn(n,'isRepl
 function unreadMentionNotices(){return state.notices.filter(n=>!n.read&&isMentionNotice(n))}
 function paintMentionCenter(){const b=$('mentionCenterButton'),c=$('mentionCenterCount'),l=$('mentionCenterLabel');if(!b||!c||!l)return;const n=unreadMentionNotices().length;c.textContent=String(n);b.hidden=n===0;l.textContent=n===1?'Вас упомянули':`У вас ${n} новых упоминания`}
 const shownAttentionToastKeys=new Map();
-const notificationSound=new Audio('./delivered-message-sound.mp3');
+const notificationSound=new Audio('./elivered-message-sound.mp3');
 notificationSound.preload='auto';
 notificationSound.volume=1;
 const isAndroidForeground=/Android/i.test(navigator.userAgent);

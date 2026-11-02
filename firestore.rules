@@ -30,11 +30,18 @@ service cloud.firestore {
         && (
           (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['notificationSettings'])
             && request.resource.data.notificationSettings is map
-            && request.resource.data.notificationSettings.keys().hasOnly(['chat', 'replies', 'likes', 'orders'])
+            && request.resource.data.notificationSettings.keys().hasOnly(['chat', 'replies', 'likes', 'orders', 'assembly', 'defects', 'status', 'editing', 'comments', 'questions', 'decisions'])
             && request.resource.data.notificationSettings.chat is bool
             && request.resource.data.notificationSettings.replies is bool
             && request.resource.data.notificationSettings.likes is bool
-            && request.resource.data.notificationSettings.orders is bool)
+            && request.resource.data.notificationSettings.orders is bool
+            && (!('assembly' in request.resource.data.notificationSettings) || request.resource.data.notificationSettings.assembly is bool)
+            && (!('defects' in request.resource.data.notificationSettings) || request.resource.data.notificationSettings.defects is bool)
+            && (!('status' in request.resource.data.notificationSettings) || request.resource.data.notificationSettings.status is bool)
+            && (!('editing' in request.resource.data.notificationSettings) || request.resource.data.notificationSettings.editing is bool)
+            && (!('comments' in request.resource.data.notificationSettings) || request.resource.data.notificationSettings.comments is bool)
+            && (!('questions' in request.resource.data.notificationSettings) || request.resource.data.notificationSettings.questions is bool)
+            && (!('decisions' in request.resource.data.notificationSettings) || request.resource.data.notificationSettings.decisions is bool))
           ||
           (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['extraPhoneNotifications'])
             && request.resource.data.extraPhoneNotifications is bool)

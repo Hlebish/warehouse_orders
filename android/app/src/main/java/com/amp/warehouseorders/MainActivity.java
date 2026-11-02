@@ -11,6 +11,13 @@ import android.os.Build;
 import android.os.Bundle;
 import android.graphics.Rect;
 import java.util.Collections;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebChromeClient;
 import android.webkit.ValueCallback;
@@ -25,6 +32,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.activity.OnBackPressedCallback;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+import androidx.core.content.FileProvider;
 
 import com.google.android.gms.auth.api.signin.GoogleSignIn;
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
@@ -48,6 +56,7 @@ public class MainActivity extends AppCompatActivity {
     private WebView webView;
     private GoogleSignInClient googleSignInClient;
     private ValueCallback<Uri[]> filePathCallback;
+    private final ExecutorService shareExecutor = Executors.newSingleThreadExecutor();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -183,6 +192,69 @@ public class MainActivity extends AppCompatActivity {
         requestNativePushToken();
     }
 
+    private void downloadAndSharePhoto(String imageUrl, String caption) {
+        File imageFile = null;
+        HttpURLConnection connection = null;
+        try {
+            URL url = new URL(imageUrl);
+            String host = url.getHost();
+            if (!"https".equalsIgnoreCase(url.getProtocol()) ||
+                    !("firebasestorage.googleapis.com".equalsIgnoreCase(host) ||
+                      "storage.googleapis.com".equalsIgnoreCase(host))) {
+                throw new IllegalArgumentException("Unsupported photo URL");
+            }
+            connection = (HttpURLConnection) url.openConnection();
+            connection.setConnectTimeout(15000);
+            connection.setReadTimeout(30000);
+            connection.setInstanceFollowRedirects(true);
+            connection.connect();
+            int status = connection.getResponseCode();
+            if (status < 200 || status >= 300) throw new IllegalStateException("Photo download failed: " + status);
+            String contentType = connection.getContentType();
+            if (contentType == null || !contentType.toLowerCase().startsWith("image/"))
+                throw new IllegalStateException("The link does not point to an image");
+            int length = connection.getContentLength();
+            if (length > 20 * 1024 * 1024) throw new IllegalStateException("Photo is larger than 20 MB");
+            imageFile = File.createTempFile("warehouse-viber-", ".jpg", getCacheDir());
+            try (InputStream input = connection.getInputStream();
+                 FileOutputStream output = new FileOutputStream(imageFile)) {
+                byte[] buffer = new byte[8192];
+                int total = 0, count;
+                while ((count = input.read(buffer)) != -1) {
+                    total += count;
+                    if (total > 20 * 1024 * 1024) throw new IllegalStateException("Photo is larger than 20 MB");
+                    output.write(buffer, 0, count);
+                }
+            }
+            Uri contentUri = FileProvider.getUriForFile(this, getPackageName() + ".fileprovider", imageFile);
+            Intent send = new Intent(Intent.ACTION_SEND);
+            send.setType(contentType);
+            send.putExtra(Intent.EXTRA_STREAM, contentUri);
+            send.putExtra(Intent.EXTRA_TEXT, caption == null ? "Фото дефекта" : caption);
+            send.setClipData(ClipData.newUri(getContentResolver(), "Фото дефекта", contentUri));
+            send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            send.setPackage("com.viber.voip");
+            Intent launch = send;
+            if (send.resolveActivity(getPackageManager()) == null) {
+                launch = Intent.createChooser(send.setPackage(null), "Отправить фотографию");
+            }
+            final Intent finalLaunch = launch;
+            runOnUiThread(() -> {
+                try {
+                    startActivity(finalLaunch);
+                } catch (Exception error) {
+                    android.widget.Toast.makeText(this, "Не удалось открыть отправку фото в Viber", android.widget.Toast.LENGTH_LONG).show();
+                }
+            });
+        } catch (Exception error) {
+            android.util.Log.e("WarehouseOrders", "Unable to share photo to Viber", error);
+            runOnUiThread(() -> android.widget.Toast.makeText(this,
+                "Не удалось подготовить фотографию для Viber", android.widget.Toast.LENGTH_LONG).show());
+        } finally {
+            if (connection != null) connection.disconnect();
+        }
+    }
+
     private void createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationChannel channel = new NotificationChannel(
@@ -265,6 +337,12 @@ public class MainActivity extends AppCompatActivity {
         public void requestNativePushToken() {
             MainActivity.this.requestNativePushToken();
         }
+
+        @JavascriptInterface
+        public void sharePhotoToViber(String imageUrl, String caption) {
+            if (imageUrl == null || imageUrl.isEmpty()) return;
+            shareExecutor.execute(() -> downloadAndSharePhoto(imageUrl, caption));
+        }
     }
 
     @Override
@@ -317,6 +395,7 @@ public class MainActivity extends AppCompatActivity {
         if (webView != null) {
             webView.removeJavascriptInterface("AndroidWarehouse");
             webView.destroy();
+            shareExecutor.shutdown();
         }
         super.onDestroy();
     }

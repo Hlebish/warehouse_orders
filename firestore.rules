@@ -141,18 +141,30 @@ service cloud.firestore {
         && (!request.resource.data.keys().hasAny(['forceAll']) || request.resource.data.forceAll is bool)
         && (request.resource.data.forceAll != true || (canManageUsers() && request.resource.data.recipientUserId == request.auth.uid))
         && request.resource.data.target in ['site', 'chat']
-        && request.resource.data.category in ['orders', 'chat', 'replies', 'likes']
+        && request.resource.data.category in ['orders', 'assembly', 'defects', 'status', 'editing', 'comments', 'questions', 'decisions', 'chat', 'replies', 'likes']
         && request.resource.data.recipientUserId is string
         && request.resource.data.recipientUserId.size() <= 128
         && (request.resource.data.recipientUserId == ''
           || get(/databases/$(database)/documents/users/$(request.resource.data.recipientUserId)).data.active == true)
         && (
-          (request.resource.data.category == 'orders'
+          // Order-related events use the category names emitted by app.js and
+          // accepted by the notification Cloud Function.
+          (request.resource.data.category in [
+              'orders', 'assembly', 'defects', 'status', 'editing',
+              'comments', 'questions', 'decisions'
+            ]
             && request.resource.data.target == 'site'
             && request.resource.data.orderId is string
             && request.resource.data.orderId.size() > 0
             && exists(/databases/$(database)/documents/orders/$(request.resource.data.orderId))
             && request.resource.data.recipientUserId == '')
+          ||
+          (request.resource.data.category == 'replies'
+            && request.resource.data.target == 'site'
+            && request.resource.data.orderId is string
+            && request.resource.data.orderId.size() > 0
+            && exists(/databases/$(database)/documents/orders/$(request.resource.data.orderId))
+            && request.resource.data.recipientUserId.size() > 0)
           ||
           (request.resource.data.category == 'chat'
             && request.resource.data.target == 'chat'
@@ -160,9 +172,6 @@ service cloud.firestore {
               || (request.resource.data.forceAll == true
                 && canManageUsers()
                 && request.resource.data.recipientUserId == request.auth.uid)))
-          ||
-          (request.resource.data.category == 'replies'
-            && request.resource.data.recipientUserId.size() > 0)
           ||
           (request.resource.data.category == 'likes'
             && request.resource.data.target == 'chat'

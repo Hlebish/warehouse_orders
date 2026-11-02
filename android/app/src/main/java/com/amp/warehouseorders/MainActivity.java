@@ -112,7 +112,9 @@ public class MainActivity extends AppCompatActivity {
             }
         });
         webView.addJavascriptInterface(new AndroidBridge(), "AndroidWarehouse");
-        webView.loadUrl(notificationUrlFrom(getIntent()));
+        // Restore the page after Android recreates this Activity to avoid a fresh startup.
+        boolean restoredWebView = savedInstanceState != null && webView.restoreState(savedInstanceState) != null;
+        if (!restoredWebView) webView.loadUrl(notificationUrlFrom(getIntent()));
         installBackHandler();
         requestNativePushToken();
     }
@@ -143,6 +145,12 @@ public class MainActivity extends AppCompatActivity {
             }
         } catch (Exception ignored) { }
         return SITE_URL;
+    }
+
+    @Override
+    protected void onSaveInstanceState(Bundle outState) {
+        if (webView != null) webView.saveState(outState);
+        super.onSaveInstanceState(outState);
     }
 
     @Override

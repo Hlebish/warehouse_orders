@@ -2106,7 +2106,7 @@ async function setStatus(status,text,kind='system'){
    }
    try{await writeAudit('Изменён статус заказа',text,o.id,{previousStatus:previous,newStatus:status});}
    catch(auditErr){console.error('Не удалось записать аудит изменения статуса',auditErr);}
-   try{await queuePush(`${o.client||'Клиент не указан'} · ${status}`,text,signedInUser.uid,o.id,'site','status');}
+   try{await queuePush(`${o.client||'Клиент не указан'} · ${status}`,text,signedInUser.uid,o.id,'site',status==='Собран'?'assembly':'status');}
    catch(pushErr){console.error('Не удалось отправить уведомление об изменении статуса',pushErr);}
   })();
  }catch(err){

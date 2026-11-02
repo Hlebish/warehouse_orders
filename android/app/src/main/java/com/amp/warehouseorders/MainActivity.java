@@ -157,10 +157,23 @@ public class MainActivity extends AppCompatActivity {
     protected void onNewIntent(android.content.Intent intent) {
         super.onNewIntent(intent);
         setIntent(intent);
-        String notificationUrl = notificationUrlFrom(intent);
-        if (webView != null) {
-            webView.post(() -> webView.loadUrl(notificationUrl));
-        }
+        // A notification tap must not reload the whole web app. Route it inside
+        // the already-running page so its auth session, cache and open UI survive.
+        String notificationLink = intent == null ? null : intent.getStringExtra("notification_link");
+        if (notificationLink == null || notificationLink.isEmpty() || webView == null) return;
+        String safeUrl = notificationUrlFrom(intent);
+        webView.post(() -> {
+            String currentUrl = webView.getUrl();
+            if (currentUrl == null || currentUrl.equals("about:blank")) {
+                webView.loadUrl(safeUrl);
+                return;
+            }
+            webView.evaluateJavascript(
+                "window.handleNativeNotificationLink && window.handleNativeNotificationLink(" +
+                    JSONObject.quote(safeUrl) + ")",
+                null
+            );
+        });
     }
 
     @Override

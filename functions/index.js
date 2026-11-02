@@ -251,7 +251,6 @@ exports.import1COrder = onRequest(
       }
 
       const orderRef = db.collection('orders').doc('1c_' + encodeURIComponent(sourceId));
-      const existing = await orderRef.get();
       const now = new Date();
       const parsedDate = body.createdAt ? new Date(body.createdAt) : now;
       const createdAt = Number.isNaN(parsedDate.getTime()) ? now : parsedDate;
@@ -270,10 +269,15 @@ exports.import1COrder = onRequest(
         sourceType
       };
 
-      if (!existing.exists) {
-        await orderRef.set(order);
-      } else {
-        await orderRef.update({
+      // Serialize concurrent retries for the same external ID. A read followed
+      // by set/update outside a transaction could let two first imports race.
+      const updated = await db.runTransaction(async transaction => {
+        const existing = await transaction.get(orderRef);
+        if (!existing.exists) {
+          transaction.create(orderRef, order);
+          return false;
+        }
+        transaction.update(orderRef, {
           number,
           client,
           articles,
@@ -282,10 +286,11 @@ exports.import1COrder = onRequest(
           sourceType,
           updatedAt: FieldValue.serverTimestamp()
         });
-      }
+        return true;
+      });
 
-      logger.info('1C order imported', { number, sourceId, updated: existing.exists });
-      return res.status(200).json({ ok: true, id: orderRef.id, number, updated: existing.exists });
+      logger.info('1C order imported', { number, sourceId, updated });
+      return res.status(200).json({ ok: true, id: orderRef.id, number, updated });
     } catch (error) {
       logger.error('1C order import failed', { error: String(error?.message || error) });
       return res.status(500).json({ ok: false, error: 'Import failed' });

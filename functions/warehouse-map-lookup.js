@@ -8,6 +8,7 @@ function normalizeMapArticle(value) {
 
 function lineContainsExactArticle(line, article) {
   const normalizedArticle = normalizeMapArticle(article);
+  if (!normalizedArticle) return false;
   const tokens = String(line || '').toUpperCase().match(/[A-Z0-9]+/g) || [];
   for (let start = 0; start < tokens.length; start++) {
     let combined = '';
@@ -22,6 +23,7 @@ function lineContainsExactArticle(line, article) {
 
 function lookupArticleInMap(cells, unaddressed, article) {
   const normalizedArticle = normalizeMapArticle(article);
+  if (!normalizedArticle) return { article, locations: [], unaddressed: false };
   const locations = [];
   for (const [street, shelves] of Object.entries(cells || {})) {
     if (!/^S[1-5]$/.test(street) || !shelves || typeof shelves !== 'object') continue;
@@ -30,10 +32,10 @@ function lookupArticleInMap(cells, unaddressed, article) {
       for (const [cell, rawValue] of Object.entries(cellRows)) {
         if (!/^([1-9]|10)$/.test(cell) || typeof rawValue !== 'string' || !rawValue.trim()) continue;
         const matched = rawValue.split(/\r?\n/).some(line => {
-          // Mirror the warehouse map's exact-article search: compare compact
-          // alphanumeric text so codes can appear beside descriptions or other items.
-          const compactLine = String(line || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
-          return compactLine.includes(normalizedArticle) || lineContainsExactArticle(line, normalizedArticle);
+          // Compare complete article tokens (including codes split by separators).
+          // A substring check here would also match a longer neighboring code,
+          // such as APHD43070 when looking up APHD4307.
+          return lineContainsExactArticle(line, normalizedArticle);
         });
         if (matched) locations.push({ address: street + '-' + shelf + '-' + cell, street, shelf, cell });
       }

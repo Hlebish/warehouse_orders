@@ -26,6 +26,13 @@ test('returns every exact storage address and no inventory contents', () => {
   assert.equal(Object.hasOwn(result, 'content'), false);
 });
 
+test('lookup rejects longer neighboring codes and empty queries', () => {
+  const cells = { S1: { A: { '1': 'APHD43070 — соседний артикул' } } };
+  assert.deepEqual(lookupArticleInMap(cells, {}, 'APHD4307').locations, []);
+  assert.deepEqual(lookupArticleInMap(cells, {}, '').locations, []);
+  assert.equal(lineContainsExactArticle('APHD4307', ''), false);
+});
+
 test('flags an article in the unaddressed list', () => {
   const result = lookupArticleInMap({}, { item1: { article: 'AP-H D4307' } }, 'AP-H D4307');
   assert.deepEqual(result.locations, []);

@@ -10,6 +10,25 @@ service cloud.firestore {
     function isDirector() { return activeUser() && role() == 'director'; }
     function isWarehouse() { return activeUser() && role() == 'warehouse'; }
     function isManager() { return activeUser() && role() in ['manager', 'chief_accountant', 'accountant']; }
+    function validOrderStatus(status) {
+      return status in [
+        'Создан', 'Камянское', 'Собран', 'Отгружен кладовщиком', 'Под вопросом', 'Дефект',
+        'Ожидает оплаты', 'На согласовании', 'Одобрен на отгрузку клиенту',
+        'Ожидает самовывоза', 'Клиент забрал самовывозом', 'Самовывоз', 'Перенесен', 'Отменён', 'Возврат'
+      ];
+    }
+    function managerOrderStatus(status) {
+      return status in [
+        'Создан', 'Под вопросом', 'Дефект', 'Ожидает оплаты', 'На согласовании',
+        'Одобрен на отгрузку клиенту', 'Ожидает самовывоза', 'Перенесен', 'Отменён'
+      ];
+    }
+    function warehouseOrderStatus(status) {
+      return status in [
+        'Создан', 'Камянское', 'Собран', 'Отгружен кладовщиком', 'Под вопросом', 'Дефект',
+        'Ожидает самовывоза', 'Клиент забрал самовывозом'
+      ];
+    }
     // Бухгалтеры и главный бухгалтер входят в ту же группу полномочий, что и менеджеры.
     function hasManagerPermissions() { return isManager(); }
     function canManageUsers() { return activeUser() && (userDoc().data.admin == true || role() == 'director'); }
@@ -274,12 +293,7 @@ service cloud.firestore {
         && request.resource.data.articles is list
         && request.resource.data.articles.size() <= 100
         && request.resource.data.createdBy == request.auth.uid
-        && request.resource.data.status in [
-          'Создан', 'Собран', 'Отгружен кладовщиком', 'Под вопросом', 'Дефект',
-          'Ожидает оплаты', 'На согласовании', 'Одобрен на отгрузку клиенту',
-          'Ожидает самовывоза', 'Клиент забрал самовывозом', 'Самовывоз',
-          'Перенесен', 'Отменён'
-        ];
+        && validOrderStatus(request.resource.data.status);
 
       // Администратор и директор могут управлять заказом полностью.
       allow update: if ((canManageUsers() || (isWarehouse()
@@ -338,21 +352,37 @@ service cloud.firestore {
           && request.resource.data.updatedBy == request.auth.uid
           && request.resource.data.updatedByName is string
           && (!request.resource.data.keys().hasAny(['deliveryType']) || request.resource.data.deliveryType in ['city', 'pickup', 'post', 'kamyanske'])
+          && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['number']) || request.resource.data.number is string && request.resource.data.number.size() > 0)
+          && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['client']) || request.resource.data.client is string)
+          && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['articles']) || request.resource.data.articles is list && request.resource.data.articles.size() <= 100)
+          && validOrderStatus(request.resource.data.status)
           && (request.resource.data.status == resource.data.status
-            || request.resource.data.status in [
-              'Создан', 'Под вопросом', 'Дефект', 'Ожидает оплаты', 'На согласовании',
-              'Одобрен на отгрузку клиенту', 'Ожидает самовывоза',
-              'Клиент забрал самовывозом', 'Перенесен', 'Отменён'
-            ]))
+            || managerOrderStatus(request.resource.data.status)))
 
         // Кладовщик может менять состав/статус до момента отгрузки.
         || (isWarehouse()
           && resource.data.status != 'Отгружен кладовщиком'
           && resource.data.status != 'Клиент забрал самовывозом'
+          && validOrderStatus(request.resource.data.status)
+          && (request.resource.data.status == resource.data.status
+            || warehouseOrderStatus(request.resource.data.status))
           && request.resource.data.diff(resource.data).affectedKeys()
             .hasOnly(['status', 'articles', 'deliveryType', 'updatedAt', 'updatedBy', 'updatedByName',
               'transferredAt', 'resumedAt', 'assembledAt', 'shippedAt', 'assemblyInProgress',
-              'assemblyStartedAt', 'assemblyStartedBy', 'assemblyStartedByName']))
+              'assemblyStartedAt', 'assemblyStartedBy', 'assemblyStartedByName'])
+          && request.resource.data.updatedAt is string
+          && request.resource.data.updatedBy == request.auth.uid
+          && request.resource.data.updatedByName is string
+          && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['articles']) || request.resource.data.articles is list && request.resource.data.articles.size() <= 100)
+          && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['deliveryType']) || request.resource.data.deliveryType in ['city', 'pickup', 'post', 'kamyanske'])
+          && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['transferredAt']) || request.resource.data.transferredAt is string)
+          && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['resumedAt']) || request.resource.data.resumedAt is string)
+          && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['assembledAt']) || request.resource.data.assembledAt is string)
+          && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['shippedAt']) || request.resource.data.shippedAt is string)
+          && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['assemblyInProgress']) || request.resource.data.assemblyInProgress is bool)
+          && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['assemblyStartedAt']) || request.resource.data.assemblyStartedAt is string)
+          && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['assemblyStartedBy']) || request.resource.data.assemblyStartedBy is string)
+          && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['assemblyStartedByName']) || request.resource.data.assemblyStartedByName is string))
         || (isWarehouse()
           && resource.data.status != 'Отгружен кладовщиком'
           && resource.data.status != 'Клиент забрал самовывозом'

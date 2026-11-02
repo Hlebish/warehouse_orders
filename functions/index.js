@@ -58,7 +58,7 @@ async function markDone(ref, fields) {
 }
 
 async function createNotificationHistory(data, eventId) {
-  const category = ['orders', 'chat', 'replies', 'likes'].includes(data.category)
+  const category = ['orders', 'assembly', 'defects', 'status', 'editing', 'comments', 'questions', 'decisions', 'chat', 'replies', 'likes'].includes(data.category)
     ? data.category
     : (data.target === 'chat' ? 'chat' : 'orders');
   const recipientUserId = String(data.recipientUserId || '');
@@ -302,7 +302,7 @@ exports.sendWarehousePush = onDocumentCreated({ document: 'pushQueue/{eventId}',
   const siteUrl = 'https://hlebish.github.io/warehouse_orders/';
   const orderId = String(data.orderId || '');
   const target = data.target === 'chat' ? 'chat' : 'site';
-  const category = ['orders', 'chat', 'replies', 'likes'].includes(data.category) ? data.category : (target === 'chat' ? 'chat' : 'orders');
+  const category = ['orders', 'assembly', 'defects', 'status', 'editing', 'comments', 'questions', 'decisions', 'chat', 'replies', 'likes'].includes(data.category) ? data.category : (target === 'chat' ? 'chat' : 'orders');
   const recipientUserId = String(data.recipientUserId || '');
   // Start notification history immediately, but do not make push delivery wait for it.
   const historyPromise = createNotificationHistory(data, eventId).catch(error => {

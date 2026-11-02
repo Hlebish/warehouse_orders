@@ -42,6 +42,27 @@ pendingNotificationOrderId=notificationParams.get('order')||'';
 pendingNotificationChat=notificationParams.get('chat')==='1';
 const $=id=>document.getElementById(id), modal=$('modalBackdrop');
 let uiStateRestored=false,lastUiSave=0;
+const isAndroidWarehouse=()=>/WarehouseOrdersAndroid/.test(navigator.userAgent);
+const ordersCacheKey=uid=>'warehouse_orders_snapshot_v1_'+uid;
+function saveOrdersCache(){
+ if(!isAndroidWarehouse()||!signedInUser)return;
+ try{
+  // Keep a bounded snapshot; Firestore remains the source of truth.
+  const orders=state.orders.slice(-2000);
+  localStorage.setItem(ordersCacheKey(signedInUser.uid),JSON.stringify({savedAt:Date.now(),orders}));
+ }catch(err){console.warn('Не удалось сохранить локальный снимок заказов',err);}
+}
+function restoreOrdersCache(uid){
+ if(!isAndroidWarehouse()||!uid)return false;
+ try{
+  const raw=localStorage.getItem(ordersCacheKey(uid));if(!raw)return false;
+  const cached=JSON.parse(raw);
+  if(!cached||!Array.isArray(cached.orders))return false;
+  state.orders=cached.orders.filter(o=>o&&typeof o.id==='string'&&typeof o.status==='string');
+  serverCache=new Map(state.orders.map(o=>[o.id,{...o,articles:Array.isArray(o.articles)?o.articles.map(x=>({...x})):[],entries:Array.isArray(o.entries)?o.entries.map(x=>({...x})):[]}]));
+  return state.orders.length>0;
+ }catch(err){console.warn('Не удалось восстановить локальный снимок заказов',err);return false;}
+}
 function saveUiState(){
   try{
     const chatBox=$('chatMessages');
@@ -49,7 +70,7 @@ function saveUiState(){
     const modalTitle=$('modalTitle')?.textContent||'';
     const isChat=modalOpen&&modalTitle==='Общий чат';
     const orderId=modalOpen&&modalTitle.includes('№')&&modal.dataset.orderDetail?String(modal.dataset.orderDetail):'';
-    sessionStorage.setItem('warehouseUiState',JSON.stringify({
+    (isAndroidWarehouse()?localStorage:sessionStorage).setItem(isAndroidWarehouse()?'warehouseUiStateAndroid':'warehouseUiState',JSON.stringify({
       scrollX:window.scrollX||0,scrollY:window.scrollY||0,
       activeFilter,search:$('searchInput')?.value||'',
       dateFrom:$('dateFromFilter')?.value||'',dateTo:$('dateToFilter')?.value||'',
@@ -62,7 +83,7 @@ function restoreUiState(){
   if(uiStateRestored)return;
   uiStateRestored=true;
   try{
-    const raw=sessionStorage.getItem('warehouseUiState');
+    const raw=(isAndroidWarehouse()?localStorage:sessionStorage).getItem(isAndroidWarehouse()?'warehouseUiStateAndroid':'warehouseUiState');
     if(!raw)return;
     const saved=JSON.parse(raw);
     if(saved.activeFilter)activeFilter=saved.activeFilter;
@@ -656,6 +677,7 @@ function watchOrderEntries(id){
   const item=state.orders.find(o=>o.id===id);if(!item)return;
   const before=JSON.stringify(item.entries||[]);item.entries=entries;
   serverCache.set(id,{...serverCache.get(id),entries:entries.map(x=>({...x}))});
+  saveOrdersCache();
   const entriesChanged=before!==JSON.stringify(entries);
   if(!initialCloudLoad&&!firstEntries&&entriesChanged){const last=entries.at(-1);if(last?.kind!=='system')toast(`${item.client||'Клиент не указан'} · ${last?last.kind==='decision'?'Добавлено решение':last.kind==='defect'?'Добавлен дефект':last.kind==='question'?'Добавлен вопрос':'Новый комментарий':'Заказ обновлён'}`);}
   const wasFirstEntries=firstEntries;firstEntries=false;
@@ -673,6 +695,7 @@ function watchPendingDefectOrders(){
    const entries=es.docs.map(x=>entryFromCloud(x.id,x.data())).sort((a,b)=>(asDate(a.createdAt)?.getTime()||0)-(asDate(b.createdAt)?.getTime()||0)||String(a.id).localeCompare(String(b.id)));
    const before=JSON.stringify(item.entries||[]);item.entries=entries;
    serverCache.set(id,{...serverCache.get(id),entries:entries.map(x=>({...x}))});
+   saveOrdersCache();
    if(before!==JSON.stringify(entries))scheduleRender();
   },err=>console.error('Не удалось проверить дефекты заказа',id,err)));
  }
@@ -682,6 +705,7 @@ function watchOrders(){
  ordersUnsubscribe=onSnapshot(collection(db,'orders'),snap=>{
    // Firestore provides only the documents that changed after the initial snapshot.
    // Keep a local index so each change can be applied without rescanning every order.
+   if(initialCloudLoad){const localIds=new Set(snap.docs.map(d=>d.id));state.orders=state.orders.filter(o=>localIds.has(o.id));}
    const orderIndexById=new Map(state.orders.map((order,index)=>[order.id,index]));
    let openedOrderStatusChanged=false;
    for(const change of snap.docChanges()){
@@ -703,7 +727,7 @@ function watchOrders(){
      if(!initialCloudLoad&&change.type==='added'){const message=`Поступил заказ № ${order.number}`;toast(message);notify(message,d.id)}
      if(pending && data.number===pending.number && data.client===pending.client && data.status===pending.status){pendingOrderData.delete(d.id);}
    }
-   if(!snap.metadata.fromCache)initialCloudLoad=false;watchPendingDefectOrders();render();restoreUiState();
+   if(!snap.metadata.fromCache)initialCloudLoad=false;saveOrdersCache();watchPendingDefectOrders();render();restoreUiState();
    // Keep the open order card in sync when another employee changes its status.
    if(openedOrderStatusChanged&&selectedId&&!modal.hidden&&modal.dataset.orderDetail===selectedId)openOrder(selectedId);
    if(pendingNotificationOrderId){const target=pendingNotificationOrderId;pendingNotificationOrderId='';history.replaceState({},'',location.pathname+location.hash);if(state.orders.some(o=>o.id===target))openOrder(target);}
@@ -719,6 +743,7 @@ onAuthStateChanged(auth,user=>{
  let startedWithCache=false;
  try{const raw=localStorage.getItem(profileCacheKey);if(raw){const parsed=JSON.parse(raw);if(parsed&&parsed.active===true&&roles[parsed.role])cachedProfile=parsed;}}catch{}
  if(cachedProfile){
+  restoreOrdersCache(user.uid);
   state.role=cachedProfile.role;canManageUsers=cachedProfile.admin===true||cachedProfile.role==='director';
   profileName=cachedProfile.displayName||user.email||roles[cachedProfile.role];
   state.notificationSettings={chat:cachedProfile.notificationSettings?.chat!==false,replies:cachedProfile.notificationSettings?.replies!==false,likes:cachedProfile.notificationSettings?.likes!==false,orders:cachedProfile.notificationSettings?.orders!==false};
@@ -726,7 +751,7 @@ onAuthStateChanged(auth,user=>{
   $('userName').textContent=profileName;$('userRole').textContent=canManageUsers?`Администратор · ${roles[cachedProfile.role]}`:roles[cachedProfile.role];
   // Reveal the shell immediately on repeat visits; profile verification continues in parallel.
   hideAuth();
-  watchOrders();watchNotifications();watchChatBadge();watchClients();loadProductsCatalog();render();
+  watchOrders();watchNotifications();watchChatBadge();watchClients();loadProductsCatalog();render();restoreUiState();
   startedWithCache=true;
  }
  profileUnsubscribe=onSnapshot(doc(db,'users',user.uid),snap=>{

@@ -480,22 +480,15 @@ async function save(){
   throw err;
  }
 }
-async function queuePush(title,body,authorId,orderId='',target='site',category='',recipientUserId='',attention={}){
+const pendingPushBatches=new Map();
+const PUSH_BATCH_QUIET_MS=2500;
+const PUSH_BATCH_MAX_MS=10000;
+const IMMEDIATE_PUSH_CATEGORIES=new Set(['defects','questions','decisions','replies']);
+async function submitWarehousePush(payload){
   try{
-    const normalizedCategory=category||(target==='chat'?'chat':'orders');
     // Enqueue through an authenticated callable so all notification requests
     // receive one server-side validation path instead of client Firestore rules.
-    await enqueueWarehousePush({
-      title:String(title||'Заказы · Склад'),
-      body:String(body||'Новое изменение в заказе.'),
-      orderId:String(orderId||''),
-      target:target==='chat'?'chat':'site',
-      category:normalizedCategory,
-      recipientUserId:String(recipientUserId||''),
-      isMention:attention.isMention===true,
-      isReply:attention.isReply===true,
-      forceAll:attention.forceAll===true
-    });
+    await enqueueWarehousePush(payload);
     return true;
   }catch(err){
     console.error('Push event was not queued',err);
@@ -504,6 +497,61 @@ async function queuePush(title,body,authorId,orderId='',target='site',category='
     toast('Не удалось создать уведомление'+(code?' ('+code+')':'')+detail+'.');
     return false;
   }
+}
+function flushPushBatch(key){
+  const batch=pendingPushBatches.get(key);
+  if(!batch)return;
+  clearTimeout(batch.timer);
+  pendingPushBatches.delete(key);
+  // Never send queued work under a different account if the user switched sessions.
+  if(signedInUser?.uid!==batch.authorId)return;
+  const orderIds=[...new Set(batch.events.map(item=>item.orderId).filter(Boolean))];
+  const eventCount=batch.events.length;
+  const summaryBody=batch.target==='chat'
+    ?`За короткое время — ${eventCount} ${plural(eventCount,'новое сообщение','новых сообщения','новых сообщений')}.`
+    :orderIds.length===1
+      ?`За короткое время — ${eventCount} ${plural(eventCount,'изменение','изменения','изменений')} в одном заказе.`
+      :orderIds.length>1
+        ?`За короткое время — ${eventCount} ${plural(eventCount,'событие','события','событий')} в ${orderIds.length} ${plural(orderIds.length,'заказе','заказах','заказах')}.`
+        :`За короткое время — ${eventCount} ${plural(eventCount,'новое событие','новых события','новых событий')}.`;
+  const payload=batch.events.length===1?batch.events[0]:{
+    ...batch.events[0],
+    title:batch.target==='chat'?'Новые сообщения в общем чате':'Обновления по заказам',
+    body:summaryBody,
+    orderId:orderIds.length===1?orderIds[0]:'',
+    isMention:false,
+    isReply:false
+  };
+  void submitWarehousePush(payload);
+}
+function queuePush(title,body,authorId,orderId='',target='site',category='',recipientUserId='',attention={}){
+  const normalizedTarget=target==='chat'?'chat':'site';
+  const normalizedCategory=category||(normalizedTarget==='chat'?'chat':'orders');
+  const payload={
+    title:String(title||'Заказы · Склад'),
+    body:String(body||'Новое изменение в заказе.'),
+    orderId:String(orderId||''),
+    target:normalizedTarget,
+    category:normalizedCategory,
+    recipientUserId:String(recipientUserId||''),
+    isMention:attention.isMention===true,
+    isReply:attention.isReply===true,
+    forceAll:attention.forceAll===true
+  };
+  // Defects, decisions, questions, replies, mentions, and explicit test pushes
+  // stay immediate; routine edits/messages are coalesced into a short burst.
+  if(attention.isMention===true||attention.isReply===true||attention.forceAll===true||IMMEDIATE_PUSH_CATEGORIES.has(normalizedCategory)){
+    return submitWarehousePush(payload);
+  }
+  const key=JSON.stringify([authorId,normalizedTarget,normalizedCategory,payload.recipientUserId]);
+  const now=Date.now();
+  let batch=pendingPushBatches.get(key);
+  if(!batch){batch={authorId,target:normalizedTarget,events:[],startedAt:now,timer:null};pendingPushBatches.set(key,batch);}
+  batch.events.push(payload);
+  clearTimeout(batch.timer);
+  const quietDelay=Math.min(PUSH_BATCH_QUIET_MS,Math.max(0,PUSH_BATCH_MAX_MS-(now-batch.startedAt)));
+  batch.timer=setTimeout(()=>flushPushBatch(key),quietDelay);
+  return Promise.resolve(true);
 }
 async function sendTestPushNotification(){
   if(!signedInUser||!canManageUsers){toast('Тестировать уведомления может только администратор.');return;}

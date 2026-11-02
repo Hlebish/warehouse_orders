@@ -36,7 +36,7 @@ import com.google.firebase.messaging.FirebaseMessaging;
 
 public class MainActivity extends AppCompatActivity {
     private static final String SITE_URL = "https://hlebish.github.io/warehouse_orders/";
-    private static final String CHANNEL_ID = "warehouse_orders_v7_custom_sound";
+    private static final String CHANNEL_ID = "warehouse_orders_v8_custom_sound";
     private static final int NOTIFICATION_PERMISSION_REQUEST = 1001;
     private static final String PREFS = "warehouse_push";
     private static final String PREF_TOKEN = "token";

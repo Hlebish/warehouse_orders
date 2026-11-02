@@ -7936,3 +7936,27 @@ body:has(.buyback-overlay:not([hidden])) .toast-stack .defect-toast {
 #toastStack .toast{max-width:min(460px,calc(100vw - 24px));overflow-wrap:anywhere;white-space:normal;line-height:1.4}
 #toastStack .mention-toast{max-height:120px;overflow:auto}
 #toastStack .defect-toast{max-width:min(460px,calc(100vw - 24px))}
+
+
+/* High-visibility red frame for persistent defect-order notifications on desktop and mobile. */
+#toastStack .toast.defect-toast,
+.toast-stack .toast.defect-toast {
+  border: 3px solid #ff2638 !important;
+  outline: 1px solid rgba(255, 38, 56, .72) !important;
+  outline-offset: 1px !important;
+  box-shadow:
+    0 0 0 2px rgba(255, 38, 56, .28),
+    0 0 16px rgba(255, 20, 40, .58),
+    0 8px 28px rgba(120, 0, 12, .48) !important;
+}
+@media (max-width: 720px) {
+  #toastStack .toast.defect-toast,
+  .toast-stack .toast.defect-toast {
+    border-width: 3px !important;
+    outline-width: 1px !important;
+    box-shadow:
+      0 0 0 2px rgba(255, 38, 56, .32),
+      0 0 18px rgba(255, 20, 40, .62),
+      0 8px 24px rgba(120, 0, 12, .5) !important;
+  }
+}

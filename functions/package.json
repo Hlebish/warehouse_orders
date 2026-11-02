@@ -10,7 +10,7 @@
     "firebase-functions": "^7.4.0"
   },
   "scripts": {
-    "test": "node --test warehouse-map-lookup.test.js",
+    "test": "node --test warehouse-map-lookup.test.js domain-modules.test.mjs",
     "test:warehouse-map-rules": "npx --yes firebase-tools emulators:exec --config ../firebase.warehouse-map-test.json --project demo-warehouse-map-rules \"node --test warehouse-map-rtdb-emulator.test.js\""
   }
 }

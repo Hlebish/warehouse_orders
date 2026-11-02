@@ -13,7 +13,7 @@ const firebaseApp=initializeApp(firebaseConfig),auth=getAuth(firebaseApp),db=get
 const warehouseFunctions=getFunctions(firebaseApp,'europe-west1'),enqueueWarehousePush=httpsCallable(warehouseFunctions,'enqueueWarehousePush');
 let signedInUser=null,profileName='',canManageUsers=false,profileUnsubscribe=null,ordersUnsubscribe=null,chatUnsubscribe=null,chatBadgeUnsubscribe=null,notificationsUnsubscribe=null,serverCache=new Map(),entryUnsubscribes=new Map(),defectEntryUnsubscribes=new Map(),pendingWrites=new Set(),pendingOrderData=new Map(),initialCloudLoad=true;
 let chatLegacyHistoryLoaded=false,chatLegacyHistoryLoading=false,chatLegacyHistoryCursor=null;
-let ordersRetryTimer=null,ordersRetryDelay=3000,ordersConnectionNoticeShown=false;
+let ordersRetryTimer=null,ordersRetryDelay=3000,ordersConnectionNoticeShown=false,ordersListenerBlocked=false;
 const roles={warehouse:'Кладовщик',manager:'Менеджер',chief_accountant:'Главный бухгалтер',accountant:'Бухгалтер',director:'Директор'};
 const isManagerRole=()=>['manager','chief_accountant','accountant'].includes(state.role);
 const isShipmentLocked=o=>['Отгружен кладовщиком','Клиент забрал самовывозом'].includes(o?.status)&&!canManageUsers;
@@ -46,6 +46,7 @@ const fmtDate=d=>{const date=asDate(d);return date?dateFormatter.format(date):'�
 const fmtDateTime=d=>{const date=asDate(d);return date?dateTimeFormatter.format(date):'—'};
 let state={orders:[],notices:[],role:'warehouse',seen:{},extraPhoneNotifications:false,notificationSettings:normalizeNotificationSettings()};
 let activeFilter='all', selectedId=null, pendingDefectId=null, pendingNotificationOrderId='', pendingNotificationChat=false, chatReplyTo=null, chatUnread=false, chatFilterText='', chatFilterMode='all', currentOrdersPage=1;
+const pendingOrderCreateDrafts=new Map();
 const ordersPageSize=50;
 const notificationParams=new URLSearchParams(location.search);
 pendingNotificationOrderId=notificationParams.get('order')||'';
@@ -783,7 +784,7 @@ onMessage(messaging,payload=>{
     notify(message,orderId,target,target==='chat'?'chat':'orders');
   }
 });
-function stopCloud(){flushOrdersCache();if(ordersRetryTimer!==null){clearTimeout(ordersRetryTimer);ordersRetryTimer=null}ordersRetryDelay=3000;ordersConnectionNoticeShown=false;profileUnsubscribe?.();ordersUnsubscribe?.();chatUnsubscribe?.();chatBadgeUnsubscribe?.();notificationsUnsubscribe?.();profileUnsubscribe=ordersUnsubscribe=chatUnsubscribe=chatBadgeUnsubscribe=notificationsUnsubscribe=null;for(const stop of entryUnsubscribes.values())stop();entryUnsubscribes.clear();for(const stop of defectEntryUnsubscribes.values())stop();defectEntryUnsubscribes.clear();serverCache.clear();state.orders=[];state.notices=[];paintMentionCenter()}
+function stopCloud(){flushOrdersCache();if(ordersRetryTimer!==null){clearTimeout(ordersRetryTimer);ordersRetryTimer=null}ordersRetryDelay=3000;ordersConnectionNoticeShown=false;ordersListenerBlocked=false;profileUnsubscribe?.();ordersUnsubscribe?.();chatUnsubscribe?.();chatBadgeUnsubscribe?.();notificationsUnsubscribe?.();profileUnsubscribe=ordersUnsubscribe=chatUnsubscribe=chatBadgeUnsubscribe=notificationsUnsubscribe=null;for(const stop of entryUnsubscribes.values())stop();entryUnsubscribes.clear();for(const stop of defectEntryUnsubscribes.values())stop();defectEntryUnsubscribes.clear();serverCache.clear();state.orders=[];state.notices=[];paintMentionCenter()}
 function watchOrderEntries(id){
  if(!id||entryUnsubscribes.has(id))return;
  let firstEntries=true;
@@ -844,7 +845,7 @@ function watchOrders(){
      if(!initialCloudLoad&&change.type==='added'){const message=`Поступил заказ № ${order.number}`;toast(message);notify(message,d.id)}
      if(pending && data.number===pending.number && data.client===pending.client && data.status===pending.status){pendingOrderData.delete(d.id);}
    }
-   if(!snap.metadata.fromCache)initialCloudLoad=false;saveOrdersCache();watchPendingDefectOrders();render();restoreUiState();
+   if(!snap.metadata.fromCache)initialCloudLoad=false;saveOrdersCache();watchPendingDefectOrders();scheduleRender();restoreUiState();
    // Keep the open order card in sync when another employee changes its status.
    if(openedOrderStatusChanged&&selectedId&&!modal.hidden&&modal.dataset.orderDetail===selectedId)openOrder(selectedId);
    if(pendingNotificationOrderId){const target=pendingNotificationOrderId;pendingNotificationOrderId='';history.replaceState({},'',location.pathname+location.hash);if(state.orders.some(o=>o.id===target))openOrder(target);}
@@ -853,12 +854,12 @@ function watchOrders(){
    ordersUnsubscribe?.();ordersUnsubscribe=null;
    if(!ordersConnectionNoticeShown){toast('Связь с заказами прервалась. Приложение попробует подключиться снова.');ordersConnectionNoticeShown=true}
    const retryable=['unavailable','deadline-exceeded','resource-exhausted','internal','unknown'].some(code=>err?.code===code||String(err?.code||'').endsWith('/'+code));
-   if(!retryable)return;
+   if(!retryable){ordersListenerBlocked=true;return}
    const delay=ordersRetryDelay;ordersRetryDelay=Math.min(ordersRetryDelay*2,60000);
    ordersRetryTimer=setTimeout(()=>{ordersRetryTimer=null;if(signedInUser&&document.visibilityState!=='hidden')watchOrders()},delay);
  });
 }
-function resumeOrdersListener(){if(signedInUser&&!ordersUnsubscribe){if(ordersRetryTimer!==null){clearTimeout(ordersRetryTimer);ordersRetryTimer=null}watchOrders()}}
+function resumeOrdersListener(){if(signedInUser&&!ordersUnsubscribe&&!ordersListenerBlocked){if(ordersRetryTimer!==null){clearTimeout(ordersRetryTimer);ordersRetryTimer=null}watchOrders()}}
 window.addEventListener('online',resumeOrdersListener);
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')resumeOrdersListener()});
 onAuthStateChanged(auth,user=>{
@@ -1901,7 +1902,44 @@ function replyToEntry(entryId){loadCurrentChatPeople();const o=state.orders.find
 function addDefect(){const o=state.orders.find(x=>x.id===selectedId);if(!o)return;if(!canEditOrder(o)){toast('После отгрузки заказ заблокирован для этой роли.');return;}const options=(o.articles||[]).map((x,i)=>`<label class="defect-multi-option"><input type="checkbox" name="defectArticleIndex" value="${i}"><span><b>${esc(x.article)}</b> · ${Number(x.quantity)||1} шт. · позиция ${i+1}</span></label>`).join('');if(!options){toast('В заказе нет позиций для выбора дефекта.');return;}showModal('Добавить дефект',`<form id="entryForm"><input id="entryKind" type="hidden" value="defect"><div class="field"><label>Позиции с дефектом * (можно выбрать несколько)</label><div class="defect-multi-list">${options}</div></div><div class="field"><label for="entryText">Описание дефекта *</label><textarea id="entryText" required placeholder="Опишите, что не так с деталью"></textarea></div><div class="field"><label for="entryPhotos">Фото дефекта (необязательно)</label><div class="upload-box">Прикрепить фотографии<input id="entryPhotos" type="file" accept="image/*" multiple></div><span class="field-hint">Прикреплённые фото будут добавлены к первой отмеченной позиции.</span></div></form>`,[button('Назад','back-detail'),button('Добавить дефект','save-entry','primary-button')],'ДЕФЕКТ ДЕТАЛИ')}
 function editDefect(entryId){const o=state.orders.find(x=>x.id===selectedId),e=o?.entries.find(x=>x.id===entryId);if(!o||!e||e.kind!=='defect'||e.decision||!(state.role==='warehouse'||canManageUsers)||!canEditOrder(o)){toast('Редактировать можно только нерассмотренный дефект в доступном для редактирования заказе.');return;}const options=(o.articles||[]).map((x,i)=>`<option value="${i}"${(Number.isInteger(e.articleIndex)?e.articleIndex===i:x.article===e.article)?' selected':''}>${esc(x.article)} · ${Number(x.quantity)||1} шт. · позиция ${i+1}</option>`).join('');showModal('Редактировать дефект',`<form id="editDefectForm"><div class="field"><label for="editDefectArticleIndex">Позиция заказа *</label><select id="editDefectArticleIndex" required>${options}</select></div><div class="field"><label for="editDefectText">Описание дефекта *</label><textarea id="editDefectText" required>${esc(e.text||'')}</textarea></div><div class="field"><label>Текущие фото</label><div class="photo-grid">${(e.photos||[]).map(p=>`<img src="${p}" alt="Фото дефекта" data-photo="${p}">`).join('')||'<span class="field-hint">Фото не прикреплены.</span>'}</div></div><div class="field"><label for="editDefectPhotos">Добавить фото</label><div class="upload-box">Прикрепить фотографии<input id="editDefectPhotos" type="file" accept="image/*" multiple></div><span class="field-hint">Существующие фото сохранятся; всего не более пяти фото.</span></div></form>`,[button('Назад','back-detail'),button('Сохранить дефект','save-defect-edit','primary-button')],'РЕДАКТИРОВАНИЕ ДЕФЕКТА');modal.dataset.editDefectId=entryId;}
 async function saveDefectEdit(){const o=state.orders.find(x=>x.id===selectedId),id=modal.dataset.editDefectId,e=o?.entries.find(x=>x.id===id);if(!o||!e||e.kind!=='defect'||e.decision||!(state.role==='warehouse'||canManageUsers)||!canEditOrder(o)){toast('Редактирование недоступно для этого заказа.');return;}const articleIndex=Number($('editDefectArticleIndex')?.value),article=o.articles?.[articleIndex]?.article,text=$('editDefectText')?.value.trim()||'';if(!article||!Number.isInteger(articleIndex)||articleIndex<0||!text){toast('Выберите позицию и заполните описание.');return;}try{const blobs=await readPhotos($('editDefectPhotos')?.files||[]);if((e.photos||[]).length+blobs.length>5){toast('Всего можно прикрепить не более пяти фото.');return;}const added=await uploadPhotos(o.id,e.id,blobs);e.article=article;e.articleIndex=articleIndex;e.text=text;e.photos=[...(e.photos||[]),...added];await save();await writeAudit('Изменён дефект',`Артикул: ${article}`,o.id,{entryId:id});closeModal();render();openOrder(o.id);toast('Дефект обновлён.');}catch(err){console.error(err);toast(err.message||'Не удалось сохранить дефект.');}}
-async function saveOrder(){const n=$('orderNumber').value.trim(),client=$('clientName').value.trim(),deliveryType=$('deliveryType')?.value==='pickup'?'pickup':'city';if(!n||!client){toast('Укажите номер заказа и имя клиента.');return}if(state.orders.some(o=>o.number.toLowerCase()===n.toLowerCase())){toast('Карточка с таким номером уже есть.');return}const articles=readArticles();const status=$('startStatus').value,comment=$('initialComment').value.trim();const o={id:crypto.randomUUID(),number:n,client,deliveryType,status,articles,createdAt:isoNow(),author:profileName||roles[state.role],createdBy:signedInUser.uid,entries:[]};if(comment)o.entries.push({id:crypto.randomUUID(),kind:'comment',text:comment,authorId:signedInUser.uid,author:profileName||roles[state.role],createdAt:isoNow(),photos:[]});state.orders.unshift(o);await save();closeModal();render();toast('Карточка заказа создана.');notify(`Создан заказ № ${n}`,o.id)}
+async function saveOrder(){
+ const submit=modal.querySelector('[data-action="create-order"]');
+ if(submit?.disabled)return;
+ const n=$('orderNumber').value.trim(),client=$('clientName').value.trim(),deliveryType=$('deliveryType')?.value==='pickup'?'pickup':'city';
+ if(!signedInUser){toast('Войдите в систему, чтобы создать заказ.');return}
+ if(!n||!client){toast('Укажите номер заказа и имя клиента.');return}
+ if(state.orders.some(o=>String(o.number).trim().toLocaleLowerCase('ru')===n.toLocaleLowerCase('ru'))){toast('Карточка с таким номером уже есть.');return}
+ const articles=readArticles(),status=$('startStatus').value,comment=$('initialComment').value.trim();
+ const fingerprint=JSON.stringify([n,client,deliveryType,status,articles,comment,signedInUser.uid]);
+ if(!pendingOrderCreateDrafts.has(fingerprint)){
+  const o={id:crypto.randomUUID(),number:n,client,deliveryType,status,articles,createdAt:isoNow(),author:profileName||roles[state.role],createdBy:signedInUser.uid,entries:[]};
+  if(comment)o.entries.push({id:crypto.randomUUID(),kind:'comment',text:comment,authorId:signedInUser.uid,author:o.author,createdAt:isoNow(),photos:[]});
+  pendingOrderCreateDrafts.set(fingerprint,o);
+ }
+ const o=pendingOrderCreateDrafts.get(fingerprint);
+ if(submit){submit.disabled=true;submit.dataset.originalText=submit.textContent;submit.textContent='Сохраняю…'}
+ try{
+  const orderRef=doc(db,'orders',o.id),existing=await getDocFromServer(orderRef);
+  if(existing.exists()){
+   const data=existing.data();
+   if(data.createdBy!==signedInUser.uid||String(data.number)!==n||String(data.client||'')!==client)throw new Error('Не удалось подтвердить результат сохранения. Обновите список заказов перед повтором.');
+  }else{
+   const batch=writeBatch(db);batch.set(orderRef,orderToCloud(o,true));
+   for(const entry of o.entries)batch.set(doc(db,'orders',o.id,'entries',entry.id),entryToCloud(entry));
+   await batch.commit();
+  }
+  if(!state.orders.some(item=>item.id===o.id))state.orders.unshift(o);
+  serverCache.set(o.id,{...o,articles:normalizeArticles(o.articles||[]),entries:[...o.entries]});
+  pendingOrderData.delete(o.id);pendingOrderCreateDrafts.delete(fingerprint);saveOrdersCache();
+  closeModal();render();toast('Карточка заказа создана.');
+  void queuePush(o.client||'Клиент не указан','Новый заказ',signedInUser.uid,o.id,'site','orders');
+  if(o.entries.length)void queuePush(o.client||'Клиент не указан','Новый комментарий',signedInUser.uid,o.id,'site','comments');
+  notify(`Создан заказ № ${n}`,o.id);
+ }catch(err){
+  console.error('Не удалось создать заказ',err);
+  toast('Заказ не подтверждён: '+(String(err?.code||err?.message||'проверьте соединение и повторите сохранение').replace(/^.*?\//,'')));
+ }finally{if(submit){submit.disabled=false;submit.textContent=submit.dataset.originalText||'Создать заказ';delete submit.dataset.originalText}}
+}
 function appendClipboardImages(event,inputId,maxFiles=5,maxBytes=8*1024*1024){
   const input=$(inputId);
   const items=Array.from(event.clipboardData?.items||[]).filter(item=>item.kind==='file'&&item.type.startsWith('image/'));

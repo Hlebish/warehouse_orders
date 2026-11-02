@@ -11,6 +11,11 @@ const { getMessaging } = require('firebase-admin/messaging');
 initializeApp();
 const db = getFirestore();
 const messaging = getMessaging();
+const ORDER_NOTIFICATION_CATEGORIES = new Set(['assembly', 'defects', 'status', 'editing', 'comments', 'questions', 'decisions']);
+function notificationCategoryEnabled(settings = {}, category = 'orders') {
+  if (settings[category] !== undefined) return settings[category] !== false;
+  return !(ORDER_NOTIFICATION_CATEGORIES.has(category) && settings.orders === false);
+}
 const oneCImportKey = defineSecret('ONE_C_API_KEY');
 
 setGlobalOptions({
@@ -78,7 +83,7 @@ async function createNotificationHistory(data, eventId) {
     const profile = user.data() || {};
     if (authorId && user.id === authorId && !(data.forceAll === true && recipientUserId === user.id)) continue;
     const settings = profile.notificationSettings || {};
-    if (settings[category] === false && !data.buybackItemId && data.forceAll !== true) continue;
+    if (!notificationCategoryEnabled(settings, category) && !data.buybackItemId && data.forceAll !== true) continue;
 
     const notificationRef = user.ref.collection('notifications').doc(eventId);
     batch.set(notificationRef, {
@@ -119,7 +124,7 @@ async function collectTokens(category='orders', recipientUserId='', authorId='',
   const eligibleUsers = users.filter(user => {
     const profile = user.data() || {};
     if (authorId && user.id === authorId && !(forceAll && recipientUserId === user.id)) return false;
-    return forceAll || (profile.notificationSettings || {})[category] !== false;
+    return forceAll || notificationCategoryEnabled(profile.notificationSettings || {}, category);
   });
 
   // Only read push-token subcollections for users who can receive this event.

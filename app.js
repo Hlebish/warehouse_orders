@@ -13,6 +13,7 @@ const firebaseApp=initializeApp(firebaseConfig),auth=getAuth(firebaseApp),db=get
 const warehouseFunctions=getFunctions(firebaseApp,'europe-west1'),enqueueWarehousePush=httpsCallable(warehouseFunctions,'enqueueWarehousePush');
 let signedInUser=null,profileName='',canManageUsers=false,profileUnsubscribe=null,ordersUnsubscribe=null,chatUnsubscribe=null,chatBadgeUnsubscribe=null,notificationsUnsubscribe=null,serverCache=new Map(),entryUnsubscribes=new Map(),defectEntryUnsubscribes=new Map(),pendingWrites=new Set(),pendingOrderData=new Map(),initialCloudLoad=true;
 let chatLegacyHistoryLoaded=false,chatLegacyHistoryLoading=false,chatLegacyHistoryCursor=null;
+let ordersRetryTimer=null,ordersRetryDelay=3000,ordersConnectionNoticeShown=false;
 const roles={warehouse:'Кладовщик',manager:'Менеджер',chief_accountant:'Главный бухгалтер',accountant:'Бухгалтер',director:'Директор'};
 const isManagerRole=()=>['manager','chief_accountant','accountant'].includes(state.role);
 const isShipmentLocked=o=>['Отгружен кладовщиком','Клиент забрал самовывозом'].includes(o?.status)&&!canManageUsers;
@@ -782,7 +783,7 @@ onMessage(messaging,payload=>{
     notify(message,orderId,target,target==='chat'?'chat':'orders');
   }
 });
-function stopCloud(){flushOrdersCache();profileUnsubscribe?.();ordersUnsubscribe?.();chatUnsubscribe?.();chatBadgeUnsubscribe?.();notificationsUnsubscribe?.();profileUnsubscribe=ordersUnsubscribe=chatUnsubscribe=chatBadgeUnsubscribe=notificationsUnsubscribe=null;for(const stop of entryUnsubscribes.values())stop();entryUnsubscribes.clear();for(const stop of defectEntryUnsubscribes.values())stop();defectEntryUnsubscribes.clear();serverCache.clear();state.orders=[];state.notices=[];paintMentionCenter()}
+function stopCloud(){flushOrdersCache();if(ordersRetryTimer!==null){clearTimeout(ordersRetryTimer);ordersRetryTimer=null}ordersRetryDelay=3000;ordersConnectionNoticeShown=false;profileUnsubscribe?.();ordersUnsubscribe?.();chatUnsubscribe?.();chatBadgeUnsubscribe?.();notificationsUnsubscribe?.();profileUnsubscribe=ordersUnsubscribe=chatUnsubscribe=chatBadgeUnsubscribe=notificationsUnsubscribe=null;for(const stop of entryUnsubscribes.values())stop();entryUnsubscribes.clear();for(const stop of defectEntryUnsubscribes.values())stop();defectEntryUnsubscribes.clear();serverCache.clear();state.orders=[];state.notices=[];paintMentionCenter()}
 function watchOrderEntries(id){
  if(!id||entryUnsubscribes.has(id))return;
  let firstEntries=true;
@@ -815,8 +816,10 @@ function watchPendingDefectOrders(){
  }
 }
 function watchOrders(){
+ if(ordersRetryTimer!==null){clearTimeout(ordersRetryTimer);ordersRetryTimer=null}
  ordersUnsubscribe?.();
  ordersUnsubscribe=onSnapshot(collection(db,'orders'),snap=>{
+   ordersRetryDelay=3000;ordersConnectionNoticeShown=false;
    // Firestore provides only the documents that changed after the initial snapshot.
    // Keep a local index so each change can be applied without rescanning every order.
    if(initialCloudLoad){const localIds=new Set(snap.docs.map(d=>d.id));state.orders=state.orders.filter(o=>localIds.has(o.id));}
@@ -845,8 +848,19 @@ function watchOrders(){
    // Keep the open order card in sync when another employee changes its status.
    if(openedOrderStatusChanged&&selectedId&&!modal.hidden&&modal.dataset.orderDetail===selectedId)openOrder(selectedId);
    if(pendingNotificationOrderId){const target=pendingNotificationOrderId;pendingNotificationOrderId='';history.replaceState({},'',location.pathname+location.hash);if(state.orders.some(o=>o.id===target))openOrder(target);}
- },err=>{console.error(err);toast('Не удалось загрузить общую историю. Проверьте доступ к Firestore.')});
+ },err=>{
+   console.error('Не удалось обновить список заказов',err);
+   ordersUnsubscribe?.();ordersUnsubscribe=null;
+   if(!ordersConnectionNoticeShown){toast('Связь с заказами прервалась. Приложение попробует подключиться снова.');ordersConnectionNoticeShown=true}
+   const retryable=['unavailable','deadline-exceeded','resource-exhausted','internal','unknown'].some(code=>err?.code===code||String(err?.code||'').endsWith('/'+code));
+   if(!retryable)return;
+   const delay=ordersRetryDelay;ordersRetryDelay=Math.min(ordersRetryDelay*2,60000);
+   ordersRetryTimer=setTimeout(()=>{ordersRetryTimer=null;if(signedInUser&&document.visibilityState!=='hidden')watchOrders()},delay);
+ });
 }
+function resumeOrdersListener(){if(signedInUser&&!ordersUnsubscribe){if(ordersRetryTimer!==null){clearTimeout(ordersRetryTimer);ordersRetryTimer=null}watchOrders()}}
+window.addEventListener('online',resumeOrdersListener);
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')resumeOrdersListener()});
 onAuthStateChanged(auth,user=>{
  stopCloud();signedInUser=user;initialCloudLoad=true;
  if(!user){showAuth();return}

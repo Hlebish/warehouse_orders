@@ -11,6 +11,11 @@ const { getMessaging } = require('firebase-admin/messaging');
 initializeApp();
 const db = getFirestore();
 const messaging = getMessaging();
+const ORDER_NOTIFICATION_CATEGORIES = new Set(['assembly', 'defects', 'status', 'editing', 'comments', 'questions', 'decisions']);
+function notificationCategoryEnabled(settings = {}, category = 'orders') {
+  if (settings[category] !== undefined) return settings[category] !== false;
+  return !(ORDER_NOTIFICATION_CATEGORIES.has(category) && settings.orders === false);
+}
 const oneCImportKey = defineSecret('ONE_C_API_KEY');
 
 setGlobalOptions({
@@ -58,7 +63,7 @@ async function markDone(ref, fields) {
 }
 
 async function createNotificationHistory(data, eventId) {
-  const category = ['orders', 'chat', 'replies', 'likes'].includes(data.category)
+  const category = ['orders', 'assembly', 'defects', 'status', 'editing', 'comments', 'questions', 'decisions', 'chat', 'replies', 'likes'].includes(data.category)
     ? data.category
     : (data.target === 'chat' ? 'chat' : 'orders');
   const recipientUserId = String(data.recipientUserId || '');
@@ -78,7 +83,7 @@ async function createNotificationHistory(data, eventId) {
     const profile = user.data() || {};
     if (authorId && user.id === authorId && !(data.forceAll === true && recipientUserId === user.id)) continue;
     const settings = profile.notificationSettings || {};
-    if (settings[category] === false && !data.buybackItemId && data.forceAll !== true) continue;
+    if (!notificationCategoryEnabled(settings, category) && !data.buybackItemId && data.forceAll !== true) continue;
 
     const notificationRef = user.ref.collection('notifications').doc(eventId);
     batch.set(notificationRef, {
@@ -119,7 +124,7 @@ async function collectTokens(category='orders', recipientUserId='', authorId='',
   const eligibleUsers = users.filter(user => {
     const profile = user.data() || {};
     if (authorId && user.id === authorId && !(forceAll && recipientUserId === user.id)) return false;
-    return forceAll || (profile.notificationSettings || {})[category] !== false;
+    return forceAll || notificationCategoryEnabled(profile.notificationSettings || {}, category);
   });
 
   // Only read push-token subcollections for users who can receive this event.
@@ -302,7 +307,7 @@ exports.sendWarehousePush = onDocumentCreated({ document: 'pushQueue/{eventId}',
   const siteUrl = 'https://hlebish.github.io/warehouse_orders/';
   const orderId = String(data.orderId || '');
   const target = data.target === 'chat' ? 'chat' : 'site';
-  const category = ['orders', 'chat', 'replies', 'likes'].includes(data.category) ? data.category : (target === 'chat' ? 'chat' : 'orders');
+  const category = ['orders', 'assembly', 'defects', 'status', 'editing', 'comments', 'questions', 'decisions', 'chat', 'replies', 'likes'].includes(data.category) ? data.category : (target === 'chat' ? 'chat' : 'orders');
   const recipientUserId = String(data.recipientUserId || '');
   // Start notification history immediately, but do not make push delivery wait for it.
   const historyPromise = createNotificationHistory(data, eventId).catch(error => {

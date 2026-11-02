@@ -3,8 +3,10 @@ import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signInWithCred
 import { getFirestore, collection, doc, onSnapshot, setDoc, deleteDoc, getDocs, getDocsFromServer, getDoc, getDocFromServer, updateDoc, writeBatch, runTransaction, serverTimestamp, query, where, orderBy, limit, startAfter, arrayUnion, arrayRemove } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
 import { getStorage, ref as storageRef, uploadBytes, uploadBytesResumable, getDownloadURL, deleteObject } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-storage.js';
 import { getMessaging, getToken, deleteToken, onMessage } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-messaging.js';
+import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-functions.js';
 import { firebaseConfig, vapidKey } from './firebase-config.js';
 const firebaseApp=initializeApp(firebaseConfig),auth=getAuth(firebaseApp),db=getFirestore(firebaseApp),messaging=getMessaging(firebaseApp),storage=getStorage(firebaseApp),staffAuth=getAuth(initializeApp(firebaseConfig,'amp-staff-provisioner'));
+const warehouseFunctions=getFunctions(firebaseApp,'europe-west1'),enqueueWarehousePush=httpsCallable(warehouseFunctions,'enqueueWarehousePush');
 let signedInUser=null,profileName='',canManageUsers=false,profileUnsubscribe=null,ordersUnsubscribe=null,chatUnsubscribe=null,chatBadgeUnsubscribe=null,notificationsUnsubscribe=null,serverCache=new Map(),entryUnsubscribes=new Map(),defectEntryUnsubscribes=new Map(),pendingWrites=new Set(),pendingOrderData=new Map(),initialCloudLoad=true;
 let chatLegacyHistoryLoaded=false,chatLegacyHistoryLoading=false;
 const roles={warehouse:'Кладовщик',manager:'Менеджер',chief_accountant:'Главный бухгалтер',accountant:'Бухгалтер',director:'Директор'};
@@ -488,25 +490,25 @@ async function save(){
 async function queuePush(title,body,authorId,orderId='',target='site',category='',recipientUserId='',attention={}){
   try{
     const normalizedCategory=category||(target==='chat'?'chat':'orders');
-    await setDoc(doc(db,'pushQueue',crypto.randomUUID()),{
+    // Enqueue through an authenticated callable so all notification requests
+    // receive one server-side validation path instead of client Firestore rules.
+    await enqueueWarehousePush({
       title:String(title||'Заказы · Склад'),
       body:String(body||'Новое изменение в заказе.'),
-      authorId,
       orderId:String(orderId||''),
       target:target==='chat'?'chat':'site',
       category:normalizedCategory,
+      recipientUserId:String(recipientUserId||''),
       isMention:attention.isMention===true,
       isReply:attention.isReply===true,
-      forceAll:attention.forceAll===true,
-      recipientUserId:String(recipientUserId||''),
-      createdAt:isoNow(),
-      sentAt:null
+      forceAll:attention.forceAll===true
     });
     return true;
   }catch(err){
     console.error('Push event was not queued',err);
     const code=String(err?.code||'').replace(/^.*?\//,'');
-    toast('Не удалось создать уведомление'+(code?' ('+code+')':'')+'. Проверьте подключение и правила Firebase.');
+    const detail=err?.message&&code!=='permission-denied'?' '+err.message:'';
+    toast('Не удалось создать уведомление'+(code?' ('+code+')':'')+detail+'.');
     return false;
   }
 }

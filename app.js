@@ -132,8 +132,7 @@ function watchNotifications(){
     if(!initialSnapshot){
       const freshNotices=next.filter(n=>!knownNoticeIds.has(n.id)&&!n.read&&isFreshLiveNotice(n));
       const attentionNotices=freshNotices.filter(shouldShowAttentionToast);
-      if(attentionNotices.length===1)showAttentionToast(attentionNotices[0]);
-      else if(attentionNotices.length>1)showAttentionToastBatch(attentionNotices);
+      if(attentionNotices.length===1)showAttentionToast(attentionNotices[0]);\n      else if(attentionNotices.length>1)showAttentionToastBatch(attentionNotices);
       if(window.warehouseDesktop?.isDesktopApp){
         freshNotices.forEach(n=>{
           const target=n.target==='chat'?'chat':'site';
@@ -991,13 +990,10 @@ function articlesContentEqual(a=[],b=[]){return JSON.stringify((a||[]).map(x=>({
 function parseOrderClipboardText(raw){
   const text=String(raw||'').replace(/\u00a0/g,' ').replace(/\r/g,'');
   const result={number:'',client:'',articles:[]};
-  const numberMatch=text.match(/Замовлення\s+покупця\s*№\s*([^|
-\r]+)/i)||text.match(/Заказ\s*(?:покупателя)?\s*№\s*([^|
-\r]+)/i);
+  const numberMatch=text.match(/Замовлення\s+покупця\s*№\s*([^|\n\r]+)/i)||text.match(/Заказ\s*(?:покупателя)?\s*№\s*([^|\n\r]+)/i);
   if(numberMatch)result.number=numberMatch[1].replace(/[*]/g,'').trim().split(/\s+/)[0];
 
-  const lines=text.split('
-');
+  const lines=text.split('\n');
   for(const line of lines){
     if(!/Покупець|Покупатель/i.test(line))continue;
     const cells=line.split('|').map(x=>x.replace(/[*]/g,'').trim()).filter(Boolean);
@@ -1010,8 +1006,7 @@ function parseOrderClipboardText(raw){
     if(nextCell){result.client=nextCell.replace(/^\*+|\*+$/g,'').trim();break;}
   }
   if(!result.client){
-    const clientMatch=text.match(/(?:Покупець|Покупатель)\s*:\s*\*{0,2}([^|
-\r*]+?)\*{0,2}(?=\s*(?:\||$))/i);
+    const clientMatch=text.match(/(?:Покупець|Покупатель)\s*:\s*\*{0,2}([^|\n\r*]+?)\*{0,2}(?=\s*(?:\||$))/i);
     if(clientMatch)result.client=clientMatch[1].trim();
   }
 
@@ -2185,8 +2180,7 @@ async function toggleChatLike(messageId){
 function findChatMessage(id){return [...chatMessages,...olderChatMessages].find(m=>m.id===id);}
 async function copyChatMessage(id){
   const m=findChatMessage(id);if(!m)return;
-  const value=[m.authorName||'Сотрудник',m.text||'',...(Array.isArray(m.photos)?m.photos:[])].filter(Boolean).join('
-');
+  const value=[m.authorName||'Сотрудник',m.text||'',...(Array.isArray(m.photos)?m.photos:[])].filter(Boolean).join('\n');
   try{await navigator.clipboard.writeText(value);toast('Сообщение скопировано.');}
   catch{const ta=document.createElement('textarea');ta.value=value;document.body.appendChild(ta);ta.select();const ok=document.execCommand('copy');ta.remove();toast(ok?'Сообщение скопировано.':'Не удалось скопировать сообщение.');}
 }
@@ -2196,23 +2190,20 @@ async function shareChatMessage(id){
   const urls=Array.isArray(m.photos)?m.photos:[];
   try{if(navigator.share){await navigator.share({title:'Сообщение из Warehouse Orders',text,...(urls.length===1?{url:urls[0]}:{})});return;}}
   catch(err){if(err?.name==='AbortError')return;console.warn('Системная отправка недоступна',err);}
-  const value=[text,...urls].join('
-');
+  const value=[text,...urls].join('\n');
   try{await navigator.clipboard.writeText(value);toast(urls.length?'Текст и ссылки на фото скопированы.':'Текст сообщения скопирован.');}
   catch{toast('Поделиться не удалось. Используй «Копировать» в меню сообщения.');}
 }
 async function sharePhotoViaViber(url,context='Фото из заказа'){
   if(!url)return;
-  const message=context+'
-'+url;
+  const message=context+'\n'+url;
   try{await navigator.clipboard.writeText(message);toast('Ссылка на фото скопирована. Если Viber не открылся, вставь её в нужный чат.');}catch{}
   window.location.href='viber://forward?text='+encodeURIComponent(message);
 }
 async function shareChatMessageViaViber(id){
   const m=findChatMessage(id);if(!m)return;
   const urls=Array.isArray(m.photos)?m.photos:[];
-  const message=[m.authorName||'Сотрудник',m.text||'📷 Фото',...urls].filter(Boolean).join('
-');
+  const message=[m.authorName||'Сотрудник',m.text||'📷 Фото',...urls].filter(Boolean).join('\n');
   const shareUrl='viber://forward?text='+encodeURIComponent(message.slice(0,200));
   // Launch the Viber protocol from the direct click gesture. If Windows has no handler,
   // the message is still copied so it can be pasted into Viber Desktop manually.
@@ -2865,8 +2856,7 @@ async function showAuditLog(){
         const raw=String(a.action||'Действие'),lower=raw.toLocaleLowerCase('ru');
         const tone=lower.includes('удал')||lower.includes('отмен')||lower.includes('дефект')?'red':lower.includes('статус')||lower.includes('одобр')?'blue':lower.includes('добав')||lower.includes('созда')?'green':lower.includes('отгруз')||lower.includes('провер')?'violet':'neutral';
         const linkedOrder=state.orders.find(o=>o.id===a.orderId);
-        const fromDetails=String(a.details||'').match(/заказ(?:а)?\s*№\s*([^·,;
-]+)/i);
+        const fromDetails=String(a.details||'').match(/заказ(?:а)?\s*№\s*([^·,;\n]+)/i);
         const visibleOrderNumber=a.orderNumber||linkedOrder?.number||deletedNumberById.get(String(a.orderId||''))||fromDetails?.[1]?.trim()||'';
         return '<article class="history-entry history-'+tone+'"><div class="history-entry-bar"></div><div class="timeline-top"><span><b>'+esc(a.actorName||'Сотрудник')+'</b> · '+fmtDateTime(a.createdAt)+'</span><span class="timeline-type">'+esc(roles[a.actorRole]||a.actorRole||'Действие')+'</span></div>'+(a.orderId?'<div class="timeline-article">Заказ №: '+esc(visibleOrderNumber||a.orderId)+'</div>':'')+'<div class="timeline-text"><b>'+esc(raw)+'</b>'+(a.details?'<br>'+esc(a.details):'')+'</div></article>';
       }).join(''):'<div class="danger-note">По выбранным фильтрам записей нет.</div>';

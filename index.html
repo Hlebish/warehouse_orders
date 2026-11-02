@@ -15,14 +15,17 @@
   (() => {
     try {
       const isAndroidApp = /WarehouseOrdersAndroid/.test(navigator.userAgent);
-      if (isAndroidApp && localStorage.getItem('warehouse_android_initialized') === '1') {
-        document.documentElement.classList.add('app-booted');
+      if (isAndroidApp) {
+        // Android restores cached content immediately; never cover it with the
+        // desktop-style blocking startup overlay. Firebase sync continues in background.
+        document.documentElement.classList.add('app-booted', 'android-warehouse');
       }
     } catch {}
   })();
   </script>
   <style>
     [hidden]{display:none!important}
+    html.android-warehouse #siteLoader{display:none!important}
     /* Keep the startup loader opaque until the first page initialization completes. */
     html:not(.app-booted) #siteLoader{visibility:visible!important;transition:opacity .36s ease,visibility .36s ease!important}
     html:not(.app-booted),html:not(.app-booted) body{background:#0a111d!important}

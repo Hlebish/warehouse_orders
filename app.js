@@ -48,7 +48,11 @@ function saveOrdersCache(){
  if(!isAndroidWarehouse()||!signedInUser)return;
  try{
   // Keep a bounded snapshot; Firestore remains the source of truth.
-  const orders=state.orders.slice(-2000);
+  const orders=state.orders.slice(-2000).map(o=>({
+   ...o,
+   articles:Array.isArray(o.articles)?o.articles:[],
+   entries:Array.isArray(o.entries)?o.entries.map(e=>({...e,photos:[]})):[]
+  }));
   localStorage.setItem(ordersCacheKey(signedInUser.uid),JSON.stringify({savedAt:Date.now(),orders}));
  }catch(err){console.warn('Не удалось сохранить локальный снимок заказов',err);}
 }

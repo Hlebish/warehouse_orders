@@ -132,7 +132,8 @@ function watchNotifications(){
     if(!initialSnapshot){
       const freshNotices=next.filter(n=>!knownNoticeIds.has(n.id)&&!n.read&&isFreshLiveNotice(n));
       const attentionNotices=freshNotices.filter(shouldShowAttentionToast);
-      if(attentionNotices.length===1)showAttentionToast(attentionNotices[0]);\n      else if(attentionNotices.length>1)showAttentionToastBatch(attentionNotices);
+      if(attentionNotices.length===1)showAttentionToast(attentionNotices[0]);
+      else if(attentionNotices.length>1)showAttentionToastBatch(attentionNotices);
       if(window.warehouseDesktop?.isDesktopApp){
         freshNotices.forEach(n=>{
           const target=n.target==='chat'?'chat':'site';

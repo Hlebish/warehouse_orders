@@ -2406,6 +2406,17 @@ async function shareChatMessage(id){
 }
 async function sharePhotoViaViber(url,context='Фото из заказа'){
   if(!url)return;
+  if(window.warehouseDesktop?.sharePhotoToViber){
+    try{
+      const result=await window.warehouseDesktop.sharePhotoToViber(url,context);
+      if(result?.copied){toast(result.viberOpened?'Фото скопировано. Viber открыт — выбери чат и нажми Ctrl+V.':'Фото скопировано. Открой Viber, выбери чат и нажми Ctrl+V.');return;}
+      throw new Error('Windows-приложение не подтвердило копирование фото.');
+    }catch(err){
+      console.error('Windows не смогло подготовить фото для Viber',err);
+      toast('Не удалось скопировать фото для Viber: '+(err?.message||'проверь интернет и попробуй ещё раз'));
+      return;
+    }
+  }
   // Android app: pass the Firebase Storage URL to the native bridge. The app
   // downloads the image and shares a real image/* content URI with Viber.
   if(window.AndroidWarehouse?.sharePhotoToViber){

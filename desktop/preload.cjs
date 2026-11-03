@@ -11,5 +11,11 @@ contextBridge.exposeInMainWorld('warehouseDesktop', {
       link: String(data.link || ''),
       notificationTag: String(data.notificationTag || '')
     });
+  },
+  sharePhotoToViber(url, context) {
+    return ipcRenderer.invoke('warehouse:share-photo-to-viber', {
+      url: String(url || ''),
+      context: String(context || '')
+    });
   }
 });

@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Tray, Menu, nativeImage, shell, session, Notification, ipcMain } = require('electron');
+const { app, BrowserWindow, Tray, Menu, nativeImage, shell, session, Notification, ipcMain, clipboard } = require('electron');
 const path = require('node:path');
 const { autoUpdater } = require('electron-updater');
 
@@ -53,6 +53,49 @@ ipcMain.on('warehouse:show-notification', (event, payload = {}) => {
     if (safeLink !== APP_URL) mainWindow.loadURL(safeLink);
   });
   notification.show();
+});
+
+ipcMain.handle('warehouse:share-photo-to-viber', async (event, payload = {}) => {
+  if (!mainWindow || event.sender !== mainWindow.webContents || event.senderFrame !== event.sender.mainFrame) {
+    throw new Error('Запрос на передачу фото отклонён.');
+  }
+
+  let photoUrl;
+  try {
+    photoUrl = new URL(String(payload.url || ''));
+  } catch {
+    throw new Error('Некорректная ссылка на фото.');
+  }
+  const allowedHosts = new Set(['firebasestorage.googleapis.com', 'storage.googleapis.com']);
+  if (photoUrl.protocol !== 'https:' || !allowedHosts.has(photoUrl.hostname)) {
+    throw new Error('Поддерживаются только фото из хранилища заказов.');
+  }
+
+  const response = await fetch(photoUrl, { signal: AbortSignal.timeout(30000) });
+  if (!response.ok) throw new Error(`Не удалось загрузить фото (HTTP ${response.status}).`);
+  const finalUrl = new URL(response.url);
+  if (finalUrl.protocol !== 'https:' || !allowedHosts.has(finalUrl.hostname)) {
+    throw new Error('Хранилище вернуло недопустимую ссылку на фото.');
+  }
+  const contentType = String(response.headers.get('content-type') || '').split(';')[0].trim().toLowerCase();
+  if (!contentType.startsWith('image/')) throw new Error('Ссылка не вернула изображение.');
+  const maxPhotoBytes = 25 * 1024 * 1024;
+  const contentLength = Number(response.headers.get('content-length'));
+  if (Number.isFinite(contentLength) && contentLength > maxPhotoBytes) throw new Error('Фото больше 25 МБ.');
+  const photo = Buffer.from(await response.arrayBuffer());
+  if (!photo.length || photo.length > maxPhotoBytes) throw new Error('Фото пустое или больше 25 МБ.');
+  const image = nativeImage.createFromBuffer(photo);
+  if (image.isEmpty()) throw new Error('Не удалось прочитать файл изображения.');
+
+  clipboard.writeImage(image);
+  let viberOpened = false;
+  try {
+    await shell.openExternal('viber://');
+    viberOpened = true;
+  } catch (error) {
+    console.warn('[Warehouse Orders] Could not open Viber:', String(error?.message || error));
+  }
+  return { copied: true, viberOpened, context: String(payload.context || '').slice(0, 200) };
 });
 
 

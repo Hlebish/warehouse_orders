@@ -2465,12 +2465,15 @@ async function sharePhotoViaViber(url,context='Фото из заказа'){
 }
 async function copyPhotoToClipboard(url,context='Фото из заказа'){
   if(!url)return;
+  let desktopError=null;
   try{
     if(window.warehouseDesktop?.sharePhotoToViber){
       const result=await window.warehouseDesktop.sharePhotoToViber(url,context,false);
       if(result?.copied){toast('Фото скопировано в буфер. Открой Viber, выбери чат и нажми Ctrl+V.');return;}
       throw new Error('Приложение не подтвердило копирование фото.');
     }
+  }catch(err){desktopError=err;console.warn('Не удалось скопировать фото через Windows',err);}
+  try{
     const response=await fetch(url);
     if(!response.ok)throw new Error('Не удалось загрузить фото.');
     const blob=await response.blob();
@@ -2480,7 +2483,8 @@ async function copyPhotoToClipboard(url,context='Фото из заказа'){
     toast('Фото скопировано в буфер обмена. Открой Viber, выбери чат и нажми Ctrl+V.');
   }catch(err){
     console.error('Не удалось скопировать фото',err);
-    toast('Не удалось скопировать фото. Используй кнопку «Отправить в Viber».');
+    const reason=err?.message||desktopError?.message||'Неизвестная ошибка';
+    toast(`Не удалось скопировать фото: ${reason}`);
   }
 }
 async function shareChatMessageViaViber(id){

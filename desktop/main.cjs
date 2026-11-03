@@ -60,30 +60,40 @@ ipcMain.handle('warehouse:share-photo-to-viber', async (event, payload = {}) => 
     throw new Error('Запрос на передачу фото отклонён.');
   }
 
-  let photoUrl;
-  try {
-    photoUrl = new URL(String(payload.url || ''));
-  } catch {
-    throw new Error('Некорректная ссылка на фото.');
-  }
-  const allowedHosts = new Set(['firebasestorage.googleapis.com', 'storage.googleapis.com']);
-  if (photoUrl.protocol !== 'https:' || !allowedHosts.has(photoUrl.hostname)) {
-    throw new Error('Поддерживаются только фото из хранилища заказов.');
+  const rawPhotoUrl = String(payload.url || '');
+  let photo;
+  const dataImage = rawPhotoUrl.match(/^data:(image\/(?:jpeg|png|webp));base64,([a-z\d+/]+=*)$/i);
+  if (dataImage) {
+    photo = Buffer.from(dataImage[2], 'base64');
+    if (!photo.length || photo.length > 25 * 1024 * 1024) throw new Error('Фото пустое или больше 25 МБ.');
   }
 
-  const response = await fetch(photoUrl, { signal: AbortSignal.timeout(30000) });
-  if (!response.ok) throw new Error(`Не удалось загрузить фото (HTTP ${response.status}).`);
-  const finalUrl = new URL(response.url);
-  if (finalUrl.protocol !== 'https:' || !allowedHosts.has(finalUrl.hostname)) {
-    throw new Error('Хранилище вернуло недопустимую ссылку на фото.');
+  let photoUrl;
+  if (!photo) {
+    try {
+      photoUrl = new URL(rawPhotoUrl);
+    } catch {
+      throw new Error('Некорректная ссылка на фото.');
+    }
+    const allowedHosts = new Set(['firebasestorage.googleapis.com', 'storage.googleapis.com']);
+    if (photoUrl.protocol !== 'https:' || !allowedHosts.has(photoUrl.hostname)) {
+      throw new Error('Поддерживаются только фото из хранилища заказов.');
+    }
+
+    const response = await fetch(photoUrl, { signal: AbortSignal.timeout(30000) });
+    if (!response.ok) throw new Error(`Не удалось загрузить фото (HTTP ${response.status}).`);
+    const finalUrl = new URL(response.url);
+    if (finalUrl.protocol !== 'https:' || !allowedHosts.has(finalUrl.hostname)) {
+      throw new Error('Хранилище вернуло недопустимую ссылку на фото.');
+    }
+    const contentType = String(response.headers.get('content-type') || '').split(';')[0].trim().toLowerCase();
+    if (!contentType.startsWith('image/')) throw new Error('Ссылка не вернула изображение.');
+    const maxPhotoBytes = 25 * 1024 * 1024;
+    const contentLength = Number(response.headers.get('content-length'));
+    if (Number.isFinite(contentLength) && contentLength > maxPhotoBytes) throw new Error('Фото больше 25 МБ.');
+    photo = Buffer.from(await response.arrayBuffer());
+    if (!photo.length || photo.length > maxPhotoBytes) throw new Error('Фото пустое или больше 25 МБ.');
   }
-  const contentType = String(response.headers.get('content-type') || '').split(';')[0].trim().toLowerCase();
-  if (!contentType.startsWith('image/')) throw new Error('Ссылка не вернула изображение.');
-  const maxPhotoBytes = 25 * 1024 * 1024;
-  const contentLength = Number(response.headers.get('content-length'));
-  if (Number.isFinite(contentLength) && contentLength > maxPhotoBytes) throw new Error('Фото больше 25 МБ.');
-  const photo = Buffer.from(await response.arrayBuffer());
-  if (!photo.length || photo.length > maxPhotoBytes) throw new Error('Фото пустое или больше 25 МБ.');
   const image = nativeImage.createFromBuffer(photo);
   if (image.isEmpty()) throw new Error('Не удалось прочитать файл изображения.');
 

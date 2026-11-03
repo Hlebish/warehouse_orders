@@ -741,7 +741,16 @@ overlay.addEventListener('click',async e=>{
     showToast(qty===Number(item.quantity)?'Статус перекупного товара обновлён.':'Часть товара перенесена в категорию «'+(nextStatus==='returned'?'Возвращён':nextStatus==='sold'?'Продан':nextStatus==='shipped'?'Отгружен':'Отменён')+'».');
   }else{
     const patch={status:nextStatus,updatedAt:serverTimestamp()};
-    if(nextStatus==='active'){patch.soldAt=null;patch.cancelledAt=null;patch.returnedAt=null;patch.shippedAt=null}
+    if(nextStatus==='active'){
+      // Do not leave a prior shipment's order link on reopened inventory.
+      // The reconciliation trigger uses soldByOrderId to avoid double counting.
+      Object.assign(patch,{
+        soldAt:null,cancelledAt:null,returnedAt:null,shippedAt:null,shippedLate:false,overdueDaysAtShipment:0,
+        soldByOrderId:'',soldByOrderNumber:'',soldToClient:'',
+        returnedFromOrderId:'',returnedFromOrderNumber:'',returnedFromReturnId:'',returnedFromClient:'',returnedFromBuybackId:'',
+        orderId:'',orderNumber:'',clientName:'',reservedAt:''
+      });
+    }
     await runTransaction(db,async transaction=>{const currentSnap=await transaction.get(doc(db,'buybackItems',item.id));if(!currentSnap.exists())throw new Error('Товар уже удалён. Обновите список.');const current=currentSnap.data();if(Number(current.quantity)!==Number(item.quantity)||String(current.status||'active')!==String(item.status||'active'))throw new Error('Эту запись уже изменили. Обновите список и повторите действие.');transaction.update(doc(db,'buybackItems',item.id),patch)});showToast('Статус перекупного товара обновлён.');
   }
   }catch(err){console.error(err);showToast('Не удалось изменить статус.')}

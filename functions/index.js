@@ -649,9 +649,12 @@ exports.sendWarehousePush = onDocumentCreated({ document: 'pushQueue/{eventId}',
 
 
 function normalizeBuybackArticle(value) {
-  const text = String(value || '').trim().toUpperCase();
-  const code = text.match(/^(AP[A-Z]{2}\d+)/);
-  return code ? code[1] : text.replace(/[^A-Z0-9]/g, '');
+  // Normalize harmless separators but keep the whole code: truncating APxx
+  // codes at their first digits can merge distinct product variants.
+  const lookalikes = { А: 'A', В: 'B', Е: 'E', К: 'K', М: 'M', Н: 'H', О: 'O', Р: 'P', С: 'C', Т: 'T', У: 'Y', Х: 'X', І: 'I', Ј: 'J', Ѕ: 'S' };
+  return String(value || '').normalize('NFKC').trim().toUpperCase()
+    .replace(/[АВЕКМНОРСТУХІЈЅ]/g, character => lookalikes[character] || character)
+    .replace(/[^A-Z0-9]/g, '');
 }
 
 function buybackArticleQuantities(articles) {
@@ -670,14 +673,26 @@ function buybackEventDocId(prefix, eventId) {
 
 async function syncBuybackOrderReferences(order) {
   const quantities = buybackArticleQuantities(order.articles);
-  if (!quantities.size) return;
   const snap = await db.collection('buybackItems').where('status', 'in', ['active', 'expired']).get();
   const today = new Date().toISOString().slice(0, 10);
   let batch = db.batch();
   let writes = 0;
   for (const item of snap.docs) {
-    if (!quantities.has(normalizeBuybackArticle(item.get('article')))) continue;
     const data = item.data();
+    const matchesOrder = quantities.has(normalizeBuybackArticle(data.article));
+    if (!matchesOrder) {
+      // Release inventory when the linked order no longer contains its SKU.
+      if (data.orderId === order.id) {
+        batch.update(item.ref, {
+          orderId: FieldValue.delete(), orderNumber: FieldValue.delete(),
+          clientName: FieldValue.delete(), reservedAt: FieldValue.delete(),
+          updatedAt: FieldValue.serverTimestamp()
+        });
+        writes++;
+        if (writes === 450) { await batch.commit(); batch = db.batch(); writes = 0; }
+      }
+      continue;
+    }
     if (data.orderId && data.orderId !== order.id) continue;
     batch.update(item.ref, {
       orderId: order.id,
@@ -696,13 +711,28 @@ async function markBuybackItemsSold(order, eventId) {
   const needed = buybackArticleQuantities(order.articles);
   if (!needed.size) return;
   const markerRef = db.collection('orders').doc(order.id).collection('buybackSync').doc(buybackEventDocId('shipment', eventId));
-  await db.runTransaction(async transaction => {
-    if ((await transaction.get(markerRef)).exists) return;
+  const result = await db.runTransaction(async transaction => {
+    if ((await transaction.get(markerRef)).exists) return { skipped: true, sold: 0, unmatched: 0 };
+    const soldSnap = await transaction.get(db.collection('buybackItems').where('soldByOrderId', '==', order.id));
     const snap = await transaction.get(db.collection('buybackItems').where('status', 'in', ['active', 'expired']));
-    const remaining = new Map(needed);
+    const alreadySold = new Map();
+    for (const itemDoc of soldSnap.docs) {
+      const item = itemDoc.data();
+      if (item.status !== 'sold') continue;
+      const article = normalizeBuybackArticle(item.article);
+      const quantity = Math.max(0, Math.floor(Number(item.quantity) || 0));
+      if (article && quantity) alreadySold.set(article, (alreadySold.get(article) || 0) + quantity);
+    }
+    // If the same shipped order is edited or re-shipped, only sell its
+    // remaining unsynced quantity; never consume stock twice for one order.
+    const remaining = new Map([...needed].map(([article, quantity]) => [article, Math.max(0, quantity - (alreadySold.get(article) || 0))]));
     const today = new Date().toISOString().slice(0, 10);
+    const candidates = snap.docs.slice().sort((a, b) =>
+      String(a.get('receivedAt') || '').localeCompare(String(b.get('receivedAt') || '')) || a.id.localeCompare(b.id)
+    );
     let writes = 0;
-    for (const itemDoc of snap.docs) {
+    let soldTotal = 0;
+    for (const itemDoc of candidates) {
       const item = itemDoc.data();
       const article = normalizeBuybackArticle(item.article);
       const quantityNeeded = remaining.get(article) || 0;
@@ -713,19 +743,37 @@ async function markBuybackItemsSold(order, eventId) {
         status: 'sold', soldAt: today, updatedAt: FieldValue.serverTimestamp(),
         soldByOrderId: order.id, soldByOrderNumber: String(order.number || ''),
         soldToClient: String(order.client || 'Клиент не указан'), orderId: order.id,
-        orderNumber: String(order.number || ''), clientName: String(order.client || 'Клиент не указан')
+        orderNumber: String(order.number || ''), clientName: String(order.client || 'Клиент не указан'),
+        returnedAt: FieldValue.delete(), returnedFromOrderId: FieldValue.delete(),
+        returnedFromOrderNumber: FieldValue.delete(), returnedFromReturnId: FieldValue.delete(),
+        returnedFromClient: FieldValue.delete(), returnedFromBuybackId: FieldValue.delete(),
+        cancelledAt: FieldValue.delete(), shippedAt: FieldValue.delete()
       };
       if (sold === available) transaction.update(itemDoc.ref, patch);
       else {
         const soldRef = db.collection('buybackItems').doc(buybackEventDocId(`sold_${itemDoc.id}`, eventId));
-        transaction.set(soldRef, { ...item, quantity: sold, ...patch, createdAt: FieldValue.serverTimestamp() });
-        transaction.update(itemDoc.ref, { quantity: available - sold, updatedAt: FieldValue.serverTimestamp() });
+        transaction.set(soldRef, {
+          ...item, quantity: sold, ...patch, createdAt: FieldValue.serverTimestamp(),
+          returnedAt: null, returnedFromOrderId: null, returnedFromOrderNumber: null,
+          returnedFromReturnId: null, returnedFromClient: null, returnedFromBuybackId: null,
+          cancelledAt: null, shippedAt: null
+        });
+        transaction.update(itemDoc.ref, {
+          quantity: available - sold, orderId: FieldValue.delete(), orderNumber: FieldValue.delete(),
+          clientName: FieldValue.delete(), reservedAt: FieldValue.delete(), updatedAt: FieldValue.serverTimestamp()
+        });
       }
       remaining.set(article, quantityNeeded - sold);
+      soldTotal += sold;
       writes += sold === available ? 1 : 2;
     }
     if (writes > 450) throw new Error('Buyback shipment exceeds the safe transaction write limit');
     transaction.set(markerRef, { processedAt: FieldValue.serverTimestamp(), kind: 'shipment' });
+    return { skipped: false, sold: soldTotal, unmatched: [...remaining.values()].reduce((sum, quantity) => sum + quantity, 0) };
+  });
+  if (!result.skipped) logger.info('Buyback inventory reconciled for shipped order', {
+    orderId: order.id, orderNumber: String(order.number || ''), soldQuantity: result.sold,
+    unmatchedQuantity: result.unmatched, articles: [...needed.keys()]
   });
 }
 
@@ -743,7 +791,10 @@ async function restoreBuybackItemsForReturn(order, returnEntry, eventId) {
     }
     const today = String(returnEntry.createdAt || new Date().toISOString()).slice(0, 10);
     let writes = 0;
-    for (const itemDoc of soldSnap.docs) {
+    const soldItems = soldSnap.docs.slice().sort((a, b) =>
+      String(a.get('soldAt') || a.get('receivedAt') || '').localeCompare(String(b.get('soldAt') || b.get('receivedAt') || '')) || a.id.localeCompare(b.id)
+    );
+    for (const itemDoc of soldItems) {
       const item = itemDoc.data(), article = normalizeBuybackArticle(item.article);
       if (item.status !== 'sold') continue;
       const needed = remaining.get(article) || 0, available = Math.max(0, Math.floor(Number(item.quantity) || 0));
@@ -754,10 +805,17 @@ async function restoreBuybackItemsForReturn(order, returnEntry, eventId) {
         returnedFromOrderNumber: String(order.number || ''), returnedFromReturnId: returnEntry.id,
         returnedFromClient: String(order.client || ''), updatedAt: FieldValue.serverTimestamp()
       };
-      if (quantity === available) transaction.update(itemDoc.ref, returnedFields);
+      if (quantity === available) transaction.update(itemDoc.ref, {
+        ...returnedFields, orderId: FieldValue.delete(), orderNumber: FieldValue.delete(),
+        clientName: FieldValue.delete(), reservedAt: FieldValue.delete()
+      });
       else {
         const splitRef = db.collection('buybackItems').doc(buybackEventDocId(`returned_${itemDoc.id}`, eventId));
-        transaction.set(splitRef, { ...item, quantity, status: 'active', ...returnedFields, returnedFromBuybackId: itemDoc.id, createdAt: FieldValue.serverTimestamp() });
+        transaction.set(splitRef, {
+          ...item, quantity, status: 'active', ...returnedFields, returnedFromBuybackId: itemDoc.id,
+          orderId: null, orderNumber: null, clientName: null, reservedAt: null,
+          createdAt: FieldValue.serverTimestamp()
+        });
         transaction.update(itemDoc.ref, { quantity: available - quantity, updatedAt: FieldValue.serverTimestamp() });
       }
       remaining.set(article, needed - quantity);
@@ -807,7 +865,7 @@ exports.syncBuybackFromOrder = onDocumentUpdated({ document: 'orders/{orderId}',
   const before = event.data?.before.data() || {}, after = event.data?.after.data() || {};
   const order = { id: event.params.orderId, ...after };
   const shipped = ['Отгружен кладовщиком', 'Клиент забрал самовывозом'];
-  if (shipped.includes(after.status) && !shipped.includes(before.status)) await markBuybackItemsSold(order, event.id);
+  const articlesChanged = JSON.stringify(before.articles || []) !== JSON.stringify(after.articles || []);
 
   const previousReturns = new Map((Array.isArray(before.returns) ? before.returns : []).map(item => [item?.id, item]));
   for (const entry of Array.isArray(after.returns) ? after.returns : []) {
@@ -819,8 +877,11 @@ exports.syncBuybackFromOrder = onDocumentUpdated({ document: 'orders/{orderId}',
     }
   }
 
-  const referenceFieldsChanged = ['number', 'client'].some(key => before[key] !== after[key])
-    || JSON.stringify(before.articles || []) !== JSON.stringify(after.articles || []);
+  // Process return cancellation first. It restores the sold quantity, after
+  // which shipment reconciliation can see that the order is already covered.
+  if (shipped.includes(after.status) && (!shipped.includes(before.status) || articlesChanged)) await markBuybackItemsSold(order, event.id);
+
+  const referenceFieldsChanged = ['number', 'client'].some(key => before[key] !== after[key]) || articlesChanged;
   if (referenceFieldsChanged) await syncBuybackOrderReferences(order);
 });
 

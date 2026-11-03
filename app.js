@@ -1272,12 +1272,13 @@ function openNewOrder(){
       <textarea id="orderClipboardText" class="order-import-textarea" placeholder="Скопируйте сюда текст заказа…"></textarea>
     </div>
     <div class="form-grid"><div class="field"><label for="orderNumber">Номер заказа *</label><input id="orderNumber" required placeholder="Например, ЗК-18472" autocomplete="off"></div><div class="field client-suggestion-wrap"><label for="clientName">Имя клиента *</label><input id="clientName" required placeholder="Имя или название компании" autocomplete="off"><div id="clientNameSuggestions" class="chat-mention-suggestions client-suggestions" hidden></div></div></div>
-    <div class="field"><label for="deliveryType">Вид доставки</label><select id="deliveryType"><option value="city">Доставка по городу</option><option value="kamyanske">Доставка в Камянское</option><option value="post">Доставка почтой</option><option value="pickup">Самовывоз</option></select></div>
+    <div class="field" id="deliveryTypeField"><label for="deliveryType">Вид доставки *</label><select id="deliveryType" required aria-describedby="deliveryTypeError"><option value="" selected disabled>Выберите способ доставки</option><option value="city">Доставка по городу</option><option value="kamyanske">Доставка в Камянское</option><option value="post">Доставка почтой</option><option value="pickup">Самовывоз</option></select><div id="deliveryTypeError" class="delivery-required-error" role="alert" hidden>⚠️ Укажите способ доставки, чтобы создать заказ.</div></div>
     <div class="field"><label>Артикулы заказа</label>${articlesEditorHtml([{article:'',quantity:1}])}<span class="field-hint">Для каждого артикула укажите количество. Можно добавлять и удалять позиции.</span></div>
     <div class="field"><label for="startStatus">Начальный статус</label><select id="startStatus">${statusOptions}</select><span class="field-hint">${statusHint}</span></div>
     <div class="field"><label for="initialComment">Комментарий (необязательно)</label><textarea id="initialComment" placeholder="Короткая заметка по заказу"></textarea></div>
   </form>`;
   showModal('Добавить заказ',body,[button('Отмена','close'),button('Создать карточку','create-order','primary-button')],'НОВЫЙ ЗАКАЗ');
+  $('deliveryType')?.addEventListener('change',()=>{const field=$('deliveryTypeField'),error=$('deliveryTypeError');field?.classList.remove('delivery-type-invalid');$('deliveryType')?.removeAttribute('aria-invalid');if(error)error.hidden=true;});
   setTimeout(()=>{
     const input=$('orderClipboardText'),parse=$('parseOrderClipboard');
     if(!input||!parse)return;
@@ -1923,9 +1924,10 @@ async function saveDefectEdit(){const o=state.orders.find(x=>x.id===selectedId),
 async function saveOrder(){
  const submit=modal.querySelector('[data-action="create-order"]');
  if(submit?.disabled)return;
- const n=$('orderNumber').value.trim(),client=$('clientName').value.trim(),deliveryType=$('deliveryType')?.value==='pickup'?'pickup':'city';
+ const n=$('orderNumber').value.trim(),client=$('clientName').value.trim(),deliveryType=$('deliveryType')?.value||'';
  if(!signedInUser){toast('Войдите в систему, чтобы создать заказ.');return}
  if(!n||!client){toast('Укажите номер заказа и имя клиента.');return}
+ if(!['city','pickup','post','kamyanske'].includes(deliveryType)){const field=$('deliveryTypeField'),select=$('deliveryType'),error=$('deliveryTypeError');field?.classList.add('delivery-type-invalid');if(select){select.setAttribute('aria-invalid','true');select.focus();}if(error)error.hidden=false;toast('Укажите способ доставки, чтобы создать заказ.');return}
  if(state.orders.some(o=>String(o.number).trim().toLocaleLowerCase('ru')===n.toLocaleLowerCase('ru'))){toast('Карточка с таким номером уже есть.');return}
  const articles=readArticles(),status=$('startStatus').value,comment=$('initialComment').value.trim();
  const fingerprint=JSON.stringify([n,client,deliveryType,status,articles,comment,signedInUser.uid]);

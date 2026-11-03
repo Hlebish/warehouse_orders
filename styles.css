@@ -380,6 +380,10 @@ td b,.client-name{color:#111}
   box-shadow:0 0 0 3px rgba(102,153,0,.12);
 }
 .field-hint{color:#777}
+.delivery-required-error[hidden]{display:none}
+.delivery-required-error{margin-top:10px;padding:12px 14px;border:2px solid #bd3030;border-radius:8px;background:#fff0f0;color:#8f1717;font-size:14px;font-weight:800;line-height:1.45;box-shadow:0 3px 12px rgba(189,48,48,.12)}
+.delivery-type-invalid select,.delivery-type-invalid select:focus{border-color:#bd3030;box-shadow:0 0 0 3px rgba(189,48,48,.16)}
+body.dark-theme .delivery-required-error{background:#3a1717;border-color:#ff7373;color:#ffdada}
 .small-button{
   background:#fff;
   color:#333;

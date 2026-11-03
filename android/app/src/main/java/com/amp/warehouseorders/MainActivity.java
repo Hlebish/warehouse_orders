@@ -19,6 +19,7 @@ import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import java.util.Collections;
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
@@ -310,28 +311,48 @@ public class MainActivity extends AppCompatActivity {
     private void downloadAndSharePhoto(String imageUrl, String caption) {
         File imageFile = null;
         HttpURLConnection connection = null;
+        InputStream photoInput = null;
         try {
-            URL url = new URL(imageUrl);
-            String host = url.getHost();
-            if (!"https".equalsIgnoreCase(url.getProtocol()) ||
-                    !("firebasestorage.googleapis.com".equalsIgnoreCase(host) ||
-                      "storage.googleapis.com".equalsIgnoreCase(host))) {
-                throw new IllegalArgumentException("Unsupported photo URL");
+            String contentType;
+            if (imageUrl.startsWith("data:image/")) {
+                if (imageUrl.length() > 28 * 1024 * 1024) throw new IllegalStateException("Photo is larger than 20 MB");
+                int comma = imageUrl.indexOf(',');
+                if (comma < 0) throw new IllegalArgumentException("Invalid inline photo");
+                String metadata = imageUrl.substring(5, comma).toLowerCase(java.util.Locale.ROOT);
+                if (!(metadata.equals("image/jpeg;base64") || metadata.equals("image/png;base64") ||
+                      metadata.equals("image/webp;base64"))) {
+                    throw new IllegalArgumentException("Unsupported inline photo type");
+                }
+                byte[] bytes = android.util.Base64.decode(imageUrl.substring(comma + 1), android.util.Base64.DEFAULT);
+                if (bytes.length > 20 * 1024 * 1024) throw new IllegalStateException("Photo is larger than 20 MB");
+                contentType = metadata.substring(0, metadata.indexOf(';'));
+                photoInput = new ByteArrayInputStream(bytes);
+            } else {
+                URL url = new URL(imageUrl);
+                String host = url.getHost();
+                if (!"https".equalsIgnoreCase(url.getProtocol()) ||
+                        !("firebasestorage.googleapis.com".equalsIgnoreCase(host) ||
+                          "storage.googleapis.com".equalsIgnoreCase(host))) {
+                    throw new IllegalArgumentException("Unsupported photo URL");
+                }
+                connection = (HttpURLConnection) url.openConnection();
+                connection.setConnectTimeout(15000);
+                connection.setReadTimeout(30000);
+                connection.setInstanceFollowRedirects(true);
+                connection.connect();
+                int status = connection.getResponseCode();
+                if (status < 200 || status >= 300) throw new IllegalStateException("Photo download failed: " + status);
+                contentType = connection.getContentType();
+                if (contentType == null || !contentType.toLowerCase(java.util.Locale.ROOT).startsWith("image/"))
+                    throw new IllegalStateException("The link does not point to an image");
+                int length = connection.getContentLength();
+                if (length > 20 * 1024 * 1024) throw new IllegalStateException("Photo is larger than 20 MB");
+                photoInput = connection.getInputStream();
             }
-            connection = (HttpURLConnection) url.openConnection();
-            connection.setConnectTimeout(15000);
-            connection.setReadTimeout(30000);
-            connection.setInstanceFollowRedirects(true);
-            connection.connect();
-            int status = connection.getResponseCode();
-            if (status < 200 || status >= 300) throw new IllegalStateException("Photo download failed: " + status);
-            String contentType = connection.getContentType();
-            if (contentType == null || !contentType.toLowerCase().startsWith("image/"))
-                throw new IllegalStateException("The link does not point to an image");
-            int length = connection.getContentLength();
-            if (length > 20 * 1024 * 1024) throw new IllegalStateException("Photo is larger than 20 MB");
-            imageFile = File.createTempFile("warehouse-viber-", ".jpg", getCacheDir());
-            try (InputStream input = connection.getInputStream();
+            String extension = contentType.equalsIgnoreCase("image/png") ? ".png" :
+                    contentType.equalsIgnoreCase("image/webp") ? ".webp" : ".jpg";
+            imageFile = File.createTempFile("warehouse-viber-", extension, getCacheDir());
+            try (InputStream input = photoInput;
                  FileOutputStream output = new FileOutputStream(imageFile)) {
                 byte[] buffer = new byte[8192];
                 int total = 0, count;
@@ -366,6 +387,9 @@ public class MainActivity extends AppCompatActivity {
             runOnUiThread(() -> android.widget.Toast.makeText(this,
                 "Не удалось подготовить фотографию для Viber", android.widget.Toast.LENGTH_LONG).show());
         } finally {
+            if (photoInput != null) {
+                try { photoInput.close(); } catch (Exception ignored) { }
+            }
             if (connection != null) connection.disconnect();
         }
     }

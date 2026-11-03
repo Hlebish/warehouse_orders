@@ -803,7 +803,7 @@ function watchOrderEntries(id){
  }));
 }
 function watchPendingDefectOrders(){
- const candidates=new Set(state.orders.filter(o=>o.status==='Дефект').map(o=>o.id));
+  const candidates=new Set(state.orders.filter(o=>o.status==='Дефект'||(o.entries||[]).some(e=>e.kind==='defect'&&!e.decision)).map(o=>o.id));
  for(const [id,stop] of defectEntryUnsubscribes){if(!candidates.has(id)){stop();defectEntryUnsubscribes.delete(id);}}
  for(const id of candidates){
   if(defectEntryUnsubscribes.has(id))continue;
@@ -814,6 +814,7 @@ function watchPendingDefectOrders(){
    serverCache.set(id,{...serverCache.get(id),entries:entries.map(x=>({...x}))});
    saveOrdersCache();
    if(before!==JSON.stringify(entries))scheduleRender();
+    watchPendingDefectOrders();
   },err=>console.error('Не удалось проверить дефекты заказа',id,err)));
  }
 }

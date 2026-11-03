@@ -2423,6 +2423,13 @@ async function sharePhotoViaViber(url,context='Фото из заказа'){
   }catch(err){
     if(err?.name==='AbortError')return;
     console.error('Не удалось передать фото в Viber',err);
+    try{
+      const original=new URL(url,location.href);
+      if(original.protocol==='https:'&&['firebasestorage.googleapis.com','storage.googleapis.com'].includes(original.hostname)){
+        showModal('Фото для Viber',`<p class="modal-description">Браузер не смог подготовить файл автоматически. Открой оригинал фото, сохрани его и прикрепи к сообщению в Viber.</p><a class="primary-button" href="${esc(original.href)}" target="_blank" rel="noopener noreferrer">Открыть оригинал фото</a>`,[button('Закрыть','close')],'ОТПРАВКА ФОТО');
+        return;
+      }
+    }catch{}
     toast('Не удалось подготовить фото для Viber. Проверь интернет и попробуй ещё раз.');
   }
 }

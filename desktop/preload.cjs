@@ -12,10 +12,11 @@ contextBridge.exposeInMainWorld('warehouseDesktop', {
       notificationTag: String(data.notificationTag || '')
     });
   },
-  sharePhotoToViber(url, context) {
+  sharePhotoToViber(url, context, openViber = true) {
     return ipcRenderer.invoke('warehouse:share-photo-to-viber', {
       url: String(url || ''),
-      context: String(context || '')
+      context: String(context || ''),
+      openViber: openViber !== false
     });
   }
 });

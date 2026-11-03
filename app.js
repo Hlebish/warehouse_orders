@@ -1109,6 +1109,14 @@ function showModal(title,body,buttons=[],eyebrow='КАРТОЧКА ЗАКАЗА'
   $('modalTitle').textContent=title;
   $('modalEyebrow').textContent=eyebrow;
   $('modalBody').innerHTML=body;
+  $('modalBody').querySelectorAll('[data-viber-photo]').forEach(viberButton=>{
+    const copyButton=viberButton.cloneNode(true);
+    copyButton.removeAttribute('data-viber-photo');
+    copyButton.dataset.copyPhoto=viberButton.dataset.viberPhoto;
+    copyButton.dataset.copyContext=viberButton.dataset.viberContext||'Фото из заказа';
+    copyButton.textContent='📋 Скопировать фото';
+    viberButton.insertAdjacentElement('afterend',copyButton);
+  });
   $('modalFoot').innerHTML=buttons.join('');
   modal.hidden=false;
   document.body.classList.add('overlay-window-open');
@@ -2408,7 +2416,7 @@ async function sharePhotoViaViber(url,context='Фото из заказа'){
   if(!url)return;
   if(window.warehouseDesktop?.sharePhotoToViber){
     try{
-      const result=await window.warehouseDesktop.sharePhotoToViber(url,context);
+      const result=await window.warehouseDesktop.sharePhotoToViber(url,context,true);
       if(result?.copied){toast(result.viberOpened?'Фото скопировано. Viber открыт — выбери чат и нажми Ctrl+V.':'Фото скопировано. Открой Viber, выбери чат и нажми Ctrl+V.');return;}
       throw new Error('Windows-приложение не подтвердило копирование фото.');
     }catch(err){
@@ -2453,6 +2461,26 @@ async function sharePhotoViaViber(url,context='Фото из заказа'){
       }
     }catch{}
     toast('Не удалось подготовить фото для Viber. Проверь интернет и попробуй ещё раз.');
+  }
+}
+async function copyPhotoToClipboard(url,context='Фото из заказа'){
+  if(!url)return;
+  try{
+    if(window.warehouseDesktop?.sharePhotoToViber){
+      const result=await window.warehouseDesktop.sharePhotoToViber(url,context,false);
+      if(result?.copied){toast('Фото скопировано в буфер. Открой Viber, выбери чат и нажми Ctrl+V.');return;}
+      throw new Error('Приложение не подтвердило копирование фото.');
+    }
+    const response=await fetch(url);
+    if(!response.ok)throw new Error('Не удалось загрузить фото.');
+    const blob=await response.blob();
+    if(!blob.type.startsWith('image/'))throw new Error('Ссылка не вернула изображение.');
+    if(!navigator.clipboard?.write||typeof ClipboardItem==='undefined')throw new Error('Этот браузер не поддерживает копирование изображений.');
+    await navigator.clipboard.write([new ClipboardItem({[blob.type]:blob})]);
+    toast('Фото скопировано в буфер обмена. Открой Viber, выбери чат и нажми Ctrl+V.');
+  }catch(err){
+    console.error('Не удалось скопировать фото',err);
+    toast('Не удалось скопировать фото. Используй кнопку «Отправить в Viber».');
   }
 }
 async function shareChatMessageViaViber(id){
@@ -3418,6 +3446,8 @@ document.addEventListener('click',e=>{
   if(copy){e.preventDefault();copyChatMessage(copy.dataset.action.split(':').slice(1).join(':'));return;}
   const share=e.target.closest('[data-action^="share-chat:"]');
   if(share){e.preventDefault();shareChatMessage(share.dataset.action.split(':').slice(1).join(':'));return;}
+  const copyPhoto=e.target.closest('[data-copy-photo]');
+  if(copyPhoto){e.preventDefault();e.stopPropagation();copyPhotoToClipboard(copyPhoto.dataset.copyPhoto,copyPhoto.dataset.copyContext||'Фото из заказа');return;}
   const viberPhoto=e.target.closest('[data-viber-photo]');
   if(viberPhoto){e.preventDefault();e.stopPropagation();sharePhotoViaViber(viberPhoto.dataset.viberPhoto,viberPhoto.dataset.viberContext||'Фото из заказа');return;}
   const viber=e.target.closest('[data-action^="viber-chat:"]');

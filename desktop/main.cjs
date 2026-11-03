@@ -89,11 +89,13 @@ ipcMain.handle('warehouse:share-photo-to-viber', async (event, payload = {}) => 
 
   clipboard.writeImage(image);
   let viberOpened = false;
-  try {
-    await shell.openExternal('viber://');
-    viberOpened = true;
-  } catch (error) {
-    console.warn('[Warehouse Orders] Could not open Viber:', String(error?.message || error));
+  if (payload.openViber !== false) {
+    try {
+      await shell.openExternal('viber://');
+      viberOpened = true;
+    } catch (error) {
+      console.warn('[Warehouse Orders] Could not open Viber:', String(error?.message || error));
+    }
   }
   return { copied: true, viberOpened, context: String(payload.context || '').slice(0, 200) };
 });

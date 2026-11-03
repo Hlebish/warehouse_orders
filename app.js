@@ -400,6 +400,7 @@ async function writeAudit(action,details='',orderId='',meta={}){
 async function save(){
  if(!signedInUser)return;
  let saveStage='подготовка изменений';
+ const touchedOrderIds=new Set();
  try{
  const currentIds=new Set(state.orders.map(o=>o.id));
  let batch=writeBatch(db),batchWrites=0;
@@ -429,6 +430,7 @@ async function save(){
        o.updatedByName=profileName;
      }
      pendingWrites.add(o.id);
+      touchedOrderIds.add(o.id);
      pendingOrderData.set(o.id,{...o,number:next.number,client:next.client,status:next.status,articles:next.articles||[]});
      const orderRef=doc(db,'orders',o.id);
      saveStage='обновление документа заказа '+(o.number||o.id);
@@ -480,8 +482,9 @@ async function save(){
    // Persist the order and its changed history entries together, reducing
    // round-trips while ensuring push notifications are queued only after data commits.
    await flushBatch();
+    pendingWrites.delete(o.id);
+    pendingOrderData.delete(o.id);
    await Promise.all(pushTasks.map(task=>task()));
-   pendingWrites.delete(o.id);
    serverCache.set(o.id,{...(serverCache.get(o.id)||o),...o,articles:normalizeArticles(o.articles||[]),entries:[...(o.entries||[])]});
  }
 
@@ -494,6 +497,7 @@ async function save(){
  }
  await flushBatch();
  }catch(err){
+   for(const id of touchedOrderIds){pendingWrites.delete(id);pendingOrderData.delete(id);}
   console.error('Ошибка сохранения заказа на этапе «'+saveStage+'»: ',err);
   const code=String(err?.code||'').trim();
   const message=String(err?.message||'').trim();
@@ -1101,6 +1105,7 @@ let modalHistoryEntry=false;
 let orderReturnModalSnapshot=null;
 function showModal(title,body,buttons=[],eyebrow='КАРТОЧКА ЗАКАЗА'){
   const wasOpen=!modal.hidden;
+  delete modal.dataset.orderDetail;
   $('modalTitle').textContent=title;
   $('modalEyebrow').textContent=eyebrow;
   $('modalBody').innerHTML=body;
@@ -2170,9 +2175,13 @@ function approveOrder(){showModal('Одобрить на отгрузку',`<p s
 function confirmApprove(){const note=$('approvalComment').value.trim()||'Согласовано к отгрузке клиенту.';setStatus('Одобрен на отгрузку клиенту',note,'decision')}
 function confirmCancel(){const reason=$('cancelReason').value.trim();if(!reason){toast('Напишите причину отмены.');return}setStatus('Отменён',reason,'decision')}
 function markViewed(){const o=state.orders.find(x=>x.id===selectedId);if(o.entries.some(e=>e.kind==='viewed'&&e.authorId===signedInUser.uid)){toast('Вы уже отмечали этот заказ просмотренным.');return}o.entries.push({id:crypto.randomUUID(),kind:'viewed',text:`${profileName||roles[state.role]} отметил(а), что увидел(а) собранный заказ.`,authorId:signedInUser.uid,author:profileName||roles[state.role],createdAt:isoNow(),photos:[]});save();render();notify(`Менеджер ${profileName||''} просмотрел заказ № ${o.number}`,o.id);openOrder(o.id)}
-function decideDefect(entryId,decision){const o=state.orders.find(x=>x.id===selectedId),e=o?.entries.find(x=>x.id===entryId);if(!o||!e||e.kind!=='defect'||e.decision||!(isManagerRole()||canManageUsers)){toast('Этот дефект уже рассмотрен или у вас нет прав на решение.');return}if(decision==='Удалена из заказа'){pendingDefectId=entryId;showModal('Удалить позицию из заказа?',`<div class="danger-note">Артикул ${esc(e.article)} будет помечен как удалённый, сохранится в истории и не попадёт в отгрузку. Остальные позиции заказа останутся без изменений.</div><div class="field"><label for="defectReason">Причина решения (необязательно)</label><textarea id="defectReason" placeholder="Укажите причину удаления позиции"></textarea></div>`,[button('Назад','back-detail'),button('Удалить позицию','confirm-defect-remove','small-button danger')],'РЕШЕНИЕ ПО ДЕФЕКТУ');return}if(decision==='Отменён'){showModal('Отменить заказ',`<p style="font-size:12px;color:#697382;margin:0 0 12px">Напишите причину отмены заказа № ${esc(o.number)} по дефекту артикула ${esc(e.article)}.</p><div class="field"><label for="defectReason">Причина отмены *</label><textarea id="defectReason" required placeholder="Почему заказ отменён?"></textarea></div>`,[button('Назад','back-detail'),button('Отменить заказ','confirm-defect-cancel','small-button danger')],'ОТМЕНА ЗАКАЗА');return}e.decision='Подтверждён';e.decisionText=`Дефект подтверждён сотрудником ${profileName||roles[state.role]}.`;e.decidedBy=profileName||roles[state.role];e.decidedByName=profileName||roles[state.role];e.decidedAt=isoNow();o.status='Создан';save();render();writeAudit('Дефект подтверждён',`Артикул: ${e.article}; статус заказа возвращён на «Создан».`,o.id,{entryId:e.id});notify(`Дефект артикула ${e.article} по заказу № ${o.number} подтверждён — статус возвращён на «Создан»`,o.id);openOrder(o.id)}
-function confirmDefectRemove(){const reason=$('defectReason')?.value.trim()||'';const o=state.orders.find(x=>x.id===selectedId),e=o?.entries.find(x=>x.id===pendingDefectId);if(!o||!e||e.kind!=='defect'||e.decision||!((isManagerRole()||canManageUsers))){toast('Не удалось удалить позицию: проверьте права и состояние дефекта.');return;}e.decision='Удалена из заказа';e.decisionText=reason||'Позиция удалена из заказа по решению менеджера.';e.decidedBy=profileName||roles[state.role];e.decidedByName=profileName||roles[state.role];e.decidedAt=isoNow();o.status='Создан';pendingDefectId=null;save();render();writeAudit('Позиция удалена из заказа по дефекту',`Артикул: ${e.article}; ${e.decisionText}; статус заказа возвращён на «Создан», позиция исключена из отгрузки.`,o.id,{entryId:e.id});notify(`Позиция ${e.article} удалена из заказа № ${o.number}; статус возвращён на «Создан»`,o.id);openOrder(o.id)}
-function confirmDefectCancel(){const reason=$('defectReason').value.trim();if(!reason){toast('Укажите причину решения.');return}const o=state.orders.find(x=>x.id===selectedId),e=o.entries.find(x=>x.id===pendingDefectId);if(!e)return;e.decision='Отменён';e.decisionText=reason;e.decidedBy=profileName||roles[state.role];e.decidedByName=profileName||roles[state.role];e.decidedAt=isoNow();o.status='Отменён';pendingDefectId=null;save();render();notify(`Заказ № ${o.number} отменён по дефекту артикула ${e.article}: ${reason}`,o.id);toast('Кладовщик получит уведомление об отмене заказа.');openOrder(o.id)}
+const defectDecisionFields=['decision','decisionText','decidedBy','decidedByName','decidedAt'];
+function snapshotDefectDecision(o,e){return{status:o.status,fields:Object.fromEntries(defectDecisionFields.map(key=>[key,e[key]]))}}
+function restoreDefectDecision(o,e,snapshot){o.status=snapshot.status;for(const key of defectDecisionFields){if(snapshot.fields[key]===undefined)delete e[key];else e[key]=snapshot.fields[key];}}
+async function persistDefectDecision(o,e,snapshot){try{await save();return true}catch{restoreDefectDecision(o,e,snapshot);render();return false}}
+async function decideDefect(entryId,decision){const o=state.orders.find(x=>x.id===selectedId),e=o?.entries.find(x=>x.id===entryId);if(!o||!e||e.kind!=='defect'||e.decision||!(isManagerRole()||canManageUsers)){toast('Этот дефект уже рассмотрен или у вас нет прав на решение.');return}if(decision==='Удалена из заказа'){pendingDefectId=entryId;showModal('Удалить позицию из заказа?',`<div class="danger-note">Артикул ${esc(e.article)} будет помечен как удалённый, сохранится в истории и не попадёт в отгрузку. Остальные позиции заказа останутся без изменений.</div><div class="field"><label for="defectReason">Причина решения (необязательно)</label><textarea id="defectReason" placeholder="Укажите причину удаления позиции"></textarea></div>`,[button('Назад','back-detail'),button('Удалить позицию','confirm-defect-remove','small-button danger')],'РЕШЕНИЕ ПО ДЕФЕКТУ');return}if(decision==='Отменён'){showModal('Отменить заказ',`<p style="font-size:12px;color:#697382;margin:0 0 12px">Напишите причину отмены заказа № ${esc(o.number)} по дефекту артикула ${esc(e.article)}.</p><div class="field"><label for="defectReason">Причина отмены *</label><textarea id="defectReason" required placeholder="Почему заказ отменён?"></textarea></div>`,[button('Назад','back-detail'),button('Отменить заказ','confirm-defect-cancel','small-button danger')],'ОТМЕНА ЗАКАЗА');return}const previous=snapshotDefectDecision(o,e);e.decision='Подтверждён';e.decisionText=`Дефект подтверждён сотрудником ${profileName||roles[state.role]}.`;e.decidedBy=profileName||roles[state.role];e.decidedByName=profileName||roles[state.role];e.decidedAt=isoNow();o.status='Создан';if(!await persistDefectDecision(o,e,previous))return;render();await writeAudit('Дефект подтверждён',`Артикул: ${e.article}; статус заказа возвращён на «Создан».`,o.id,{entryId:e.id});notify(`Дефект артикула ${e.article} по заказу № ${o.number} подтверждён — статус возвращён на «Создан»`,o.id);openOrder(o.id)}
+async function confirmDefectRemove(){const reason=$('defectReason')?.value.trim()||'';const o=state.orders.find(x=>x.id===selectedId),e=o?.entries.find(x=>x.id===pendingDefectId);if(!o||!e||e.kind!=='defect'||e.decision||!(isManagerRole()||canManageUsers)){toast('Не удалось удалить позицию: проверьте права и состояние дефекта.');return}const previous=snapshotDefectDecision(o,e);e.decision='Удалена из заказа';e.decisionText=reason||'Позиция удалена из заказа по решению менеджера.';e.decidedBy=profileName||roles[state.role];e.decidedByName=profileName||roles[state.role];e.decidedAt=isoNow();o.status='Создан';if(!await persistDefectDecision(o,e,previous))return;pendingDefectId=null;render();await writeAudit('Позиция удалена из заказа по дефекту',`Артикул: ${e.article}; ${e.decisionText}; статус заказа возвращён на «Создан», позиция исключена из отгрузки.`,o.id,{entryId:e.id});notify(`Позиция ${e.article} удалена из заказа № ${o.number}; статус возвращён на «Создан»`,o.id);openOrder(o.id)}
+async function confirmDefectCancel(){const reason=$('defectReason')?.value.trim()||'';if(!reason){toast('Укажите причину решения.');return}const o=state.orders.find(x=>x.id===selectedId),e=o?.entries.find(x=>x.id===pendingDefectId);if(!o||!e)return;const previous=snapshotDefectDecision(o,e);e.decision='Отменён';e.decisionText=reason;e.decidedBy=profileName||roles[state.role];e.decidedByName=profileName||roles[state.role];e.decidedAt=isoNow();o.status='Отменён';if(!await persistDefectDecision(o,e,previous))return;pendingDefectId=null;render();notify(`Заказ № ${o.number} отменён по дефекту артикула ${e.article}: ${reason}`,o.id);toast('Кладовщик получит уведомление об отмене заказа.');openOrder(o.id)}
 function deleteOrder(){if(!canManageUsers)return;const current=state.orders.find(x=>x.id===selectedId);if(current&&hasPendingDefect(current)){toast('Нельзя удалить заказ, пока не рассмотрен дефект.');return;}const o=state.orders.find(x=>x.id===selectedId);if(!o)return;showModal('Удалить карточку?',`<div class="danger-note">Заказ № ${esc(o.number)} и его записи сначала сохранятся в отдельной истории удалённых заказов, а затем исчезнут из общего списка.</div>`,[button('Назад','back-detail'),button('Удалить карточку','confirm-delete','small-button danger')],'УДАЛЕНИЕ ЗАКАЗА')}
 function deleteEntry(entryId){const o=state.orders.find(x=>x.id===selectedId),entry=o.entries.find(x=>x.id===entryId);if(!entry||state.role!=='director')return;showModal('Удалить запись?',`<div class="danger-note">Комментарий и прикреплённые к нему фото будут удалены. Действие попадёт в журнал директора.</div>`,[button('Назад','back-detail'),button('Удалить запись','confirm-delete-entry:'+entryId,'small-button danger')],'ДЕЙСТВИЕ ДИРЕКТОРА')}
 function confirmDeleteEntry(entryId){const o=state.orders.find(x=>x.id===selectedId),entry=o.entries.find(x=>x.id===entryId);if(!entry)return;const label=entry.article?`дефект артикула ${entry.article}`:({comment:'комментарий',question:'вопрос',decision:'решение',viewed:'отметку о просмотре'})[entry.kind]||'запись';o.entries=o.entries.filter(x=>x.id!==entryId);state.notices.unshift({id:crypto.randomUUID(),message:`Директор удалил ${label} из заказа № ${o.number}`,orderId:null,at:isoNow(),read:false,kind:'audit'});save();render();toast('Удаление внесено в журнал действий.');openOrder(o.id)}
@@ -2426,7 +2435,7 @@ async function sharePhotoViaViber(url,context='Фото из заказа'){
     try{
       const original=new URL(url,location.href);
       if(original.protocol==='https:'&&['firebasestorage.googleapis.com','storage.googleapis.com'].includes(original.hostname)){
-        showModal('Фото для Viber',`<p class="modal-description">Браузер не смог подготовить файл автоматически. Открой оригинал фото, сохрани его и прикрепи к сообщению в Viber.</p><a class="primary-button" href="${esc(original.href)}" target="_blank" rel="noopener noreferrer">Открыть оригинал фото</a>`,[button('Закрыть','close')],'ОТПРАВКА ФОТО');
+        const fallback=toast('Браузер не смог подготовить файл автоматически. Сохрани оригинал и прикрепи к Viber:','',{persistent:true});const link=document.createElement('a');link.href=original.href;link.target='_blank';link.rel='noopener noreferrer';link.textContent=' Открыть фото';link.style.color='white';link.style.textDecoration='underline';fallback.append(link);const close=document.createElement('button');close.type='button';close.textContent=' ×';close.setAttribute('aria-label','Закрыть уведомление');close.addEventListener('click',()=>fallback.remove());fallback.append(close);
         return;
       }
     }catch{}

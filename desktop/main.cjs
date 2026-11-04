@@ -13,6 +13,7 @@ let updateDownloaded = false;
 let updateAvailable = false;
 let updateCheckInProgress = false;
 let manualUpdateCheckPending = false;
+let updateInstallScheduled = false;
 let showingOfflinePage = false;
 let offlineRetryTimer = null;
 let offlineRetryInProgress = false;
@@ -97,6 +98,32 @@ async function checkForDesktopUpdates(manual = false) {
     updateCheckInProgress = false;
     refreshTrayMenu();
   }
+}
+
+async function appIsAwayAndReadyForUpdate() {
+  if (!mainWindow || mainWindow.isDestroyed()) return true;
+  const windowIsInactive = !mainWindow.isVisible() || mainWindow.isMinimized() || !mainWindow.isFocused();
+  if (!windowIsInactive || mainWindow.webContents.isLoading()) return false;
+  return mainWindow.webContents.executeJavaScript(`(() => {
+    const modal = document.getElementById('modalBackdrop');
+    const active = document.activeElement;
+    const editing = active && (['INPUT', 'TEXTAREA', 'SELECT'].includes(active.tagName) || active.isContentEditable);
+    return (!modal || modal.hidden) && !editing;
+  })()`).catch(() => false);
+}
+
+async function installDownloadedUpdateWhenSafe() {
+  if (!app.isPackaged || !updateDownloaded || updateInstallScheduled) return;
+  if (!await appIsAwayAndReadyForUpdate()) return;
+  updateInstallScheduled = true;
+  setTimeout(async () => {
+    updateInstallScheduled = false;
+    if (!updateDownloaded || !await appIsAwayAndReadyForUpdate()) return;
+    notifyDesktopUpdateStatus('Устанавливаем обновление в фоне. Приложение перезапустится.');
+    quitting = true;
+    // NSIS runs silently; reopen the app after installation completes.
+    autoUpdater.quitAndInstall(true, true);
+  }, 5000);
 }
 
 ipcMain.on('warehouse:show-notification', (event, payload = {}) => {
@@ -348,10 +375,7 @@ function showTestNotification() {
 function refreshTrayMenu() {
   if (!tray) return;
   const updateAction = updateDownloaded
-    ? { label: 'Установить обновление и перезапустить', enabled: true, click: () => {
-        quitting = true;
-        autoUpdater.quitAndInstall();
-      } }
+    ? { label: 'Обновление установится, когда приложение будет неактивно', enabled: false }
     : { label: updateAvailable ? 'Обновление скачивается…' : updateCheckInProgress ? 'Проверяем обновления…' : 'Проверить обновления', enabled: !updateAvailable && !updateCheckInProgress, click: () => checkForDesktopUpdates(true) };
   const items = [
     { label: 'Открыть заказы', click: () => { if (mainWindow) { mainWindow.show(); mainWindow.focus(); } } },
@@ -384,9 +408,9 @@ app.whenReady().then(() => {
   createWindow();
   createTray();
   autoUpdater.autoDownload = true;
-  // Download updates in the background, but restart only after the employee
-  // explicitly chooses the install action from the tray menu.
-  autoUpdater.autoInstallOnAppQuit = false;
+  // Updates are downloaded quietly; installation is scheduled for a safe,
+  // unfocused moment and the NSIS installer runs without a wizard.
+  autoUpdater.autoInstallOnAppQuit = true;
   autoUpdater.on('error', error => {
     updateAvailable = false;
     console.warn('[Warehouse Orders] App update failed:', String(error?.message || error));
@@ -411,10 +435,12 @@ app.whenReady().then(() => {
     updateAvailable = false;
     updateDownloaded = true;
     refreshTrayMenu();
-    notifyDesktopUpdateStatus('Обновление ' + info.version + ' загружено. Установить его можно через меню приложения в системном трее.');
+    notifyDesktopUpdateStatus('Обновление ' + info.version + ' загружено. Оно установится в фоне, когда окном приложения не пользуются.');
+    installDownloadedUpdateWhenSafe();
   });
   checkForDesktopUpdates();
   setInterval(checkForDesktopUpdates, 120000);
+  setInterval(installDownloadedUpdateWhenSafe, 15000);
   // Check for published site changes every two minutes. Reloads are deferred while editing.
   mainWindow.webContents.once('did-finish-load', () => {
     readPublishedAssetVersion().then(version => { loadedAssetVersion = version; }).catch(error => {

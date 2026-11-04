@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Tray, Menu, nativeImage, shell, session, Notification, ipcMain, clipboard } = require('electron');
+const { app, BrowserWindow, Tray, Menu, nativeImage, shell, session, Notification, ipcMain, clipboard, net } = require('electron');
 const path = require('node:path');
 const { autoUpdater } = require('electron-updater');
 
@@ -80,12 +80,8 @@ ipcMain.handle('warehouse:share-photo-to-viber', async (event, payload = {}) => 
       throw new Error('Поддерживаются только фото из хранилища заказов.');
     }
 
-    const response = await fetch(photoUrl, { signal: AbortSignal.timeout(30000) });
+    const response = await net.fetch(photoUrl.href, { signal: AbortSignal.timeout(30000) });
     if (!response.ok) throw new Error(`Не удалось загрузить фото (HTTP ${response.status}).`);
-    const finalUrl = new URL(response.url);
-    if (finalUrl.protocol !== 'https:' || !allowedHosts.has(finalUrl.hostname)) {
-      throw new Error('Хранилище вернуло недопустимую ссылку на фото.');
-    }
     const contentType = String(response.headers.get('content-type') || '').split(';')[0].trim().toLowerCase();
     if (!contentType.startsWith('image/')) throw new Error('Ссылка не вернула изображение.');
     const maxPhotoBytes = 25 * 1024 * 1024;

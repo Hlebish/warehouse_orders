@@ -2483,7 +2483,7 @@ async function copyPhotoToClipboard(url,context='Фото из заказа'){
     toast('Фото скопировано в буфер обмена. Открой Viber, выбери чат и нажми Ctrl+V.');
   }catch(err){
     console.error('Не удалось скопировать фото',err);
-    const reason=err?.message||desktopError?.message||'Неизвестная ошибка';
+    const reason=desktopError?.message||err?.message||'Неизвестная ошибка';
     toast(`Не удалось скопировать фото: ${reason}`);
   }
 }

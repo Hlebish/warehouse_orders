@@ -133,6 +133,25 @@ public class MainActivity extends AppCompatActivity {
             }
 
             @Override
+            public void onPageFinished(WebView view, String url) {
+                super.onPageFinished(view, url);
+                if (url == null || !url.startsWith(SITE_URL)) return;
+                // WebView can finish loading before Android has composed its
+                // first hardware frame. Request a layout/paint so the user
+                // never has to tap the screen to reveal the rendered page.
+                view.post(() -> {
+                    view.requestLayout();
+                    view.invalidate();
+                    if (Build.VERSION.SDK_INT >= 16) view.postInvalidateOnAnimation();
+                });
+                view.postDelayed(() -> {
+                    if (view.isAttachedToWindow() && Build.VERSION.SDK_INT >= 16) {
+                        view.postInvalidateOnAnimation();
+                    }
+                }, 250);
+            }
+
+            @Override
             public void onReceivedError(WebView view, android.webkit.WebResourceRequest request,
                     android.webkit.WebResourceError error) {
                 super.onReceivedError(view, request, error);
@@ -479,6 +498,21 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private class AndroidBridge {
+        @JavascriptInterface
+        public void invalidateWebView() {
+            runOnUiThread(() -> {
+                if (webView == null || !webView.isAttachedToWindow()) return;
+                webView.requestLayout();
+                webView.invalidate();
+                if (Build.VERSION.SDK_INT >= 16) webView.postInvalidateOnAnimation();
+                webView.postDelayed(() -> {
+                    if (webView != null && webView.isAttachedToWindow() && Build.VERSION.SDK_INT >= 16) {
+                        webView.postInvalidateOnAnimation();
+                    }
+                }, 180);
+            });
+        }
+
         @JavascriptInterface
         public void startGoogleSignIn() {
             runOnUiThread(() -> {

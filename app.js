@@ -1120,15 +1120,15 @@ function showModal(title,body,buttons=[],eyebrow='КАРТОЧКА ЗАКАЗА'
     if(!isPhoneDevice())viberButton.remove();
   });
   $('modalBody').querySelectorAll('.defect-comment-photos,.defect-modal-photos').forEach(photoGroup=>{
-    const photoButtons=Array.from(photoGroup.querySelectorAll('[data-viber-context]'));
     const photoUrls=[...new Set(Array.from(photoGroup.querySelectorAll('img[data-photo]')).map(item=>item.dataset.photo).filter(Boolean))];
-    if(photoUrls.length<2||(!isAndroidWarehouse()&&!window.warehouseDesktop?.isDesktopApp))return;
+    const photoButton=photoGroup.querySelector('[data-viber-context],[data-copy-context]');
+    if(photoUrls.length<2||(isPhoneDevice()&&!isAndroidWarehouse()))return;
     const groupButton=document.createElement('button');
     groupButton.type='button';
     groupButton.className='small-button primary-soft defect-photo-group-button';
-    groupButton.textContent=isAndroidWarehouse()?'Отправить все фото в Viber':'📋 Скопировать все фото';
+    groupButton.textContent=isAndroidWarehouse()?'Отправить все фото в Viber':'📋 Скопировать все фото (коллаж)';
     groupButton.dataset.photoGroup=JSON.stringify(photoUrls);
-    groupButton.dataset.photoGroupContext=photoButtons[0]?.dataset.viberContext||'Фото дефекта';
+    groupButton.dataset.photoGroupContext=photoButton?.dataset.viberContext||photoButton?.dataset.copyContext||'Фото дефекта';
     photoGroup.insertAdjacentElement('beforebegin',groupButton);
   });
   $('modalFoot').innerHTML=buttons.join('');
@@ -2441,6 +2441,38 @@ function fetchPhotoAsPng(url){
     return png;
   });
 }
+async function createDefectPhotoCollage(urls,context='Фото дефекта'){
+  const columns=2,outer=18,gap=12,tileWidth=560,imageHeight=390,footerHeight=38,headerHeight=58;
+  const rows=Math.ceil(urls.length/columns),tileHeight=imageHeight+footerHeight;
+  const canvas=document.createElement('canvas');
+  canvas.width=outer*2+columns*tileWidth+gap*(columns-1);
+  canvas.height=outer*2+headerHeight+rows*tileHeight+gap*(rows-1);
+  const ctx=canvas.getContext('2d');
+  if(!ctx)throw new Error('Не удалось подготовить изображение для буфера обмена.');
+  ctx.fillStyle='#111820';ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle='#f4f7fb';ctx.font='600 20px system-ui, sans-serif';
+  ctx.fillText(String(context||'Фото дефекта').slice(0,70),outer,outer+28);
+  ctx.fillStyle='#aeb9c8';ctx.font='14px system-ui, sans-serif';
+  ctx.fillText(`${urls.length} фотографий`,outer,outer+48);
+  for(let index=0;index<urls.length;index++){
+    const blob=await fetchPhotoAsPng(urls[index]);
+    const bitmap=await createImageBitmap(blob);
+    const col=index%columns,row=Math.floor(index/columns);
+    const x=outer+col*(tileWidth+gap),y=outer+headerHeight+row*(tileHeight+gap);
+    ctx.fillStyle='#202a35';ctx.fillRect(x,y,tileWidth,tileHeight);
+    ctx.fillStyle='#05080c';ctx.fillRect(x+8,y+8,tileWidth-16,imageHeight-12);
+    const scale=Math.min((tileWidth-32)/bitmap.width,(imageHeight-36)/bitmap.height);
+    const width=bitmap.width*scale,height=bitmap.height*scale;
+    ctx.drawImage(bitmap,x+(tileWidth-width)/2,y+8+(imageHeight-12-height)/2,width,height);
+    bitmap.close();
+    ctx.fillStyle='#f4f7fb';ctx.font='600 15px system-ui, sans-serif';
+    ctx.fillText(`Фото ${index+1}`,x+14,y+imageHeight+25);
+  }
+  const result=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));
+  if(!result)throw new Error('Не удалось собрать коллаж из фотографий.');
+  if(result.size>20*1024*1024)throw new Error('Коллаж больше 20 МБ. Скопируй фото по одному.');
+  return result;
+}
 function startBrowserPhotoCopy(url){
   if(!navigator.clipboard?.write||typeof ClipboardItem==='undefined')throw new Error('Этот браузер не поддерживает копирование изображений.');
   const pngPromise=fetchPhotoAsPng(url);
@@ -2494,14 +2526,20 @@ async function copyPhotoGroup(urls,context='Фото дефекта'){
     try{window.AndroidWarehouse.sharePhotosToViber(JSON.stringify(urls),context);toast(`Готовлю ${urls.length} фото для Viber…`);return;}
     catch(err){console.warn('Не удалось отправить группу фото в Android Viber',err);}
   }
-  if(window.warehouseDesktop?.copyPhotosToClipboard){
-    try{
-      const result=await window.warehouseDesktop.copyPhotosToClipboard(urls,context);
-      if(result?.copied){toast(`${result.count||urls.length} фото скопированы. Открой чат Viber и нажми Ctrl+V.`);return;}
-      throw new Error('Windows-приложение не подтвердило копирование фотографий.');
-    }catch(err){console.error('Не удалось скопировать группу фото в Windows',err);toast('Не удалось скопировать все фото: '+(err?.message||'проверь интернет и попробуй ещё раз'));return;}
-  }
-  toast('Пакетное копирование доступно в приложении Windows. В браузере скопируй фотографии по одной.');
+  try{
+    if(window.warehouseDesktop?.sharePhotoToViber){
+      const collage=await createDefectPhotoCollage(urls,context);
+      const reader=new FileReader();
+      const dataUrl=await new Promise((resolve,reject)=>{reader.onload=()=>resolve(String(reader.result||''));reader.onerror=()=>reject(new Error('Не удалось прочитать коллаж.'));reader.readAsDataURL(collage);});
+      const result=await window.warehouseDesktop.sharePhotoToViber(dataUrl,context,false);
+      if(!result?.copied)throw new Error('Windows-приложение не подтвердило копирование коллажа.');
+    }else{
+      if(!navigator.clipboard?.write||typeof ClipboardItem==='undefined')throw new Error('Браузер не поддерживает копирование изображений.');
+      const collagePromise=createDefectPhotoCollage(urls,context);
+      await navigator.clipboard.write([new ClipboardItem({'image/png':collagePromise})]);
+    }
+    toast(`${urls.length} фото объединены в одно изображение и скопированы. Вставь в Viber через Ctrl+V.`);
+  }catch(err){console.error('Не удалось скопировать фотографии дефекта',err);toast('Не удалось скопировать фото: '+(err?.message||'проверь интернет и попробуй ещё раз'));}
 }
 async function copyPhotoToClipboard(url,context='Фото из заказа'){
   if(!url)return;

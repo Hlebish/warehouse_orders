@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Tray, Menu, nativeImage, shell, session, Notification, ipcMain, clipboard, net } = require('electron');
+const { app, BrowserWindow, Tray, Menu, nativeImage, shell, session, Notification, ipcMain, clipboard, net, powerMonitor } = require('electron');
 const { spawn } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -89,7 +89,9 @@ async function checkForDesktopUpdates(manual = false) {
   updateCheckInProgress = true;
   refreshTrayMenu();
   try {
-    await autoUpdater.checkForUpdatesAndNotify();
+    // Use the updater without its default "install on exit" toast; our own
+    // status is clearer and installation is gated by real system inactivity.
+    await autoUpdater.checkForUpdates();
   } catch (error) {
     console.warn('[Warehouse Orders] Could not check desktop updates:', String(error?.message || error));
     if (manualUpdateCheckPending) notifyDesktopUpdateStatus('Не удалось проверить обновления: ' + String(error?.message || error));
@@ -103,7 +105,9 @@ async function checkForDesktopUpdates(manual = false) {
 async function appIsAwayAndReadyForUpdate() {
   if (!mainWindow || mainWindow.isDestroyed()) return true;
   const windowIsInactive = !mainWindow.isVisible() || mainWindow.isMinimized() || !mainWindow.isFocused();
-  if (!windowIsInactive || mainWindow.webContents.isLoading()) return false;
+  // Losing focus alone is not enough: the employee may simply be working in
+  // another program. Wait until Windows has seen no keyboard/mouse input.
+  if (!windowIsInactive || powerMonitor.getSystemIdleTime() < 180 || mainWindow.webContents.isLoading()) return false;
   return mainWindow.webContents.executeJavaScript(`(() => {
     const modal = document.getElementById('modalBackdrop');
     const active = document.activeElement;
@@ -410,7 +414,9 @@ app.whenReady().then(() => {
   autoUpdater.autoDownload = true;
   // Updates are downloaded quietly; installation is scheduled for a safe,
   // unfocused moment and the NSIS installer runs without a wizard.
-  autoUpdater.autoInstallOnAppQuit = true;
+  // Never start the NSIS installer just because the app was closed normally.
+  // Our explicit silent install runs only after the workstation is idle.
+  autoUpdater.autoInstallOnAppQuit = false;
   autoUpdater.on('error', error => {
     updateAvailable = false;
     console.warn('[Warehouse Orders] App update failed:', String(error?.message || error));

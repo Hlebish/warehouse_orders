@@ -2412,6 +2412,27 @@ async function shareChatMessage(id){
   try{await navigator.clipboard.writeText(value);toast(urls.length?'Текст и ссылки на фото скопированы.':'Текст сообщения скопирован.');}
   catch{toast('Поделиться не удалось. Используй «Копировать» в меню сообщения.');}
 }
+function fetchPhotoAsPng(url){
+  return fetch(url,{mode:'cors'}).then(async response=>{
+    if(!response.ok)throw new Error(`Не удалось загрузить фото (HTTP ${response.status}).`);
+    const source=await response.blob();
+    if(!source.type.startsWith('image/'))throw new Error('Ссылка не вернула изображение.');
+    if(source.type==='image/png')return source;
+    if(typeof createImageBitmap!=='function')throw new Error('Браузер не умеет преобразовать фото для буфера обмена.');
+    const bitmap=await createImageBitmap(source),canvas=document.createElement('canvas');
+    canvas.width=bitmap.width;canvas.height=bitmap.height;
+    canvas.getContext('2d').drawImage(bitmap,0,0);bitmap.close();
+    const png=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));
+    if(!png)throw new Error('Не удалось подготовить PNG для буфера обмена.');
+    return png;
+  });
+}
+function startBrowserPhotoCopy(url){
+  if(!navigator.clipboard?.write||typeof ClipboardItem==='undefined')throw new Error('Этот браузер не поддерживает копирование изображений.');
+  const pngPromise=fetchPhotoAsPng(url);
+  const writePromise=navigator.clipboard.write([new ClipboardItem({'image/png':pngPromise})]);
+  return {pngPromise,writePromise};
+}
 async function sharePhotoViaViber(url,context='Фото из заказа'){
   if(!url)return;
   if(window.warehouseDesktop?.sharePhotoToViber){
@@ -2431,25 +2452,15 @@ async function sharePhotoViaViber(url,context='Фото из заказа'){
     try{window.AndroidWarehouse.sharePhotoToViber(url,context);return;}
     catch(err){console.warn('Native Viber photo share failed',err);}
   }
-  // Desktop browsers that support file sharing can pass the actual image file.
+  // In a desktop browser, copy a PNG during the click gesture and open Viber's
+  // supported share URI with a short caption. The user picks a chat and pastes.
   try{
-    const response=await fetch(url);
-    if(!response.ok)throw new Error('Не удалось загрузить фотографию');
-    const blob=await response.blob();
-    const type=blob.type&&blob.type.startsWith('image/')?blob.type:'image/jpeg';
-    const ext=type==='image/png'?'png':type==='image/webp'?'webp':'jpg';
-    const file=new File([blob],`warehouse-defect-photo.${ext}`,{type});
-    if(navigator.canShare?.({files:[file]})&&navigator.share){
-      await navigator.share({title:context,text:context,files:[file]});
-      return;
-    }
-    // Viber Desktop has no supported public URL scheme for attaching a local
-    // image. Download the real file so the user can attach it in the chat.
-    const objectUrl=URL.createObjectURL(blob),link=document.createElement('a');
-    link.href=objectUrl;link.download=file.name;document.body.appendChild(link);link.click();link.remove();
-    setTimeout(()=>URL.revokeObjectURL(objectUrl),60000);
-    try{await navigator.clipboard.writeText(context);}catch{}
-    toast('Фото скачано. Прикрепи файл к сообщению в Viber.');
+    const copy=startBrowserPhotoCopy(url);
+    const launch=document.createElement('a');
+    launch.href='viber://forward?text='+encodeURIComponent(context+' · фото скопировано, нажми Ctrl+V');
+    launch.rel='noreferrer';document.body.appendChild(launch);launch.click();launch.remove();
+    await copy.writePromise;
+    toast('Фото скопировано. Выбери чат в Viber и нажми Ctrl+V.');
   }catch(err){
     if(err?.name==='AbortError')return;
     console.error('Не удалось передать фото в Viber',err);
@@ -2474,12 +2485,8 @@ async function copyPhotoToClipboard(url,context='Фото из заказа'){
     }
   }catch(err){desktopError=err;console.warn('Не удалось скопировать фото через Windows',err);}
   try{
-    const response=await fetch(url);
-    if(!response.ok)throw new Error('Не удалось загрузить фото.');
-    const blob=await response.blob();
-    if(!blob.type.startsWith('image/'))throw new Error('Ссылка не вернула изображение.');
-    if(!navigator.clipboard?.write||typeof ClipboardItem==='undefined')throw new Error('Этот браузер не поддерживает копирование изображений.');
-    await navigator.clipboard.write([new ClipboardItem({[blob.type]:blob})]);
+    const copy=startBrowserPhotoCopy(url);
+    await copy.writePromise;
     toast('Фото скопировано в буфер обмена. Открой Viber, выбери чат и нажми Ctrl+V.');
   }catch(err){
     console.error('Не удалось скопировать фото',err);

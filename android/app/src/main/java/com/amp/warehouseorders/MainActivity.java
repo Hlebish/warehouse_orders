@@ -385,7 +385,7 @@ public class MainActivity extends AppCompatActivity {
             } else {
                 send.putParcelableArrayListExtra(Intent.EXTRA_STREAM, contentUris);
             }
-            send.putExtra(Intent.EXTRA_TEXT, caption == null ? "Фото дефекта" : caption);
+            if (contentUris.size() == 1) send.putExtra(Intent.EXTRA_TEXT, caption == null ? "Фото дефекта" : caption);
             ClipData clipData = ClipData.newUri(getContentResolver(), "Фото дефекта", contentUris.get(0));
             for (int i = 1; i < contentUris.size(); i++) clipData.addItem(new ClipData.Item(contentUris.get(i)));
             send.setClipData(clipData);
@@ -395,7 +395,11 @@ public class MainActivity extends AppCompatActivity {
             if (send.resolveActivity(getPackageManager()) == null) launch = Intent.createChooser(send.setPackage(null), "Отправить фотографии");
             final Intent finalLaunch = launch;
             runOnUiThread(() -> {
-                try { startActivity(finalLaunch); }
+                try {
+                    startActivity(finalLaunch);
+                    if (contentUris.size() > 1) android.widget.Toast.makeText(this,
+                        "Выбери чат в Viber и нажми «Отправить»", android.widget.Toast.LENGTH_LONG).show();
+                }
                 catch (Exception error) { android.widget.Toast.makeText(this, "Не удалось открыть отправку фото в Viber", android.widget.Toast.LENGTH_LONG).show(); }
             });
         } catch (Exception error) {

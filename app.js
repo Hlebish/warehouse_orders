@@ -1126,7 +1126,7 @@ function showModal(title,body,buttons=[],eyebrow='КАРТОЧКА ЗАКАЗА'
     const groupButton=document.createElement('button');
     groupButton.type='button';
     groupButton.className='small-button primary-soft defect-photo-group-button';
-    groupButton.textContent=isAndroidWarehouse()?'Отправить все фото в Viber':'📋 Скопировать все фото (коллаж)';
+    groupButton.textContent=isAndroidWarehouse()?`Отправить ${photoUrls.length} фото в Viber`:'📋 Скопировать все фото (коллаж)';
     groupButton.dataset.photoGroup=JSON.stringify(photoUrls);
     groupButton.dataset.photoGroupContext=photoButton?.dataset.viberContext||photoButton?.dataset.copyContext||'Фото дефекта';
     photoGroup.insertAdjacentElement('beforebegin',groupButton);

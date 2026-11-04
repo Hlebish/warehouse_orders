@@ -3924,6 +3924,13 @@ body.dark-theme .order-detail-head .detail-client-link:hover{
 .client-detail-field span{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted,#87939a);font-weight:750}
 .client-detail-field b{font-size:14px;font-weight:550;overflow-wrap:anywhere;white-space:pre-wrap}
 .client-detail-comment{border-bottom:0}
+.client-detail-choices{display:grid;gap:10px;max-height:min(62vh,560px);overflow:auto;padding:2px 3px 3px 0}
+.client-detail-choice{display:grid;gap:8px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--surface,#fff);min-width:0}
+.client-detail-choice .client-detail-name{padding:0;background:transparent;border:0;font-size:15px}
+.client-detail-choice .client-detail-field{padding:0;border:0;gap:3px}
+.client-detail-choice .client-detail-field span{font-size:9px}
+.client-detail-choice .client-detail-field b{font-size:12px}
+.client-detail-choice>button{justify-self:start;margin-top:2px}
 
 /* Daily order group separators */
 body.dark-theme .date-separator td{padding:14px 10px 8px!important;border:0!important;background:transparent!important}

@@ -12,6 +12,8 @@ let quitting = false;
 let updateDownloaded = false;
 let updateAvailable = false;
 let updateCheckInProgress = false;
+let manualUpdateCheckPending = false;
+let updateInstallScheduled = false;
 const activeNotifications = new Map();
 
 app.setAppUserModelId('ua.amp.warehouseorders');
@@ -62,18 +64,55 @@ function openViberApp(context = '') {
   }));
 }
 
-async function checkForDesktopUpdates() {
-  if (!app.isPackaged || updateCheckInProgress || updateAvailable || updateDownloaded) return;
+function notifyDesktopUpdateStatus(body) {
+  if (Notification.isSupported()) {
+    new Notification({ title: 'Заказы · Склад', body, silent: true }).show();
+  } else if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('warehouse:update-status', String(body || ''));
+  }
+}
+
+async function checkForDesktopUpdates(manual = false) {
+  if (!app.isPackaged) {
+    if (manual) notifyDesktopUpdateStatus('Автообновление работает только в установленном приложении.');
+    return;
+  }
+  if (updateCheckInProgress) {
+    if (manual) manualUpdateCheckPending = true;
+    return;
+  }
+  if (updateAvailable || updateDownloaded) return;
+  manualUpdateCheckPending = manual;
   updateCheckInProgress = true;
   refreshTrayMenu();
   try {
     await autoUpdater.checkForUpdatesAndNotify();
   } catch (error) {
     console.warn('[Warehouse Orders] Could not check desktop updates:', String(error?.message || error));
+    if (manualUpdateCheckPending) notifyDesktopUpdateStatus('Не удалось проверить обновления: ' + String(error?.message || error));
+    manualUpdateCheckPending = false;
   } finally {
     updateCheckInProgress = false;
     refreshTrayMenu();
   }
+}
+
+async function installDownloadedUpdateWhenSafe() {
+  if (!app.isPackaged || !updateDownloaded || updateInstallScheduled) return;
+  if (mainWindow && !mainWindow.isDestroyed() && mainWindow.webContents.isLoading()) return;
+  const canInstall = !mainWindow || mainWindow.isDestroyed() ? true : await mainWindow.webContents.executeJavaScript(`(() => {
+    const modal = document.getElementById('modalBackdrop');
+    const active = document.activeElement;
+    const editing = active && (['INPUT', 'TEXTAREA', 'SELECT'].includes(active.tagName) || active.isContentEditable);
+    return (!modal || modal.hidden) && !editing;
+  })()`).catch(() => false);
+  if (!canInstall) return;
+  updateInstallScheduled = true;
+  notifyDesktopUpdateStatus('Обновление установится автоматически. Приложение сейчас перезапустится.');
+  setTimeout(() => {
+    quitting = true;
+    autoUpdater.quitAndInstall();
+  }, 2500);
 }
 
 
@@ -290,8 +329,8 @@ function showTestNotification() {
 function refreshTrayMenu() {
   if (!tray) return;
   const updateAction = updateDownloaded
-    ? { label: 'Перезапустить и установить обновление', click: () => { quitting = true; autoUpdater.quitAndInstall(); } }
-    : { label: updateAvailable ? 'Обновление скачивается…' : updateCheckInProgress ? 'Проверяем обновления…' : 'Проверить обновления', enabled: !updateAvailable && !updateCheckInProgress, click: checkForDesktopUpdates };
+    ? { label: 'Обновление установится автоматически…', enabled: false }
+    : { label: updateAvailable ? 'Обновление скачивается…' : updateCheckInProgress ? 'Проверяем обновления…' : 'Проверить обновления', enabled: !updateAvailable && !updateCheckInProgress, click: () => checkForDesktopUpdates(true) };
   const items = [
     { label: 'Открыть заказы', click: () => { if (mainWindow) { mainWindow.show(); mainWindow.focus(); } } },
     updateAction,
@@ -313,6 +352,7 @@ function createTray() {
 }
 
 app.whenReady().then(() => {
+  ipcMain.handle('warehouse:get-app-version', () => app.getVersion());
   session.fromPartition('persist:warehouse-orders').setPermissionRequestHandler((webContents, permission, callback) => {
     callback(['notifications', 'audio', 'media'].includes(permission));
   });
@@ -323,23 +363,33 @@ app.whenReady().then(() => {
   autoUpdater.on('error', error => {
     updateAvailable = false;
     console.warn('[Warehouse Orders] App update failed:', String(error?.message || error));
+    if (manualUpdateCheckPending) notifyDesktopUpdateStatus('Не удалось проверить или загрузить обновление: ' + String(error?.message || error));
+    manualUpdateCheckPending = false;
     refreshTrayMenu();
   });
-  autoUpdater.on('update-not-available', () => { updateAvailable = false; refreshTrayMenu(); });
+  autoUpdater.on('update-not-available', () => {
+    updateAvailable = false;
+    if (manualUpdateCheckPending) notifyDesktopUpdateStatus('Обновлений нет. Установлена версия ' + app.getVersion() + '.');
+    manualUpdateCheckPending = false;
+    refreshTrayMenu();
+  });
   autoUpdater.on('update-available', info => {
     updateAvailable = true;
     console.info('[Warehouse Orders] Desktop update available:', info.version);
     refreshTrayMenu();
-    if (Notification.isSupported()) new Notification({ title: 'Заказы · Склад', body: 'Найдено обновление ' + info.version + '. Оно загружается в фоне.' }).show();
+    notifyDesktopUpdateStatus('Найдено обновление ' + info.version + '. Оно загружается в фоне.');
+    manualUpdateCheckPending = false;
   });
   autoUpdater.on('update-downloaded', info => {
     updateAvailable = false;
     updateDownloaded = true;
     refreshTrayMenu();
-    if (Notification.isSupported()) new Notification({ title: 'Заказы · Склад', body: 'Обновление ' + info.version + ' скачано. Установить его можно через меню значка приложения.' }).show();
+    notifyDesktopUpdateStatus('Обновление ' + info.version + ' загружено и установится автоматически при ближайшей паузе.');
+    installDownloadedUpdateWhenSafe();
   });
   checkForDesktopUpdates();
   setInterval(checkForDesktopUpdates, 120000);
+  setInterval(installDownloadedUpdateWhenSafe, 15000);
   // Check for published site changes every two minutes. Reloads are deferred while editing.
   mainWindow.webContents.once('did-finish-load', () => {
     readPublishedAssetVersion().then(version => { loadedAssetVersion = version; }).catch(error => {

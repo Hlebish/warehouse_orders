@@ -379,7 +379,7 @@ public class MainActivity extends AppCompatActivity {
         updateExecutor.execute(() -> {
             try {
                 AndroidRelease release = findLatestAndroidRelease();
-                if (release == null || release.versionCode <= BuildConfig.VERSION_CODE) return;
+                if (release == null || release.versionCode <= installedAppVersionCode()) return;
                 File apk = new File(appUpdateDirectory(), "warehouse-orders-update.apk");
                 File parent = apk.getParentFile();
                 if (parent == null || (!parent.exists() && !parent.mkdirs())) {
@@ -490,7 +490,17 @@ public class MainActivity extends AppCompatActivity {
 
     private boolean hasExpectedApkVersion(File apk, int expectedVersionCode) {
         long apkVersion = getApkVersionCode(apk);
-        return apkVersion == expectedVersionCode && apkVersion > BuildConfig.VERSION_CODE;
+        return apkVersion == expectedVersionCode && apkVersion > installedAppVersionCode();
+    }
+
+    private long installedAppVersionCode() {
+        try {
+            android.content.pm.PackageInfo installed = getPackageManager().getPackageInfo(getPackageName(), 0);
+            return Build.VERSION.SDK_INT >= 28 ? installed.getLongVersionCode() : installed.versionCode;
+        } catch (Exception error) {
+            android.util.Log.w("WarehouseOrders", "Could not read installed app version", error);
+            return 0;
+        }
     }
 
     private long getApkVersionCode(File apk) {
@@ -519,7 +529,7 @@ public class MainActivity extends AppCompatActivity {
             File apk = new File(appUpdateDirectory(), "warehouse-orders-update.apk");
             if (apk.exists() && apk.length() > 0) {
                 long versionCode = getApkVersionCode(apk);
-                if (versionCode <= BuildConfig.VERSION_CODE) {
+                if (versionCode <= installedAppVersionCode()) {
                     apk.delete();
                     getSharedPreferences(PREFS, MODE_PRIVATE).edit().remove(PREF_PENDING_UPDATE_VERSION).apply();
                     return;

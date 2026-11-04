@@ -616,8 +616,26 @@ window.registerNativePushToken=registerNativePushToken;
 
 async function syncPushToken(requestPermission=false){
   // Electron uses native Windows notifications driven by the signed-in Firestore listener.
-  // Web Push/FCM token registration is unreliable inside Electron and is not needed there.
+  // Remove stale FCM registrations created by older Electron builds: those tokens
+  // make the service worker show a second, system-sound notification beside the
+  // desktop app's silent Windows toast and built-in website sound.
   if(window.warehouseDesktop?.isDesktopApp){
+    const cleanupKey='warehouse_desktop_push_cleanup_'+(signedInUser?.uid||'');
+    if(signedInUser&&sessionStorage.getItem(cleanupKey)!=='done'){
+      try{
+        const tokenDocs=await getDocs(collection(db,'users',signedInUser.uid,'pushTokens'));
+        const stale=tokenDocs.docs.filter(item=>{
+          const data=item.data()||{};
+          return data.platform==='web'&&data.appId==='warehouse_orders'&&/Electron/i.test(String(data.userAgent||''));
+        });
+        for(let index=0;index<stale.length;index+=400){
+          const batch=writeBatch(db);
+          stale.slice(index,index+400).forEach(item=>batch.delete(item.ref));
+          await batch.commit();
+        }
+        sessionStorage.setItem(cleanupKey,'done');
+      }catch(err){console.warn('Не удалось удалить устаревшие desktop push-токены',err);}
+    }
     if(requestPermission)toast('Уведомления Windows для приложения обрабатываются автоматически.');
     return;
   }

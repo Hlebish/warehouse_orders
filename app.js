@@ -3274,14 +3274,14 @@ async function toggleShipmentItemChecked(dateKey,orderId,article){
     if(nextChecked)checked.add(key);else checked.delete(key);
     await setDoc(ref,{date:dateKey,checkedOrderArticles:[...checked]},{merge:true});
     await writeAudit(nextChecked?'Проверена позиция на отгрузке':'Снята проверка позиции на отгрузке','Дата: '+dateKey+'; заказ: '+orderKey+'; артикул: '+articleKey);
-    openShipmentManifest(dateKey,'',$('shipmentSearch')?.value||'');
+    openShipmentManifest(dateKey,'',$('shipmentSearch')?.value||'',nextChecked?orderKey:'');
   }catch(err){
     console.error('Не удалось сохранить отметку проверки отгрузки',err);
     toast('Не удалось сохранить отметку проверки.');
   }
 }
 let shipmentSearchDebounce=null;
-async function openShipmentManifest(dateKey=localDateKey(new Date()),categoryFilter='',searchQuery=''){
+async function openShipmentManifest(dateKey=localDateKey(new Date()),categoryFilter='',searchQuery='',autoCollapsedOrderId=''){
   const expandedOrderIds=new Set([...document.querySelectorAll('.shipment-order-card[open]')].map(el=>el.dataset.orderId).filter(Boolean));
   await loadShipmentCategoryMap();
   let confirmation=null;
@@ -3320,7 +3320,8 @@ async function openShipmentManifest(dateKey=localDateKey(new Date()),categoryFil
     for(const order of visibleOrders){
       const orderQuantity=order.shipmentArticles.reduce((sum,item)=>sum+(Number(item.quantity)||1),0);
       const orderClass=order.isShipmentChecked?' shipment-order-complete':' shipment-order-pending';
-      html+='<details data-order-id="'+esc(order.id)+'" class="shipment-order-card'+orderClass+'"'+(expandedOrderIds.has(String(order.id))?' open':'')+'><summary class="shipment-order-header"><div><strong class="shipment-client-name">'+esc(order.client||'Клиент не указан')+'</strong><span>Заказ № '+esc(order.number||'—')+'</span></div><span class="shipment-order-count">'+orderQuantity+' шт.</span></summary><div class="shipment-order-articles">';
+      const keepExpanded=expandedOrderIds.has(String(order.id))&&!(order.isShipmentChecked&&String(order.id)===String(autoCollapsedOrderId));
+      html+='<details data-order-id="'+esc(order.id)+'" class="shipment-order-card'+orderClass+'"'+(keepExpanded?' open':'')+'><summary class="shipment-order-header"><div><strong class="shipment-client-name">'+esc(order.client||'Клиент не указан')+'</strong><span>Заказ № '+esc(order.number||'—')+'</span></div><span class="shipment-order-count">'+orderQuantity+' шт.</span></summary><div class="shipment-order-articles">';
       for(const item of order.visibleArticles){
         const checkControl=(canManageUsers||state.role==='warehouse')
           ? '<button type="button" class="small-button '+(item.checked?'good':'primary-soft')+'" data-action="toggle-shipment-checked:'+dateKey+'|'+encodeURIComponent(order.id)+'|'+encodeURIComponent(item.article)+'">'+(item.checked?'✓ Проверено':'Проверить')+'</button>'

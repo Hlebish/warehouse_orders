@@ -2461,10 +2461,10 @@ body.dark-theme .create-order-button:hover{background:linear-gradient(135deg,#50
 /* Shipment manifest grouped into individual order/client blocks. */
 .shipment-order-list{display:grid;gap:12px;margin:12px 0}
 .shipment-order-card{overflow:hidden;border:1px solid var(--border,#343a40);border-radius:12px;background:var(--surface,#17191b)}
-.shipment-order-header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 15px;background:rgba(80,130,65,.09);border-bottom:1px solid var(--border,#343a40)}
+.shipment-order-header{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 12px;background:rgba(80,130,65,.09);border-bottom:1px solid var(--border,#343a40)}
 .shipment-order-header>div{display:grid;gap:4px;min-width:0}
-.shipment-order-header>div strong{font-size:13px;color:var(--text,#edf0ed)}
-.shipment-order-header>div span{font-size:12px;color:var(--muted,#9ba49b);overflow-wrap:anywhere}
+.shipment-order-header>div strong{font-size:12px;color:var(--text,#edf0ed)}
+.shipment-order-header>div span{font-size:10px;color:var(--muted,#9ba49b);overflow-wrap:anywhere}
 .shipment-order-count{flex:0 0 auto;padding:5px 9px;border-radius:999px;background:rgba(105,153,0,.16);color:var(--accent,#9fca5b);font-size:11px;font-weight:800}
 .shipment-order-articles{padding:0 12px}
 .shipment-order-articles .manifest-row{gap:12px;padding:11px 2px;border-bottom:1px solid var(--border,#343a40)}
@@ -2493,14 +2493,14 @@ body.dark-theme .date-separator.current-date-separator td{background:#1c2118!imp
 
 
 /* Emphasize the client name in each shipment block. */
-.shipment-order-header .shipment-client-name{display:block;font-size:16px!important;font-weight:500;line-height:1.35;color:var(--text,#edf0ed);overflow-wrap:anywhere}
-body.dark-theme .shipment-order-header .shipment-client-name{font-size:16px!important;color:#edf0e9!important}
+.shipment-order-header .shipment-client-name{display:block;font-size:13px!important;font-weight:600;line-height:1.3;color:var(--text,#edf0ed);overflow-wrap:anywhere}
+body.dark-theme .shipment-order-header .shipment-client-name{font-size:13px!important;color:#edf0e9!important}
 
 
 /* Shipment order cards with optional collapsing for long article lists. */
 .shipment-order-card>summary.shipment-order-header{list-style:none;cursor:pointer}
 .shipment-order-card>summary.shipment-order-header::-webkit-details-marker{display:none}
-.shipment-order-card>summary.shipment-order-header:after{content:"⌄";flex:0 0 auto;margin-left:2px;color:var(--muted,#9ba49b);font-size:18px;line-height:1;transition:transform .16s ease}
+.shipment-order-card>summary.shipment-order-header:after{content:"⌄";flex:0 0 auto;margin-left:2px;color:var(--muted,#9ba49b);font-size:15px;line-height:1;transition:transform .16s ease}
 .shipment-order-card[open]>summary.shipment-order-header:after{transform:rotate(180deg)}
 .shipment-order-card:not([open])>summary.shipment-order-header{border-bottom:0}
 .shipment-order-card>summary.shipment-order-header:focus-visible{outline:2px solid var(--accent,#9fca5b);outline-offset:-3px}

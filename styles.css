@@ -7999,3 +7999,63 @@ body.dark-theme .push-registration-status[data-state="pending"]{background:#352e
 @media(max-width:520px){.notification-group-actions .small-button{padding:6px 7px;font-size:8px}.notification-summary{justify-content:space-between}}
 .toast.site-update-notice{display:flex;align-items:center;justify-content:space-between;gap:12px}
 .toast.site-update-notice button{flex:0 0 auto;white-space:nowrap}
+
+/* Calm, consistent touch feedback in Android WebView, mobile browsers and desktop. */
+html,
+body,
+button,
+a,
+[role="button"]{
+  -webkit-tap-highlight-color: transparent;
+}
+button,
+a,
+[role="button"]{
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+}
+button:focus:not(:focus-visible),
+a:focus:not(:focus-visible),
+[role="button"]:focus:not(:focus-visible){
+  outline: none !important;
+}
+button,
+.nav-item,
+.stat-card,
+.stat-order-item,
+.notice-item,
+.timeline-item,
+.shipment-order-card{
+  transition-duration: .22s !important;
+  transition-timing-function: cubic-bezier(.2,.75,.25,1) !important;
+}
+button:active:not(:disabled){transform:scale(.992)}
+.nav-item:active{transform:translateX(1px)}
+
+/* Slow the largest entrances slightly so screens feel settled instead of snapping. */
+.modal-backdrop:not([hidden]),
+.image-viewer:not([hidden]),
+.sidebar-backdrop:not([hidden]){
+  animation-duration: .24s;
+  animation-timing-function: cubic-bezier(.2,.75,.25,1);
+}
+.modal-backdrop:not([hidden])>.modal{
+  animation-duration: .28s;
+  animation-timing-function: cubic-bezier(.22,1,.36,1);
+}
+.filter-menu:not([hidden]),
+.client-suggestions:not([hidden]),
+.product-suggestions:not([hidden]),
+.chat-mention-suggestions:not([hidden]),
+.directory-suggestions:not([hidden]){
+  animation-duration: .22s;
+  animation-timing-function: cubic-bezier(.22,1,.36,1);
+}
+.toast-stack .toast{animation-duration:.26s;animation-timing-function:cubic-bezier(.22,1,.36,1)}
+@media(max-width:720px){
+  .sidebar{transition-duration:.28s!important;transition-timing-function:cubic-bezier(.22,1,.36,1)!important}
+}
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;transition-duration:.01ms!important}
+}

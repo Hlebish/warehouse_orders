@@ -31,8 +31,13 @@ function isGoogleAuthUrl(rawUrl) {
   }
 }
 
-function openViberApp() {
-  if (process.platform !== 'win32') return shell.openExternal('viber://');
+function openViberApp(context = '') {
+  // Viber rejects the bare `viber://` URI. Its documented forward action
+  // accepts text and opens the contact picker, so keep the clipboard photo
+  // ready for the user to paste into the selected chat.
+  const caption = `Фото из Заказы · Склад${context ? ` · ${context}` : ''}. Фото скопировано — вставьте его в чате через Ctrl+V.`.slice(0, 190);
+  const shareUrl = `viber://forward?text=${encodeURIComponent(caption)}`;
+  if (process.platform !== 'win32') return shell.openExternal(shareUrl);
 
   const viberPaths = [
     path.join(process.env.LOCALAPPDATA || '', 'Viber', 'Viber.exe'),
@@ -42,14 +47,18 @@ function openViberApp() {
   const executable = viberPaths.find(candidate => candidate && fs.existsSync(candidate));
   if (!executable) throw new Error('Не удалось найти установленный Viber. Фото уже скопировано — открой Viber вручную и нажми Ctrl+V.');
 
-  return new Promise((resolve, reject) => {
+  // Launch the registered share action so an existing Viber window comes to
+  // the foreground with its recipient picker, instead of opening a blank URI.
+  return shell.openExternal(shareUrl).then(() => true).catch(() => new Promise((resolve, reject) => {
+    // Keep a reliable fallback for installations where the URI handler is not
+    // registered; this at least raises Viber and leaves the image on clipboard.
     const child = spawn(executable, [], { detached: true, stdio: 'ignore', windowsHide: true });
     child.once('error', reject);
     child.once('spawn', () => {
       child.unref();
       resolve(true);
     });
-  });
+  }));
 }
 
 async function checkForDesktopUpdates() {
@@ -136,7 +145,7 @@ ipcMain.handle('warehouse:share-photo-to-viber', async (event, payload = {}) => 
   let viberOpened = false;
   if (payload.openViber !== false) {
     try {
-      viberOpened = await openViberApp();
+      viberOpened = await openViberApp(String(payload.context || '').slice(0, 100));
     } catch (error) {
       console.warn('[Warehouse Orders] Could not open Viber:', String(error?.message || error));
     }

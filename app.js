@@ -1384,20 +1384,37 @@ async function openClientCardByName(name,clientId='',orderId=selectedId){
     clients=snap.docs.map(d=>({id:d.id,...d.data()}));
   }catch(err){console.warn('Не удалось обновить данные клиента',err);}
   const normalizeClientName=value=>String(value||'').trim().replace(/\s+/g,' ').toLocaleLowerCase('ru').replace(/ё/g,'е');
+  const firstClientValue=(client,keys)=>{
+    for(const key of keys){
+      const value=client?.[key];
+      if(Array.isArray(value)){const joined=value.map(item=>String(item||'').trim()).filter(Boolean).join(', ');if(joined)return joined;}
+      else if(value!==undefined&&value!==null&&String(value).trim())return String(value).trim();
+    }
+    return '';
+  };
+  const clientPhone=client=>firstClientValue(client,['phone','phoneNumber','telephone','mobile','tel','phones','Телефон','Номер телефона']);
+  const clientAddress=client=>firstClientValue(client,['address','deliveryAddress','customerAddress','postalAddress','Адрес','Адрес клиента','Адрес доставки']);
+  const clientComment=client=>firstClientValue(client,['comment','comments','note','notes','Комментарий']);
   const exact=clients.filter(c=>normalizeClientName(c.name)===normalizeClientName(target));
-  const linked=clientId?clients.find(c=>c.id===clientId):null;
   const matches=exact.filter(c=>!c.hiddenFromDirectory);
-  if(!linked&&matches.length>1){
-    const cards=matches.map(c=>'<article class="client-detail-choice"><div class="client-detail-name">'+esc(c.name||target)+'</div><div class="client-detail-field"><span>Телефон</span><b>'+esc(String(c.phone||'—'))+'</b></div><div class="client-detail-field"><span>Адрес</span><b>'+esc(String(c.address||'—'))+'</b></div><button type="button" class="small-button primary-soft" data-action="choose-order-client-record" data-client-record-id="'+esc(c.id)+'" data-order-id="'+esc(orderId||'')+'">'+(orderId&&canEditOrder(state.orders.find(o=>o.id===orderId))?'Выбрать эту карточку':'Открыть эту карточку')+'</button></article>').join('');
+  const linked=clientId?clients.find(c=>c.id===clientId):null;
+  const hasContactData=c=>Boolean(clientPhone(c)||clientAddress(c)||clientComment(c));
+  // Old orders may point to an empty/stale client record while a duplicate with
+  // the same name contains the real contact details. Prefer the populated record.
+  const usableMatches=matches.filter(hasContactData);
+  const selected=linked&&hasContactData(linked)?linked:usableMatches.length===1?usableMatches[0]:null;
+  const needsChoice=usableMatches.length>1&&!(linked&&hasContactData(linked));
+  if(needsChoice){
+    const cards=usableMatches.map(c=>'<article class="client-detail-choice"><div class="client-detail-name">'+esc(c.name||target)+'</div><div class="client-detail-field"><span>Телефон</span><b>'+esc(clientPhone(c)||'—')+'</b></div><div class="client-detail-field"><span>Адрес</span><b>'+esc(clientAddress(c)||'—')+'</b></div><button type="button" class="small-button primary-soft" data-action="choose-order-client-record" data-client-record-id="'+esc(c.id)+'" data-order-id="'+esc(orderId||'')+'">'+(orderId&&canEditOrder(state.orders.find(o=>o.id===orderId))?'Выбрать эту карточку':'Открыть эту карточку')+'</button></article>').join('');
     showModal('Выберите карточку клиента','<p class="field-hint">У этого имени найдено несколько карточек. Сверьте телефон и адрес — приложение больше не будет подставлять случайную запись.</p><div class="client-detail-choices">'+cards+'</div>',[button('Назад к заказу','back-detail')],'НЕСКОЛЬКО СОВПАДЕНИЙ');
     return;
   }
-  const c=linked||matches[0]||exact[0];
+  const c=selected||(linked&&hasContactData(linked)?linked:null)||matches.find(hasContactData)||matches[0]||linked||exact[0];
   const row=(label,value)=>'<div class="client-detail-field"><span>'+label+'</span><b>'+esc(String(value||'—'))+'</b></div>';
   const body='<div class="client-detail-card">'+
     '<div class="client-detail-name">'+esc(c?.name||target)+'</div>'+
-    row('Телефон',c?.phone)+row('Адрес',c?.address)+
-    '<div class="client-detail-field client-detail-comment"><span>Комментарий</span><b>'+esc(String(c?.comment||'—'))+'</b></div>'+
+    row('Телефон',clientPhone(c))+row('Адрес',clientAddress(c))+
+    '<div class="client-detail-field client-detail-comment"><span>Комментарий</span><b>'+esc(clientComment(c)||'—')+'</b></div>'+
     (!c?'<div class="field-hint">В справочнике нет точного совпадения для этого имени. Возможно, заказ сохранён под старым названием клиента.</div>':'')+
     '</div>';
   showModal('Карточка клиента',body,[button('Назад к заказу','back-detail')],'ДАННЫЕ КЛИЕНТА');

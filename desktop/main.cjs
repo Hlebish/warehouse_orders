@@ -1,4 +1,6 @@
 const { app, BrowserWindow, Tray, Menu, nativeImage, shell, session, Notification, ipcMain, clipboard, net } = require('electron');
+const { spawn } = require('node:child_process');
+const fs = require('node:fs');
 const path = require('node:path');
 const { autoUpdater } = require('electron-updater');
 
@@ -8,6 +10,8 @@ let mainWindow = null;
 let tray = null;
 let quitting = false;
 let updateDownloaded = false;
+let updateAvailable = false;
+let updateCheckInProgress = false;
 const activeNotifications = new Map();
 
 app.setAppUserModelId('ua.amp.warehouseorders');
@@ -24,6 +28,41 @@ function isGoogleAuthUrl(rawUrl) {
     );
   } catch {
     return false;
+  }
+}
+
+function openViberApp() {
+  if (process.platform !== 'win32') return shell.openExternal('viber://');
+
+  const viberPaths = [
+    path.join(process.env.LOCALAPPDATA || '', 'Viber', 'Viber.exe'),
+    path.join(process.env.ProgramFiles || 'C:\\Program Files', 'Rakuten Viber', 'Viber.exe'),
+    path.join(process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)', 'Rakuten Viber', 'Viber.exe')
+  ];
+  const executable = viberPaths.find(candidate => candidate && fs.existsSync(candidate));
+  if (!executable) throw new Error('Не удалось найти установленный Viber. Фото уже скопировано — открой Viber вручную и нажми Ctrl+V.');
+
+  return new Promise((resolve, reject) => {
+    const child = spawn(executable, [], { detached: true, stdio: 'ignore', windowsHide: true });
+    child.once('error', reject);
+    child.once('spawn', () => {
+      child.unref();
+      resolve(true);
+    });
+  });
+}
+
+async function checkForDesktopUpdates() {
+  if (!app.isPackaged || updateCheckInProgress || updateAvailable || updateDownloaded) return;
+  updateCheckInProgress = true;
+  refreshTrayMenu();
+  try {
+    await autoUpdater.checkForUpdatesAndNotify();
+  } catch (error) {
+    console.warn('[Warehouse Orders] Could not check desktop updates:', String(error?.message || error));
+  } finally {
+    updateCheckInProgress = false;
+    refreshTrayMenu();
   }
 }
 
@@ -97,8 +136,7 @@ ipcMain.handle('warehouse:share-photo-to-viber', async (event, payload = {}) => 
   let viberOpened = false;
   if (payload.openViber !== false) {
     try {
-      await shell.openExternal('viber://');
-      viberOpened = true;
+      viberOpened = await openViberApp();
     } catch (error) {
       console.warn('[Warehouse Orders] Could not open Viber:', String(error?.message || error));
     }
@@ -240,9 +278,12 @@ function showTestNotification() {
 
 function refreshTrayMenu() {
   if (!tray) return;
+  const updateAction = updateDownloaded
+    ? { label: 'Перезапустить и установить обновление', click: () => { quitting = true; autoUpdater.quitAndInstall(); } }
+    : { label: updateAvailable ? 'Обновление скачивается…' : updateCheckInProgress ? 'Проверяем обновления…' : 'Проверить обновления', enabled: !updateAvailable && !updateCheckInProgress, click: checkForDesktopUpdates };
   const items = [
     { label: 'Открыть заказы', click: () => { if (mainWindow) { mainWindow.show(); mainWindow.focus(); } } },
-    ...(updateDownloaded ? [{ label: 'Перезапустить и установить обновление', click: () => { quitting = true; autoUpdater.quitAndInstall(); } }] : []),
+    updateAction,
     { label: 'Проверить уведомления Windows', click: () => showTestNotification() },
     { label: 'Перезагрузить приложение', click: () => { if (mainWindow) mainWindow.webContents.reload(); } },
     { type: 'separator' },
@@ -268,14 +309,26 @@ app.whenReady().then(() => {
   createTray();
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;
-  autoUpdater.on('error', error => console.warn('[Warehouse Orders] App update failed:', String(error?.message || error)));
-  autoUpdater.on('update-available', info => { console.info('[Warehouse Orders] Desktop update available:', info.version); });
+  autoUpdater.on('error', error => {
+    updateAvailable = false;
+    console.warn('[Warehouse Orders] App update failed:', String(error?.message || error));
+    refreshTrayMenu();
+  });
+  autoUpdater.on('update-not-available', () => { updateAvailable = false; refreshTrayMenu(); });
+  autoUpdater.on('update-available', info => {
+    updateAvailable = true;
+    console.info('[Warehouse Orders] Desktop update available:', info.version);
+    refreshTrayMenu();
+    if (Notification.isSupported()) new Notification({ title: 'Заказы · Склад', body: 'Найдено обновление ' + info.version + '. Оно загружается в фоне.' }).show();
+  });
   autoUpdater.on('update-downloaded', info => {
+    updateAvailable = false;
     updateDownloaded = true;
     refreshTrayMenu();
     if (Notification.isSupported()) new Notification({ title: 'Заказы · Склад', body: 'Обновление ' + info.version + ' скачано. Установить его можно через меню значка приложения.' }).show();
   });
-  autoUpdater.checkForUpdatesAndNotify().catch(error => console.warn('[Warehouse Orders] Could not check desktop updates:', String(error?.message || error)));
+  checkForDesktopUpdates();
+  setInterval(checkForDesktopUpdates, 120000);
   // Check for published site changes every two minutes. Reloads are deferred while editing.
   mainWindow.webContents.once('did-finish-load', () => {
     readPublishedAssetVersion().then(version => { loadedAssetVersion = version; }).catch(error => {

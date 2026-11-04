@@ -9,6 +9,10 @@ import android.content.ClipData;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
+import android.os.Handler;
+import android.os.Looper;
+import android.provider.Settings;
 import android.graphics.Rect;
 import android.graphics.Color;
 import android.view.Gravity;
@@ -25,6 +29,7 @@ import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.concurrent.ExecutorService;
@@ -56,11 +61,18 @@ import com.google.firebase.messaging.FirebaseMessaging;
 
 public class MainActivity extends AppCompatActivity {
     private static final String SITE_URL = "https://hlebish.github.io/warehouse_orders/";
+    private static final String ANDROID_RELEASES_URL = "https://api.github.com/repos/Hlebish/warehouse_orders/releases?per_page=100";
     private static final String CHANNEL_ID = "warehouse_orders_v8_custom_sound";
     private static final int NOTIFICATION_PERMISSION_REQUEST = 1001;
     private static final String PREFS = "warehouse_push";
     private static final String PREF_TOKEN = "token";
     private static final String PREF_INSTALLATION = "installationId";
+    private static final String PREF_UPDATE_CHECKED_AT = "androidUpdateCheckedAt";
+    private static final String PREF_PENDING_UPDATE_VERSION = "androidPendingUpdateVersion";
+    private static final String PREF_UPDATE_SNOOZED_VERSION = "androidUpdateSnoozedVersion";
+    private static final String PREF_UPDATE_SNOOZED_UNTIL = "androidUpdateSnoozedUntil";
+    private static final long UPDATE_CHECK_INTERVAL_MS = 6L * 60L * 60L * 1000L;
+    private static final long UPDATE_SNOOZE_MS = 12L * 60L * 60L * 1000L;
     private static final int GOOGLE_SIGN_IN_REQUEST = 1002;
     private static final int FILE_CHOOSER_REQUEST = 1003;
     private static final String GOOGLE_WEB_CLIENT_ID = "329606730319-bqe5c2lkngq4jk87atifp6n9qnn3chfh.apps.googleusercontent.com";
@@ -71,6 +83,20 @@ public class MainActivity extends AppCompatActivity {
     private GoogleSignInClient googleSignInClient;
     private ValueCallback<Uri[]> filePathCallback;
     private final ExecutorService shareExecutor = Executors.newSingleThreadExecutor();
+    private final ExecutorService updateExecutor = Executors.newSingleThreadExecutor();
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private final Runnable periodicAppUpdateCheck = new Runnable() {
+        @Override public void run() {
+            checkForAppUpdateIfDue();
+            mainHandler.postDelayed(this, UPDATE_CHECK_INTERVAL_MS);
+        }
+    };
+    private volatile boolean updateCheckInProgress;
+    private boolean updateDialogVisible;
+    private boolean activityResumed;
+    private boolean installPermissionSettingsOpened;
+    private File downloadedUpdateFile;
+    private String downloadedUpdateVersion = "";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -314,8 +340,13 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
+        activityResumed = true;
+        mainHandler.removeCallbacks(periodicAppUpdateCheck);
+        mainHandler.postDelayed(periodicAppUpdateCheck, UPDATE_CHECK_INTERVAL_MS);
         sendCachedTokenToSite();
         requestNativePushToken();
+        showPendingAppUpdateIfReady();
+        checkForAppUpdateIfDue();
         if (webView != null) {
             webView.postDelayed(() -> {
                 if (networkErrorView != null && networkErrorView.getVisibility() == View.VISIBLE) {
@@ -327,6 +358,253 @@ public class MainActivity extends AppCompatActivity {
                     null
                 );
             }, 500);
+        }
+    }
+
+    @Override
+    protected void onPause() {
+        activityResumed = false;
+        mainHandler.removeCallbacks(periodicAppUpdateCheck);
+        super.onPause();
+    }
+
+    private void checkForAppUpdateIfDue() {
+        if (updateCheckInProgress) return;
+        SharedPreferences prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
+        long lastCheck = prefs.getLong(PREF_UPDATE_CHECKED_AT, 0L);
+        long now = System.currentTimeMillis();
+        if (now - lastCheck < UPDATE_CHECK_INTERVAL_MS) return;
+        updateCheckInProgress = true;
+        prefs.edit().putLong(PREF_UPDATE_CHECKED_AT, now).apply();
+        updateExecutor.execute(() -> {
+            try {
+                AndroidRelease release = findLatestAndroidRelease();
+                if (release == null || release.versionCode <= BuildConfig.VERSION_CODE) return;
+                File apk = new File(appUpdateDirectory(), "warehouse-orders-update.apk");
+                File parent = apk.getParentFile();
+                if (parent == null || (!parent.exists() && !parent.mkdirs())) {
+                    throw new IllegalStateException("Не удалось подготовить папку для обновления.");
+                }
+                if (apk.exists() && apk.length() > 0 && hasExpectedApkVersion(apk, release.versionCode)) {
+                    markUpdateReady(apk, release.versionName);
+                    return;
+                }
+                File temporaryApk = new File(parent, "warehouse-orders-update.apk.part");
+                downloadApk(release.downloadUrl, temporaryApk);
+                if (!hasExpectedApkVersion(temporaryApk, release.versionCode)) {
+                    throw new IllegalStateException("Скачанный APK не прошёл проверку версии приложения.");
+                }
+                if (apk.exists() && !apk.delete()) throw new IllegalStateException("Не удалось заменить старый файл обновления.");
+                if (!temporaryApk.renameTo(apk)) throw new IllegalStateException("Не удалось сохранить APK обновления.");
+                markUpdateReady(apk, release.versionName);
+            } catch (Exception error) {
+                android.util.Log.w("WarehouseOrders", "Android app update check failed", error);
+                getSharedPreferences(PREFS, MODE_PRIVATE).edit()
+                    .putLong(PREF_UPDATE_CHECKED_AT, System.currentTimeMillis() - UPDATE_CHECK_INTERVAL_MS + 10L * 60L * 1000L)
+                    .apply();
+                new File(appUpdateDirectory(), "warehouse-orders-update.apk.part").delete();
+            } finally {
+                updateCheckInProgress = false;
+            }
+        });
+    }
+
+    private File appUpdateDirectory() {
+        File directory = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
+        return directory == null ? getCacheDir() : directory;
+    }
+
+    private AndroidRelease findLatestAndroidRelease() throws Exception {
+        HttpURLConnection connection = (HttpURLConnection) new URL(ANDROID_RELEASES_URL).openConnection();
+        connection.setConnectTimeout(12000);
+        connection.setReadTimeout(20000);
+        connection.setRequestProperty("Accept", "application/vnd.github+json");
+        connection.setRequestProperty("User-Agent", "WarehouseOrders-Android-Updater");
+        try {
+            int responseCode = connection.getResponseCode();
+            if (responseCode != HttpURLConnection.HTTP_OK) throw new IllegalStateException("GitHub API returned HTTP " + responseCode);
+            StringBuilder body = new StringBuilder();
+            try (InputStream input = connection.getInputStream()) {
+                byte[] buffer = new byte[8192];
+                int count;
+                while ((count = input.read(buffer)) != -1) body.append(new String(buffer, 0, count, "UTF-8"));
+            }
+            org.json.JSONArray releases = new org.json.JSONArray(body.toString());
+            AndroidRelease latest = null;
+            for (int i = 0; i < releases.length(); i++) {
+                JSONObject release = releases.optJSONObject(i);
+                if (release == null || release.optBoolean("draft") || release.optBoolean("prerelease")) continue;
+                String tag = release.optString("tag_name", "");
+                String prefix = "android-v1.0.";
+                if (!tag.startsWith(prefix)) continue;
+                int versionCode;
+                try { versionCode = Integer.parseInt(tag.substring(prefix.length())); }
+                catch (NumberFormatException ignored) { continue; }
+                org.json.JSONArray assets = release.optJSONArray("assets");
+                if (assets == null) continue;
+                String downloadUrl = "";
+                for (int assetIndex = 0; assetIndex < assets.length(); assetIndex++) {
+                    JSONObject asset = assets.optJSONObject(assetIndex);
+                    if (asset != null && "app-release.apk".equals(asset.optString("name"))) {
+                        downloadUrl = asset.optString("browser_download_url", "");
+                        break;
+                    }
+                }
+                if (!downloadUrl.startsWith("https://github.com/Hlebish/warehouse_orders/releases/download/")) continue;
+                if (latest == null || versionCode > latest.versionCode) {
+                    latest = new AndroidRelease(versionCode, "1.0." + versionCode, downloadUrl);
+                }
+            }
+            return latest;
+        } finally {
+            connection.disconnect();
+        }
+    }
+
+    private void downloadApk(String downloadUrl, File destination) throws Exception {
+        HttpURLConnection connection = (HttpURLConnection) new URL(downloadUrl).openConnection();
+        connection.setConnectTimeout(15000);
+        connection.setReadTimeout(45000);
+        connection.setInstanceFollowRedirects(true);
+        connection.setRequestProperty("User-Agent", "WarehouseOrders-Android-Updater");
+        try {
+            int responseCode = connection.getResponseCode();
+            if (responseCode != HttpURLConnection.HTTP_OK) throw new IllegalStateException("Не удалось скачать APK (HTTP " + responseCode + ").");
+            long length = connection.getContentLength();
+            if (length > 180L * 1024L * 1024L) throw new IllegalStateException("Файл обновления превышает допустимый размер.");
+            try (InputStream input = connection.getInputStream(); OutputStream output = new FileOutputStream(destination)) {
+                byte[] buffer = new byte[32768];
+                int count;
+                long total = 0;
+                while ((count = input.read(buffer)) != -1) {
+                    total += count;
+                    if (total > 180L * 1024L * 1024L) throw new IllegalStateException("Файл обновления превышает допустимый размер.");
+                    output.write(buffer, 0, count);
+                }
+                output.flush();
+            }
+        } finally {
+            connection.disconnect();
+        }
+    }
+
+    private boolean hasExpectedApkVersion(File apk, int expectedVersionCode) {
+        long apkVersion = getApkVersionCode(apk);
+        return apkVersion == expectedVersionCode && apkVersion > BuildConfig.VERSION_CODE;
+    }
+
+    private long getApkVersionCode(File apk) {
+        if (apk == null || !apk.isFile() || apk.length() == 0) return -1;
+        try {
+            android.content.pm.PackageInfo info = getPackageManager().getPackageArchiveInfo(apk.getAbsolutePath(), 0);
+            if (info == null || !getPackageName().equals(info.packageName)) return -1;
+            return Build.VERSION.SDK_INT >= 28 ? info.getLongVersionCode() : info.versionCode;
+        } catch (Exception error) {
+            android.util.Log.w("WarehouseOrders", "Could not validate downloaded APK", error);
+            return -1;
+        }
+    }
+
+    private void markUpdateReady(File apk, String versionName) {
+        getSharedPreferences(PREFS, MODE_PRIVATE).edit().putString(PREF_PENDING_UPDATE_VERSION, versionName).apply();
+        mainHandler.post(() -> {
+            downloadedUpdateFile = apk;
+            downloadedUpdateVersion = versionName;
+            showPendingAppUpdateIfReady();
+        });
+    }
+
+    private void showPendingAppUpdateIfReady() {
+        if (downloadedUpdateFile == null) {
+            File apk = new File(appUpdateDirectory(), "warehouse-orders-update.apk");
+            if (apk.exists() && apk.length() > 0) {
+                long versionCode = getApkVersionCode(apk);
+                if (versionCode <= BuildConfig.VERSION_CODE) {
+                    apk.delete();
+                    getSharedPreferences(PREFS, MODE_PRIVATE).edit().remove(PREF_PENDING_UPDATE_VERSION).apply();
+                    return;
+                }
+                downloadedUpdateFile = apk;
+                downloadedUpdateVersion = getSharedPreferences(PREFS, MODE_PRIVATE)
+                    .getString(PREF_PENDING_UPDATE_VERSION, "1.0." + versionCode);
+            }
+        }
+        if (updateDialogVisible || !activityResumed || downloadedUpdateFile == null || !downloadedUpdateFile.exists() || isFinishing() || isDestroyed()) return;
+        if (installPermissionSettingsOpened) {
+            installPermissionSettingsOpened = false;
+            if (Build.VERSION.SDK_INT < 26 || getPackageManager().canRequestPackageInstalls()) {
+                launchPackageInstaller();
+                return;
+            }
+        }
+        SharedPreferences prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
+        if (downloadedUpdateVersion.equals(prefs.getString(PREF_UPDATE_SNOOZED_VERSION, "")) &&
+                System.currentTimeMillis() < prefs.getLong(PREF_UPDATE_SNOOZED_UNTIL, 0L)) return;
+        updateDialogVisible = true;
+        new androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle("Обновление приложения готово")
+            .setMessage("Версия " + downloadedUpdateVersion + " уже скачана. Установить её сейчас?")
+            .setCancelable(true)
+            .setPositiveButton("Установить", (dialog, which) -> installDownloadedUpdate())
+            .setNegativeButton("Позже", (dialog, which) -> prefs.edit()
+                .putString(PREF_UPDATE_SNOOZED_VERSION, downloadedUpdateVersion)
+                .putLong(PREF_UPDATE_SNOOZED_UNTIL, System.currentTimeMillis() + UPDATE_SNOOZE_MS)
+                .apply())
+            .setOnDismissListener(dialog -> updateDialogVisible = false)
+            .show();
+    }
+
+    private void installDownloadedUpdate() {
+        if (downloadedUpdateFile == null || !downloadedUpdateFile.exists()) {
+            updateDialogVisible = false;
+            return;
+        }
+        if (Build.VERSION.SDK_INT >= 26 && !getPackageManager().canRequestPackageInstalls()) {
+            installPermissionSettingsOpened = true;
+            new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("Разрешите обновление")
+                .setMessage("Android просит один раз разрешить этому приложению устанавливать обновления. После этого вернитесь сюда — установка продолжится.")
+                .setNegativeButton("Отмена", (dialog, which) -> { })
+                .setPositiveButton("Открыть настройки", (dialog, which) -> {
+                    Intent settingsIntent = new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                        Uri.parse("package:" + getPackageName()));
+                    try { startActivity(settingsIntent); }
+                    catch (Exception error) {
+                        installPermissionSettingsOpened = false;
+                        android.util.Log.w("WarehouseOrders", "Could not open install permission settings", error);
+                    }
+                })
+                .show();
+            return;
+        }
+        launchPackageInstaller();
+    }
+
+    private void launchPackageInstaller() {
+        try {
+            Uri apkUri = FileProvider.getUriForFile(this, getPackageName() + ".fileprovider", downloadedUpdateFile);
+            Intent installIntent = new Intent(Intent.ACTION_VIEW);
+            installIntent.setDataAndType(apkUri, "application/vnd.android.package-archive");
+            installIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            startActivity(installIntent);
+        } catch (Exception error) {
+            android.util.Log.e("WarehouseOrders", "Could not start APK installer", error);
+            new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("Не удалось открыть установщик")
+                .setMessage("APK уже скачан. Проверьте разрешение на установку приложений для «Заказы · Склад» и попробуйте снова.")
+                .setPositiveButton("Понятно", null)
+                .show();
+        }
+    }
+
+    private static final class AndroidRelease {
+        final int versionCode;
+        final String versionName;
+        final String downloadUrl;
+        AndroidRelease(int versionCode, String versionName, String downloadUrl) {
+            this.versionCode = versionCode;
+            this.versionName = versionName;
+            this.downloadUrl = downloadUrl;
         }
     }
 

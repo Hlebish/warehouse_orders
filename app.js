@@ -54,6 +54,7 @@ pendingNotificationChat=notificationParams.get('chat')==='1';
 const $=id=>document.getElementById(id), modal=$('modalBackdrop');
 let uiStateRestored=false,lastUiSave=0;
 const isAndroidWarehouse=()=>/WarehouseOrdersAndroid/.test(navigator.userAgent);
+const isPhoneDevice=()=>/Android|iPhone|iPod|Mobile/i.test(navigator.userAgent);
 const ordersCacheKey=uid=>'warehouse_orders_snapshot_v1_'+uid;
 let ordersCacheSaveTimer=null,ordersCachePendingUid='';
 function writeOrdersCache(uid){
@@ -1116,6 +1117,7 @@ function showModal(title,body,buttons=[],eyebrow='КАРТОЧКА ЗАКАЗА'
     copyButton.dataset.copyContext=viberButton.dataset.viberContext||'Фото из заказа';
     copyButton.textContent='📋 Скопировать фото';
     viberButton.insertAdjacentElement('afterend',copyButton);
+    if(!isPhoneDevice())viberButton.remove();
   });
   $('modalFoot').innerHTML=buttons.join('');
   modal.hidden=false;

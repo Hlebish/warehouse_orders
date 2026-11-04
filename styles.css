@@ -7784,50 +7784,57 @@ body:has(.buyback-overlay:not([hidden])) .toast-stack .defect-toast {
 @media(max-width:720px){.kamenskoye-stat-section{margin:10px 0 18px}.kamenskoye-stat-card{width:100%;min-height:70px}}
 
 
-/* Fix scrolling inside the order card: keep its header/actions visible while the
-   long articles and comments area scrolls within the available window height. */
-#modal-backdrop:has(#modalBody .order-detail-head),
-.modal-backdrop:has(#modalBody .order-detail-head) {
-  overflow-y: auto !important;
+/* All dialog content scrolls in its own area; headers and actions stay visible. */
+.modal-backdrop:not([hidden]) {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
   overflow-x: hidden !important;
-  align-items: flex-start !important;
-  padding-top: 16px !important;
-  padding-bottom: 16px !important;
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch;
 }
-#modal:has(#modalBody .order-detail-head) {
+.modal-backdrop:not([hidden]) > .modal {
   display: flex !important;
   flex-direction: column !important;
-  height: auto !important;
   max-height: calc(100vh - 32px) !important;
   max-height: calc(100dvh - 32px) !important;
-  overflow: hidden !important;
   min-height: 0 !important;
+  overflow: hidden !important;
+  margin: auto 0;
+}
+.modal-backdrop:not([hidden]) > .modal > .modal-head,
+.modal-backdrop:not([hidden]) > .modal > .modal-foot {
   flex: 0 0 auto !important;
 }
-#modal:has(#modalBody .order-detail-head) #modalBody {
-  display: block !important;
-  flex: 1 1 0% !important;
-  height: 0 !important;
+.modal-backdrop:not([hidden]) > .modal > .modal-body {
+  flex: 1 1 auto !important;
   min-height: 0 !important;
-  max-height: none !important;
-  overflow-y: scroll !important;
   overflow-x: hidden !important;
+  overflow-y: auto !important;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
-  scrollbar-gutter: stable;
   touch-action: pan-y;
 }
-#modal:has(#modalBody .order-detail-head) .modal-head,
-#modal:has(#modalBody .order-detail-head) .modal-foot {
-  flex: 0 0 auto !important;
+@media (max-width: 720px) {
+  .modal-backdrop:not([hidden]) {
+    align-items: flex-end !important;
+    padding-top: max(8px, env(safe-area-inset-top)) !important;
+    padding-bottom: max(8px, env(safe-area-inset-bottom)) !important;
+  }
+  .modal-backdrop:not([hidden]) > .modal {
+    width: 100% !important;
+    max-width: 100% !important;
+    max-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 16px) !important;
+    margin: 0 !important;
+  }
 }
 
 
 /* Compact, easy-to-scan returns register */
-#modal:has(#modalBody .returns-panel){width:min(900px,calc(100vw - 32px));max-height:min(88dvh,820px);display:flex;flex-direction:column;overflow:hidden}
-#modal:has(#modalBody .returns-panel) .modal-head{padding:16px 20px 13px;flex:0 0 auto}
-#modal:has(#modalBody .returns-panel) .modal-body{padding:14px 18px 18px;min-height:0;overflow:auto;overscroll-behavior:contain}
-#modal:has(#modalBody .returns-panel) .modal-foot{padding:10px 18px 13px;flex:0 0 auto}
+.modal:has(#modalBody .returns-panel){width:min(900px,calc(100vw - 32px));max-height:min(88dvh,820px);display:flex;flex-direction:column;overflow:hidden}
+.modal:has(#modalBody .returns-panel) .modal-head{padding:16px 20px 13px;flex:0 0 auto}
+.modal:has(#modalBody .returns-panel) .modal-body{padding:14px 18px 18px;min-height:0;overflow:auto;overscroll-behavior:contain}
+.modal:has(#modalBody .returns-panel) .modal-foot{padding:10px 18px 13px;flex:0 0 auto}
 .returns-panel{display:grid;gap:12px;min-width:0}
 .returns-filters{display:grid;grid-template-columns:minmax(130px,.8fr) minmax(130px,.8fr) minmax(220px,1.5fr) auto;gap:8px;align-items:center}
 .returns-filters .search-box{min-width:0;min-height:38px}
@@ -7862,9 +7869,9 @@ body:has(.buyback-overlay:not([hidden])) .toast-stack .defect-toast {
 .returns-empty{display:grid;gap:5px;justify-items:center;text-align:center;padding:30px 16px;border:1px dashed var(--line,#303943);border-radius:10px;color:var(--muted,#9aa4b2);font-size:11px}
 .returns-empty b{font-size:13px;color:var(--text,#e7ebf0)}
 @media(max-width:720px){
-#modal:has(#modalBody .returns-panel){width:calc(100vw - 18px);max-height:calc(100dvh - 20px)}
-#modal:has(#modalBody .returns-panel) .modal-head{padding:13px 14px 11px}
-#modal:has(#modalBody .returns-panel) .modal-body{padding:11px}
+.modal:has(#modalBody .returns-panel){width:calc(100vw - 18px);max-height:calc(100dvh - 20px)}
+.modal:has(#modalBody .returns-panel) .modal-head{padding:13px 14px 11px}
+.modal:has(#modalBody .returns-panel) .modal-body{padding:11px}
 .returns-filters{grid-template-columns:1fr 1fr;gap:7px}
 .returns-filters .returns-search{grid-column:1/-1}
 .returns-filters .small-button{width:100%}

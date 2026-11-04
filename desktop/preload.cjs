@@ -12,6 +12,15 @@ contextBridge.exposeInMainWorld('warehouseDesktop', {
     ipcRenderer.on('warehouse:update-status', listener);
     return () => ipcRenderer.removeListener('warehouse:update-status', listener);
   },
+  retryAppConnection() {
+    ipcRenderer.send('warehouse:retry-app-connection');
+  },
+  onOfflineStatus(callback) {
+    if (typeof callback !== 'function') return () => {};
+    const listener = (_event, message) => callback(String(message || ''));
+    ipcRenderer.on('warehouse:offline-status', listener);
+    return () => ipcRenderer.removeListener('warehouse:offline-status', listener);
+  },
   showNotification(payload) {
     const data = payload && typeof payload === 'object' ? payload : {};
     ipcRenderer.send('warehouse:show-notification', {

@@ -14,6 +14,9 @@ let updateAvailable = false;
 let updateCheckInProgress = false;
 let manualUpdateCheckPending = false;
 let updateInstallScheduled = false;
+let showingOfflinePage = false;
+let offlineRetryTimer = null;
+let offlineRetryInProgress = false;
 const activeNotifications = new Map();
 
 app.setAppUserModelId('ua.amp.warehouseorders');
@@ -268,8 +271,17 @@ function createWindow() {
   mainWindow.webContents.on('console-message', (_event, details) => {
     if (details.level >= 2) console.warn('[Warehouse Orders renderer]', details.message);
   });
-  mainWindow.webContents.on('did-fail-load', (_event, code, description, validatedURL) => {
+  mainWindow.webContents.on('did-fail-load', (_event, code, description, validatedURL, isMainFrame) => {
     console.error('[Warehouse Orders] Page load failed:', code, description, validatedURL);
+    if (!isMainFrame || code === -3 || !String(validatedURL || '').startsWith(APP_URL)) return;
+    showOfflineStartupPage();
+  });
+  mainWindow.webContents.on('did-finish-load', () => {
+    if (mainWindow?.webContents.getURL().startsWith(APP_URL)) {
+      showingOfflinePage = false;
+      if (offlineRetryTimer) clearInterval(offlineRetryTimer);
+      offlineRetryTimer = null;
+    }
   });
   mainWindow.on('close', event => {
     if (!quitting) {
@@ -310,6 +322,33 @@ function createWindow() {
     event.preventDefault();
     if (url.startsWith('https://')) shell.openExternal(url);
   });
+}
+
+function showOfflineStartupPage() {
+  if (!mainWindow || mainWindow.isDestroyed() || showingOfflinePage) return;
+  showingOfflinePage = true;
+  mainWindow.loadFile(path.join(__dirname, 'offline.html')).catch(error => {
+    console.error('[Warehouse Orders] Could not show offline page:', String(error?.message || error));
+  });
+  if (!offlineRetryTimer) offlineRetryTimer = setInterval(retryAppConnection, 15000);
+}
+
+async function retryAppConnection() {
+  if (!showingOfflinePage || offlineRetryInProgress || !mainWindow || mainWindow.isDestroyed()) return;
+  offlineRetryInProgress = true;
+  try {
+    const response = await fetch(APP_URL, { cache: 'no-store', signal: AbortSignal.timeout(8000) });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    showingOfflinePage = false;
+    if (offlineRetryTimer) clearInterval(offlineRetryTimer);
+    offlineRetryTimer = null;
+    await mainWindow.loadURL(APP_URL);
+  } catch (error) {
+    console.info('[Warehouse Orders] Still waiting for network:', String(error?.message || error));
+    mainWindow?.webContents.send('warehouse:offline-status', 'Соединения пока нет. Повторим проверку автоматически.');
+  } finally {
+    offlineRetryInProgress = false;
+  }
 }
 
 
@@ -353,6 +392,9 @@ function createTray() {
 
 app.whenReady().then(() => {
   ipcMain.handle('warehouse:get-app-version', () => app.getVersion());
+  ipcMain.on('warehouse:retry-app-connection', event => {
+    if (mainWindow && event.sender === mainWindow.webContents) retryAppConnection();
+  });
   session.fromPartition('persist:warehouse-orders').setPermissionRequestHandler((webContents, permission, callback) => {
     callback(['notifications', 'audio', 'media'].includes(permission));
   });

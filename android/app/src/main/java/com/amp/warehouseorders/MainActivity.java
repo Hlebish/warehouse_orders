@@ -19,6 +19,8 @@ import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import java.util.Collections;
+import java.util.ArrayList;
+import java.util.List;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -36,6 +38,7 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 
 import org.json.JSONObject;
+import org.json.JSONArray;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.activity.OnBackPressedCallback;
@@ -308,89 +311,97 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private void downloadAndSharePhoto(String imageUrl, String caption) {
-        File imageFile = null;
+    private File downloadPhotoFile(String imageUrl) throws Exception {
+        String contentType;
+        InputStream photoInput;
         HttpURLConnection connection = null;
-        InputStream photoInput = null;
+        if (imageUrl.startsWith("data:image/")) {
+            if (imageUrl.length() > 28 * 1024 * 1024) throw new IllegalStateException("Photo is larger than 20 MB");
+            int comma = imageUrl.indexOf(',');
+            if (comma < 0) throw new IllegalArgumentException("Invalid inline photo");
+            String metadata = imageUrl.substring(5, comma).toLowerCase(java.util.Locale.ROOT);
+            if (!(metadata.equals("image/jpeg;base64") || metadata.equals("image/png;base64") ||
+                  metadata.equals("image/webp;base64"))) throw new IllegalArgumentException("Unsupported inline photo type");
+            byte[] bytes = android.util.Base64.decode(imageUrl.substring(comma + 1), android.util.Base64.DEFAULT);
+            if (bytes.length > 20 * 1024 * 1024) throw new IllegalStateException("Photo is larger than 20 MB");
+            contentType = metadata.substring(0, metadata.indexOf(';'));
+            photoInput = new ByteArrayInputStream(bytes);
+        } else {
+            URL url = new URL(imageUrl);
+            String host = url.getHost();
+            if (!"https".equalsIgnoreCase(url.getProtocol()) ||
+                    !("firebasestorage.googleapis.com".equalsIgnoreCase(host) ||
+                      "storage.googleapis.com".equalsIgnoreCase(host))) throw new IllegalArgumentException("Unsupported photo URL");
+            connection = (HttpURLConnection) url.openConnection();
+            connection.setConnectTimeout(15000);
+            connection.setReadTimeout(30000);
+            connection.setInstanceFollowRedirects(true);
+            connection.connect();
+            int status = connection.getResponseCode();
+            if (status < 200 || status >= 300) throw new IllegalStateException("Photo download failed: " + status);
+            contentType = connection.getContentType();
+            if (contentType == null || !contentType.toLowerCase(java.util.Locale.ROOT).startsWith("image/"))
+                throw new IllegalStateException("The link does not point to an image");
+            if (connection.getContentLength() > 20 * 1024 * 1024) throw new IllegalStateException("Photo is larger than 20 MB");
+            photoInput = connection.getInputStream();
+        }
+        String extension = contentType.equalsIgnoreCase("image/png") ? ".png" :
+                contentType.equalsIgnoreCase("image/webp") ? ".webp" : ".jpg";
+        File imageFile = File.createTempFile("warehouse-viber-", extension, getCacheDir());
+        try (InputStream input = photoInput; FileOutputStream output = new FileOutputStream(imageFile)) {
+            byte[] buffer = new byte[8192];
+            int total = 0, count;
+            while ((count = input.read(buffer)) != -1) {
+                total += count;
+                if (total > 20 * 1024 * 1024) throw new IllegalStateException("Photo is larger than 20 MB");
+                output.write(buffer, 0, count);
+            }
+        } finally {
+            if (connection != null) connection.disconnect();
+        }
+        return imageFile;
+    }
+
+    private void downloadAndSharePhoto(String imageUrl, String caption) {
+        downloadAndSharePhotos(Collections.singletonList(imageUrl), caption);
+    }
+
+    private void downloadAndSharePhotos(List<String> imageUrls, String caption) {
         try {
-            String contentType;
-            if (imageUrl.startsWith("data:image/")) {
-                if (imageUrl.length() > 28 * 1024 * 1024) throw new IllegalStateException("Photo is larger than 20 MB");
-                int comma = imageUrl.indexOf(',');
-                if (comma < 0) throw new IllegalArgumentException("Invalid inline photo");
-                String metadata = imageUrl.substring(5, comma).toLowerCase(java.util.Locale.ROOT);
-                if (!(metadata.equals("image/jpeg;base64") || metadata.equals("image/png;base64") ||
-                      metadata.equals("image/webp;base64"))) {
-                    throw new IllegalArgumentException("Unsupported inline photo type");
-                }
-                byte[] bytes = android.util.Base64.decode(imageUrl.substring(comma + 1), android.util.Base64.DEFAULT);
-                if (bytes.length > 20 * 1024 * 1024) throw new IllegalStateException("Photo is larger than 20 MB");
-                contentType = metadata.substring(0, metadata.indexOf(';'));
-                photoInput = new ByteArrayInputStream(bytes);
+            if (imageUrls == null || imageUrls.isEmpty() || imageUrls.size() > 20)
+                throw new IllegalArgumentException("Choose between 1 and 20 photos");
+            ArrayList<Uri> contentUris = new ArrayList<>();
+            long totalBytes = 0;
+            for (String imageUrl : imageUrls) {
+                File imageFile = downloadPhotoFile(imageUrl);
+                totalBytes += imageFile.length();
+                if (totalBytes > 100L * 1024 * 1024) throw new IllegalStateException("Photos are larger than 100 MB in total");
+                contentUris.add(FileProvider.getUriForFile(this, getPackageName() + ".fileprovider", imageFile));
+            }
+            Intent send = new Intent(contentUris.size() == 1 ? Intent.ACTION_SEND : Intent.ACTION_SEND_MULTIPLE);
+            send.setType("image/*");
+            if (contentUris.size() == 1) {
+                send.putExtra(Intent.EXTRA_STREAM, contentUris.get(0));
             } else {
-                URL url = new URL(imageUrl);
-                String host = url.getHost();
-                if (!"https".equalsIgnoreCase(url.getProtocol()) ||
-                        !("firebasestorage.googleapis.com".equalsIgnoreCase(host) ||
-                          "storage.googleapis.com".equalsIgnoreCase(host))) {
-                    throw new IllegalArgumentException("Unsupported photo URL");
-                }
-                connection = (HttpURLConnection) url.openConnection();
-                connection.setConnectTimeout(15000);
-                connection.setReadTimeout(30000);
-                connection.setInstanceFollowRedirects(true);
-                connection.connect();
-                int status = connection.getResponseCode();
-                if (status < 200 || status >= 300) throw new IllegalStateException("Photo download failed: " + status);
-                contentType = connection.getContentType();
-                if (contentType == null || !contentType.toLowerCase(java.util.Locale.ROOT).startsWith("image/"))
-                    throw new IllegalStateException("The link does not point to an image");
-                int length = connection.getContentLength();
-                if (length > 20 * 1024 * 1024) throw new IllegalStateException("Photo is larger than 20 MB");
-                photoInput = connection.getInputStream();
+                send.putParcelableArrayListExtra(Intent.EXTRA_STREAM, contentUris);
             }
-            String extension = contentType.equalsIgnoreCase("image/png") ? ".png" :
-                    contentType.equalsIgnoreCase("image/webp") ? ".webp" : ".jpg";
-            imageFile = File.createTempFile("warehouse-viber-", extension, getCacheDir());
-            try (InputStream input = photoInput;
-                 FileOutputStream output = new FileOutputStream(imageFile)) {
-                byte[] buffer = new byte[8192];
-                int total = 0, count;
-                while ((count = input.read(buffer)) != -1) {
-                    total += count;
-                    if (total > 20 * 1024 * 1024) throw new IllegalStateException("Photo is larger than 20 MB");
-                    output.write(buffer, 0, count);
-                }
-            }
-            Uri contentUri = FileProvider.getUriForFile(this, getPackageName() + ".fileprovider", imageFile);
-            Intent send = new Intent(Intent.ACTION_SEND);
-            send.setType(contentType);
-            send.putExtra(Intent.EXTRA_STREAM, contentUri);
             send.putExtra(Intent.EXTRA_TEXT, caption == null ? "Фото дефекта" : caption);
-            send.setClipData(ClipData.newUri(getContentResolver(), "Фото дефекта", contentUri));
+            ClipData clipData = ClipData.newUri(getContentResolver(), "Фото дефекта", contentUris.get(0));
+            for (int i = 1; i < contentUris.size(); i++) clipData.addItem(new ClipData.Item(contentUris.get(i)));
+            send.setClipData(clipData);
             send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
             send.setPackage("com.viber.voip");
             Intent launch = send;
-            if (send.resolveActivity(getPackageManager()) == null) {
-                launch = Intent.createChooser(send.setPackage(null), "Отправить фотографию");
-            }
+            if (send.resolveActivity(getPackageManager()) == null) launch = Intent.createChooser(send.setPackage(null), "Отправить фотографии");
             final Intent finalLaunch = launch;
             runOnUiThread(() -> {
-                try {
-                    startActivity(finalLaunch);
-                } catch (Exception error) {
-                    android.widget.Toast.makeText(this, "Не удалось открыть отправку фото в Viber", android.widget.Toast.LENGTH_LONG).show();
-                }
+                try { startActivity(finalLaunch); }
+                catch (Exception error) { android.widget.Toast.makeText(this, "Не удалось открыть отправку фото в Viber", android.widget.Toast.LENGTH_LONG).show(); }
             });
         } catch (Exception error) {
-            android.util.Log.e("WarehouseOrders", "Unable to share photo to Viber", error);
+            android.util.Log.e("WarehouseOrders", "Unable to share photos to Viber", error);
             runOnUiThread(() -> android.widget.Toast.makeText(this,
-                "Не удалось подготовить фотографию для Viber", android.widget.Toast.LENGTH_LONG).show());
-        } finally {
-            if (photoInput != null) {
-                try { photoInput.close(); } catch (Exception ignored) { }
-            }
-            if (connection != null) connection.disconnect();
+                "Не удалось подготовить фотографии для Viber", android.widget.Toast.LENGTH_LONG).show());
         }
     }
 
@@ -481,6 +492,23 @@ public class MainActivity extends AppCompatActivity {
         public void sharePhotoToViber(String imageUrl, String caption) {
             if (imageUrl == null || imageUrl.isEmpty()) return;
             shareExecutor.execute(() -> downloadAndSharePhoto(imageUrl, caption));
+        }
+
+        @JavascriptInterface
+        public void sharePhotosToViber(String imageUrlsJson, String caption) {
+            if (imageUrlsJson == null || imageUrlsJson.isEmpty()) return;
+            shareExecutor.execute(() -> {
+                try {
+                    JSONArray urls = new JSONArray(imageUrlsJson);
+                    ArrayList<String> values = new ArrayList<>();
+                    for (int i = 0; i < urls.length(); i++) values.add(urls.getString(i));
+                    downloadAndSharePhotos(values, caption);
+                } catch (Exception error) {
+                    android.util.Log.e("WarehouseOrders", "Invalid group of photos", error);
+                    runOnUiThread(() -> android.widget.Toast.makeText(MainActivity.this,
+                        "Не удалось прочитать список фотографий", android.widget.Toast.LENGTH_LONG).show());
+                }
+            });
         }
     }
 

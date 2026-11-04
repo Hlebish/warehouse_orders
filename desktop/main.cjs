@@ -15,6 +15,7 @@ let updateCheckInProgress = false;
 const activeNotifications = new Map();
 
 app.setAppUserModelId('ua.amp.warehouseorders');
+app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 app.setLoginItemSettings({ openAtLogin: true, path: process.execPath, args: ['--hidden'] });
 
 function isGoogleAuthUrl(rawUrl) {
@@ -89,7 +90,9 @@ ipcMain.on('warehouse:show-notification', (event, payload = {}) => {
   }
   const previous = notificationTag ? activeNotifications.get(notificationTag) : null;
   previous?.close();
-  const notification = new Notification({ title, body, silent: Boolean(previous) });
+  // The page plays the site's bundled MP3. Keep Windows' default notification
+  // chime disabled so employees hear the same sound as in the website.
+  const notification = new Notification({ title, body, silent: true });
   if (notificationTag) activeNotifications.set(notificationTag, notification);
   notification.on('close', () => {
     if (notificationTag && activeNotifications.get(notificationTag) === notification) activeNotifications.delete(notificationTag);
@@ -151,6 +154,77 @@ ipcMain.handle('warehouse:share-photo-to-viber', async (event, payload = {}) => 
     }
   }
   return { copied: true, viberOpened, context: String(payload.context || '').slice(0, 200) };
+});
+
+function copyWindowsFileListToClipboard(filePaths) {
+  if (process.platform !== 'win32') throw new Error('Копирование группы файлов доступно в Windows-приложении.');
+  const powershell = path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe');
+  if (!fs.existsSync(powershell)) throw new Error('Не удалось запустить системное копирование файлов.');
+  const quotedPaths = filePaths.map(filePath => `'${filePath.replace(/'/g, "''")}'`).join(',');
+  const script = [
+    'Add-Type -AssemblyName System.Windows.Forms',
+    '$paths = @(' + quotedPaths + ')',
+    '$files = New-Object System.Collections.Specialized.StringCollection',
+    'foreach ($file in $paths) { if (-not (Test-Path -LiteralPath $file)) { throw "Файл фотографии не найден" }; [void]$files.Add($file) }',
+    '[System.Windows.Forms.Clipboard]::SetFileDropList($files)'
+  ].join('; ');
+  const encodedScript = Buffer.from(script, 'utf16le').toString('base64');
+  return new Promise((resolve, reject) => {
+    const child = spawn(powershell, ['-NoProfile', '-NonInteractive', '-STA', '-EncodedCommand', encodedScript], { windowsHide: true, stdio: ['ignore', 'ignore', 'pipe'] });
+    let errorOutput = '';
+    child.stderr.on('data', chunk => { errorOutput += chunk.toString(); });
+    child.once('error', reject);
+    child.once('close', code => code === 0 ? resolve() : reject(new Error(errorOutput.trim() || 'Windows не смог скопировать фотографии.')));
+  });
+}
+
+async function fetchPhotoForFileCopy(rawPhotoUrl) {
+  const dataImage = rawPhotoUrl.match(/^data:(image\/(?:jpeg|png|webp));base64,([a-z\d+/]+=*)$/i);
+  let photo;
+  let contentType;
+  if (dataImage) {
+    contentType = dataImage[1].toLowerCase();
+    photo = Buffer.from(dataImage[2], 'base64');
+  } else {
+    let photoUrl;
+    try { photoUrl = new URL(rawPhotoUrl); } catch { throw new Error('Некорректная ссылка на фото.'); }
+    if (photoUrl.protocol !== 'https:' || !['firebasestorage.googleapis.com', 'storage.googleapis.com'].includes(photoUrl.hostname)) {
+      throw new Error('Поддерживаются только фото из хранилища заказов.');
+    }
+    const response = await net.fetch(photoUrl.href, { signal: AbortSignal.timeout(30000) });
+    if (!response.ok) throw new Error(`Не удалось загрузить фото (HTTP ${response.status}).`);
+    contentType = String(response.headers.get('content-type') || '').split(';')[0].trim().toLowerCase();
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(contentType)) throw new Error('Поддерживаются фотографии JPG, PNG и WebP.');
+    const contentLength = Number(response.headers.get('content-length'));
+    if (Number.isFinite(contentLength) && contentLength > 25 * 1024 * 1024) throw new Error('Фото больше 25 МБ.');
+    photo = Buffer.from(await response.arrayBuffer());
+  }
+  if (!photo.length || photo.length > 25 * 1024 * 1024) throw new Error('Фото пустое или больше 25 МБ.');
+  if (nativeImage.createFromBuffer(photo).isEmpty()) throw new Error('Не удалось прочитать файл изображения.');
+  const extension = contentType === 'image/png' ? 'png' : contentType === 'image/webp' ? 'webp' : 'jpg';
+  return { photo, extension };
+}
+
+ipcMain.handle('warehouse:copy-photos-to-clipboard', async (event, payload = {}) => {
+  if (!mainWindow || event.sender !== mainWindow.webContents || event.senderFrame !== event.sender.mainFrame) {
+    throw new Error('Запрос на копирование фотографий отклонён.');
+  }
+  if (process.platform !== 'win32') throw new Error('Групповое копирование доступно в Windows-приложении.');
+  const urls = Array.isArray(payload.urls) ? payload.urls.map(url => String(url || '')).filter(Boolean) : [];
+  if (urls.length < 2 || urls.length > 20) throw new Error('Можно копировать от 2 до 20 фотографий за раз.');
+  const folder = fs.mkdtempSync(path.join(app.getPath('temp'), 'warehouse-order-photos-'));
+  const filePaths = [];
+  let totalBytes = 0;
+  for (let index = 0; index < urls.length; index++) {
+    const { photo, extension } = await fetchPhotoForFileCopy(urls[index]);
+    totalBytes += photo.length;
+    if (totalBytes > 100 * 1024 * 1024) throw new Error('Общий размер фотографий превышает 100 МБ.');
+    const filePath = path.join(folder, `photo-${String(index + 1).padStart(2, '0')}.${extension}`);
+    fs.writeFileSync(filePath, photo);
+    filePaths.push(filePath);
+  }
+  await copyWindowsFileListToClipboard(filePaths);
+  return { copied: true, count: filePaths.length };
 });
 
 

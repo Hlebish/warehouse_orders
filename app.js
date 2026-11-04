@@ -188,6 +188,7 @@ function watchNotifications(){
       else if(attentionNotices.length>1)showAttentionToastBatch(attentionNotices);
       if(window.warehouseDesktop?.isDesktopApp){
         freshNotices.forEach(n=>{
+          if(shouldPlayPushSound(n))playNotificationSound();
           const target=n.target==='chat'?'chat':'site';
           const link=target==='chat'
             ? 'https://hlebish.github.io/warehouse_orders/?chat=1'
@@ -731,6 +732,7 @@ async function showForegroundPushNotification(data={}){
     const registration=await navigator.serviceWorker.ready;
     registration.active?.postMessage({
       type:'SHOW_FOREGROUND_NOTIFICATION',
+      silent:true,
       title:String(data.title||'Заказы · Склад'),
       body:String(data.body||'Новое изменение.'),
       eventId:String(data.eventId||''),
@@ -751,10 +753,8 @@ async function showForegroundPushNotification(data={}){
 const recentPushEvents=new Map();
 const recentPushSounds=new Map();
 function shouldPlayPushSound(n,now=Date.now()){
-  const category=String(n.category||'');
-  if(flagOn(n,'isMention')||flagOn(n,'isReply')||['defects','questions','decisions','replies'].includes(category))return true;
   for(const[key,time]of recentPushSounds){if(now-time>60000)recentPushSounds.delete(key)}
-  const key=String(n.notificationTag||`${n.target||'site'}:${category}`);
+  const key=String(n.notificationTag||n.eventId||`${n.target||'site'}:${n.category||''}:${n.title||''}`);
   const previous=recentPushSounds.get(key)||0;
   if(now-previous<15000)return false;
   recentPushSounds.set(key,now);
@@ -1118,6 +1118,18 @@ function showModal(title,body,buttons=[],eyebrow='КАРТОЧКА ЗАКАЗА'
     copyButton.textContent='📋 Скопировать фото';
     viberButton.insertAdjacentElement('afterend',copyButton);
     if(!isPhoneDevice())viberButton.remove();
+  });
+  $('modalBody').querySelectorAll('.defect-comment-photos,.defect-modal-photos').forEach(photoGroup=>{
+    const photoButtons=Array.from(photoGroup.querySelectorAll('[data-viber-context]'));
+    const photoUrls=[...new Set(Array.from(photoGroup.querySelectorAll('img[data-photo]')).map(item=>item.dataset.photo).filter(Boolean))];
+    if(photoUrls.length<2||(!isAndroidWarehouse()&&!window.warehouseDesktop?.isDesktopApp))return;
+    const groupButton=document.createElement('button');
+    groupButton.type='button';
+    groupButton.className='small-button primary-soft defect-photo-group-button';
+    groupButton.textContent=isAndroidWarehouse()?'Отправить все фото в Viber':'📋 Скопировать все фото';
+    groupButton.dataset.photoGroup=JSON.stringify(photoUrls);
+    groupButton.dataset.photoGroupContext=photoButtons[0]?.dataset.viberContext||'Фото дефекта';
+    photoGroup.insertAdjacentElement('beforebegin',groupButton);
   });
   $('modalFoot').innerHTML=buttons.join('');
   modal.hidden=false;
@@ -2476,6 +2488,21 @@ async function sharePhotoViaViber(url,context='Фото из заказа'){
     toast('Не удалось подготовить фото для Viber. Проверь интернет и попробуй ещё раз.');
   }
 }
+async function copyPhotoGroup(urls,context='Фото дефекта'){
+  if(!Array.isArray(urls)||urls.length<2)return;
+  if(window.AndroidWarehouse?.sharePhotosToViber){
+    try{window.AndroidWarehouse.sharePhotosToViber(JSON.stringify(urls),context);toast(`Готовлю ${urls.length} фото для Viber…`);return;}
+    catch(err){console.warn('Не удалось отправить группу фото в Android Viber',err);}
+  }
+  if(window.warehouseDesktop?.copyPhotosToClipboard){
+    try{
+      const result=await window.warehouseDesktop.copyPhotosToClipboard(urls,context);
+      if(result?.copied){toast(`${result.count||urls.length} фото скопированы. Открой чат Viber и нажми Ctrl+V.`);return;}
+      throw new Error('Windows-приложение не подтвердило копирование фотографий.');
+    }catch(err){console.error('Не удалось скопировать группу фото в Windows',err);toast('Не удалось скопировать все фото: '+(err?.message||'проверь интернет и попробуй ещё раз'));return;}
+  }
+  toast('Пакетное копирование доступно в приложении Windows. В браузере скопируй фотографии по одной.');
+}
 async function copyPhotoToClipboard(url,context='Фото из заказа'){
   if(!url)return;
   let desktopError=null;
@@ -3461,6 +3488,8 @@ document.addEventListener('click',e=>{
   if(share){e.preventDefault();shareChatMessage(share.dataset.action.split(':').slice(1).join(':'));return;}
   const copyPhoto=e.target.closest('[data-copy-photo]');
   if(copyPhoto){e.preventDefault();e.stopPropagation();copyPhotoToClipboard(copyPhoto.dataset.copyPhoto,copyPhoto.dataset.copyContext||'Фото из заказа');return;}
+  const photoGroup=e.target.closest('[data-photo-group]');
+  if(photoGroup){e.preventDefault();e.stopPropagation();try{copyPhotoGroup(JSON.parse(photoGroup.dataset.photoGroup||'[]'),photoGroup.dataset.photoGroupContext||'Фото дефекта')}catch(err){console.error('Некорректный список фотографий дефекта',err);toast('Не удалось прочитать список фотографий.')}return;}
   const viberPhoto=e.target.closest('[data-viber-photo]');
   if(viberPhoto){e.preventDefault();e.stopPropagation();sharePhotoViaViber(viberPhoto.dataset.viberPhoto,viberPhoto.dataset.viberContext||'Фото из заказа');return;}
   const viber=e.target.closest('[data-action^="viber-chat:"]');
@@ -3538,7 +3567,7 @@ function isNewerSiteVersion(candidate,current){
 }
 function showSiteUpdateNotice(){
  if(siteUpdateNotice?.isConnected)return;
- siteUpdateNotice=toast('Новая версия готова. Обновите приложение, когда закончите текущую работу.','',{persistent:true});
+ siteUpdateNotice=toast('Новая версия сайта готова. Обновите страницу, когда закончите текущую работу.','',{persistent:true});
  siteUpdateNotice.classList.add('site-update-notice');
  const button=document.createElement('button');
  button.type='button';button.className='small-button primary-soft';button.textContent='Обновить';
@@ -3552,7 +3581,7 @@ function reloadToLatestSite(){
  location.replace(url.href);
 }
 window.checkWarehouseSiteUpdate=async function(){
- if(!isAndroidWarehouse()||siteVersionCheckPromise)return;
+ if(window.warehouseDesktop?.isDesktopApp||siteVersionCheckPromise)return;
  const now=Date.now();if(now-lastSiteVersionCheck<60000)return;
  lastSiteVersionCheck=now;
  siteVersionCheckPromise=(async()=>{
@@ -3568,13 +3597,13 @@ window.checkWarehouseSiteUpdate=async function(){
    const buybackOpen=!!document.querySelector('.buyback-overlay:not([hidden])');
    if(modal.hidden&&!editing&&!buybackOpen){reloadToLatestSite();return}
    showSiteUpdateNotice();
-  }catch(error){console.debug('Не удалось проверить обновление Android-приложения',error)}
+  }catch(error){console.debug('Не удалось проверить обновление сайта',error)}
  })();
  try{await siteVersionCheckPromise}finally{siteVersionCheckPromise=null}
 };
 window.addEventListener('load',()=>{
  void window.checkWarehouseSiteUpdate();
- window.setInterval(()=>{if(document.visibilityState==='visible')void window.checkWarehouseSiteUpdate()},5*60*1000);
+ window.setInterval(()=>{if(document.visibilityState==='visible')void window.checkWarehouseSiteUpdate()},2*60*1000);
 },{once:true});
 // Returning from the Android background must not recreate Firestore listeners.
 // The existing WebView and its live onSnapshot subscriptions remain active.

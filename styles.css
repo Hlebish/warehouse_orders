@@ -7922,6 +7922,7 @@ body:has(.buyback-overlay:not([hidden])) .toast-stack .defect-toast {
 .defect-comment-article{font-size:12px;margin-top:9px;color:var(--muted,#9aa4b2)}
 .defect-comment-article b{color:var(--text,#e8edf3);overflow-wrap:anywhere}
 .defect-comment-photos{display:grid;grid-template-columns:repeat(auto-fill,minmax(105px,145px));gap:8px;margin-top:10px}
+.defect-photo-group-button{width:100%;min-height:36px;margin:8px 0;font-size:12px;font-weight:800}
 .defect-comment-photos .order-photo-share{min-width:0;display:flex;flex-direction:column;gap:6px}
 #modalBody .order-photo-share{min-width:0;display:flex;flex-direction:column;gap:6px}
 #modalBody .order-photo-share [data-copy-photo]{border-color:#b7c8d8;background:#f0f5f9;color:#334a5c}

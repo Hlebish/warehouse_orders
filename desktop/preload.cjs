@@ -18,5 +18,11 @@ contextBridge.exposeInMainWorld('warehouseDesktop', {
       context: String(context || ''),
       openViber: openViber !== false
     });
+  },
+  copyPhotosToClipboard(urls, context) {
+    return ipcRenderer.invoke('warehouse:copy-photos-to-clipboard', {
+      urls: Array.isArray(urls) ? urls.map(url => String(url || '')) : [],
+      context: String(context || '')
+    });
   }
 });

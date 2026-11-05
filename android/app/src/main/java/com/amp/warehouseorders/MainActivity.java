@@ -341,8 +341,8 @@ public class MainActivity extends AppCompatActivity {
         showPendingAppUpdateIfReady();
         checkForAppUpdateIfDue();
         if (webView != null) {
-            requestWebViewRedraw();
-            webView.postDelayed(this::requestWebViewRedraw, 350);
+            refreshWebViewAfterResume();
+            webView.postDelayed(this::requestWebViewRedraw, 500);
             webView.postDelayed(() -> {
                 if (networkErrorView != null && networkErrorView.getVisibility() == View.VISIBLE) {
                     retryMainPage();
@@ -354,6 +354,29 @@ public class MainActivity extends AppCompatActivity {
                 );
             }, 500);
         }
+    }
+
+    private void refreshWebViewAfterResume() {
+        WebView target = webView;
+        if (target == null) return;
+        target.onResume();
+        target.resumeTimers();
+        // Reattach the WebView's compositor layer for one frame. On some devices
+        // invalidate() alone leaves the previous Surface blank until a touch event.
+        target.setVisibility(View.INVISIBLE);
+        target.postOnAnimation(() -> {
+            if (webView != target || !target.isAttachedToWindow()) return;
+            target.setVisibility(View.VISIBLE);
+            requestWebViewRedraw();
+            target.evaluateJavascript(
+                "window.dispatchEvent(new Event('warehouse-app-resumed')); window.dispatchEvent(new Event('resize'))",
+                null
+            );
+            if (Build.VERSION.SDK_INT >= 23) {
+                target.postVisualStateCallback(android.os.SystemClock.uptimeMillis(),
+                    requestId -> requestWebViewRedraw());
+            }
+        });
     }
 
     @Override

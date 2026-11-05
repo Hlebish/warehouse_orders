@@ -284,7 +284,7 @@ service cloud.firestore {
 
       allow create: if (isWarehouse() || isManager() || canManageUsers())
         && request.resource.data.keys().hasOnly([
-          'number', 'client', 'deliveryType', 'status', 'articles', 'createdAt', 'createdBy',
+          'number', 'client', 'clientId', 'deliveryType', 'status', 'articles', 'createdAt', 'createdBy',
           'createdByName', 'updatedAt', 'transferredAt', 'resumedAt',
           'assembledAt', 'shippedAt', 'assemblyInProgress', 'assemblyStartedAt',
           'assemblyStartedBy', 'assemblyStartedByName', 'returns'
@@ -292,6 +292,7 @@ service cloud.firestore {
         && request.resource.data.number is string
         && request.resource.data.number.size() > 0
         && request.resource.data.client is string
+        && (!request.resource.data.keys().hasAny(['clientId']) || request.resource.data.clientId is string && request.resource.data.clientId.size() <= 256)
         && request.resource.data.deliveryType in ['city', 'pickup', 'post', 'kamyanske']
         && request.resource.data.articles is list
         && request.resource.data.articles.size() <= 100
@@ -320,10 +321,11 @@ service cloud.firestore {
           && resource.data.status != 'Клиент забрал самовывозом'
           && request.resource.data.status == resource.data.status
           && request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['number', 'client', 'updatedAt', 'updatedBy', 'updatedByName'])
+            .hasOnly(['number', 'client', 'clientId', 'updatedAt', 'updatedBy', 'updatedByName'])
           && request.resource.data.number is string
           && request.resource.data.number.size() > 0
           && request.resource.data.client is string
+          && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['clientId']) || request.resource.data.clientId is string && request.resource.data.clientId.size() <= 256)
           && request.resource.data.updatedAt is string
           && request.resource.data.updatedBy == request.auth.uid
           && request.resource.data.updatedByName is string)
@@ -349,7 +351,7 @@ service cloud.firestore {
           && request.resource.data.status != 'Отгружен кладовщиком'
           && request.resource.data.status != 'Клиент забрал самовывозом'
           && request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['number', 'client', 'deliveryType', 'articles', 'status', 'updatedAt', 'updatedBy', 'updatedByName',
+            .hasOnly(['number', 'client', 'clientId', 'deliveryType', 'articles', 'status', 'updatedAt', 'updatedBy', 'updatedByName',
               'transferredAt', 'resumedAt', 'assembledAt'])
           && request.resource.data.updatedAt is string
           && request.resource.data.updatedBy == request.auth.uid
@@ -357,6 +359,7 @@ service cloud.firestore {
           && (!request.resource.data.keys().hasAny(['deliveryType']) || request.resource.data.deliveryType in ['city', 'pickup', 'post', 'kamyanske'])
           && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['number']) || request.resource.data.number is string && request.resource.data.number.size() > 0)
           && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['client']) || request.resource.data.client is string)
+          && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['clientId']) || request.resource.data.clientId is string && request.resource.data.clientId.size() <= 256)
           && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['articles']) || request.resource.data.articles is list && request.resource.data.articles.size() <= 100)
           && validOrderStatus(request.resource.data.status)
           && (request.resource.data.status == resource.data.status
@@ -370,12 +373,15 @@ service cloud.firestore {
           && (request.resource.data.status == resource.data.status
             || warehouseOrderStatus(request.resource.data.status))
           && request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['status', 'articles', 'deliveryType', 'updatedAt', 'updatedBy', 'updatedByName',
+            .hasOnly(['status', 'number', 'client', 'clientId', 'articles', 'deliveryType', 'updatedAt', 'updatedBy', 'updatedByName',
               'transferredAt', 'resumedAt', 'assembledAt', 'shippedAt', 'assemblyInProgress',
               'assemblyStartedAt', 'assemblyStartedBy', 'assemblyStartedByName'])
           && request.resource.data.updatedAt is string
           && request.resource.data.updatedBy == request.auth.uid
           && request.resource.data.updatedByName is string
+          && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['number']) || request.resource.data.number is string && request.resource.data.number.size() > 0)
+          && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['client']) || request.resource.data.client is string)
+          && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['clientId']) || request.resource.data.clientId is string && request.resource.data.clientId.size() <= 256)
           && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['articles']) || request.resource.data.articles is list && request.resource.data.articles.size() <= 100)
           && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['deliveryType']) || request.resource.data.deliveryType in ['city', 'pickup', 'post', 'kamyanske'])
           && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['transferredAt']) || request.resource.data.transferredAt is string)

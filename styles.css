@@ -8000,6 +8000,18 @@ body.dark-theme .push-registration-status[data-state="pending"]{background:#352e
 .toast.site-update-notice{display:flex;align-items:center;justify-content:space-between;gap:12px}
 .toast.site-update-notice button{flex:0 0 auto;white-space:nowrap}
 
+/* Kamyanske is a neutral location/status, so its action matches the neutral order state. */
+.order-action-menu-list .warehouse-status-kamenskoye{
+  background:#eef2f7!important;
+  color:#475569!important;
+  border-color:#d7dee8!important;
+}
+body.dark-theme .order-action-menu-list .warehouse-status-kamenskoye{
+  background:#21262d!important;
+  color:#c3c8ce!important;
+  border-color:#3d444d!important;
+}
+
 /* Calm, consistent touch feedback in Android WebView, mobile browsers and desktop. */
 html,
 body,

@@ -162,19 +162,12 @@ public class MainActivity extends AppCompatActivity {
             public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
                 if (url == null || !url.startsWith(SITE_URL)) return;
-                // WebView can finish loading before Android has composed its
-                // first hardware frame. Request a layout/paint so the user
-                // never has to tap the screen to reveal the rendered page.
-                view.post(() -> {
-                    view.requestLayout();
-                    view.invalidate();
-                    if (Build.VERSION.SDK_INT >= 16) view.postInvalidateOnAnimation();
-                });
-                view.postDelayed(() -> {
-                    if (view.isAttachedToWindow() && Build.VERSION.SDK_INT >= 16) {
-                        view.postInvalidateOnAnimation();
-                    }
-                }, 250);
+                // The app removes its startup overlay after Firebase auth resolves.
+                // Repaint again after that transition; the first WebView frame alone
+                // can be blank on some Android GPU/WebView combinations until touch.
+                requestWebViewRedraw();
+                view.postDelayed(MainActivity.this::requestWebViewRedraw, 250);
+                view.postDelayed(MainActivity.this::requestWebViewRedraw, 700);
             }
 
             @Override
@@ -348,6 +341,8 @@ public class MainActivity extends AppCompatActivity {
         showPendingAppUpdateIfReady();
         checkForAppUpdateIfDue();
         if (webView != null) {
+            requestWebViewRedraw();
+            webView.postDelayed(this::requestWebViewRedraw, 350);
             webView.postDelayed(() -> {
                 if (networkErrorView != null && networkErrorView.getVisibility() == View.VISIBLE) {
                     retryMainPage();
@@ -359,6 +354,32 @@ public class MainActivity extends AppCompatActivity {
                 );
             }, 500);
         }
+    }
+
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        if (hasFocus) requestWebViewRedraw();
+    }
+
+    private void requestWebViewRedraw() {
+        WebView target = webView;
+        if (target == null) return;
+        target.post(() -> {
+            if (!target.isAttachedToWindow()) return;
+            target.onResume();
+            target.requestLayout();
+            target.invalidate();
+            View root = target.getRootView();
+            if (root != null) {
+                root.requestLayout();
+                root.invalidate();
+            }
+            if (Build.VERSION.SDK_INT >= 16) {
+                target.postInvalidateOnAnimation();
+                if (root != null) root.postInvalidateOnAnimation();
+            }
+        });
     }
 
     @Override

@@ -735,7 +735,7 @@ overlay.addEventListener('click',async e=>{
       const current=currentSnap.data();
       if(Number(current.quantity)!==Number(item.quantity)||String(current.status||'active')!==String(item.status||'active'))throw new Error('Эту запись уже изменили. Обновите список и повторите действие.');
       if(!splitRef){transaction.update(itemRef,patch);return}
-      transaction.set(splitRef,{article:item.article,quantity:qty,receivedAt:item.receivedAt,supplier:item.supplier||'',comment:item.comment||'',createdAt:serverTimestamp(),createdOn:item.createdOn||eventDate,createdBy:item.createdBy||currentUser.uid,createdByName:item.createdByName||currentUser.displayName||currentUser.email||'Сотрудник',status:nextStatus,soldAt:nextStatus==='sold'?eventDate:null,cancelledAt:nextStatus==='cancelled'?eventDate:null,returnedAt:nextStatus==='returned'?eventDate:null,shippedAt:nextStatus==='shipped'?eventDate:null,shippedLate:nextStatus==='shipped'?isExpired:false,overdueDaysAtShipment:nextStatus==='shipped'?Math.max(0,elapsedDays(item.receivedAt)-14):0,sentMilestones:Array.isArray(item.sentMilestones)?item.sentMilestones:[],updatedAt:serverTimestamp()});
+      transaction.set(splitRef,{article:item.article,quantity:qty,receivedAt:item.receivedAt,supplier:item.supplier||'',comment:item.comment||'',createdAt:serverTimestamp(),createdOn:item.createdOn||eventDate,createdBy:currentUser.uid,createdByName:currentUser.displayName||currentUser.email||'Сотрудник',status:nextStatus,soldAt:nextStatus==='sold'?eventDate:null,cancelledAt:nextStatus==='cancelled'?eventDate:null,returnedAt:nextStatus==='returned'?eventDate:null,shippedAt:nextStatus==='shipped'?eventDate:null,shippedLate:nextStatus==='shipped'?isExpired:false,overdueDaysAtShipment:nextStatus==='shipped'?Math.max(0,elapsedDays(item.receivedAt)-14):0,sentMilestones:Array.isArray(item.sentMilestones)?item.sentMilestones:[],updatedAt:serverTimestamp()});
       transaction.update(itemRef,{quantity:Number(current.quantity)-qty,updatedAt:serverTimestamp()});
     });
     showToast(qty===Number(item.quantity)?'Статус перекупного товара обновлён.':'Часть товара перенесена в категорию «'+(nextStatus==='returned'?'Возвращён':nextStatus==='sold'?'Продан':nextStatus==='shipped'?'Отгружен':'Отменён')+'».');
@@ -753,7 +753,7 @@ overlay.addEventListener('click',async e=>{
     }
     await runTransaction(db,async transaction=>{const currentSnap=await transaction.get(doc(db,'buybackItems',item.id));if(!currentSnap.exists())throw new Error('Товар уже удалён. Обновите список.');const current=currentSnap.data();if(Number(current.quantity)!==Number(item.quantity)||String(current.status||'active')!==String(item.status||'active'))throw new Error('Эту запись уже изменили. Обновите список и повторите действие.');transaction.update(doc(db,'buybackItems',item.id),patch)});showToast('Статус перекупного товара обновлён.');
   }
-  }catch(err){console.error(err);showToast('Не удалось изменить статус.')}
+  }catch(err){console.error('Не удалось изменить статус перекупного товара',err);showToast(err?.code==='permission-denied'?'Нет прав на изменение перекупного товара.':err?.message||'Не удалось изменить статус.')}
 });
 onAuthStateChanged(auth,user=>{
  currentUser=user;

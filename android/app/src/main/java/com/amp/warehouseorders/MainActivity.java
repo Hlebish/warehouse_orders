@@ -374,7 +374,12 @@ public class MainActivity extends AppCompatActivity {
             );
             if (Build.VERSION.SDK_INT >= 23) {
                 target.postVisualStateCallback(android.os.SystemClock.uptimeMillis(),
-                    requestId -> requestWebViewRedraw());
+                    new WebView.VisualStateCallback() {
+                        @Override
+                        public void onComplete(long requestId) {
+                            requestWebViewRedraw();
+                        }
+                    });
             }
         });
     }

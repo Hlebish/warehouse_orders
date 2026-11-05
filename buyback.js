@@ -449,6 +449,19 @@ style.textContent = `
 
 `;
 document.head.append(style);
+style.textContent+=`
+.buyback-quantity-overlay{z-index:70!important;background:rgba(0,0,0,.76)!important;backdrop-filter:blur(5px)!important}
+.buyback-quantity-window{width:min(440px,100%)!important;height:auto!important;max-height:calc(100dvh - 32px)!important;border-radius:16px!important;overflow:hidden!important}
+.buyback-quantity-window .buyback-head{position:static!important;padding:18px 20px 14px!important;background:#151a20!important}
+.buyback-quantity-window .buyback-head h2{font-size:18px!important}
+.buyback-quantity-body{padding:18px 20px 20px!important}
+.buyback-quantity-prompt{margin:0 0 14px;color:#dce3eb;font-size:13px;line-height:1.5}
+.buyback-quantity-hint{margin:10px 0 0;color:#9ba7b4;font-size:11px;line-height:1.45}
+.buyback-quantity-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}
+.buyback-quantity-actions button{min-height:38px;padding:8px 13px;border:1px solid #414a54;border-radius:8px;background:#222830;color:#dce3eb;font:inherit;font-size:12px;font-weight:700}
+.buyback-quantity-actions .buyback-quantity-confirm{background:#365f24;border-color:#648c43;color:#eff9e7}
+@media(max-width:700px){.buyback-quantity-overlay{padding:16px!important;place-items:center!important}.buyback-quantity-window{width:100%!important;height:auto!important;max-height:calc(100dvh - 32px)!important;border-radius:16px!important}.buyback-quantity-window .buyback-head{position:static!important}}
+`;
 
 const overlay=document.createElement('div');
 overlay.className='buyback-overlay';overlay.hidden=true;overlay.innerHTML=`
@@ -473,6 +486,11 @@ overlay.className='buyback-overlay';overlay.hidden=true;overlay.innerHTML=`
 <div class="buyback-list" id="buybackList"><div class="buyback-empty">Загружаю перекупной товар…</div></div>
 </div></section>`;
 document.body.append(overlay);
+const quantityOverlay=document.createElement('div');
+quantityOverlay.className='buyback-overlay buyback-quantity-overlay';
+quantityOverlay.hidden=true;
+quantityOverlay.innerHTML='<section class="buyback-window buyback-quantity-window" role="dialog" aria-modal="true" aria-labelledby="buybackQuantityTitle"><header class="buyback-head"><div><span class="eyebrow">ИЗМЕНЕНИЕ КОЛИЧЕСТВА</span><h2 id="buybackQuantityTitle">Отметить товар</h2></div></header><form id="buybackQuantityForm"><div class="buyback-body buyback-quantity-body"><p class="buyback-quantity-prompt" id="buybackQuantityPrompt"></p><label class="buyback-field">Количество<input id="buybackQuantityValue" type="number" min="1" step="1" required></label><p class="buyback-quantity-hint">Остальные единицы останутся в текущем статусе.</p><div class="buyback-quantity-actions"><button type="button" id="buybackQuantityCancel">Отмена</button><button type="submit" class="buyback-quantity-confirm">Продолжить</button></div></div></form></section>';
+document.body.append(quantityOverlay);
 const editOverlay=document.createElement('div');
 editOverlay.className='buyback-overlay buyback-edit-overlay';
 editOverlay.hidden=true;
@@ -593,6 +611,7 @@ function open(){
  try{history.pushState({...history.state,buybackPanelOpen:true},'');buybackHistoryEntry=true}catch{buybackHistoryEntry=false}
 }
 function close(fromPopState=false){
+ if(!quantityOverlay.hidden)finishBuybackQuantity(null);
  if(overlay.hidden)return;
  overlay.hidden=true;
  nav?.classList.remove('active');
@@ -652,6 +671,7 @@ $('buybackClose').addEventListener('click',()=>close());
 overlay.addEventListener('click',e=>{if(e.target===overlay)close()});
 document.addEventListener('keydown',e=>{
  if(e.key!=='Escape')return;
+ if(!quantityOverlay.hidden){e.preventDefault();finishBuybackQuantity(null);return}
  if(!editOverlay.hidden){e.preventDefault();closeBuybackEditor();return}
  if(!overlay.hidden){e.preventDefault();close()}
 });
@@ -684,6 +704,31 @@ $('buybackForm').addEventListener('submit',async e=>{
  catch(err){console.error(err);showToast('Не удалось добавить товар: '+(err.code||'проверьте доступ'))}
  finally{submit.disabled=false}
 });
+let quantitySelectionResolver=null;
+function finishBuybackQuantity(value){
+ quantityOverlay.hidden=true;
+ const resolve=quantitySelectionResolver;quantitySelectionResolver=null;
+ resolve?.(value);
+}
+function askBuybackQuantity(item,status){
+ if(quantitySelectionResolver)finishBuybackQuantity(null);
+ const quantity=Number(item.quantity)||1;
+ const label=status==='returned'?'возвращёнными':status==='sold'?'проданными':status==='shipped'?'отгруженными':'отменёнными';
+ $('buybackQuantityTitle').textContent='Изменить статус';
+ $('buybackQuantityPrompt').textContent='Сколько из '+quantity+' единиц артикула '+String(item.article||'')+' отметить как '+label+'?';
+ const input=$('buybackQuantityValue');input.max=String(quantity);input.value=String(quantity);
+ quantityOverlay.hidden=false;
+ requestAnimationFrame(()=>{input.focus();input.select()});
+ return new Promise(resolve=>{quantitySelectionResolver=resolve});
+}
+$('buybackQuantityForm').addEventListener('submit',e=>{
+ e.preventDefault();
+ const input=$('buybackQuantityValue'),quantity=Number(input.value),max=Number(input.max);
+ if(!Number.isInteger(quantity)||quantity<1||quantity>max){showToast('Укажите целое количество от 1 до '+max+'.');input.focus();return}
+ finishBuybackQuantity(quantity);
+});
+$('buybackQuantityCancel').addEventListener('click',()=>finishBuybackQuantity(null));
+quantityOverlay.addEventListener('click',e=>{if(e.target===quantityOverlay)finishBuybackQuantity(null)});
 overlay.addEventListener('click',async e=>{
  const statCard=e.target.closest('[data-buyback-stat]');if(statCard){openBuybackStatModal(statCard.dataset.buybackStat);return}
  const commentBtn=e.target.closest('[data-save-buyback-comment]');
@@ -722,9 +767,8 @@ overlay.addEventListener('click',async e=>{
   if((item.status==='active'||isExpired)&&['returned','sold','cancelled','shipped'].includes(nextStatus)){
     let qty=Number(item.quantity)||1;
     if(btn.dataset.partial==='true'||qty>1){
-      const entered=window.prompt('Сколько единиц из '+qty+' отметить как «'+(nextStatus==='returned'?'возвращённые':nextStatus==='sold'?'проданные':nextStatus==='shipped'?'отгруженные':'отменённые')+'»? Введите количество от 1 до '+qty+'.',String(qty));
-      if(entered===null)return;qty=Number(entered);
-      if(!Number.isInteger(qty)||qty<1||qty>Number(item.quantity)){showToast('Укажите целое количество от 1 до '+item.quantity+'.');return}
+      const entered=await askBuybackQuantity(item,nextStatus);
+      if(entered===null)return;qty=entered;
     }
     const patch={status:nextStatus,updatedAt:serverTimestamp()};
     if(nextStatus==='sold')patch.soldAt=eventDate;else if(nextStatus==='cancelled')patch.cancelledAt=eventDate;else if(nextStatus==='shipped'){patch.shippedAt=eventDate;patch.shippedLate=isExpired;patch.overdueDaysAtShipment=Math.max(0,elapsedDays(item.receivedAt)-14)}else patch.returnedAt=eventDate;

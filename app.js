@@ -46,6 +46,7 @@ const fmtDate=d=>{const date=asDate(d);return date?dateFormatter.format(date):'�
 const fmtDateTime=d=>{const date=asDate(d);return date?dateTimeFormatter.format(date):'—'};
 let state={orders:[],notices:[],role:'warehouse',seen:{},extraPhoneNotifications:false,notificationSettings:normalizeNotificationSettings()};
 let activeFilter='all', selectedId=null, pendingDefectId=null, pendingNotificationOrderId='', pendingNotificationChat=false, chatReplyTo=null, chatUnread=false, chatFilterText='', chatFilterMode='all', currentOrdersPage=1;
+let pendingNotificationLoadId='';
 const pendingOrderCreateDrafts=new Map();
 const ordersPageSize=50;
 const notificationParams=new URLSearchParams(location.search);
@@ -825,6 +826,22 @@ function watchOrderEntries(id){
   if(wasFirstEntries&&selectedId===id&&!modal.hidden&&modal.dataset.orderDetail===id)openOrder(id);
  }));
 }
+async function openPendingNotificationOrder(){
+ const id=String(pendingNotificationOrderId||'');if(!id||!signedInUser)return;
+ history.replaceState({},'',location.pathname+location.hash);
+ const cached=state.orders.find(order=>order.id===id);
+ if(cached){pendingNotificationOrderId='';openOrder(id);return;}
+ if(pendingNotificationLoadId===id)return;
+ pendingNotificationLoadId=id;
+ try{
+  const snap=await getDoc(doc(db,'orders',id));
+  if(pendingNotificationOrderId!==id||!snap.exists())return;
+  const data=snap.data(),prior=serverCache.get(id);
+  const order={id,number:data.number||'',client:data.client||'',clientId:data.clientId||'',deliveryType:['city','pickup','post','kamyanske'].includes(data.deliveryType)?data.deliveryType:'city',status:data.status||'Создан',returnCancelled:data.returnCancelled===true||(Array.isArray(data.returns)&&data.returns.some(r=>r?.status==='cancelled')),articles:Array.isArray(data.articles)?data.articles:[],createdAt:data.createdAt,updatedAt:data.updatedAt,transferredAt:data.transferredAt,resumedAt:data.resumedAt,assembledAt:data.assembledAt,shippedAt:data.shippedAt,assemblyInProgress:data.assemblyInProgress===true,assemblyStartedAt:data.assemblyStartedAt,assemblyStartedBy:data.assemblyStartedBy,assemblyStartedByName:data.assemblyStartedByName,returns:Array.isArray(data.returns)?data.returns:[],author:data.createdByName||'Сотрудник',createdBy:data.createdBy,updatedBy:data.updatedBy,updatedByName:data.updatedByName,entries:prior?.entries||[]};
+  state.orders.unshift(order);serverCache.set(id,{...order,articles:order.articles.map(item=>({...item})),entries:order.entries.map(entry=>({...entry}))});saveOrdersCache();pendingNotificationOrderId='';render();openOrder(id);
+ }catch(error){console.warn('Не удалось быстро открыть заказ из уведомления',error);}
+ finally{if(pendingNotificationLoadId===id)pendingNotificationLoadId='';}
+}
 function watchPendingDefectOrders(){
   const candidates=new Set(state.orders.filter(o=>o.status==='Дефект'||(o.entries||[]).some(e=>e.kind==='defect'&&!e.decision)).map(o=>o.id));
  for(const [id,stop] of defectEntryUnsubscribes){if(!candidates.has(id)){stop();defectEntryUnsubscribes.delete(id);}}
@@ -873,7 +890,7 @@ function watchOrders(){
    if(!snap.metadata.fromCache)initialCloudLoad=false;saveOrdersCache();watchPendingDefectOrders();scheduleRender();restoreUiState();
    // Keep the open order card in sync when another employee changes its status.
    if(openedOrderStatusChanged&&selectedId&&!modal.hidden&&modal.dataset.orderDetail===selectedId)openOrder(selectedId);
-   if(pendingNotificationOrderId){const target=pendingNotificationOrderId;pendingNotificationOrderId='';history.replaceState({},'',location.pathname+location.hash);if(state.orders.some(o=>o.id===target))openOrder(target);}
+   if(pendingNotificationOrderId)void openPendingNotificationOrder();
  },err=>{
    console.error('Не удалось обновить список заказов',err);
    ordersUnsubscribe?.();ordersUnsubscribe=null;
@@ -905,7 +922,7 @@ onAuthStateChanged(auth,user=>{
   $('userName').textContent=profileName;$('userRole').textContent=canManageUsers?`Администратор · ${roles[cachedProfile.role]}`:roles[cachedProfile.role];
   // Reveal the shell immediately on repeat visits; profile verification continues in parallel.
   hideAuth();
-  watchOrders();watchNotifications();watchChatBadge();watchClients();loadProductsCatalog();render();restoreUiState();
+  watchOrders();watchNotifications();watchChatBadge();watchClients();loadProductsCatalog();render();restoreUiState();if(pendingNotificationOrderId)void openPendingNotificationOrder();
   startedWithCache=true;
  }
  profileUnsubscribe=onSnapshot(doc(db,'users',user.uid),snap=>{
@@ -919,11 +936,11 @@ onAuthStateChanged(auth,user=>{
     // Server profile is now confirmed; refresh role-dependent UI without restarting listeners.
     render();
    }
-   syncPushToken(false);if(window.AndroidWarehouse?.requestNativePushToken){window.AndroidWarehouse.requestNativePushToken();}if(pendingNotificationChat){pendingNotificationChat=false;history.replaceState({},'',location.pathname+location.hash);setTimeout(()=>openChat(),0);}
+   syncPushToken(false);if(window.AndroidWarehouse?.requestNativePushToken){window.AndroidWarehouse.requestNativePushToken();}if(pendingNotificationOrderId)void openPendingNotificationOrder();if(pendingNotificationChat){pendingNotificationChat=false;history.replaceState({},'',location.pathname+location.hash);setTimeout(()=>openChat(),0);}
  },err=>{console.error(err);if(!startedWithCache)showAuth('Не удалось проверить профиль сотрудника. Проверьте правила доступа Firestore.');else toast('Не удалось обновить профиль с сервера. Доступ к данным контролируется Firestore.')});
 });
  $('loginForm').addEventListener('submit',async e=>{e.preventDefault();$('authError').textContent='';try{await signInWithEmailAndPassword(auth,$('loginEmail').value.trim(),$('loginPassword').value)}catch(err){console.error('Ошибка входа Firebase:',err.code,err.message);$('authError').textContent=err.code==='auth/invalid-credential'?'Firebase отклонил почту или пароль (auth/invalid-credential).':err.code==='auth/too-many-requests'?'Слишком много попыток. Попробуйте позже. (auth/too-many-requests)':`Не удалось войти: ${err.code||'неизвестная ошибка'}. Проверьте почту, пароль и настройки Firebase.`}});
- window.handleNativeNotificationLink=rawUrl=>{try{const target=new URL(String(rawUrl||''),location.href);if(target.origin!==location.origin)return false;const orderId=target.searchParams.get('order')||'';const openChatTarget=target.searchParams.get('chat')==='1';history.replaceState({},'',location.pathname+location.hash);if(orderId){pendingNotificationOrderId=orderId;if(state.orders.some(o=>o.id===orderId)){pendingNotificationOrderId='';openOrder(orderId);}}if(openChatTarget){pendingNotificationChat=true;if(signedInUser){pendingNotificationChat=false;openChat();}}return true;}catch(error){console.warn('Не удалось обработать уведомление',error);return false;}};
+ window.handleNativeNotificationLink=rawUrl=>{try{const target=new URL(String(rawUrl||''),location.href);if(target.origin!==location.origin)return false;const orderId=target.searchParams.get('order')||'';const openChatTarget=target.searchParams.get('chat')==='1';history.replaceState({},'',location.pathname+location.hash);if(orderId){pendingNotificationOrderId=orderId;if(signedInUser)void openPendingNotificationOrder();}if(openChatTarget){pendingNotificationChat=true;if(signedInUser){pendingNotificationChat=false;openChat();}}return true;}catch(error){console.warn('Не удалось обработать уведомление',error);return false;}};
 window.handleNativeGoogleSignIn=async idToken=>{try{await signInWithCredential(auth,GoogleAuthProvider.credential(idToken))}catch(err){console.error('Native Google sign-in Firebase error:',err);$('authError').textContent='Google-вход не завершён: '+(err.code||'ошибка Firebase')}};
 window.handleNativeGoogleSignInError=message=>{$('authError').textContent=message||'Не удалось войти через Google.'};
 $('googleLoginButton').addEventListener('click',async()=>{ $('authError').textContent='';try{if(window.AndroidWarehouse&&typeof window.AndroidWarehouse.startGoogleSignIn==='function'){window.AndroidWarehouse.startGoogleSignIn();return}if(/WarehouseOrdersAndroid/i.test(navigator.userAgent)){throw new Error('native-google-bridge-unavailable')}await signInWithPopup(auth,new GoogleAuthProvider())}catch(err){console.error(err);$('authError').textContent=err.message==='native-google-bridge-unavailable'?'Не удалось связаться с Android-входом. Полностью закройте приложение и откройте снова.':'Не удалось войти через Google: '+(err.code||err.message||'ошибка')}});
@@ -2167,13 +2184,30 @@ if(!o)return;if(kind!=='comment'&&!canEditOrder(o)){toast('После отгру
 entrySending=true;
 if(sendButton){sendButton.disabled=true;sendButton.textContent='Отправка…';}
 const previousStatus=o.status;
+let defectCommitted=false;
  const addedEntryIds=[];
 try{
 const photoBlobs=await readPhotos($('entryPhotos').files);const important=kind==='comment'&&$('entryImportant')?.checked===true;
 const entryId=crypto.randomUUID();
 const photos=await uploadPhotos(o.id,entryId,photoBlobs);
- if(kind==='defect'){o.status='Дефект';articleIndexes.forEach((idx,n)=>{const entry={id:n===0?entryId:crypto.randomUUID(),kind,article:o.articles[idx].article,articleIndex:idx,text,important:false,authorId:signedInUser.uid,author:profileName||roles[state.role],createdAt:isoNow(),photos:n===0?photos:[]};addedEntryIds.push(entry.id);o.entries.push(entry);});}else{const entry={id:entryId,kind,article:'',...(replyTarget?{replyToEntryId:replyTarget.id,replyToAuthorId:replyTarget.authorId||'',replyToAuthorName:replyTarget.author||'Сотрудник',replyToText:String(replyTarget.text||'').slice(0,500)}:{}),text,important,authorId:signedInUser.uid,author:profileName||roles[state.role],createdAt:isoNow(),photos};addedEntryIds.push(entry.id);o.entries.push(entry);}await save();if(kind==='comment'){if(replyTarget?.authorId&&replyTarget.authorId!==signedInUser.uid){await queuePush(profileName||roles[state.role],`Ответ на ваш комментарий: ${text}`,signedInUser.uid,o.id,'site','replies',replyTarget.authorId,{isReply:true});}const tokens=[...text.matchAll(/(^|[\s])@([\p{L}\p{N}_-]{2,})/gu)].map(x=>x[2].toLocaleLowerCase('ru'));const mentioned=[...new Map(knownChatPeople.map(p=>[p.id,p])).values()].filter(p=>p.id&&p.id!==signedInUser.uid&&p.id!==replyTarget?.authorId&&tokens.includes(chatMentionToken(p.name).toLocaleLowerCase('ru')));await Promise.all(mentioned.map(p=>queuePush(profileName||roles[state.role],text,signedInUser.uid,o.id,'site','replies',p.id,{isMention:true})));}await writeAudit(kind==='defect'?'Добавлен дефект':'Добавлен комментарий',text,o.id,{entryId});closeModal();render();if(kind==='defect'){const defectToast=toast(`⚠️ ДЕФЕКТ · Заказ № ${o.number}`,o.id);defectToast.classList.add('defect-toast');}else{toast('Запись добавлена в историю заказа.');}notify(`${kind==='defect'?'Дефект':'Комментарий'} к заказу № ${o.number}`,o.id);openOrder(o.id)
- }catch(e){if(addedEntryIds.length)o.entries=o.entries.filter(entry=>!addedEntryIds.includes(entry.id));if(kind==='defect')o.status=previousStatus;render();toast(e.message)}
+ if(kind==='defect'){
+  const createdAt=isoNow(),author=profileName||roles[state.role],entries=articleIndexes.map((idx,n)=>({id:n===0?entryId:crypto.randomUUID(),kind,article:o.articles[idx].article,articleIndex:idx,text,important:false,authorId:signedInUser.uid,author,createdAt,photos:n===0?photos:[]}));
+  const updatedAt=isoNow(),orderRef=doc(db,'orders',o.id),batch=writeBatch(db);
+  batch.update(orderRef,{status:'Дефект',updatedAt,updatedBy:signedInUser.uid,updatedByName:profileName});
+  for(const entry of entries)batch.set(doc(db,'orders',o.id,'entries',entry.id),entryToCloud(entry));
+  await batch.commit();
+  defectCommitted=true;
+  // Apply the committed result to the latest snapshot. The order and entry listeners
+  // can both fire during commit, so never append to the stale `o` captured pre-upload.
+  const latest=state.orders.find(x=>x.id===o.id);
+  if(latest){latest.status='Дефект';latest.updatedAt=updatedAt;latest.updatedBy=signedInUser.uid;latest.updatedByName=profileName;const byId=new Map((latest.entries||[]).map(e=>[e.id,e]));for(const entry of entries)byId.set(entry.id,entry);latest.entries=[...byId.values()].sort((a,b)=>(asDate(a.createdAt)?.getTime()||0)-(asDate(b.createdAt)?.getTime()||0)||String(a.id).localeCompare(String(b.id)));serverCache.set(o.id,{...(serverCache.get(o.id)||latest),...latest,articles:(latest.articles||[]).map(x=>({...x})),entries:latest.entries.map(x=>({...x}))});saveOrdersCache();}
+  await writeAudit('Добавлен дефект',text,o.id,{entryId});
+  await queuePush(o.client||'Клиент не указан','Добавлен дефект',signedInUser.uid,o.id,'site','defects');
+  closeModal();render();const defectToast=toast(`⚠️ ДЕФЕКТ · Заказ № ${o.number}`,o.id);defectToast.classList.add('defect-toast');notify(`Дефект к заказу № ${o.number}`,o.id);openOrder(o.id);
+ }else{
+  const entry={id:entryId,kind,article:'',...(replyTarget?{replyToEntryId:replyTarget.id,replyToAuthorId:replyTarget.authorId||'',replyToAuthorName:replyTarget.author||'Сотрудника',replyToText:String(replyTarget.text||'').slice(0,500)}:{}),text,important,authorId:signedInUser.uid,author:profileName||roles[state.role],createdAt:isoNow(),photos};addedEntryIds.push(entry.id);o.entries.push(entry);await save();if(replyTarget?.authorId&&replyTarget.authorId!==signedInUser.uid){await queuePush(profileName||roles[state.role],`Ответ на ваш комментарий: ${text}`,signedInUser.uid,o.id,'site','replies',replyTarget.authorId,{isReply:true});}const tokens=[...text.matchAll(/(^|[\s])@([\p{L}\p{N}_-]{2,})/gu)].map(x=>x[2].toLocaleLowerCase('ru'));const mentioned=[...new Map(knownChatPeople.map(p=>[p.id,p])).values()].filter(p=>p.id&&p.id!==signedInUser.uid&&p.id!==replyTarget?.authorId&&tokens.includes(chatMentionToken(p.name).toLocaleLowerCase('ru')));await Promise.all(mentioned.map(p=>queuePush(profileName||roles[state.role],text,signedInUser.uid,o.id,'site','replies',p.id,{isMention:true})));await writeAudit('Добавлен комментарий',text,o.id,{entryId});closeModal();render();toast('Запись добавлена в историю заказа.');notify(`Комментарий к заказу № ${o.number}`,o.id);openOrder(o.id)
+ }
+ }catch(e){if(addedEntryIds.length)o.entries=o.entries.filter(entry=>!addedEntryIds.includes(entry.id));if(kind==='defect'&&!defectCommitted)o.status=previousStatus;render();toast(defectCommitted?'Дефект сохранён, но не удалось обновить уведомления.':e.message)}
 finally{entrySending=false;if(sendButton){sendButton.disabled=false;sendButton.textContent=kind==='defect'?'Добавить дефект':'Отправить';}}}
 
 async function setStatus(status,text,kind='system'){

@@ -329,7 +329,7 @@ function chatUnreadIndicatorMode(){return signedInUser&&localStorage.getItem('wa
 function paintChatBadge(){const button=$('chatSidebarButton');if(!button)return;const unread=!!chatUnread;button.classList.toggle('has-unread-chat',unread&&chatUnreadIndicatorMode()==='dot');button.classList.toggle('has-unread-chat-bell',unread&&chatUnreadIndicatorMode()==='bell');}
 async function markChatMessagesRead(messages=[]){
   if(!signedInUser)return;
-  const incoming=messages.filter(m=>m.authorId!==signedInUser.uid);
+  const incoming=messages.filter(m=>m.authorId!==signedInUser.uid&&m.isUrgent!==true);
   if(!incoming.length)return;
   try{
     const batch=writeBatch(db);
@@ -2526,6 +2526,11 @@ async function editChatMessage(id){
   try{await updateDoc(doc(db,'chatMessages',id),{text,editedAt:isoNow()});toast('Сообщение изменено.');}
   catch(err){console.error('Не удалось изменить сообщение',err);toast('Не удалось изменить сообщение. Проверьте правила Firestore.');}
 }
+async function acknowledgeUrgentChatMessage(messageId){
+  if(!signedInUser||!messageId)return;
+  try{await updateDoc(doc(db,'chatMessages',messageId),{urgentAckBy:arrayUnion(signedInUser.uid)});await deleteDoc(doc(db,'chatUnread',signedInUser.uid+'_'+messageId)).catch(()=>{});toast('Получение срочного обращения подтверждено.');}
+  catch(err){console.error('Не удалось подтвердить срочное обращение',err);toast('Не удалось подтвердить получение. Проверьте соединение.');}
+}
 function findChatMessage(id){return [...chatMessages,...olderChatMessages].find(m=>m.id===id);}
 async function copyChatMessage(id){
   const m=findChatMessage(id);if(!m)return;
@@ -2804,11 +2809,11 @@ function renderChatMessages(options={}){
       const liked=likes.includes(signedInUser?.uid);
       const photoHtml=photos.length?'<div class="chat-photo-grid">'+photos.map(p=>'<a href="'+esc(p)+'" target="_blank" rel="noopener"><img src="'+esc(p)+'" alt="Фото из общего чата" loading="lazy"></a>').join('')+'</div>':'';
       const replyHtml=m.replyToId?'<div class="chat-reply-quote"><b>Ответ на '+esc(m.replyToAuthorName||'сообщение')+'</b><span>'+esc(m.replyToText||'📷 Фото')+'</span></div>':'';
-      const likeHtml='<button type="button" class="chat-like-button '+(liked?'active':'')+'" data-action="toggle-chat-like:'+esc(m.id)+'" aria-label="Нравится">👍 <span>'+likes.length+'</span></button>'; const readBy=Array.isArray(m.readBy)?m.readBy:[]; const receipt='<button type="button" class="chat-read-receipt" data-action="chat-readers:'+esc(m.id)+'" title="Кто прочитал">'+(readBy.length>1?'✓✓':'✓')+'</button>'; const menuHtml='<details class="chat-message-menu"><summary aria-label="Меню сообщения">⋯</summary><div class="chat-message-menu-items"><button type="button" data-action="reply-chat:'+esc(m.id)+'">↩ Ответить</button>'+(mine?'<button type="button" data-action="edit-chat:'+esc(m.id)+'">✎ Изменить</button>':'')+'<button type="button" data-action="copy-chat:'+esc(m.id)+'">Копировать</button><button type="button" data-action="share-chat:'+esc(m.id)+'">Поделиться…</button><button type="button" data-action="viber-chat:'+esc(m.id)+'">Отправить через Viber</button></div></details>';
+      const likeHtml='<button type="button" class="chat-like-button '+(liked?'active':'')+'" data-action="toggle-chat-like:'+esc(m.id)+'" aria-label="Нравится">👍 <span>'+likes.length+'</span></button>'; const readBy=Array.isArray(m.readBy)?m.readBy:[]; const receipt='<button type="button" class="chat-read-receipt" data-action="chat-readers:'+esc(m.id)+'" title="Кто прочитал">'+(readBy.length>1?'✓✓':'✓')+'</button>'; const urgentPending=m.isUrgent===true&&m.authorId!==signedInUser?.uid&&!(Array.isArray(m.urgentAckBy)&&m.urgentAckBy.includes(signedInUser?.uid)); const urgentAckButton=urgentPending?'<button type="button" class="chat-urgent-ack" data-action="ack-urgent-chat:'+esc(m.id)+'">✓ Подтвердить получение</button>':''; const menuHtml='<details class="chat-message-menu"><summary aria-label="Меню сообщения">⋯</summary><div class="chat-message-menu-items"><button type="button" data-action="reply-chat:'+esc(m.id)+'">↩ Ответить</button>'+(mine?'<button type="button" data-action="edit-chat:'+esc(m.id)+'">✎ Изменить</button>':'')+'<button type="button" data-action="copy-chat:'+esc(m.id)+'">Копировать</button><button type="button" data-action="share-chat:'+esc(m.id)+'">Поделиться…</button><button type="button" data-action="viber-chat:'+esc(m.id)+'">Отправить через Viber</button></div></details>';
 
       const roleMeta=({admin:{label:'Администратор',icon:'⚙',tone:'admin'},administrator:{label:'Администратор',icon:'⚙',tone:'admin'},warehouse:{label:'Кладовщик',icon:'▦',tone:'warehouse'},manager:{label:'Менеджер',icon:'↗',tone:'manager'},chief_accountant:{label:'Главный бухгалтер',icon:'₴',tone:'chief-accountant'},accountant:{label:'Бухгалтер',icon:'▤',tone:'accountant'},director:{label:'Директор',icon:'♛',tone:'director'}})[m.authorRole]||{label:'Сотрудник',icon:'•',tone:'unknown'};
       const roleBadge='<span class="chat-role-badge chat-role-'+roleMeta.tone+'" title="'+esc(roleMeta.label)+'"><span aria-hidden="true">'+roleMeta.icon+'</span>'+esc(roleMeta.label)+'</span>';
-      return chatDayDivider+'<article class="chat-message chat-author-role-'+roleMeta.tone+' '+(mine?'mine':'')+'"><div class="chat-message-head"><span class="chat-author-line"><span class="chat-role-avatar chat-role-avatar-'+roleMeta.tone+'" aria-hidden="true">'+roleMeta.icon+'</span><b>'+esc(chatDisplayName(m.authorName))+'</b>'+roleBadge+'</span><time>'+esc(fmtDateTime(m.createdAt))+'</time></div>'+replyHtml+'<div class="chat-message-text">'+renderChatText(m.text)+'</div>'+(m.editedAt?'<small class="chat-edited-label">изменено</small>':'')'+photoHtml+'<div class="chat-message-actions">'+likeHtml+menuHtml+receipt+'</div></article>';
+      return chatDayDivider+'<article class="chat-message chat-author-role-'+roleMeta.tone+' '+(mine?'mine':'')+'"><div class="chat-message-head"><span class="chat-author-line"><span class="chat-role-avatar chat-role-avatar-'+roleMeta.tone+'" aria-hidden="true">'+roleMeta.icon+'</span><b>'+esc(chatDisplayName(m.authorName))+'</b>'+roleBadge+'</span><time>'+esc(fmtDateTime(m.createdAt))+'</time></div>'+replyHtml+'<div class="chat-message-text">'+renderChatText(m.text)+'</div>'+(m.editedAt?'<small class="chat-edited-label">изменено</small>':'')+photoHtml+(m.isUrgent?'<div class="chat-urgent-banner">🚨 СРОЧНОЕ ОБРАЩЕНИЕ</div>':'')+'<div class="chat-message-actions">'+likeHtml+menuHtml+receipt+urgentAckButton+'</div></article>';
     }).join('');
     if(chatPendingScrollRestore){box.scrollTop=chatPendingScrollRestore.top+(box.scrollHeight-chatPendingScrollRestore.height);chatPendingScrollRestore=null;}
     else if(options.preserveScroll){
@@ -2831,7 +2836,7 @@ function openChat(){
   chatUnsubscribe?.();
   chatMessages=[];olderChatMessages=[];chatOldestCursor=null;hasOlderChatMessages=true;loadingOlderChatMessages=false;chatLegacyHistoryLoaded=false;chatLegacyHistoryLoading=false;chatLegacyHistoryCursor=null;chatPendingScrollRestore=null;chatReplyTo=null;chatFilterText='';chatFilterMode='all';
   knownChatPeople=[];loadCurrentChatPeople();
-  showModal('Общий чат','<div class="chat-shell"><div class="chat-toolbar">'+(canManageUsers?'<button type="button" class="small-button primary-soft" data-action="test-push-notification">🔔 Проверка уведомления</button>':'')+'<label class="search-box"><span>⌕</span><input id="chatSearch" type="search" placeholder="Поиск по чату"></label><select id="chatFilter"><option value="all">Все сообщения</option><option value="mine">Мои</option><option value="replies">С ответами</option><option value="photos">С фото</option></select></div><div class="chat-messages" id="chatMessages"><div class="chat-empty">Загрузка сообщений…</div></div><form id="chatForm" class="chat-form"><div id="chatReplyPreview" class="chat-reply-preview" hidden></div><div class="chat-input-wrap"><textarea id="chatInput" maxlength="1000" rows="2" placeholder="Напишите сообщение… (можно вставить фото из буфера)" autocomplete="off"></textarea><div id="chatMentionSuggestions" class="chat-mention-suggestions" hidden></div></div><div class="chat-attach-row"><label class="chat-attach-button">📎 Фото<input id="chatPhotoInput" type="file" accept="image/*" multiple hidden></label><span id="chatPhotoHint">До 5 фото, по 8 МБ</span></div><div id="chatUploadProgress" class="chat-upload-progress" hidden><div class="chat-upload-progress-track"><div id="chatUploadProgressBar" class="chat-upload-progress-bar"></div></div><span id="chatUploadProgressText">Загрузка…</span></div><div id="chatPhotoPreview" class="chat-photo-preview"></div></form></div>',[button('Закрыть','close'),button('Отправить','send-chat','primary-button')],'ОБЩИЙ ЧАТ');
+  showModal('Общий чат','<div class="chat-shell"><div class="chat-toolbar">'+(canManageUsers?'<button type="button" class="small-button primary-soft" data-action="test-push-notification">🔔 Проверка уведомления</button>':'')+'<label class="search-box"><span>⌕</span><input id="chatSearch" type="search" placeholder="Поиск по чату"></label><select id="chatFilter"><option value="all">Все сообщения</option><option value="mine">Мои</option><option value="replies">С ответами</option><option value="photos">С фото</option></select></div><div class="chat-messages" id="chatMessages"><div class="chat-empty">Загрузка сообщений…</div></div><form id="chatForm" class="chat-form"><div id="chatReplyPreview" class="chat-reply-preview" hidden></div><label class="chat-urgent-toggle"><input id="chatUrgent" type="checkbox"> <span>🚨 Срочное обращение <small>только сотрудникам, упомянутым через @</small></span></label><div class="chat-input-wrap"><textarea id="chatInput" maxlength="1000" rows="2" placeholder="Напишите сообщение… (можно вставить фото из буфера)" autocomplete="off"></textarea><div id="chatMentionSuggestions" class="chat-mention-suggestions" hidden></div></div><div class="chat-attach-row"><label class="chat-attach-button">📎 Фото<input id="chatPhotoInput" type="file" accept="image/*" multiple hidden></label><span id="chatPhotoHint">До 5 фото, по 8 МБ</span></div><div id="chatUploadProgress" class="chat-upload-progress" hidden><div class="chat-upload-progress-track"><div id="chatUploadProgressBar" class="chat-upload-progress-bar"></div></div><span id="chatUploadProgressText">Загрузка…</span></div><div id="chatPhotoPreview" class="chat-photo-preview"></div></form></div>',[button('Закрыть','close'),button('Отправить','send-chat','primary-button')],'ОБЩИЙ ЧАТ');
   // Subscribe only to recent canonical Timestamp records. Legacy messages are
   // fetched on demand when the user scrolls back through the modern history.
   const recentChatQuery=query(collection(db,'chatMessages'),where('createdAt','>=',new Date(0)),where('createdAt','<=',new Date('9999-12-31T23:59:59.999Z')),orderBy('createdAt','desc'),limit(50));
@@ -2921,9 +2926,10 @@ function openChat(){
       const mentionedTokens=[...text.matchAll(/(^|[\\s])@([\\p{L}\\p{N}_-]{2,})/gu)].map(x=>x[2].toLocaleLowerCase('ru'));
       const mentionedUsers=[...new Map(knownChatPeople.filter(p=>p.id&&p.name&&p.active!==false).map(p=>[p.id,p])).values()]
         .filter(p=>p.id&&p.id!==signedInUser.uid&&p.id!==chatReplyTo?.authorId&&mentionedTokens.includes(chatMentionToken(p.name).toLocaleLowerCase('ru')));
+      const isUrgent=$('chatUrgent')?.checked===true;
       const notificationRecipientIds=[...new Set([
         ...mentionedUsers.map(person=>person.id),
-        ...(chatReplyTo?.authorId&&chatReplyTo.authorId!==signedInUser.uid?[chatReplyTo.authorId]:[])
+        ...(!isUrgent&&chatReplyTo?.authorId&&chatReplyTo.authorId!==signedInUser.uid?[chatReplyTo.authorId]:[])
       ])];
       await setDoc(doc(db,'chatMessages',crypto.randomUUID()),{
         text:text.slice(0,1000),
@@ -2936,14 +2942,16 @@ function openChat(){
         readBy:[signedInUser.uid],
         mentionUserIds:mentionedUsers.map(person=>person.id),
         notificationRecipientIds,
-        ...(chatReplyTo?{replyToId:chatReplyTo.id,replyToAuthorId:chatReplyTo.authorId,replyToAuthorName:chatReplyTo.authorName||'Сотрудник',replyToText:(chatReplyTo.text||'📷 Фото').slice(0,300)}:{})
+        ...(isUrgent?{isUrgent:true,urgentAckBy:[]}:{isUrgent:false}),
+        ...(!isUrgent&&chatReplyTo?{replyToId:chatReplyTo.id,replyToAuthorId:chatReplyTo.authorId,replyToAuthorName:chatReplyTo.authorName||'Сотрудник',replyToText:(chatReplyTo.text||'📷 Фото').slice(0,300)}:{})
       });
-      if(chatReplyTo?.authorId&&chatReplyTo.authorId!==signedInUser.uid){
+      if(!isUrgent&&chatReplyTo?.authorId&&chatReplyTo.authorId!==signedInUser.uid){
         await queuePush(profileName,text||'📷 Фото',signedInUser.uid,'','chat','replies',chatReplyTo.authorId,{isReply:true});
       }
       for(const person of mentionedUsers){
-        await queuePush(profileName,text||'📷 Фото',signedInUser.uid,'','chat','replies',person.id,{isMention:true});
+        await queuePush(isUrgent?'🚨 СРОЧНО · '+profileName:profileName,text||'📷 Фото',signedInUser.uid,'','chat','replies',person.id,{isMention:true});
       }
+      const urgentToggle=$('chatUrgent');if(urgentToggle)urgentToggle.checked=false;
       input.value='';
       cancelChatReply();
       if(photoInput){photoInput.value='';photoInput.disabled=false;}
@@ -3658,6 +3666,8 @@ document.addEventListener('click',e=>{
   if(like){e.preventDefault();toggleChatLike(like.dataset.action.split(':').slice(1).join(':'));return;}
   const readers=e.target.closest('[data-action^="chat-readers:"]');
   if(readers){e.preventDefault();showChatReaders(readers.dataset.action.split(':').slice(1).join(':'));return;}
+  const urgentAck=e.target.closest('[data-action^="ack-urgent-chat:"]');
+  if(urgentAck){e.preventDefault();acknowledgeUrgentChatMessage(urgentAck.dataset.action.split(':').slice(1).join(':'));return;}
   const edit=e.target.closest('[data-action^="edit-chat:"]');
   if(edit){e.preventDefault();editChatMessage(edit.dataset.action.split(':').slice(1).join(':'));return;}
   const copy=e.target.closest('[data-action^="copy-chat:"]');

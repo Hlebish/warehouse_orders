@@ -311,12 +311,12 @@ function watchChatBadge(){
   chatBadgeUnsubscribe=onSnapshot(q,snap=>{
     const messages=snap.docs.map(d=>({id:d.id,...(d.data()||{})}));
     if(!initialSnapshot){
-      messages.filter(m=>!knownMessageIds.has(m.id)&&m.authorId&&m.authorId!==signedInUser.uid&&isFreshLiveMessage(m)).forEach(m=>{
+      messages.filter(m=>!knownMessageIds.has(m.id)&&m.authorId&&m.authorId!==signedInUser.uid&&isFreshLiveMessage(m)
+        &&Array.isArray(m.notificationRecipientIds)&&m.notificationRecipientIds.includes(signedInUser.uid)).forEach(m=>{
         const messageText=String(m.text||m.message||m.content||'').trim()||'📷 Фото';
         const sender=chatDisplayName(m.authorName||m.author||m.userName||'Сотрудник');
-        const mentionToken='@'+chatMentionToken(profileName||'');
-        const isMention=!!profileName&&messageText.toLocaleLowerCase('ru').includes(mentionToken.toLocaleLowerCase('ru'));
-        showAttentionToast({id:'chat-message:'+m.id,title:sender,message:messageText.slice(0,300),target:'chat',category:'chat',isReply:!!m.replyToId,isMention});
+        const isMention=Array.isArray(m.mentionUserIds)&&m.mentionUserIds.includes(signedInUser.uid);
+        showAttentionToast({id:'chat-message:'+m.id,title:sender,message:messageText.slice(0,300),target:'chat',category:'chat',isReply:!!m.replyToId&&!isMention,isMention});
       });
     }
     initialSnapshot=false;

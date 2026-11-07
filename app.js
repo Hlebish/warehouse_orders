@@ -11,7 +11,7 @@ import { searchClients, searchProducts } from './client-directory.mjs';
 import { shipmentOrderDateKey as getShipmentOrderDateKey, shipmentItemsForDate as buildShipmentItemsForDate } from './warehouse-operations.mjs';
 const firebaseApp=initializeApp(firebaseConfig),auth=getAuth(firebaseApp),db=getFirestore(firebaseApp),messaging=getMessaging(firebaseApp),storage=getStorage(firebaseApp),staffAuth=getAuth(initializeApp(firebaseConfig,'amp-staff-provisioner'));
 const warehouseFunctions=getFunctions(firebaseApp,'europe-west1'),enqueueWarehousePush=httpsCallable(warehouseFunctions,'enqueueWarehousePush');
-let signedInUser=null,profileName='',canManageUsers=false,profileUnsubscribe=null,ordersUnsubscribe=null,chatUnsubscribe=null,chatBadgeUnsubscribe=null,notificationsUnsubscribe=null,serverCache=new Map(),entryUnsubscribes=new Map(),defectEntryUnsubscribes=new Map(),pendingWrites=new Set(),pendingOrderData=new Map(),initialCloudLoad=true;
+let signedInUser=null,profileName='',canManageUsers=false,profileUnsubscribe=null,ordersUnsubscribe=null,chatUnsubscribe=null,chatBadgeUnsubscribe=null,chatUnreadReceiptUnsubscribe=null,notificationsUnsubscribe=null,serverCache=new Map(),entryUnsubscribes=new Map(),defectEntryUnsubscribes=new Map(),pendingWrites=new Set(),pendingOrderData=new Map(),initialCloudLoad=true;
 let chatLegacyHistoryLoaded=false,chatLegacyHistoryLoading=false,chatLegacyHistoryCursor=null;
 let ordersRetryTimer=null,ordersRetryDelay=3000,ordersConnectionNoticeShown=false,ordersListenerBlocked=false;
 const roles={warehouse:'Кладовщик',manager:'Менеджер',chief_accountant:'Главный бухгалтер',accountant:'Бухгалтер',director:'Директор'};
@@ -45,7 +45,7 @@ const todayFormatter=new Intl.DateTimeFormat('ru-RU',{weekday:'short',day:'numer
 const fmtDate=d=>{const date=asDate(d);return date?dateFormatter.format(date):'—'};
 const fmtDateTime=d=>{const date=asDate(d);return date?dateTimeFormatter.format(date):'—'};
 let state={orders:[],notices:[],role:'warehouse',seen:{},extraPhoneNotifications:false,notificationSettings:normalizeNotificationSettings()};
-let activeFilter='all', selectedId=null, pendingDefectId=null, pendingNotificationOrderId='', pendingNotificationChat=false, chatReplyTo=null, chatUnread=false, chatFilterText='', chatFilterMode='all', currentOrdersPage=1;
+let activeFilter='all', selectedId=null, pendingDefectId=null, pendingNotificationOrderId='', pendingNotificationChat=false, chatReplyTo=null, chatUnread=false, chatUnreadReceiptCount=0, chatFilterText='', chatFilterMode='all', currentOrdersPage=1;
 let pendingNotificationLoadId='';
 const pendingOrderCreateDrafts=new Map();
 const ordersPageSize=50;
@@ -284,6 +284,7 @@ function openMentionNotice(n){if(n?.orderId){closeModal();openOrder(String(n.ord
 function openMentionCenter(){const items=unreadMentionNotices();if(!items.length){showNotifications();return}const body='<div class="mention-center-list">'+items.map(n=>'<button type="button" class="mention-center-item" data-mention-notice="'+esc(n.id)+'"><b>'+esc(n.title||'Вас упомянули')+'</b><span>'+esc(n.message||n.body||'Новое упоминание')+'</span><small>'+esc(fmtDateTime(n.createdAt||n.at))+'</small></button>').join('')+'</div>';showModal('Новые упоминания',body,[button('Все уведомления','show-notifications','small-button'),button('Закрыть','close')],'ВАС УПОМЯНУЛИ')}
 function watchChatBadge(){
   chatBadgeUnsubscribe?.();
+  chatUnreadReceiptUnsubscribe?.();
   if(!signedInUser)return;
   let initialSnapshot=true;
   let knownMessageIds=new Set();
@@ -292,6 +293,19 @@ function watchChatBadge(){
     const created=asDate(m.createdAt)?.getTime();
     return Number.isFinite(created)&&created>=listenerStartedAt-5000&&Date.now()-created<=60000;
   };
+  const refreshUnread=legacyUnread=>{
+    chatUnread=chatUnreadReceiptCount>0||legacyUnread;
+    paintChatBadge();
+  };
+  chatUnreadReceiptCount=0;
+  chatUnreadReceiptUnsubscribe=onSnapshot(
+    query(collection(db,'chatUnread'),where('recipientUserId','==',signedInUser.uid),limit(500)),
+    snap=>{
+      chatUnreadReceiptCount=snap.size;
+      refreshUnread(false);
+    },
+    err=>console.error('Не удалось проверить полный список непрочитанных сообщений',err)
+  );
   const q=query(collection(db,'chatMessages'),where('createdAt','>=',new Date(0)),where('createdAt','<=',new Date('9999-12-31T23:59:59.999Z')),orderBy('createdAt','desc'),limit(50));
   chatBadgeUnsubscribe=onSnapshot(q,snap=>{
     const messages=snap.docs.map(d=>({id:d.id,...(d.data()||{})}));
@@ -301,41 +315,33 @@ function watchChatBadge(){
         const sender=chatDisplayName(m.authorName||m.author||m.userName||'Сотрудник');
         const mentionToken='@'+chatMentionToken(profileName||'');
         const isMention=!!profileName&&messageText.toLocaleLowerCase('ru').includes(mentionToken.toLocaleLowerCase('ru'));
-        showAttentionToast({
-          id:'chat-message:'+m.id,
-          title:sender,
-          message:messageText.slice(0,300),
-          target:'chat',
-          category:'chat',
-          isReply:!!m.replyToId,
-          isMention
-        });
+        showAttentionToast({id:'chat-message:'+m.id,title:sender,message:messageText.slice(0,300),target:'chat',category:'chat',isReply:!!m.replyToId,isMention});
       });
     }
     initialSnapshot=false;
     knownMessageIds=new Set(messages.map(m=>m.id));
-    // Do not derive mention targets from old messages; use the current users collection.
-    chatUnread=messages.some(m=>m.authorId!==signedInUser.uid && Array.isArray(m.readBy) && !m.readBy.includes(signedInUser.uid));
-    paintChatBadge();
+    const legacyUnread=messages.some(m=>m.authorId!==signedInUser.uid&&Array.isArray(m.readBy)&&!m.readBy.includes(signedInUser.uid));
+    refreshUnread(legacyUnread);
   },err=>console.error('Не удалось проверить непрочитанный чат',err));
 }
 function chatUnreadIndicatorMode(){return signedInUser&&localStorage.getItem('warehouse_chat_indicator_'+signedInUser.uid)==='bell'?'bell':'dot'}
 function paintChatBadge(){const button=$('chatSidebarButton');if(!button)return;const unread=!!chatUnread;button.classList.toggle('has-unread-chat',unread&&chatUnreadIndicatorMode()==='dot');button.classList.toggle('has-unread-chat-bell',unread&&chatUnreadIndicatorMode()==='bell');}
 async function markChatMessagesRead(messages=[]){
   if(!signedInUser)return;
-  const unread=messages.filter(m=>m.authorId!==signedInUser.uid && !(Array.isArray(m.readBy) && m.readBy.includes(signedInUser.uid)));
-  if(!unread.length){chatUnread=false;paintChatBadge();return;}
+  const unread=messages.filter(m=>m.authorId!==signedInUser.uid&&!(Array.isArray(m.readBy)&&m.readBy.includes(signedInUser.uid)));
+  if(!unread.length)return;
   try{
-    // A single Firestore batch replaces up to 50 individual network requests.
     const batch=writeBatch(db);
-    unread.forEach(m=>batch.update(doc(db,'chatMessages',m.id),{readBy:arrayUnion(signedInUser.uid)}));
+    unread.forEach(m=>{
+      batch.update(doc(db,'chatMessages',m.id),{readBy:arrayUnion(signedInUser.uid)});
+      batch.delete(doc(db,'chatUnread',signedInUser.uid+'_'+m.id));
+    });
     await batch.commit();
-    chatUnread=false;
   }catch(err){
     console.warn('Не удалось отметить чат прочитанным',err);
     chatUnread=true;
+    paintChatBadge();
   }
-  paintChatBadge();
 }
 async function markNotificationItemsRead(items=[],showToast=false){
   if(!signedInUser)return {total:0,failed:0};

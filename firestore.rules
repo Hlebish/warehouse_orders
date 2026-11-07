@@ -38,6 +38,7 @@ service cloud.firestore {
     }
     function chatLikes(data) { return data.keys().hasAll(['likes']) ? data.likes : []; }
     function chatReadBy(data) { return data.keys().hasAll(['readBy']) ? data.readBy : []; }
+    function chatUrgentAckBy(data) { return data.keys().hasAll(['urgentAckBy']) && data.urgentAckBy is list ? data.urgentAckBy : []; }
 
     match /users/{userId} {
       allow read: if signedIn() && (request.auth.uid == userId || canManageUsers());
@@ -95,7 +96,7 @@ service cloud.firestore {
     match /chatMessages/{messageId} {
       allow read: if activeUser();
       allow create: if activeUser()
-        && request.resource.data.keys().hasOnly(['text', 'authorId', 'authorName', 'authorRole', 'createdAt', 'photos', 'likes', 'readBy', 'mentionUserIds', 'notificationRecipientIds', 'replyToId', 'replyToAuthorId', 'replyToAuthorName', 'replyToText'])
+        && request.resource.data.keys().hasOnly(['text', 'authorId', 'authorName', 'authorRole', 'createdAt', 'photos', 'likes', 'readBy', 'mentionUserIds', 'notificationRecipientIds', 'replyToId', 'replyToAuthorId', 'replyToAuthorName', 'replyToText', 'isUrgent', 'urgentAckBy'])
         && request.resource.data.authorId == request.auth.uid
         && request.resource.data.authorName is string
         && request.resource.data.authorRole == role()
@@ -137,6 +138,14 @@ service cloud.firestore {
             && request.resource.data.readBy.size() <= resource.data.readBy.size() + 1
           )
         )
+        ||
+        (activeUser()
+          && resource.data.isUrgent == true
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['urgentAckBy'])
+          && request.resource.data.urgentAckBy is list
+          && request.resource.data.urgentAckBy.hasAll(chatUrgentAckBy(resource.data))
+          && request.resource.data.urgentAckBy.hasAll([request.auth.uid])
+          && request.resource.data.urgentAckBy.size() <= chatUrgentAckBy(resource.data).size() + 1)
         ||
         (activeUser()
           && resource.data.authorId == request.auth.uid

@@ -93,6 +93,36 @@ service cloud.firestore {
       }
     }
 
+    // Safe staff directory: only public work identity, never email or private profile fields.
+    match /staffDirectory/{staffId} {
+      allow read: if activeUser();
+      allow create, update: if activeUser()
+        && request.auth.uid == staffId
+        && request.resource.data.keys().hasOnly(['displayName','role','roleLabel','active','avatarUrl'])
+        && request.resource.data.displayName is string
+        && request.resource.data.displayName.size() <= 100
+        && request.resource.data.role == role()
+        && request.resource.data.roleLabel is string
+        && request.resource.data.roleLabel.size() <= 60
+        && request.resource.data.active == true
+        && request.resource.data.avatarUrl is string
+        && request.resource.data.avatarUrl.size() <= 1000;
+      allow delete: if activeUser() && request.auth.uid == staffId;
+    }
+
+    // Presence is isolated from user profiles and can only be written by its owner.
+    match /presence/{staffId} {
+      allow read: if activeUser();
+      allow create, update: if activeUser()
+        && request.auth.uid == staffId
+        && request.resource.data.keys().hasOnly(['active','activity','updatedAt'])
+        && request.resource.data.active == true
+        && request.resource.data.activity is string
+        && request.resource.data.activity.size() <= 80
+        && request.resource.data.updatedAt is number;
+      allow delete: if activeUser() && request.auth.uid == staffId;
+    }
+
     match /chatMessages/{messageId} {
       allow read: if activeUser();
       allow create: if activeUser()

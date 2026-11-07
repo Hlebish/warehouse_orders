@@ -139,6 +139,14 @@ service cloud.firestore {
         )
         ||
         (activeUser()
+          && resource.data.authorId == request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['text', 'editedAt'])
+          && request.resource.data.text is string
+          && request.resource.data.text.size() <= 1000
+          && (request.resource.data.text.size() > 0 || (resource.data.photos is list && resource.data.photos.size() > 0))
+          && request.resource.data.editedAt is string)
+        ||
+        (activeUser()
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes'])
           && request.resource.data.likes is list
           && request.resource.data.likes.size() <= 200

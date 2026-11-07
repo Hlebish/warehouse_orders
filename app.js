@@ -995,13 +995,14 @@ document.addEventListener('focusin',e=>{
  const el=e.target;if(!(el instanceof HTMLElement)||!el.matches('input,textarea,[contenteditable="true"]'))return;
  const inChat=el.id==='chatInput'||!!el.closest('#chatModal,#chatPanel,.chat-modal,.chat-panel,[data-chat-composer]');
  const inOrder=!!el.closest('#orderModal,#orderForm,#modalBackdrop');
- if(inChat)setWarehouseActivity('Печатает сообщение');
+ if(inChat)setWarehouseActivity('В чате',0);
  else if(inOrder)setWarehouseActivity('Создаёт или редактирует заказ');
  else setWarehouseActivity('Заполняет форму');
 });
 document.addEventListener('focusout',e=>{
  if(e.target instanceof HTMLElement&&e.target.matches('input,textarea,[contenteditable="true"]'))setWarehouseActivity('В приложении',0);
 });
+document.addEventListener('input',e=>{if(e.target instanceof HTMLElement&&e.target.id==='chatInput')setWarehouseActivity('Печатает сообщение')});
 
 onAuthStateChanged(auth,user=>{
  stopPresence();stopCloud();signedInUser=user;initialCloudLoad=true;

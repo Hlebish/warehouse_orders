@@ -919,8 +919,92 @@ function watchOrders(){
 function resumeOrdersListener(){if(signedInUser&&!ordersUnsubscribe&&!ordersListenerBlocked){if(ordersRetryTimer!==null){clearTimeout(ordersRetryTimer);ordersRetryTimer=null}watchOrders()}}
 window.addEventListener('online',resumeOrdersListener);
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')resumeOrdersListener()});
+
+let presenceUnsubscribe=null,directoryUnsubscribe=null,presenceHeartbeat=null,presenceExpiryTimer=null,currentActivity='В приложении',activityResetTimer=null;
+const staffPresence=new Map(),staffDirectory=new Map();
+function stopPresence(){
+ if(presenceHeartbeat!==null){clearInterval(presenceHeartbeat);presenceHeartbeat=null}
+ if(presenceExpiryTimer!==null){clearInterval(presenceExpiryTimer);presenceExpiryTimer=null}
+ if(activityResetTimer!==null){clearTimeout(activityResetTimer);activityResetTimer=null}
+ presenceUnsubscribe?.();presenceUnsubscribe=null;directoryUnsubscribe?.();directoryUnsubscribe=null;
+ staffPresence.clear();staffDirectory.clear();renderStaffPanel();
+}
+function setWarehouseActivity(label='В приложении',duration=12000){
+ currentActivity=String(label||'В приложении').slice(0,80);
+ if(signedInUser) void writePresence();
+ if(activityResetTimer!==null)clearTimeout(activityResetTimer);
+ if(duration>0)activityResetTimer=setTimeout(()=>{currentActivity='В приложении';void writePresence()},duration);
+}
+window.setWarehouseActivity=setWarehouseActivity;
+async function writePresence(){
+ if(!signedInUser||!state.role)return;
+ try{await setDoc(doc(db,'presence',signedInUser.uid),{active:true,activity:currentActivity,updatedAt:Date.now()},{merge:true})}
+ catch(err){console.warn('Не удалось обновить присутствие сотрудника',err)}
+}
+function renderStaffPanel(){
+ const list=$('staffPresenceList');if(!list)return;
+ const now=Date.now(),items=[...staffDirectory.values()].filter(x=>x.active===true).map(person=>{
+  const p=staffPresence.get(person.uid),online=!!p&&p.active===true&&now-Number(p.updatedAt||0)<75000;
+  return {...person,online,activity:online?(p.activity||'В приложении'):'Не в сети',updatedAt:p?.updatedAt||0};
+ }).sort((x,y)=>Number(y.online)-Number(x.online)||String(x.displayName).localeCompare(String(y.displayName),'ru'));
+ const onlineCount=items.filter(x=>x.online).length;
+ $('staffPresenceCount').textContent=String(onlineCount);
+ $('staffPresenceSummary').textContent=onlineCount+' в сети · '+items.length+' сотрудников';
+ list.innerHTML=items.length?items.map(person=>{
+  const initials=String(person.displayName||'?').trim().split(/\s+/).slice(0,2).map(x=>x[0]||'').join('').toLocaleUpperCase('ru');
+  const avatar=person.avatarUrl?'<img src="'+esc(person.avatarUrl)+'" alt="">':'<span>'+esc(initials||'?')+'</span>';
+  return '<button type="button" class="staff-presence-item" data-staff-id="'+esc(person.uid)+'"><span class="staff-avatar">'+avatar+'<i class="'+(person.online?'is-online':'')+'"></i></span><span class="staff-presence-copy"><b>'+esc(person.displayName||'Сотрудник')+'</b><small>'+esc(person.online?person.activity:person.roleLabel)+'</small></span><span class="staff-presence-state '+(person.online?'online':'')+'">'+(person.online?'●':'○')+'</span></button>';
+ }).join(''):'<div class="staff-empty">Список сотрудников пока пуст</div>';
+ list.querySelectorAll('[data-staff-id]').forEach(button=>button.addEventListener('click',()=>{
+  const person=items.find(x=>x.uid===button.dataset.staffId);if(!person)return;
+  const initials=String(person.displayName||'?').trim().split(/\s+/).slice(0,2).map(x=>x[0]||'').join('').toLocaleUpperCase('ru');
+  $('staffProfileAvatar').textContent=initials||'?';$('staffProfileName').textContent=person.displayName||'Сотрудник';
+  $('staffProfileRole').textContent=person.roleLabel||'Сотрудник';$('staffProfileActivity').textContent=person.online?person.activity:'Не в сети';
+  $('staffProfileStatus').textContent=person.online?'● Сейчас онлайн':'○ Не в сети';
+  $('staffProfileCard').hidden=false;
+ }));
+}
+function startPresence(user){
+ stopPresence();if(!user)return;
+ const roleLabel=roles[state.role]||'Сотрудник';
+ void setDoc(doc(db,'staffDirectory',user.uid),{displayName:profileName||roleLabel,role:state.role,roleLabel,active:true,avatarUrl:user.photoURL||''},{merge:true})
+  .catch(err=>console.warn('Не удалось обновить карточку сотрудника',err));
+ directoryUnsubscribe=onSnapshot(collection(db,'staffDirectory'),snap=>{
+  staffDirectory.clear();snap.forEach(d=>staffDirectory.set(d.id,{uid:d.id,...d.data()}));renderStaffPanel();
+ },err=>console.warn('Не удалось загрузить список сотрудников',err));
+ presenceUnsubscribe=onSnapshot(collection(db,'presence'),snap=>{
+  staffPresence.clear();snap.forEach(d=>staffPresence.set(d.id,d.data()));renderStaffPanel();
+ },err=>console.warn('Не удалось загрузить присутствие сотрудников',err));
+ currentActivity='В приложении';void writePresence();
+ presenceHeartbeat=setInterval(()=>{if(document.visibilityState==='visible')void writePresence()},25000);
+ presenceExpiryTimer=setInterval(renderStaffPanel,15000);
+}
+function openStaffPanel(open=true){
+ const panel=$('staffPresencePanel'),backdrop=$('staffPresenceBackdrop'),button=$('staffPresenceToggle');
+ if(!panel||!backdrop)return;
+ panel.classList.toggle('open',open);backdrop.hidden=!open;
+ button?.setAttribute('aria-expanded',String(open));
+ if(!open)$('staffProfileCard').hidden=true;
+}
+$('staffPresenceToggle')?.addEventListener('click',()=>openStaffPanel(!$('staffPresencePanel').classList.contains('open')));
+$('staffPresenceClose')?.addEventListener('click',()=>openStaffPanel(false));
+$('staffPresenceBackdrop')?.addEventListener('click',()=>openStaffPanel(false));
+$('staffProfileClose')?.addEventListener('click',()=>$('staffProfileCard').hidden=true);
+document.addEventListener('keydown',e=>{if(e.key==='Escape')openStaffPanel(false)});
+document.addEventListener('focusin',e=>{
+ const el=e.target;if(!(el instanceof HTMLElement)||!el.matches('input,textarea,[contenteditable="true"]'))return;
+ const inChat=!!el.closest('#chatModal,#chatPanel,.chat-modal,.chat-panel,[data-chat-composer]');
+ const inOrder=!!el.closest('#orderModal,#orderForm,#modalBackdrop');
+ if(inChat)setWarehouseActivity('Печатает сообщение');
+ else if(inOrder)setWarehouseActivity('Создаёт или редактирует заказ');
+ else setWarehouseActivity('Заполняет форму');
+});
+document.addEventListener('focusout',e=>{
+ if(e.target instanceof HTMLElement&&e.target.matches('input,textarea,[contenteditable="true"]'))setWarehouseActivity('В приложении',0);
+});
+
 onAuthStateChanged(auth,user=>{
- stopCloud();signedInUser=user;initialCloudLoad=true;
+ stopPresence();stopCloud();signedInUser=user;initialCloudLoad=true;
  if(!user){showAuth();return}
  // A locally cached profile is only a fast visual bootstrap. Firestore rules still
  // protect all cloud data; the server profile is immediately revalidated below.
@@ -951,7 +1035,7 @@ onAuthStateChanged(auth,user=>{
     // Server profile is now confirmed; refresh role-dependent UI without restarting listeners.
     render();
    }
-   syncPushToken(false);if(window.AndroidWarehouse?.requestNativePushToken){window.AndroidWarehouse.requestNativePushToken();}if(pendingNotificationOrderId)void openPendingNotificationOrder();if(pendingNotificationChat){pendingNotificationChat=false;history.replaceState({},'',location.pathname+location.hash);setTimeout(()=>openChat(),0);}
+   startPresence(user);syncPushToken(false);if(window.AndroidWarehouse?.requestNativePushToken){window.AndroidWarehouse.requestNativePushToken();}if(pendingNotificationOrderId)void openPendingNotificationOrder();if(pendingNotificationChat){pendingNotificationChat=false;history.replaceState({},'',location.pathname+location.hash);setTimeout(()=>openChat(),0);}
  },err=>{console.error(err);if(!startedWithCache)showAuth('Не удалось проверить профиль сотрудника. Проверьте правила доступа Firestore.');else toast('Не удалось обновить профиль с сервера. Доступ к данным контролируется Firestore.')});
 });
  $('loginForm').addEventListener('submit',async e=>{e.preventDefault();$('authError').textContent='';try{await signInWithEmailAndPassword(auth,$('loginEmail').value.trim(),$('loginPassword').value)}catch(err){console.error('Ошибка входа Firebase:',err.code,err.message);$('authError').textContent=err.code==='auth/invalid-credential'?'Firebase отклонил почту или пароль (auth/invalid-credential).':err.code==='auth/too-many-requests'?'Слишком много попыток. Попробуйте позже. (auth/too-many-requests)':`Не удалось войти: ${err.code||'неизвестная ошибка'}. Проверьте почту, пароль и настройки Firebase.`}});

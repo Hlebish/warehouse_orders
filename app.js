@@ -2927,6 +2927,7 @@ function openChat(){
       const mentionedUsers=[...new Map(knownChatPeople.filter(p=>p.id&&p.name&&p.active!==false).map(p=>[p.id,p])).values()]
         .filter(p=>p.id&&p.id!==signedInUser.uid&&p.id!==chatReplyTo?.authorId&&mentionedTokens.includes(chatMentionToken(p.name).toLocaleLowerCase('ru')));
       const isUrgent=$('chatUrgent')?.checked===true;
+      if(isUrgent&&!mentionedUsers.length){toast('Для срочного обращения обязательно отметьте сотрудника через @.');return;}
       const notificationRecipientIds=[...new Set([
         ...mentionedUsers.map(person=>person.id),
         ...(!isUrgent&&chatReplyTo?.authorId&&chatReplyTo.authorId!==signedInUser.uid?[chatReplyTo.authorId]:[])

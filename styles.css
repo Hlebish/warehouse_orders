@@ -8074,3 +8074,5 @@ button:active:not(:disabled){transform:scale(.992)}
 
 /* Chat message editing metadata */
 .chat-edited-label{display:block;margin-top:3px;font-size:10px;color:#8b969c;opacity:.8}
+
+.chat-urgent-toggle{display:flex;align-items:flex-start;gap:9px;padding:9px 11px;margin-top:8px;border:1px solid #d9775744;border-radius:10px;background:#d977570d;font-size:12px;font-weight:700}.chat-urgent-toggle input{margin-top:2px;accent-color:#d94b35}.chat-urgent-toggle small{display:block;font-size:10px;font-weight:500;opacity:.75;margin-top:2px}.chat-urgent-banner{padding:6px 9px;margin:7px 0;border-radius:7px;background:#b8322630;color:#e05a4d;font-size:11px;font-weight:800;letter-spacing:.04em}.chat-urgent-ack{padding:7px 10px!important;border-radius:8px!important;background:#b83226!important;color:#fff!important;font-weight:800!important;font-size:11px!important}

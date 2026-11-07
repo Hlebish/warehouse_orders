@@ -337,11 +337,15 @@ async function markChatMessagesRead(messages=[]){
       if(!(Array.isArray(m.readBy)&&m.readBy.includes(signedInUser.uid))){
         batch.update(doc(db,'chatMessages',m.id),{readBy:arrayUnion(signedInUser.uid)});
       }
-      // Delete even when the legacy readBy already contains this user: this also
-      // repairs any receipt left behind by a reconnect or a previous race.
-      batch.delete(doc(db,'chatUnread',signedInUser.uid+'_'+m.id));
     });
+    // Keep the legacy read receipt working even before the new Firestore rules
+    // are deployed. Receipt cleanup is a separate best-effort operation.
     await batch.commit();
+    await Promise.all(incoming.map(m=>
+      deleteDoc(doc(db,'chatUnread',signedInUser.uid+'_'+m.id)).catch(err=>{
+        if(err?.code!=='permission-denied')console.warn('Не удалось удалить квитанцию непрочитанного сообщения',m.id,err);
+      })
+    ));
   }catch(err){
     console.warn('Не удалось отметить чат прочитанным',err);
     chatUnread=true;

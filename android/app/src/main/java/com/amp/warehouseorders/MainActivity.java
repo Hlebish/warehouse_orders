@@ -95,6 +95,7 @@ public class MainActivity extends AppCompatActivity {
     private boolean updateDialogVisible;
     private boolean activityResumed;
     private boolean installPermissionSettingsOpened;
+    private volatile boolean forceUpdateCheckRequested;
     private File downloadedUpdateFile;
     private String downloadedUpdateVersion = "";
 
@@ -131,6 +132,20 @@ public class MainActivity extends AppCompatActivity {
             ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
         );
         root.addView(networkErrorView, errorParams);
+
+        // Native shortcut: let the user check for an APK update whenever they want.
+        Button updateButton = new Button(this);
+        updateButton.setText("Проверить обновление");
+        updateButton.setAllCaps(false);
+        updateButton.setTextSize(12);
+        updateButton.setOnClickListener(view -> forceCheckForAppUpdate());
+        FrameLayout.LayoutParams updateButtonParams = new FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.WRAP_CONTENT, (int) (44 * getResources().getDisplayMetrics().density),
+            Gravity.TOP | Gravity.END
+        );
+        int updateButtonMargin = (int) (10 * getResources().getDisplayMetrics().density);
+        updateButtonParams.setMargins(updateButtonMargin, updateButtonMargin, updateButtonMargin, 0);
+        root.addView(updateButton, updateButtonParams);
         setContentView(root);
         if (Build.VERSION.SDK_INT >= 29) {
             webView.addOnLayoutChangeListener((view, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) -> {
@@ -417,6 +432,21 @@ public class MainActivity extends AppCompatActivity {
         super.onPause();
     }
 
+    private void forceCheckForAppUpdate() {
+        if (downloadedUpdateFile != null && downloadedUpdateFile.exists()) {
+            showPendingAppUpdateIfReady();
+            return;
+        }
+        if (updateCheckInProgress) {
+            android.widget.Toast.makeText(this, "Проверка уже выполняется.", android.widget.Toast.LENGTH_SHORT).show();
+            return;
+        }
+        forceUpdateCheckRequested = true;
+        getSharedPreferences(PREFS, MODE_PRIVATE).edit().putLong(PREF_UPDATE_CHECKED_AT, 0L).apply();
+        android.widget.Toast.makeText(this, "Проверяю наличие обновления…", android.widget.Toast.LENGTH_SHORT).show();
+        checkForAppUpdateIfDue();
+    }
+
     private void checkForAppUpdateIfDue() {
         if (updateCheckInProgress) return;
         SharedPreferences prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
@@ -428,7 +458,13 @@ public class MainActivity extends AppCompatActivity {
         updateExecutor.execute(() -> {
             try {
                 AndroidRelease release = findLatestAndroidRelease();
-                if (release == null || release.versionCode <= installedAppVersionCode()) return;
+                if (release == null || release.versionCode <= installedAppVersionCode()) {
+                    if (forceUpdateCheckRequested) {
+                        mainHandler.post(() -> android.widget.Toast.makeText(MainActivity.this,
+                            "Установлена последняя версия приложения.", android.widget.Toast.LENGTH_LONG).show());
+                    }
+                    return;
+                }
                 File apk = new File(appUpdateDirectory(), "warehouse-orders-update.apk");
                 File parent = apk.getParentFile();
                 if (parent == null || (!parent.exists() && !parent.mkdirs())) {
@@ -448,11 +484,16 @@ public class MainActivity extends AppCompatActivity {
                 markUpdateReady(apk, release.versionName);
             } catch (Exception error) {
                 android.util.Log.w("WarehouseOrders", "Android app update check failed", error);
+                if (forceUpdateCheckRequested) {
+                    mainHandler.post(() -> android.widget.Toast.makeText(MainActivity.this,
+                        "Не удалось проверить обновление. Попробуй позже.", android.widget.Toast.LENGTH_LONG).show());
+                }
                 getSharedPreferences(PREFS, MODE_PRIVATE).edit()
                     .putLong(PREF_UPDATE_CHECKED_AT, System.currentTimeMillis() - UPDATE_CHECK_INTERVAL_MS + 10L * 60L * 1000L)
                     .apply();
                 new File(appUpdateDirectory(), "warehouse-orders-update.apk.part").delete();
             } finally {
+                forceUpdateCheckRequested = false;
                 updateCheckInProgress = false;
             }
         });

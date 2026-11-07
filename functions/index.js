@@ -5,7 +5,7 @@ const { defineSecret } = require('firebase-functions/params');
 const { setGlobalOptions } = require('firebase-functions/v2/options');
 const { logger } = require('firebase-functions');
 const { initializeApp } = require('firebase-admin/app');
-const { getFirestore, FieldValue, Timestamp } = require('firebase-admin/firestore');
+const { getFirestore, FieldValue, Timestamp, FieldPath } = require('firebase-admin/firestore');
 const { getMessaging } = require('firebase-admin/messaging');
 const { createHash } = require('crypto');
 
@@ -933,6 +933,79 @@ exports.createChatUnreadReceipts = onDocumentCreated({
       });
     });
   });
+});
+
+
+/**
+ * One-time, paginated backfill for unread messages that existed before receipts
+ * were introduced. It never loads the entire chat and advances a durable cursor.
+ */
+exports.backfillLegacyChatUnreadReceipts = onSchedule({
+  schedule: 'every 5 minutes',
+  timeZone: 'Europe/Kyiv',
+  retryCount: 2
+}, async () => {
+  const stateRef = db.collection('chatSystemState').doc('legacyUnreadBackfill');
+  const stateSnap = await stateRef.get();
+  const state = stateSnap.data() || {};
+  if (state.completed === true) return;
+  let pageQuery = db.collection('chatMessages')
+    .orderBy(FieldPath.documentId())
+    .limit(25);
+  if (state.lastMessageId) pageQuery = pageQuery.startAfter(String(state.lastMessageId));
+  const page = await pageQuery.get();
+  if (page.empty) {
+    await stateRef.set({ completed: true, completedAt: FieldValue.serverTimestamp() }, { merge: true });
+    return;
+  }
+  const users = await db.collection('users').where('active', '==', true).get();
+  for (const messageDoc of page.docs) {
+    const original = messageDoc.data() || {};
+    const authorId = String(original.authorId || '');
+    if (!authorId) continue;
+    const pendingUsers = users.docs.filter(user =>
+      user.id !== authorId &&
+      !(Array.isArray(original.readBy) && original.readBy.includes(user.id))
+    );
+    const createdDate = original.createdAt instanceof Timestamp
+      ? original.createdAt
+      : (original.createdAt instanceof Date
+        ? Timestamp.fromDate(original.createdAt)
+        : Timestamp.now());
+    const nextReminderAt = Timestamp.fromMillis(Date.now() + 10 * 60 * 1000);
+    const preview = String(original.text || original.message || original.content || '').trim().slice(0, 240) || '📷 Фото';
+    await db.runTransaction(async tx => {
+      const live = await tx.get(messageDoc.ref);
+      if (!live.exists) return;
+      const liveData = live.data() || {};
+      const readBy = Array.isArray(liveData.readBy) ? liveData.readBy : [];
+      const candidates = pendingUsers.filter(user => !readBy.includes(user.id));
+      const refs = candidates.map(user => db.collection('chatUnread').doc(user.id + '_' + messageDoc.id));
+      const existing = await Promise.all(refs.map(ref => tx.get(ref)));
+      candidates.forEach((user, index) => {
+        if (existing[index].exists) return;
+        tx.create(refs[index], {
+          recipientUserId: user.id,
+          messageId: messageDoc.id,
+          authorId,
+          authorName: String(original.authorName || original.author || 'Сотрудник').slice(0, 100),
+          preview,
+          createdAt: createdDate,
+          nextReminderAt,
+          reminderCount: 0,
+          status: 'unread',
+          isReply: Boolean(original.replyToId)
+        });
+      });
+    });
+  }
+  await stateRef.set({
+    lastMessageId: page.docs[page.docs.length - 1].id,
+    processedAt: FieldValue.serverTimestamp()
+  }, { merge: true });
+  if (page.size < 25) {
+    await stateRef.set({ completed: true, completedAt: FieldValue.serverTimestamp() }, { merge: true });
+  }
 });
 
 exports.repeatUnreadChatNotifications = onSchedule({

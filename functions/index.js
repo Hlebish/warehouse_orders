@@ -907,7 +907,7 @@ exports.createChatUnreadReceipts = onDocumentCreated({
     .filter(uid => uid && uid !== authorId);
   if (!recipientIds.length) return;
   const createdAt = initial.createdAt instanceof Timestamp ? initial.createdAt : Timestamp.now();
-  const nextReminderAt = Timestamp.fromMillis(Date.now() + 10 * 60 * 1000);
+  const nextReminderAt = Timestamp.fromMillis(Date.now() + 5 * 60 * 1000);
   const preview = String(initial.text || '').trim().slice(0, 240) || '📷 Фото';
   const candidates = recipientIds.map(uid => ({ id: uid }));
   await db.runTransaction(async tx => {
@@ -975,7 +975,7 @@ exports.backfillLegacyChatUnreadReceipts = onSchedule({
       : (original.createdAt instanceof Date
         ? Timestamp.fromDate(original.createdAt)
         : Timestamp.now());
-    const nextReminderAt = Timestamp.fromMillis(Date.now() + 10 * 60 * 1000);
+    const nextReminderAt = Timestamp.fromMillis(Date.now() + 5 * 60 * 1000);
     const preview = String(original.text || original.message || original.content || '').trim().slice(0, 240) || '📷 Фото';
     await db.runTransaction(async tx => {
       const live = await tx.get(messageDoc.ref);
@@ -1012,7 +1012,7 @@ exports.backfillLegacyChatUnreadReceipts = onSchedule({
 });
 
 exports.repeatUnreadChatNotifications = onSchedule({
-  schedule: 'every 10 minutes',
+  schedule: 'every 1 minutes',
   timeZone: 'Europe/Kyiv',
   retryCount: 2
 }, async () => {
@@ -1048,7 +1048,7 @@ exports.repeatUnreadChatNotifications = onSchedule({
       tx.update(receipt.ref, {
         reminderCount: nextCount,
         lastReminderAt: FieldValue.serverTimestamp(),
-        nextReminderAt: Timestamp.fromMillis(Date.now() + 10 * 60 * 1000)
+        nextReminderAt: Timestamp.fromMillis(Date.now() + 5 * 60 * 1000)
       });
       return true;
     });

@@ -2515,6 +2515,17 @@ async function toggleChatLike(messageId){
     if(added&&message.authorId&&message.authorId!==signedInUser.uid)await queuePush('Вам поставили лайк',profileName+' понравилось ваше сообщение: '+((message.text||'📷 Фото').slice(0,160)),signedInUser.uid,'','chat','likes',message.authorId);
   }catch(err){console.error('Не удалось изменить реакцию',err);toast('Не удалось сохранить реакцию. Проверьте доступ к Firestore.');}
 }
+async function editChatMessage(id){
+  const message=findChatMessage(id);
+  if(!message||message.authorId!==signedInUser?.uid){toast('Изменять можно только свои сообщения.');return;}
+  const next=prompt('Изменить сообщение:',String(message.text||''));
+  if(next===null)return;
+  const text=next.trim();
+  if(!text&&!message.photos?.length){toast('Нельзя оставить пустое сообщение без фото.');return;}
+  if(text.length>1000){toast('Максимум 1000 символов.');return;}
+  try{await updateDoc(doc(db,'chatMessages',id),{text,editedAt:isoNow()});toast('Сообщение изменено.');}
+  catch(err){console.error('Не удалось изменить сообщение',err);toast('Не удалось изменить сообщение. Проверьте правила Firestore.');}
+}
 function findChatMessage(id){return [...chatMessages,...olderChatMessages].find(m=>m.id===id);}
 async function copyChatMessage(id){
   const m=findChatMessage(id);if(!m)return;
@@ -2793,11 +2804,11 @@ function renderChatMessages(options={}){
       const liked=likes.includes(signedInUser?.uid);
       const photoHtml=photos.length?'<div class="chat-photo-grid">'+photos.map(p=>'<a href="'+esc(p)+'" target="_blank" rel="noopener"><img src="'+esc(p)+'" alt="Фото из общего чата" loading="lazy"></a>').join('')+'</div>':'';
       const replyHtml=m.replyToId?'<div class="chat-reply-quote"><b>Ответ на '+esc(m.replyToAuthorName||'сообщение')+'</b><span>'+esc(m.replyToText||'📷 Фото')+'</span></div>':'';
-      const likeHtml='<button type="button" class="chat-like-button '+(liked?'active':'')+'" data-action="toggle-chat-like:'+esc(m.id)+'" aria-label="Нравится">👍 <span>'+likes.length+'</span></button>'; const readBy=Array.isArray(m.readBy)?m.readBy:[]; const receipt='<button type="button" class="chat-read-receipt" data-action="chat-readers:'+esc(m.id)+'" title="Кто прочитал">'+(readBy.length>1?'✓✓':'✓')+'</button>'; const menuHtml='<details class="chat-message-menu"><summary aria-label="Меню сообщения">⋯</summary><div class="chat-message-menu-items"><button type="button" data-action="reply-chat:'+esc(m.id)+'">↩ Ответить</button><button type="button" data-action="copy-chat:'+esc(m.id)+'">Копировать</button><button type="button" data-action="share-chat:'+esc(m.id)+'">Поделиться…</button><button type="button" data-action="viber-chat:'+esc(m.id)+'">Отправить через Viber</button></div></details>';
+      const likeHtml='<button type="button" class="chat-like-button '+(liked?'active':'')+'" data-action="toggle-chat-like:'+esc(m.id)+'" aria-label="Нравится">👍 <span>'+likes.length+'</span></button>'; const readBy=Array.isArray(m.readBy)?m.readBy:[]; const receipt='<button type="button" class="chat-read-receipt" data-action="chat-readers:'+esc(m.id)+'" title="Кто прочитал">'+(readBy.length>1?'✓✓':'✓')+'</button>'; const menuHtml='<details class="chat-message-menu"><summary aria-label="Меню сообщения">⋯</summary><div class="chat-message-menu-items"><button type="button" data-action="reply-chat:'+esc(m.id)+'">↩ Ответить</button>'+(mine?'<button type="button" data-action="edit-chat:'+esc(m.id)+'">✎ Изменить</button>':'')+'<button type="button" data-action="copy-chat:'+esc(m.id)+'">Копировать</button><button type="button" data-action="share-chat:'+esc(m.id)+'">Поделиться…</button><button type="button" data-action="viber-chat:'+esc(m.id)+'">Отправить через Viber</button></div></details>';
 
       const roleMeta=({admin:{label:'Администратор',icon:'⚙',tone:'admin'},administrator:{label:'Администратор',icon:'⚙',tone:'admin'},warehouse:{label:'Кладовщик',icon:'▦',tone:'warehouse'},manager:{label:'Менеджер',icon:'↗',tone:'manager'},chief_accountant:{label:'Главный бухгалтер',icon:'₴',tone:'chief-accountant'},accountant:{label:'Бухгалтер',icon:'▤',tone:'accountant'},director:{label:'Директор',icon:'♛',tone:'director'}})[m.authorRole]||{label:'Сотрудник',icon:'•',tone:'unknown'};
       const roleBadge='<span class="chat-role-badge chat-role-'+roleMeta.tone+'" title="'+esc(roleMeta.label)+'"><span aria-hidden="true">'+roleMeta.icon+'</span>'+esc(roleMeta.label)+'</span>';
-      return chatDayDivider+'<article class="chat-message chat-author-role-'+roleMeta.tone+' '+(mine?'mine':'')+'"><div class="chat-message-head"><span class="chat-author-line"><span class="chat-role-avatar chat-role-avatar-'+roleMeta.tone+'" aria-hidden="true">'+roleMeta.icon+'</span><b>'+esc(chatDisplayName(m.authorName))+'</b>'+roleBadge+'</span><time>'+esc(fmtDateTime(m.createdAt))+'</time></div>'+replyHtml+'<div class="chat-message-text">'+renderChatText(m.text)+'</div>'+photoHtml+'<div class="chat-message-actions">'+likeHtml+menuHtml+receipt+'</div></article>';
+      return chatDayDivider+'<article class="chat-message chat-author-role-'+roleMeta.tone+' '+(mine?'mine':'')+'"><div class="chat-message-head"><span class="chat-author-line"><span class="chat-role-avatar chat-role-avatar-'+roleMeta.tone+'" aria-hidden="true">'+roleMeta.icon+'</span><b>'+esc(chatDisplayName(m.authorName))+'</b>'+roleBadge+'</span><time>'+esc(fmtDateTime(m.createdAt))+'</time></div>'+replyHtml+'<div class="chat-message-text">'+renderChatText(m.text)+'</div>'+(m.editedAt?'<small class="chat-edited-label">изменено</small>':'')'+photoHtml+'<div class="chat-message-actions">'+likeHtml+menuHtml+receipt+'</div></article>';
     }).join('');
     if(chatPendingScrollRestore){box.scrollTop=chatPendingScrollRestore.top+(box.scrollHeight-chatPendingScrollRestore.height);chatPendingScrollRestore=null;}
     else if(options.preserveScroll){
@@ -3647,6 +3658,8 @@ document.addEventListener('click',e=>{
   if(like){e.preventDefault();toggleChatLike(like.dataset.action.split(':').slice(1).join(':'));return;}
   const readers=e.target.closest('[data-action^="chat-readers:"]');
   if(readers){e.preventDefault();showChatReaders(readers.dataset.action.split(':').slice(1).join(':'));return;}
+  const edit=e.target.closest('[data-action^="edit-chat:"]');
+  if(edit){e.preventDefault();editChatMessage(edit.dataset.action.split(':').slice(1).join(':'));return;}
   const copy=e.target.closest('[data-action^="copy-chat:"]');
   if(copy){e.preventDefault();copyChatMessage(copy.dataset.action.split(':').slice(1).join(':'));return;}
   const share=e.target.closest('[data-action^="share-chat:"]');

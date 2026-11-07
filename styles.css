@@ -8071,3 +8071,6 @@ button:active:not(:disabled){transform:scale(.992)}
 @media(prefers-reduced-motion:reduce){
   *,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;transition-duration:.01ms!important}
 }
+
+/* Chat message editing metadata */
+.chat-edited-label{display:block;margin-top:3px;font-size:10px;color:#8b969c;opacity:.8}

@@ -299,7 +299,7 @@ function watchChatBadge(){
   };
   chatUnreadReceiptCount=0;
   chatUnreadReceiptUnsubscribe=onSnapshot(
-    query(collection(db,'chatUnread'),where('recipientUserId','==',signedInUser.uid),limit(500)),
+    query(collection(db,'chatUnread'),where('recipientUserId','==',signedInUser.uid)),
     snap=>{
       chatUnreadReceiptCount=snap.size;
       refreshUnread(false);
@@ -328,12 +328,16 @@ function chatUnreadIndicatorMode(){return signedInUser&&localStorage.getItem('wa
 function paintChatBadge(){const button=$('chatSidebarButton');if(!button)return;const unread=!!chatUnread;button.classList.toggle('has-unread-chat',unread&&chatUnreadIndicatorMode()==='dot');button.classList.toggle('has-unread-chat-bell',unread&&chatUnreadIndicatorMode()==='bell');}
 async function markChatMessagesRead(messages=[]){
   if(!signedInUser)return;
-  const unread=messages.filter(m=>m.authorId!==signedInUser.uid&&!(Array.isArray(m.readBy)&&m.readBy.includes(signedInUser.uid)));
-  if(!unread.length)return;
+  const incoming=messages.filter(m=>m.authorId!==signedInUser.uid);
+  if(!incoming.length)return;
   try{
     const batch=writeBatch(db);
-    unread.forEach(m=>{
-      batch.update(doc(db,'chatMessages',m.id),{readBy:arrayUnion(signedInUser.uid)});
+    incoming.forEach(m=>{
+      if(!(Array.isArray(m.readBy)&&m.readBy.includes(signedInUser.uid))){
+        batch.update(doc(db,'chatMessages',m.id),{readBy:arrayUnion(signedInUser.uid)});
+      }
+      // Delete even when the legacy readBy already contains this user: this also
+      // repairs any receipt left behind by a reconnect or a previous race.
       batch.delete(doc(db,'chatUnread',signedInUser.uid+'_'+m.id));
     });
     await batch.commit();

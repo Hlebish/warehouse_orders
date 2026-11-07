@@ -2687,12 +2687,11 @@ function showChatReaders(id){
     {id:signedInUser?.uid,name:profileName}
   ].filter(p=>p.id&&p.name).map(p=>[p.id,{id:p.id,name:chatDisplayName(p.name)}])).values()];
   const read=people.filter(p=>readIds.has(p.id));
-  const unread=people.filter(p=>p.id!==m.authorId&&!readIds.has(p.id));
   const body=$('modalBody');if(!body)return;
   body.querySelector('.chat-readers-overlay')?.remove();
   const overlay=document.createElement('div');
   overlay.className='chat-readers-overlay';
-  overlay.innerHTML='<section class="chat-readers-dialog" role="dialog" aria-modal="true" aria-label="Статистика прочтения"><header><b>Прочтение сообщения</b><button type="button" class="chat-readers-close" aria-label="Закрыть">×</button></header><div class="chat-readers-list"><b>Прочитали ('+read.length+')</b>'+(read.length?read.map(p=>'<div class="chat-reader-name">✓ '+esc(p.name)+'</div>').join(''):'<div class="chat-empty">Пока никто не прочитал.</div>')+'<b class="chat-readers-unread-title">Не прочитали ('+unread.length+')</b>'+(unread.length?unread.map(p=>'<div class="chat-reader-name">◷ '+esc(p.name)+'</div>').join(''):'<div class="chat-empty">Все участники прочитали.</div>')+'</div></section>';
+  overlay.innerHTML='<section class="chat-readers-dialog" role="dialog" aria-modal="true" aria-label="Статистика прочтения"><header><b>Прочтение сообщения</b><button type="button" class="chat-readers-close" aria-label="Закрыть">×</button></header><div class="chat-readers-list"><b>Прочитали ('+read.length+')</b>'+(read.length?read.map(p=>'<div class="chat-reader-name">✓ '+esc(p.name)+'</div>').join(''):'<div class="chat-empty">Пока никто не прочитал.</div>')+'</div></section>';
   body.appendChild(overlay);
   const close=()=>overlay.remove();
   overlay.querySelector('.chat-readers-close')?.addEventListener('click',close);

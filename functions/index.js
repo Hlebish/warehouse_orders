@@ -1022,6 +1022,20 @@ exports.repeatUnreadChatNotifications = onSchedule({
     .get();
   for (const receipt of due.docs) {
     const data = receipt.data() || {};
+    // Legacy receipts were previously created for every active employee.
+    // Stop reminders unless this message explicitly addresses this recipient.
+    if (data.messageId && data.recipientUserId) {
+      const messageSnap = await db.collection('chatMessages').doc(String(data.messageId)).get();
+      const recipients = messageSnap.exists && Array.isArray(messageSnap.data()?.notificationRecipientIds)
+        ? messageSnap.data().notificationRecipientIds.map(String) : [];
+      if (!recipients.includes(String(data.recipientUserId))) {
+        await receipt.ref.update({ status: 'ignored', nextReminderAt: null });
+        continue;
+      }
+    } else {
+      await receipt.ref.update({ status: 'ignored', nextReminderAt: null });
+      continue;
+    }
     const nextCount = (Number(data.reminderCount) || 0) + 1;
     const claimed = await db.runTransaction(async tx => {
       const fresh = await tx.get(receipt.ref);

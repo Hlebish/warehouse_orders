@@ -948,7 +948,7 @@ function renderStaffPanel(){
   return {...person,online,activity:online?(p.activity||'В приложении'):'Не в сети',updatedAt:p?.updatedAt||0};
  }).sort((x,y)=>Number(y.online)-Number(x.online)||String(x.displayName).localeCompare(String(y.displayName),'ru'));
  const onlineCount=items.filter(x=>x.online).length;
- $('staffPresenceCount').textContent=String(onlineCount);
+ $('staffPresenceCount').textContent=String(onlineCount);if($('staffPresenceBadge'))$('staffPresenceBadge').textContent=String(onlineCount);
  $('staffPresenceSummary').textContent=onlineCount+' в сети · '+items.length+' сотрудников';
  list.innerHTML=items.length?items.map(person=>{
   const initials=String(person.displayName||'?').trim().split(/\s+/).slice(0,2).map(x=>x[0]||'').join('').toLocaleUpperCase('ru');
@@ -993,7 +993,7 @@ $('staffProfileClose')?.addEventListener('click',()=>$('staffProfileCard').hidde
 document.addEventListener('keydown',e=>{if(e.key==='Escape')openStaffPanel(false)});
 document.addEventListener('focusin',e=>{
  const el=e.target;if(!(el instanceof HTMLElement)||!el.matches('input,textarea,[contenteditable="true"]'))return;
- const inChat=!!el.closest('#chatModal,#chatPanel,.chat-modal,.chat-panel,[data-chat-composer]');
+ const inChat=el.id==='chatInput'||!!el.closest('#chatModal,#chatPanel,.chat-modal,.chat-panel,[data-chat-composer]');
  const inOrder=!!el.closest('#orderModal,#orderForm,#modalBackdrop');
  if(inChat)setWarehouseActivity('Печатает сообщение');
  else if(inOrder)setWarehouseActivity('Создаёт или редактирует заказ');

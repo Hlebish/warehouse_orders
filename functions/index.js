@@ -900,35 +900,39 @@ exports.createChatUnreadReceipts = onDocumentCreated({
   document: 'chatMessages/{messageId}',
   retry: true
 }, async event => {
-  const message = event.data?.data() || {};
-  const authorId = String(message.authorId || '');
+  const initial = event.data?.data() || {};
+  const authorId = String(initial.authorId || '');
   if (!authorId) return;
   const users = await db.collection('users').where('active', '==', true).get();
-  const createdAt = message.createdAt instanceof Timestamp
-    ? message.createdAt
-    : Timestamp.now();
+  const createdAt = initial.createdAt instanceof Timestamp ? initial.createdAt : Timestamp.now();
   const nextReminderAt = Timestamp.fromMillis(Date.now() + 10 * 60 * 1000);
-  const preview = String(message.text || '').trim().slice(0, 240) || '📷 Фото';
-  const writes = users.docs
-    .filter(user => user.id !== authorId)
-    .map(user => {
-      const ref = db.collection('chatUnread').doc(user.id + '_' + event.params.messageId);
-      return ref.create({
+  const preview = String(initial.text || '').trim().slice(0, 240) || '📷 Фото';
+  const candidates = users.docs.filter(user => user.id !== authorId);
+  await db.runTransaction(async tx => {
+    // Read the live message inside the transaction. If the recipient opened it
+    // before this trigger ran, the updated readBy value prevents a stale receipt.
+    const messageSnap = await tx.get(event.data.ref);
+    if (!messageSnap.exists) return;
+    const currentReadBy = Array.isArray(messageSnap.data()?.readBy) ? messageSnap.data().readBy : [];
+    const pending = candidates.filter(user => !currentReadBy.includes(user.id));
+    const refs = pending.map(user => db.collection('chatUnread').doc(user.id + '_' + event.params.messageId));
+    const existing = await Promise.all(refs.map(ref => tx.get(ref)));
+    pending.forEach((user, index) => {
+      if (existing[index].exists) return;
+      tx.create(refs[index], {
         recipientUserId: user.id,
         messageId: event.params.messageId,
         authorId,
-        authorName: String(message.authorName || 'Сотрудник').slice(0, 100),
+        authorName: String(initial.authorName || 'Сотрудник').slice(0, 100),
         preview,
         createdAt,
         nextReminderAt,
         reminderCount: 0,
         status: 'unread',
-        isReply: Boolean(message.replyToId)
-      }).catch(error => {
-        if (error.code !== 6 && error.code !== 'already-exists') throw error;
+        isReply: Boolean(initial.replyToId)
       });
     });
-  await Promise.all(writes);
+  });
 });
 
 exports.repeatUnreadChatNotifications = onSchedule({

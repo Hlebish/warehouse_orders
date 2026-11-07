@@ -960,7 +960,6 @@ exports.backfillLegacyChatUnreadReceipts = onSchedule({
     await stateRef.set({ completed: true, completedAt: FieldValue.serverTimestamp() }, { merge: true });
     return;
   }
-  const users = await db.collection('users').where('active', '==', true).get();
   for (const messageDoc of page.docs) {
     const original = messageDoc.data() || {};
     const authorId = String(original.authorId || '');

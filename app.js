@@ -2908,6 +2908,13 @@ function openChat(){
       }));
       if(progressBar)progressBar.style.width='100%';
       if(progressText)progressText.textContent='Отправка сообщения…';
+      const mentionedTokens=[...text.matchAll(/(^|[\\s])@([\\p{L}\\p{N}_-]{2,})/gu)].map(x=>x[2].toLocaleLowerCase('ru'));
+      const mentionedUsers=[...new Map(knownChatPeople.filter(p=>p.id&&p.name&&p.active!==false).map(p=>[p.id,p])).values()]
+        .filter(p=>p.id&&p.id!==signedInUser.uid&&p.id!==chatReplyTo?.authorId&&mentionedTokens.includes(chatMentionToken(p.name).toLocaleLowerCase('ru')));
+      const notificationRecipientIds=[...new Set([
+        ...mentionedUsers.map(person=>person.id),
+        ...(chatReplyTo?.authorId&&chatReplyTo.authorId!==signedInUser.uid?[chatReplyTo.authorId]:[])
+      ])];
       await setDoc(doc(db,'chatMessages',crypto.randomUUID()),{
         text:text.slice(0,1000),
         authorId:signedInUser.uid,
@@ -2917,12 +2924,13 @@ function openChat(){
         photos,
         likes:[],
         readBy:[signedInUser.uid],
+        mentionUserIds:mentionedUsers.map(person=>person.id),
+        notificationRecipientIds,
         ...(chatReplyTo?{replyToId:chatReplyTo.id,replyToAuthorId:chatReplyTo.authorId,replyToAuthorName:chatReplyTo.authorName||'Сотрудник',replyToText:(chatReplyTo.text||'📷 Фото').slice(0,300)}:{})
       });
-      if(chatReplyTo){await queuePush(profileName,text||'📷 Фото',signedInUser.uid,'','chat','replies',chatReplyTo.authorId,{isReply:true});}else{await queuePush(profileName,text||'📷 Фото',signedInUser.uid,'','chat','chat');}
-      const mentionedTokens=[...text.matchAll(/(^|[\s])@([\p{L}\p{N}_-]{2,})/gu)].map(x=>x[2].toLocaleLowerCase('ru'));
-      const mentionedUsers=[...new Map(knownChatPeople.filter(p=>p.id&&p.name&&p.active!==false).map(p=>[p.id,p])).values()]
-        .filter(p=>p.id&&p.id!==signedInUser.uid&&mentionedTokens.includes(chatMentionToken(p.name).toLocaleLowerCase('ru')));
+      if(chatReplyTo?.authorId&&chatReplyTo.authorId!==signedInUser.uid){
+        await queuePush(profileName,text||'📷 Фото',signedInUser.uid,'','chat','replies',chatReplyTo.authorId,{isReply:true});
+      }
       for(const person of mentionedUsers){
         await queuePush(profileName,text||'📷 Фото',signedInUser.uid,'','chat','replies',person.id,{isMention:true});
       }

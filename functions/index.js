@@ -891,6 +891,101 @@ exports.linkBuybackToNewOrder = onDocumentCreated({ document: 'orders/{orderId}'
 });
 
 // Ежедневная проверка сроков перекупного товара. Отправляем каждую контрольную отметку один раз.
+
+/**
+ * Reliable group-chat unread tracking. Receipts are separate from the 50-message
+ * history window, so old unread messages remain visible until the recipient reads them.
+ */
+exports.createChatUnreadReceipts = onDocumentCreated({
+  document: 'chatMessages/{messageId}',
+  retry: true
+}, async event => {
+  const message = event.data?.data() || {};
+  const authorId = String(message.authorId || '');
+  if (!authorId) return;
+  const users = await db.collection('users').where('active', '==', true).get();
+  const createdAt = message.createdAt instanceof Timestamp
+    ? message.createdAt
+    : Timestamp.now();
+  const nextReminderAt = Timestamp.fromMillis(Date.now() + 10 * 60 * 1000);
+  const preview = String(message.text || '').trim().slice(0, 240) || '📷 Фото';
+  const writes = users.docs
+    .filter(user => user.id !== authorId)
+    .map(user => {
+      const ref = db.collection('chatUnread').doc(user.id + '_' + event.params.messageId);
+      return ref.create({
+        recipientUserId: user.id,
+        messageId: event.params.messageId,
+        authorId,
+        authorName: String(message.authorName || 'Сотрудник').slice(0, 100),
+        preview,
+        createdAt,
+        nextReminderAt,
+        reminderCount: 0,
+        status: 'unread',
+        isReply: Boolean(message.replyToId)
+      }).catch(error => {
+        if (error.code !== 6 && error.code !== 'already-exists') throw error;
+      });
+    });
+  await Promise.all(writes);
+});
+
+exports.repeatUnreadChatNotifications = onSchedule({
+  schedule: 'every 10 minutes',
+  timeZone: 'Europe/Kyiv',
+  retryCount: 2
+}, async () => {
+  const due = await db.collection('chatUnread')
+    .where('nextReminderAt', '<=', Timestamp.now())
+    .limit(300)
+    .get();
+  for (const receipt of due.docs) {
+    const data = receipt.data() || {};
+    const nextCount = (Number(data.reminderCount) || 0) + 1;
+    const claimed = await db.runTransaction(async tx => {
+      const fresh = await tx.get(receipt.ref);
+      if (!fresh.exists) return false;
+      const current = fresh.data() || {};
+      const dueAt = current.nextReminderAt instanceof Timestamp
+        ? current.nextReminderAt.toMillis()
+        : 0;
+      if (current.status !== 'unread' || dueAt > Date.now()) return false;
+      tx.update(receipt.ref, {
+        reminderCount: nextCount,
+        lastReminderAt: FieldValue.serverTimestamp(),
+        nextReminderAt: Timestamp.fromMillis(Date.now() + 10 * 60 * 1000)
+      });
+      return true;
+    });
+    if (!claimed) continue;
+    const eventId = 'chat-reminder-' + receipt.id + '-' + nextCount;
+    const queueRef = db.collection('pushQueue').doc(eventId);
+    try {
+      await queueRef.create({
+        title: String(data.authorName || 'Новое сообщение'),
+        body: String(data.preview || 'В общем чате есть непрочитанное сообщение.'),
+        authorId: String(data.authorId || ''),
+        orderId: '',
+        target: 'chat',
+        category: 'chat',
+        recipientUserId: String(data.recipientUserId || ''),
+        isMention: false,
+        isReply: data.isReply === true,
+        forceAll: false,
+        orderVersion: '',
+        createdAt: new Date().toISOString(),
+        expiresAt: Date.now() + 60000,
+        sentAt: null,
+        reminderForMessageId: String(data.messageId || '')
+      });
+    } catch (error) {
+      if (error.code !== 6 && error.code !== 'already-exists') throw error;
+      logger.info('Chat reminder queue event already exists', { eventId });
+    }
+  }
+});
+
 exports.checkBuybackDeadlines = onSchedule({
   schedule: 'every day 09:00',
   timeZone: 'Europe/Kyiv',

@@ -95,7 +95,7 @@ service cloud.firestore {
     match /chatMessages/{messageId} {
       allow read: if activeUser();
       allow create: if activeUser()
-        && request.resource.data.keys().hasOnly(['text', 'authorId', 'authorName', 'authorRole', 'createdAt', 'photos', 'likes', 'readBy', 'replyToId', 'replyToAuthorId', 'replyToAuthorName', 'replyToText'])
+        && request.resource.data.keys().hasOnly(['text', 'authorId', 'authorName', 'authorRole', 'createdAt', 'photos', 'likes', 'readBy', 'mentionUserIds', 'notificationRecipientIds', 'replyToId', 'replyToAuthorId', 'replyToAuthorName', 'replyToText'])
         && request.resource.data.authorId == request.auth.uid
         && request.resource.data.authorName is string
         && request.resource.data.authorRole == role()
@@ -109,6 +109,11 @@ service cloud.firestore {
         && request.resource.data.readBy is list
         && request.resource.data.readBy.size() <= 200
         && request.resource.data.readBy.hasAll([request.resource.data.authorId])
+        && request.resource.data.mentionUserIds is list
+        && request.resource.data.mentionUserIds.size() <= 200
+        && request.resource.data.notificationRecipientIds is list
+        && request.resource.data.notificationRecipientIds.size() <= 200
+        && request.resource.data.notificationRecipientIds.hasAll(request.resource.data.mentionUserIds)
         && (!request.resource.data.keys().hasAny(['replyToId', 'replyToAuthorId', 'replyToAuthorName', 'replyToText'])
           || (request.resource.data.replyToId is string
             && request.resource.data.replyToAuthorId is string

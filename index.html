@@ -114,6 +114,13 @@
       </div>
     </aside>
 
+    <div class="staff-presence-backdrop" id="staffPresenceBackdrop" hidden></div>
+    <aside class="staff-presence-panel" id="staffPresencePanel" aria-label="Сотрудники">
+      <div class="staff-panel-header"><div><span class="eyebrow">КОМАНДА</span><h2>Сотрудники</h2><p id="staffPresenceSummary">Загружаем присутствие…</p></div><button type="button" id="staffPresenceClose" aria-label="Закрыть панель">×</button></div>
+      <div class="staff-online-heading"><span>СЕЙЧАС В СЕТИ</span><b id="staffPresenceCount">0</b></div>
+      <div class="staff-presence-list" id="staffPresenceList"><div class="staff-empty">Загружаем сотрудников…</div></div>
+      <section class="staff-profile-card" id="staffProfileCard" hidden><button type="button" id="staffProfileClose" aria-label="Закрыть профиль">×</button><div class="staff-profile-avatar" id="staffProfileAvatar">?</div><h3 id="staffProfileName">Сотрудник</h3><p id="staffProfileRole"></p><span id="staffProfileStatus"></span><small id="staffProfileActivity"></small></section>
+    </aside>
     <main class="main-area">
       <header class="topbar">
         <button class="mobile-menu" id="mobileMenu" aria-label="Открыть меню">☰</button>
@@ -124,6 +131,7 @@
           <button class="top-history-button" id="siteHistoryButton" data-action="site-history" type="button" title="История действий по сайту">🕘 История</button>
           <button class="top-history-button" id="analyticsButton" data-action="analytics" type="button" title="Статистика работы склада">📊 Статистика</button>
           <span class="top-divider"></span>
+          <button class="staff-presence-toggle" id="staffPresenceToggle" type="button" aria-label="Сотрудники" aria-expanded="false" title="Сотрудники"><span>♙</span><i id="staffPresenceCount">0</i></button>
           <button class="icon-button" id="notificationButton" aria-label="Уведомления">
             <svg viewBox="0 0 24 24" aria-hidden="true" width="23" height="23" style="display:block;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;">
               <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/>

@@ -45,7 +45,7 @@ const todayFormatter=new Intl.DateTimeFormat('ru-RU',{weekday:'short',day:'numer
 const fmtDate=d=>{const date=asDate(d);return date?dateFormatter.format(date):'—'};
 const fmtDateTime=d=>{const date=asDate(d);return date?dateTimeFormatter.format(date):'—'};
 let state={orders:[],notices:[],role:'warehouse',seen:{},extraPhoneNotifications:false,notificationSettings:normalizeNotificationSettings()};
-let activeFilter='all', selectedId=null, pendingDefectId=null, pendingNotificationOrderId='', pendingNotificationChat=false, chatReplyTo=null, chatUnread=false, chatUnreadReceiptCount=0, chatFilterText='', chatFilterMode='all', currentOrdersPage=1;
+let activeFilter='all', selectedId=null, pendingDefectId=null, pendingNotificationOrderId='', pendingNotificationChat=false, chatReplyTo=null, chatUnread=false, chatUnreadReceiptCount=0, chatLegacyUnread=false, chatFilterText='', chatFilterMode='all', currentOrdersPage=1;
 let pendingNotificationLoadId='';
 const pendingOrderCreateDrafts=new Map();
 const ordersPageSize=50;
@@ -293,16 +293,17 @@ function watchChatBadge(){
     const created=asDate(m.createdAt)?.getTime();
     return Number.isFinite(created)&&created>=listenerStartedAt-5000&&Date.now()-created<=60000;
   };
-  const refreshUnread=legacyUnread=>{
-    chatUnread=chatUnreadReceiptCount>0||legacyUnread;
+  const refreshUnread=()=>{
+    chatUnread=chatUnreadReceiptCount>0||chatLegacyUnread;
     paintChatBadge();
   };
   chatUnreadReceiptCount=0;
+  chatLegacyUnread=false;
   chatUnreadReceiptUnsubscribe=onSnapshot(
     query(collection(db,'chatUnread'),where('recipientUserId','==',signedInUser.uid)),
     snap=>{
       chatUnreadReceiptCount=snap.size;
-      refreshUnread(false);
+      refreshUnread();
     },
     err=>console.error('Не удалось проверить полный список непрочитанных сообщений',err)
   );
@@ -320,8 +321,8 @@ function watchChatBadge(){
     }
     initialSnapshot=false;
     knownMessageIds=new Set(messages.map(m=>m.id));
-    const legacyUnread=messages.some(m=>m.authorId!==signedInUser.uid&&Array.isArray(m.readBy)&&!m.readBy.includes(signedInUser.uid));
-    refreshUnread(legacyUnread);
+    chatLegacyUnread=messages.some(m=>m.authorId!==signedInUser.uid&&Array.isArray(m.readBy)&&!m.readBy.includes(signedInUser.uid));
+    refreshUnread();
   },err=>console.error('Не удалось проверить непрочитанный чат',err));
 }
 function chatUnreadIndicatorMode(){return signedInUser&&localStorage.getItem('warehouse_chat_indicator_'+signedInUser.uid)==='bell'?'bell':'dot'}
@@ -2712,6 +2713,7 @@ async function loadOlderChatMessages(){
         const known=new Set([...chatMessages,...olderChatMessages].map(m=>m.id));
         const loaded=snap.docs.map(normalizeChatMessageDoc).filter(m=>(m.text||m.photos.length)&&!known.has(m.id));
         olderChatMessages=[...olderChatMessages,...loaded];
+        markChatMessagesRead(loaded);
         chatOldestCursor=snap.docs.length===50?snap.docs.at(-1):null;
         hasOlderChatMessages=snap.docs.length===50||!chatLegacyHistoryLoaded;
         renderChatMessages();
@@ -2732,6 +2734,7 @@ async function loadOlderChatMessages(){
       chatLegacyHistoryCursor=legacySnap.docs.at(-1)||chatLegacyHistoryCursor;
       chatPendingScrollRestore={top:box.scrollTop,height:box.scrollHeight};
       olderChatMessages=[...olderChatMessages,...legacy];
+      markChatMessagesRead(legacy);
       chatLegacyHistoryLoaded=legacySnap.docs.length<50;
       hasOlderChatMessages=!chatLegacyHistoryLoaded;
       renderChatMessages();

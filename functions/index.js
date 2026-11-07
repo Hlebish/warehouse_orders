@@ -903,11 +903,13 @@ exports.createChatUnreadReceipts = onDocumentCreated({
   const initial = event.data?.data() || {};
   const authorId = String(initial.authorId || '');
   if (!authorId) return;
-  const users = await db.collection('users').where('active', '==', true).get();
+  const recipientIds = [...new Set((Array.isArray(initial.notificationRecipientIds) ? initial.notificationRecipientIds : []).map(String))]
+    .filter(uid => uid && uid !== authorId);
+  if (!recipientIds.length) return;
   const createdAt = initial.createdAt instanceof Timestamp ? initial.createdAt : Timestamp.now();
   const nextReminderAt = Timestamp.fromMillis(Date.now() + 10 * 60 * 1000);
   const preview = String(initial.text || '').trim().slice(0, 240) || '📷 Фото';
-  const candidates = users.docs.filter(user => user.id !== authorId);
+  const candidates = recipientIds.map(uid => ({ id: uid }));
   await db.runTransaction(async tx => {
     // Read the live message inside the transaction. If the recipient opened it
     // before this trigger ran, the updated readBy value prevents a stale receipt.
@@ -963,10 +965,12 @@ exports.backfillLegacyChatUnreadReceipts = onSchedule({
     const original = messageDoc.data() || {};
     const authorId = String(original.authorId || '');
     if (!authorId) continue;
-    const pendingUsers = users.docs.filter(user =>
-      user.id !== authorId &&
-      !(Array.isArray(original.readBy) && original.readBy.includes(user.id))
-    );
+    const recipientIds = [...new Set((Array.isArray(original.notificationRecipientIds) ? original.notificationRecipientIds : []).map(String))]
+      .filter(uid => uid && uid !== authorId);
+    if (!recipientIds.length) continue;
+    const pendingUsers = recipientIds
+      .filter(uid => !(Array.isArray(original.readBy) && original.readBy.includes(uid)))
+      .map(uid => ({ id: uid }));
     const createdDate = original.createdAt instanceof Timestamp
       ? original.createdAt
       : (original.createdAt instanceof Date

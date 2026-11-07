@@ -133,19 +133,6 @@ public class MainActivity extends AppCompatActivity {
         );
         root.addView(networkErrorView, errorParams);
 
-        // Native shortcut: let the user check for an APK update whenever they want.
-        Button updateButton = new Button(this);
-        updateButton.setText("Проверить обновление");
-        updateButton.setAllCaps(false);
-        updateButton.setTextSize(12);
-        updateButton.setOnClickListener(view -> forceCheckForAppUpdate());
-        FrameLayout.LayoutParams updateButtonParams = new FrameLayout.LayoutParams(
-            ViewGroup.LayoutParams.WRAP_CONTENT, (int) (44 * getResources().getDisplayMetrics().density),
-            Gravity.TOP | Gravity.END
-        );
-        int updateButtonMargin = (int) (10 * getResources().getDisplayMetrics().density);
-        updateButtonParams.setMargins(updateButtonMargin, updateButtonMargin, updateButtonMargin, 0);
-        root.addView(updateButton, updateButtonParams);
         setContentView(root);
         if (Build.VERSION.SDK_INT >= 29) {
             webView.addOnLayoutChangeListener((view, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) -> {
@@ -876,6 +863,11 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private class AndroidBridge {
+        @JavascriptInterface
+        public void checkForAppUpdate() {
+            runOnUiThread(() -> forceCheckForAppUpdate());
+        }
+
         @JavascriptInterface
         public void invalidateWebView() {
             runOnUiThread(() -> {

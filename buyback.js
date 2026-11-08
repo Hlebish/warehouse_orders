@@ -685,6 +685,13 @@ document.addEventListener('keydown',e=>{
  if(!editOverlay.hidden){e.preventDefault();closeBuybackEditor();return}
  if(!overlay.hidden){e.preventDefault();close()}
 });
+window.handleBuybackBack=()=>{
+ if(!buybackStatModal.hidden){closeBuybackStatModal();return true}
+ if(!quantityOverlay.hidden){finishBuybackQuantity(null);return true}
+ if(!editOverlay.hidden){closeBuybackEditor();return true}
+ if(!overlay.hidden){close();return true}
+ return false;
+};
 window.addEventListener('popstate',()=>{
  if(ignoreBuybackStatBackPop){ignoreBuybackStatBackPop=false;return}
  if(buybackStatHistoryEntry&&!buybackStatModal.hidden){buybackStatHistoryEntry=false;closeBuybackStatModal(true);return}

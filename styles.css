@@ -8157,3 +8157,12 @@ body.dark-theme .direct-chat-form textarea{background:#1d242b;color:#f1f4f6;bord
   body:has(.staff-presence-panel:not(.open)) .main-area{margin-right:0!important}
   .staff-presence-backdrop{display:none!important}
 }
+
+
+/* Clear, compact quick action for starting a direct message from staff list. */
+.staff-presence-row{gap:8px}
+.staff-presence-message{flex:0 0 auto!important;width:auto!important;min-width:94px;height:36px;display:inline-flex!important;align-items:center;justify-content:center;gap:7px;padding:0 11px!important;border:1px solid #354b42!important;border-radius:10px!important;background:#1b2924!important;color:#a8e5c1!important;font-size:11px!important;font-weight:700;letter-spacing:.01em;white-space:nowrap;box-shadow:inset 0 1px 0 #ffffff08;transition:background .16s,border-color .16s,transform .16s,box-shadow .16s}
+.staff-presence-message svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;flex:0 0 16px}
+.staff-presence-message:hover,.staff-presence-message:focus-visible{background:#244235!important;border-color:#4e9b70!important;color:#c8f5d8!important;box-shadow:0 0 0 3px #45a66b20;outline:none}
+.staff-presence-message:active{transform:translateY(1px) scale(.98)}
+@media(max-width:700px){.staff-presence-message{min-width:40px;width:40px!important;height:40px;padding:0!important;border-radius:11px!important}.staff-presence-message span{display:none}.staff-presence-message svg{width:18px;height:18px;flex-basis:18px}}

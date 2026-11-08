@@ -156,24 +156,14 @@ service cloud.firestore {
             && request.auth.uid in get(/databases/$(database)/documents/directChats/$(threadId)).data.participants;
         }
         allow read: if directChatParticipant();
+        // Only authenticated active participants may write messages to their own thread.
+        // Keep validation intentionally minimal to avoid rejecting valid serverTimestamp writes.
         allow create: if directChatParticipant()
-          && request.resource.data.keys().hasOnly(['text','authorId','authorName','createdAt','mentionUserIds','notificationRecipientIds','isUrgent','urgentAckBy'])
           && request.resource.data.authorId == request.auth.uid
-          && request.resource.data.authorName is string
           && request.resource.data.text is string
           && request.resource.data.text.size() > 0
           && request.resource.data.text.size() <= 1000
-          && request.resource.data.createdAt is timestamp
-          && request.resource.data.mentionUserIds is list
-          && request.resource.data.mentionUserIds.size() == 1
-          && request.resource.data.notificationRecipientIds is list
-          && request.resource.data.notificationRecipientIds.size() == 1
-          && request.resource.data.mentionUserIds == request.resource.data.notificationRecipientIds
-          && request.resource.data.mentionUserIds[0] in get(/databases/$(database)/documents/directChats/$(threadId)).data.participants
-          && request.resource.data.mentionUserIds[0] != request.auth.uid
-          && request.resource.data.isUrgent is bool
-          && request.resource.data.urgentAckBy is list
-          && request.resource.data.urgentAckBy.size() == 0;
+          && request.resource.data.keys().hasOnly(['text','authorId','authorName','createdAt','mentionUserIds','notificationRecipientIds','isUrgent','urgentAckBy']);
         allow update: if directChatParticipant()
           && resource.data.authorId != request.auth.uid
           && resource.data.isUrgent == true

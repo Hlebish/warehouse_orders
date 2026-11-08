@@ -379,8 +379,8 @@ exports.syncStaffDirectory = onCall(async request => {
   if (!request.auth?.uid) throw new HttpsError('unauthenticated', 'Требуется авторизация.');
   const actorSnap = await db.collection('users').doc(request.auth.uid).get();
   const actor = actorSnap.data() || {};
-  if (!actorSnap.exists || actor.active !== true || !(actor.admin === true || actor.role === 'director')) {
-    throw new HttpsError('permission-denied', 'Синхронизация доступна только администратору.');
+  if (!actorSnap.exists || actor.active !== true || !['warehouse', 'manager', 'chief_accountant', 'accountant', 'director'].includes(actor.role)) {
+    throw new HttpsError('permission-denied', 'Активный профиль сотрудника не найден.');
   }
 
   const usersSnap = await db.collection('users').get();

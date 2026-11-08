@@ -4172,3 +4172,74 @@ if('serviceWorker'in navigator){
   window.addEventListener('load',async()=>{try{const registration=await navigator.serviceWorker.register('./sw.js',{updateViaCache:'none'});await registration.update();}catch(err){console.warn('Не удалось проверить обновление приложения',err);}});
 }
 showAuth();
+
+
+/*
+ * Mobile outside-tap dismissal.
+ * Keep this delegated because several dialogs are created dynamically.
+ */
+(() => {
+  const isMobileUi = () =>
+    /Android|iPhone|iPod|Mobile/i.test(navigator.userAgent) ||
+    window.matchMedia('(max-width: 900px), (pointer: coarse)').matches;
+
+  const isCreateOrderDialog = (overlay) => {
+    if (!overlay || overlay.id !== 'modalBackdrop') return false;
+    const title = String(document.getElementById('modalTitle')?.textContent || '').trim().toLocaleLowerCase('ru');
+    const form = overlay.querySelector('form, #orderForm, [data-order-create]');
+    return /создан|создани|новый заказ|добавить заказ|оформить заказ/.test(title) ||
+      !!form?.matches('[data-order-create="true"]');
+  };
+
+  const dismissOverlay = (overlay) => {
+    if (!overlay || overlay.hidden || isCreateOrderDialog(overlay)) return false;
+
+    // Use the dialog's own close control so existing cleanup/history logic runs.
+    const close = overlay.querySelector(
+      '.close-button, .image-viewer-close, .buyback-stat-close, [data-close], [aria-label*="закрыть" i]'
+    );
+    if (close) {
+      close.click();
+      return true;
+    }
+
+    // The buyback statistics overlay has a dedicated close routine but may not
+    // expose a shared close button in older cached markup.
+    if (overlay.classList.contains('buyback-stat-modal')) {
+      overlay.hidden = true;
+      return true;
+    }
+    return false;
+  };
+
+  document.addEventListener('pointerdown', (event) => {
+    if (!isMobileUi() || event.button !== 0) return;
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+
+    const backdrop = target.closest(
+      '#modalBackdrop, #imageViewer, .buyback-stat-modal, [data-overlay], [data-drawer-backdrop]'
+    );
+    if (!backdrop || target !== backdrop) return;
+
+    // Never dismiss the create-order flow from an accidental outside tap.
+    if (isCreateOrderDialog(backdrop)) return;
+    dismissOverlay(backdrop);
+  }, true);
+
+  // Menus and popovers are not modal overlays; close them when tapping elsewhere.
+  document.addEventListener('pointerdown', (event) => {
+    if (!isMobileUi()) return;
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+
+    document.querySelectorAll('.filter-menu:not([hidden]), [role="menu"]:not([hidden]), [data-popover]:not([hidden])')
+      .forEach((menu) => {
+        const trigger = menu.parentElement?.querySelector('.filter-button, [aria-haspopup="menu"], [data-popover-trigger]');
+        if (!menu.contains(target) && !trigger?.contains(target)) {
+          menu.hidden = true;
+          trigger?.setAttribute('aria-expanded', 'false');
+        }
+      });
+  }, true);
+})();

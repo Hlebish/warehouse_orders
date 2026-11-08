@@ -923,6 +923,7 @@ document.addEventListener('visibilitychange',()=>{if(document.visibilityState===
 let presenceUnsubscribe=null,presenceHeartbeat=null,presenceExpiryTimer=null,staffDirectoryRetryTimer=null,currentActivity='В приложении',activityResetTimer=null,staffDirectoryLoadError=false;
 const staffPresence=new Map(),staffDirectory=new Map();
 function stopPresence(){
+ directChatUnsubscribe?.();directChatUnsubscribe=null;directChatTarget=null;
  if(presenceHeartbeat!==null){clearInterval(presenceHeartbeat);presenceHeartbeat=null}
  if(presenceExpiryTimer!==null){clearInterval(presenceExpiryTimer);presenceExpiryTimer=null}
  if(activityResetTimer!==null){clearTimeout(activityResetTimer);activityResetTimer=null}

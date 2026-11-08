@@ -420,6 +420,33 @@ exports.syncStaffDirectory = onCall(async request => {
   return { ok: true, count: staff.length, staff };
 });
 
+// Read-only staff directory endpoint. The server is the sole source of active staff;
+// clients never need direct access to the users collection or to write directory records.
+exports.getStaffDirectory = onCall(async request => {
+  if (!request.auth?.uid) throw new HttpsError('unauthenticated', 'Требуется авторизация.');
+  const actorSnap = await db.collection('users').doc(request.auth.uid).get();
+  const actor = actorSnap.data() || {};
+  const allowedRoles = ['warehouse', 'manager', 'chief_accountant', 'accountant', 'director'];
+  if (!actorSnap.exists || actor.active !== true || !allowedRoles.includes(actor.role)) {
+    throw new HttpsError('permission-denied', 'Активный профиль сотрудника не найден.');
+  }
+  const usersSnap = await db.collection('users').get();
+  const roleLabels = { warehouse: 'Кладовщик', manager: 'Менеджер', chief_accountant: 'Главный бухгалтер', accountant: 'Бухгалтер', director: 'Директор' };
+  const staff = usersSnap.docs.flatMap(userDoc => {
+    const profile = userDoc.data() || {};
+    if (profile.active !== true || !allowedRoles.includes(profile.role)) return [];
+    return [{
+      uid: userDoc.id,
+      displayName: String(profile.displayName || roleLabels[profile.role]).slice(0, 100),
+      role: profile.role,
+      roleLabel: roleLabels[profile.role],
+      active: true,
+      avatarUrl: typeof profile.avatarUrl === 'string' ? profile.avatarUrl.slice(0, 1000) : ''
+    }];
+  });
+  return { ok: true, count: staff.length, staff };
+});
+
 // All client notification requests pass through this callable. Admin SDK writes
 // avoid brittle client-side pushQueue rule evaluation while preserving strict
 // authentication, recipient, category and administrator checks.

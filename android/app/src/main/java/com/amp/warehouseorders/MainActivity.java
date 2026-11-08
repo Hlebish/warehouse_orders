@@ -61,7 +61,7 @@ import com.google.firebase.messaging.FirebaseMessaging;
 
 public class MainActivity extends AppCompatActivity {
     private static final String SITE_URL = "https://hlebish.github.io/warehouse_orders/";
-    private static final String ANDROID_RELEASES_URL = "https://api.github.com/repos/Hlebish/warehouse_orders/releases?per_page=100";
+    private static final String ANDROID_RELEASES_URL = "https://api.github.com/repos/Hlebish/warehouse_orders/releases/latest";
     private static final String CHANNEL_ID = "warehouse_orders_v8_custom_sound";
     private static final int NOTIFICATION_PERMISSION_REQUEST = 1001;
     private static final String PREFS = "warehouse_push";
@@ -92,7 +92,7 @@ public class MainActivity extends AppCompatActivity {
         }
     };
     private volatile boolean updateCheckInProgress;
-    private boolean updateDialogVisible;
+    private boolean updateDialogVisible;\n    private androidx.appcompat.app.AlertDialog updateProgressDialog;
     private boolean activityResumed;
     private boolean installPermissionSettingsOpened;
     private volatile boolean forceUpdateCheckRequested;
@@ -420,18 +420,38 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void forceCheckForAppUpdate() {
-        if (downloadedUpdateFile != null && downloadedUpdateFile.exists()) {
-            showPendingAppUpdateIfReady();
-            return;
-        }
-        if (updateCheckInProgress) {
-            android.widget.Toast.makeText(this, "Проверка уже выполняется.", android.widget.Toast.LENGTH_SHORT).show();
-            return;
-        }
+        if (downloadedUpdateFile != null && downloadedUpdateFile.exists()) { showPendingAppUpdateIfReady(); return; }
+        if (updateCheckInProgress) { if (updateProgressDialog == null || !updateProgressDialog.isShowing()) showUpdateCheckingDialog(); return; }
         forceUpdateCheckRequested = true;
         getSharedPreferences(PREFS, MODE_PRIVATE).edit().putLong(PREF_UPDATE_CHECKED_AT, 0L).apply();
-        android.widget.Toast.makeText(this, "Проверяю наличие обновления…", android.widget.Toast.LENGTH_SHORT).show();
+        showUpdateCheckingDialog();
         checkForAppUpdateIfDue();
+    }
+    private void showUpdateCheckingDialog() {
+        if (isFinishing() || isDestroyed() || (updateProgressDialog != null && updateProgressDialog.isShowing())) return;
+        android.widget.LinearLayout layout = new android.widget.LinearLayout(this);
+        layout.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        int pad = (int)(24 * getResources().getDisplayMetrics().density);
+        layout.setPadding(pad, pad / 2, pad, pad / 2);
+        android.widget.ProgressBar spinner = new android.widget.ProgressBar(this);
+        layout.addView(spinner, new android.widget.LinearLayout.LayoutParams(pad, pad));
+        android.widget.TextView text = new android.widget.TextView(this);
+        text.setText("Связываюсь с GitHub и проверяю последнюю опубликованную версию…");
+        text.setTextSize(14); text.setPadding(pad, 0, 0, 0);
+        layout.addView(text, new android.widget.LinearLayout.LayoutParams(0, -2, 1));
+        updateProgressDialog = new androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle("Проверка обновлений").setView(layout).setCancelable(false).create();
+        updateProgressDialog.show();
+    }
+    private void finishUpdateCheckingDialog(String title, String message) {
+        mainHandler.post(() -> {
+            if (updateProgressDialog != null && updateProgressDialog.isShowing()) updateProgressDialog.dismiss();
+            updateProgressDialog = null;
+            if (forceUpdateCheckRequested && !isFinishing() && !isDestroyed()) {
+                new androidx.appcompat.app.AlertDialog.Builder(this).setTitle(title).setMessage(message)
+                    .setPositiveButton("Понятно", null).show();
+            }
+        });
     }
 
     private void checkForAppUpdateIfDue() {
@@ -446,10 +466,8 @@ public class MainActivity extends AppCompatActivity {
             try {
                 AndroidRelease release = findLatestAndroidRelease();
                 if (release == null || release.versionCode <= installedAppVersionCode()) {
-                    if (forceUpdateCheckRequested) {
-                        mainHandler.post(() -> android.widget.Toast.makeText(MainActivity.this,
-                            "Установлена последняя версия приложения.", android.widget.Toast.LENGTH_LONG).show());
-                    }
+                    finishUpdateCheckingDialog("Обновлений нет",
+                        "У тебя уже установлена последняя версия приложения (v" + installedAppVersionCode() + ").");
                     return;
                 }
                 File apk = new File(appUpdateDirectory(), "warehouse-orders-update.apk");
@@ -471,15 +489,17 @@ public class MainActivity extends AppCompatActivity {
                 markUpdateReady(apk, release.versionName);
             } catch (Exception error) {
                 android.util.Log.w("WarehouseOrders", "Android app update check failed", error);
-                if (forceUpdateCheckRequested) {
-                    mainHandler.post(() -> android.widget.Toast.makeText(MainActivity.this,
-                        "Не удалось проверить обновление. Попробуй позже.", android.widget.Toast.LENGTH_LONG).show());
-                }
+                finishUpdateCheckingDialog("Не удалось проверить обновления",
+                    String.valueOf(error.getMessage() == null ? "Неизвестная ошибка сети." : error.getMessage()));
                 getSharedPreferences(PREFS, MODE_PRIVATE).edit()
                     .putLong(PREF_UPDATE_CHECKED_AT, System.currentTimeMillis() - UPDATE_CHECK_INTERVAL_MS + 10L * 60L * 1000L)
                     .apply();
                 new File(appUpdateDirectory(), "warehouse-orders-update.apk.part").delete();
             } finally {
+                mainHandler.post(() -> {
+                    if (updateProgressDialog != null && updateProgressDialog.isShowing()) updateProgressDialog.dismiss();
+                    updateProgressDialog = null;
+                });
                 forceUpdateCheckRequested = false;
                 updateCheckInProgress = false;
             }
@@ -499,41 +519,36 @@ public class MainActivity extends AppCompatActivity {
         connection.setRequestProperty("User-Agent", "WarehouseOrders-Android-Updater");
         try {
             int responseCode = connection.getResponseCode();
-            if (responseCode != HttpURLConnection.HTTP_OK) throw new IllegalStateException("GitHub API returned HTTP " + responseCode);
+            if (responseCode != HttpURLConnection.HTTP_OK) {
+                if (responseCode == 403) throw new IllegalStateException("GitHub ограничил частоту запросов (HTTP 403). Попробуй через несколько минут.");
+                if (responseCode == 404) throw new IllegalStateException("GitHub не нашёл опубликованный Android-релиз (HTTP 404).");
+                throw new IllegalStateException("GitHub вернул HTTP " + responseCode + ".");
+            }
             StringBuilder body = new StringBuilder();
             try (InputStream input = connection.getInputStream()) {
                 byte[] buffer = new byte[8192];
                 int count;
                 while ((count = input.read(buffer)) != -1) body.append(new String(buffer, 0, count, "UTF-8"));
             }
-            org.json.JSONArray releases = new org.json.JSONArray(body.toString());
-            AndroidRelease latest = null;
-            for (int i = 0; i < releases.length(); i++) {
-                JSONObject release = releases.optJSONObject(i);
-                if (release == null || release.optBoolean("draft") || release.optBoolean("prerelease")) continue;
-                String tag = release.optString("tag_name", "");
-                String prefix = "android-v1.0.";
-                if (!tag.startsWith(prefix)) continue;
-                int versionCode;
-                try { versionCode = Integer.parseInt(tag.substring(prefix.length())); }
-                catch (NumberFormatException ignored) { continue; }
-                org.json.JSONArray assets = release.optJSONArray("assets");
-                if (assets == null) continue;
-                String downloadUrl = "";
-                for (int assetIndex = 0; assetIndex < assets.length(); assetIndex++) {
-                    JSONObject asset = assets.optJSONObject(assetIndex);
-                    if (asset != null && "app-release.apk".equals(asset.optString("name"))) {
-                        downloadUrl = asset.optString("browser_download_url", "");
-                        break;
-                    }
-                }
-                if (!downloadUrl.startsWith("https://github.com/Hlebish/warehouse_orders/releases/download/")) continue;
-                if (latest == null || versionCode > latest.versionCode) {
-                    latest = new AndroidRelease(versionCode, "1.0." + versionCode, downloadUrl);
+            JSONObject release = new JSONObject(body.toString());
+            if (release.optBoolean("draft") || release.optBoolean("prerelease")) return null;
+            String tag = release.optString("tag_name", "");
+            String prefix = "android-v1.0.";
+            if (!tag.startsWith(prefix)) return null;
+            int versionCode;
+            try { versionCode = Integer.parseInt(tag.substring(prefix.length())); }
+            catch (NumberFormatException ignored) { return null; }
+            org.json.JSONArray assets = release.optJSONArray("assets");
+            if (assets == null) return null;
+            String downloadUrl = "";
+            for (int assetIndex = 0; assetIndex < assets.length(); assetIndex++) {
+                JSONObject asset = assets.optJSONObject(assetIndex);
+                if (asset != null && "app-release.apk".equals(asset.optString("name"))) {
+                    downloadUrl = asset.optString("browser_download_url", ""); break;
                 }
             }
-            return latest;
-        } finally {
+            if (!downloadUrl.startsWith("https://github.com/Hlebish/warehouse_orders/releases/download/")) return null;
+            return new AndroidRelease(versionCode, "1.0." + versionCode, downloadUrl);
             connection.disconnect();
         }
     }

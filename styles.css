@@ -8342,3 +8342,35 @@ body:has(.staff-presence-panel.open) .main-area{
  .staff-presence-panel{width:var(--staff-dock-slot)!important}
  .staff-presence-panel.open{width:min(196px,calc(100vw - 12px))!important}
 }
+
+/* Staff dock v4: mobile workspace must physically end before the collapsed rail.
+   Expanded panel overlays this reserved edge without changing content dimensions. */
+@media(max-width:720px){
+ :root{--staff-dock-slot:46px}
+ .main-area,
+ body:has(.staff-presence-panel) .main-area,
+ body:has(.staff-presence-panel.open) .main-area{
+  display:block!important;
+  width:calc(100% - var(--staff-dock-slot))!important;
+  max-width:calc(100% - var(--staff-dock-slot))!important;
+  min-width:0!important;
+  margin-left:0!important;
+  margin-right:0!important;
+  box-sizing:border-box!important;
+  overflow-x:hidden!important;
+ }
+ .staff-presence-panel{
+  position:fixed!important;
+  right:0!important;
+  top:80px!important;
+  bottom:0!important;
+  width:var(--staff-dock-slot)!important;
+  max-width:var(--staff-dock-slot)!important;
+  z-index:40!important;
+ }
+ .staff-presence-panel.open{
+  width:min(196px,calc(100vw - 12px))!important;
+  max-width:min(196px,calc(100vw - 12px))!important;
+  z-index:1200!important;
+ }
+}

@@ -1018,6 +1018,23 @@ function renderStaffPanel(){
   const sender=String(n.authorId);unreadCountsBySender.set(sender,(unreadCountsBySender.get(sender)||0)+1);
  });
  const totalUnreadDirectMessages=[...unreadCountsBySender.values()].reduce((sum,count)=>sum+count,0);
+ const urgentNotices=(Array.isArray(state.notices)?state.notices:[])
+  .filter(n=>!n.read&&flagOn(n,'isUrgent')&&n.directChatThreadId&&n.authorId&&String(n.authorId)!==String(signedInUser?.uid||''))
+  .sort((a,b)=>(asDate(b.createdAt||b.at)?.getTime()||0)-(asDate(a.createdAt||a.at)?.getTime()||0));
+ const urgentList=$('staffUrgentList'),urgentCount=$('staffUrgentCount'),urgentSection=$('staffUrgentSection');
+ if(urgentCount)urgentCount.textContent=String(urgentNotices.length);
+ if(urgentSection)urgentSection.hidden=urgentNotices.length===0;
+ if(urgentList){
+  urgentList.innerHTML=urgentNotices.map(n=>{
+   const sender=String(n.title||'Сотрудник');
+   const message=String(n.message||n.body||'Срочное обращение');
+   return '<button type="button" class="staff-urgent-card" data-staff-urgent-notice="'+esc(n.id)+'"><span class="staff-urgent-icon">!</span><span class="staff-urgent-copy"><b>'+esc(sender)+'</b><span>'+esc(message.length>110?message.slice(0,107)+'…':message)+'</span><small>'+esc(fmtDateTime(n.createdAt||n.at))+'</small></span><span class="staff-urgent-arrow">›</span></button>';
+  }).join('');
+  urgentList.querySelectorAll('[data-staff-urgent-notice]').forEach(button=>button.addEventListener('click',()=>{
+   const notice=urgentNotices.find(n=>n.id===button.dataset.staffUrgentNotice);
+   if(notice)void openMentionNotice(notice);
+  }));
+ }
  $('staffPresenceCount').textContent=String(onlineCount);
  $('staffPresenceRailCount').textContent=String(totalUnreadDirectMessages);
  if($('staffPresenceBadge'))$('staffPresenceBadge').textContent=String(totalUnreadDirectMessages);
@@ -1094,12 +1111,25 @@ function startPresence(user){
  presenceExpiryTimer=setInterval(renderStaffPanel,10000);
 }
 function isStaffPanelDesktopLayout(){return window.matchMedia('(min-width: 721px)').matches}
+let staffBackdropHideTimer=null;
 function openStaffPanel(open=true){
  const panel=$('staffPresencePanel'),backdrop=$('staffPresenceBackdrop'),button=$('staffPresenceToggle');
  if(!panel)return;
+ if(staffBackdropHideTimer!==null){clearTimeout(staffBackdropHideTimer);staffBackdropHideTimer=null;}
  panel.classList.toggle('open',open);
- // The scrim must cover the workspace while the right-side staff drawer is open.
- if(backdrop)backdrop.hidden=!open;
+ // Fade the scrim in/out without allowing taps to reach the workspace underneath.
+ if(backdrop){
+  if(open){
+   backdrop.hidden=false;
+   requestAnimationFrame(()=>backdrop.classList.add('is-visible'));
+  }else{
+   backdrop.classList.remove('is-visible');
+   staffBackdropHideTimer=setTimeout(()=>{
+    if(!panel.classList.contains('open'))backdrop.hidden=true;
+    staffBackdropHideTimer=null;
+   },240);
+  }
+ }
  button?.setAttribute('aria-expanded',String(open));
  $('staffPresenceExpand')?.setAttribute('aria-expanded',String(open));
  if(!open&&$('staffProfileCard'))$('staffProfileCard').hidden=true;

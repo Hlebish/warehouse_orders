@@ -1098,7 +1098,8 @@ function openStaffPanel(open=true){
  const panel=$('staffPresencePanel'),backdrop=$('staffPresenceBackdrop'),button=$('staffPresenceToggle');
  if(!panel)return;
  panel.classList.toggle('open',open);
- if(backdrop)backdrop.hidden=true;
+ // The scrim must cover the workspace while the right-side staff drawer is open.
+ if(backdrop)backdrop.hidden=!open;
  button?.setAttribute('aria-expanded',String(open));
  $('staffPresenceExpand')?.setAttribute('aria-expanded',String(open));
  if(!open&&$('staffProfileCard'))$('staffProfileCard').hidden=true;
@@ -4224,6 +4225,12 @@ showAuth();
       return true;
     }
 
+    // The staff drawer owns its own close routine and state synchronization.
+    if (overlay.id === 'staffPresenceBackdrop') {
+      document.getElementById('staffPresenceClose')?.click();
+      return true;
+    }
+
     // The buyback statistics overlay has a dedicated close routine but may not
     // expose a shared close button in older cached markup.
     if (overlay.classList.contains('buyback-stat-modal')) {
@@ -4242,7 +4249,7 @@ showAuth();
     if (!(target instanceof Element)) return;
 
     const backdrop = target.closest(
-      '#modalBackdrop, #imageViewer, .buyback-stat-modal, [data-overlay], [data-drawer-backdrop]'
+      '#modalBackdrop, #imageViewer, .buyback-stat-modal, #staffPresenceBackdrop, [data-overlay], [data-drawer-backdrop]'
     );
     if (!backdrop || target !== backdrop) return;
 

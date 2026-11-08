@@ -1013,24 +1013,28 @@ function renderStaffPanel(){
   return {...person,online,lastSeen,activity:online?(p.activity||'В приложении'):'Не в сети'};
  }).sort((x,y)=>Number(y.online)-Number(x.online)||String(x.displayName).localeCompare(String(y.displayName),'ru'));
  const onlineCount=items.filter(x=>x.online).length;
- const unreadSenders=new Set((Array.isArray(state.notices)?state.notices:[]).filter(n=>!n.read&&n.directChatThreadId&&n.authorId).map(n=>String(n.authorId)));
+ const unreadCountsBySender=new Map();
+ (Array.isArray(state.notices)?state.notices:[]).filter(n=>!n.read&&n.directChatThreadId&&n.authorId&&String(n.authorId)!==String(signedInUser?.uid||'')).forEach(n=>{
+  const sender=String(n.authorId);unreadCountsBySender.set(sender,(unreadCountsBySender.get(sender)||0)+1);
+ });
+ const totalUnreadDirectMessages=[...unreadCountsBySender.values()].reduce((sum,count)=>sum+count,0);
  $('staffPresenceCount').textContent=String(onlineCount);
- $('staffPresenceRailCount').textContent=String(onlineCount);
- if($('staffPresenceBadge'))$('staffPresenceBadge').textContent=String(onlineCount);
+ $('staffPresenceRailCount').textContent=String(totalUnreadDirectMessages);
+ if($('staffPresenceBadge'))$('staffPresenceBadge').textContent=String(totalUnreadDirectMessages);
  $('staffPresenceSummary').textContent=onlineCount+' в сети · '+items.length+' сотрудников';
  rail.innerHTML=items.length?items.map(person=>{
   const initials=String(person.displayName||'?').trim().split(/\\s+/).slice(0,2).map(x=>x[0]||'').join('').toLocaleUpperCase('ru');
   const avatar=person.avatarUrl?'<img src="'+esc(person.avatarUrl)+'" alt="">':'<span>'+esc(initials||'?')+'</span>';
-  const unread=unreadSenders.has(String(person.uid));
-  return '<button type="button" class="staff-rail-avatar" data-staff-rail-id="'+esc(person.uid)+'" title="'+esc(person.displayName||'Сотрудник')+'" aria-label="'+esc(person.displayName||'Сотрудник')+(person.online?', онлайн':'')+(unread?', новое сообщение':'')+'"><span class="staff-avatar">'+avatar+'<i class="'+(person.online?'is-online':'')+'"></i></span>'+(unread?'<b class="staff-rail-unread" aria-label="Новое сообщение"></b>':'')+'</button>';
+  const unreadCount=unreadCountsBySender.get(String(person.uid))||0;
+  return '<button type="button" class="staff-rail-avatar" data-staff-rail-id="'+esc(person.uid)+'" title="'+esc(person.displayName||'Сотрудник')+(unreadCount?' · непрочитанных: '+unreadCount:'')+'" aria-label="'+esc(person.displayName||'Сотрудник')+(person.online?', онлайн':'')+(unreadCount?', непрочитанных сообщений: '+unreadCount:'')+'"><span class="staff-avatar">'+avatar+'<i class="'+(person.online?'is-online':'')+'"></i></span>'+(unreadCount?'<b class="staff-rail-unread staff-rail-unread-count">'+(unreadCount>99?'99+':unreadCount)+'</b>':'')+'</button>';
  }).join(''):'<span class="staff-rail-loading">—</span>';
  list.innerHTML=items.length?items.map(person=>{
   const initials=String(person.displayName||'?').trim().split(/\\s+/).slice(0,2).map(x=>x[0]||'').join('').toLocaleUpperCase('ru');
   const avatar=person.avatarUrl?'<img src="'+esc(person.avatarUrl)+'" alt="">':'<span>'+esc(initials||'?')+'</span>';
   const sub=person.online?person.activity:person.roleLabel;
   const lastSeen=!person.online?'<small class="staff-last-seen">'+esc(presenceLastSeenLabel(person.lastSeen))+'</small>':'';
-  const unread=unreadSenders.has(String(person.uid));
-  const profileButton='<button type="button" class="staff-presence-item" data-staff-id="'+esc(person.uid)+'"><span class="staff-avatar">'+avatar+'<i class="'+(person.online?'is-online':'')+'"></i>'+(unread?'<b class="staff-unread-dot" aria-label="Новое сообщение"></b>':'')+'</span><span class="staff-presence-copy"><b>'+esc(person.displayName||'Сотрудник')+'</b><small>'+esc(sub||'Сотрудник')+'</small>'+lastSeen+'</span><span class="staff-presence-state '+(person.online?'online':'')+'">'+(person.online?'●':'○')+'</span></button>';
+  const unreadCount=unreadCountsBySender.get(String(person.uid))||0;
+  const profileButton='<button type="button" class="staff-presence-item" data-staff-id="'+esc(person.uid)+'"><span class="staff-avatar">'+avatar+'<i class="'+(person.online?'is-online':'')+'"></i>'+(unreadCount?'<b class="staff-unread-dot staff-unread-count" aria-label="'+unreadCount+' непрочитанных сообщений">'+(unreadCount>99?'99+':unreadCount)+'</b>':'')+'</span><span class="staff-presence-copy"><b>'+esc(person.displayName||'Сотрудник')+'</b><small>'+esc(sub||'Сотрудник')+'</small>'+lastSeen+'</span><span class="staff-presence-state '+(person.online?'online':'')+'">'+(person.online?'●':'○')+'</span></button>';
   const messageButton=person.uid!==signedInUser?.uid?'<button type="button" class="staff-presence-message" data-staff-message-id="'+esc(person.uid)+'" aria-label="Написать '+esc(person.displayName||'сотруднику')+'" title="Написать личное сообщение"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.75 5.75h14.5a1.75 1.75 0 0 1 1.75 1.75v9a1.75 1.75 0 0 1-1.75 1.75H9l-4.25 2v-3.75A1.75 1.75 0 0 1 3 14.75v-7a2 2 0 0 1 1.75-2Z"/><path d="m7.5 9 4.5 3.5L16.5 9"/></svg><span>Написать</span></button>':'';
   return '<div class="staff-presence-row">'+profileButton+messageButton+'</div>';
  }).join(''):'<div class="staff-empty">'+(staffDirectoryLoadError?'Не удалось загрузить сотрудников. Повторяем попытку…':'Список сотрудников пока пуст')+'</div>';

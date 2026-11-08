@@ -45,13 +45,15 @@ const todayFormatter=new Intl.DateTimeFormat('ru-RU',{weekday:'short',day:'numer
 const fmtDate=d=>{const date=asDate(d);return date?dateFormatter.format(date):'—'};
 const fmtDateTime=d=>{const date=asDate(d);return date?dateTimeFormatter.format(date):'—'};
 let state={orders:[],notices:[],role:'warehouse',seen:{},extraPhoneNotifications:false,notificationSettings:normalizeNotificationSettings()};
-let activeFilter='all', selectedId=null, pendingDefectId=null, pendingNotificationOrderId='', pendingNotificationChat=false, chatReplyTo=null, chatUnread=false, chatUnreadReceiptCount=0, chatLegacyUnread=false, chatFilterText='', chatFilterMode='all', currentOrdersPage=1;
+let activeFilter='all', selectedId=null, pendingDefectId=null, pendingNotificationOrderId='', pendingNotificationChat=false, pendingDirectChatThreadId='', pendingDirectChatPeerId='', chatReplyTo=null, chatUnread=false, chatUnreadReceiptCount=0, chatLegacyUnread=false, chatFilterText='', chatFilterMode='all', currentOrdersPage=1;
 let pendingNotificationLoadId='';
 const pendingOrderCreateDrafts=new Map();
 const ordersPageSize=50;
 const notificationParams=new URLSearchParams(location.search);
 pendingNotificationOrderId=notificationParams.get('order')||'';
 pendingNotificationChat=notificationParams.get('chat')==='1';
+pendingDirectChatThreadId=notificationParams.get('directChat')||'';
+pendingDirectChatPeerId=notificationParams.get('peer')||'';
 const $=id=>document.getElementById(id), modal=$('modalBackdrop');
 let uiStateRestored=false,lastUiSave=0;
 const isAndroidWarehouse=()=>/WarehouseOrdersAndroid/.test(navigator.userAgent);
@@ -301,6 +303,12 @@ function showAttentionToastBatch(items){
  t.classList.add('mention-toast');t.setAttribute('role','button');t.tabIndex=0;
  t.addEventListener('click',()=>openMentionCenter());
  t.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openMentionCenter()}});
+}
+async function openPendingDirectChat(){
+ const threadId=String(pendingDirectChatThreadId||''),peerId=String(pendingDirectChatPeerId||'');
+ if(!threadId||!peerId||!signedInUser)return;
+ pendingDirectChatThreadId='';pendingDirectChatPeerId='';
+ await openMentionNotice({directChatThreadId:threadId,authorId:peerId});
 }
 async function openMentionNotice(n){
  if(n?.orderId){closeModal();openOrder(String(n.orderId));return;}
@@ -1115,7 +1123,7 @@ onAuthStateChanged(auth,user=>{
   $('userName').textContent=profileName;$('userRole').textContent=canManageUsers?`Администратор · ${roles[cachedProfile.role]}`:roles[cachedProfile.role];
   // Reveal the shell immediately on repeat visits; profile verification continues in parallel.
   hideAuth();
-  watchOrders();watchNotifications();watchChatBadge();watchClients();loadProductsCatalog();render();restoreUiState();if(pendingNotificationOrderId)void openPendingNotificationOrder();
+  watchOrders();watchNotifications();watchChatBadge();watchClients();loadProductsCatalog();render();restoreUiState();if(pendingNotificationOrderId)void openPendingNotificationOrder();if(pendingDirectChatThreadId)void openPendingDirectChat();
   startedWithCache=true;
  }
  profileUnsubscribe=onSnapshot(doc(db,'users',user.uid),snap=>{
@@ -1129,11 +1137,11 @@ onAuthStateChanged(auth,user=>{
     // Server profile is now confirmed; refresh role-dependent UI without restarting listeners.
     render();
    }
-   startPresence(user);syncPushToken(false);if(window.AndroidWarehouse?.requestNativePushToken){window.AndroidWarehouse.requestNativePushToken();}if(pendingNotificationOrderId)void openPendingNotificationOrder();if(pendingNotificationChat){pendingNotificationChat=false;history.replaceState({},'',location.pathname+location.hash);setTimeout(()=>openChat(),0);}
+   startPresence(user);syncPushToken(false);if(window.AndroidWarehouse?.requestNativePushToken){window.AndroidWarehouse.requestNativePushToken();}if(pendingNotificationOrderId)void openPendingNotificationOrder();if(pendingDirectChatThreadId)void openPendingDirectChat();if(pendingNotificationChat){pendingNotificationChat=false;history.replaceState({},'',location.pathname+location.hash);setTimeout(()=>openChat(),0);}
  },err=>{console.error(err);if(!startedWithCache)showAuth('Не удалось проверить профиль сотрудника. Проверьте правила доступа Firestore.');else toast('Не удалось обновить профиль с сервера. Доступ к данным контролируется Firestore.')});
 });
  $('loginForm').addEventListener('submit',async e=>{e.preventDefault();$('authError').textContent='';try{await signInWithEmailAndPassword(auth,$('loginEmail').value.trim(),$('loginPassword').value)}catch(err){console.error('Ошибка входа Firebase:',err.code,err.message);$('authError').textContent=err.code==='auth/invalid-credential'?'Firebase отклонил почту или пароль (auth/invalid-credential).':err.code==='auth/too-many-requests'?'Слишком много попыток. Попробуйте позже. (auth/too-many-requests)':`Не удалось войти: ${err.code||'неизвестная ошибка'}. Проверьте почту, пароль и настройки Firebase.`}});
- window.handleNativeNotificationLink=rawUrl=>{try{const target=new URL(String(rawUrl||''),location.href);if(target.origin!==location.origin)return false;const orderId=target.searchParams.get('order')||'';const openChatTarget=target.searchParams.get('chat')==='1';history.replaceState({},'',location.pathname+location.hash);if(orderId){pendingNotificationOrderId=orderId;if(signedInUser)void openPendingNotificationOrder();}if(openChatTarget){pendingNotificationChat=true;if(signedInUser){pendingNotificationChat=false;openChat();}}return true;}catch(error){console.warn('Не удалось обработать уведомление',error);return false;}};
+ window.handleNativeNotificationLink=rawUrl=>{try{const target=new URL(String(rawUrl||''),location.href);if(target.origin!==location.origin)return false;const orderId=target.searchParams.get('order')||'';const openChatTarget=target.searchParams.get('chat')==='1';const directThreadId=target.searchParams.get('directChat')||'';const directPeerId=target.searchParams.get('peer')||'';history.replaceState({},'',location.pathname+location.hash);if(orderId){pendingNotificationOrderId=orderId;if(signedInUser)void openPendingNotificationOrder();}if(directThreadId&&directPeerId){pendingDirectChatThreadId=directThreadId;pendingDirectChatPeerId=directPeerId;if(signedInUser)void openPendingDirectChat();}else if(openChatTarget){pendingNotificationChat=true;if(signedInUser){pendingNotificationChat=false;openChat();}}return true;}catch(error){console.warn('Не удалось обработать уведомление',error);return false;}};
 window.handleNativeGoogleSignIn=async idToken=>{try{await signInWithCredential(auth,GoogleAuthProvider.credential(idToken))}catch(err){console.error('Native Google sign-in Firebase error:',err);$('authError').textContent='Google-вход не завершён: '+(err.code||'ошибка Firebase')}};
 window.handleNativeGoogleSignInError=message=>{$('authError').textContent=message||'Не удалось войти через Google.'};
 $('googleLoginButton').addEventListener('click',async()=>{ $('authError').textContent='';try{if(window.AndroidWarehouse&&typeof window.AndroidWarehouse.startGoogleSignIn==='function'){window.AndroidWarehouse.startGoogleSignIn();return}if(/WarehouseOrdersAndroid/i.test(navigator.userAgent)){throw new Error('native-google-bridge-unavailable')}await signInWithPopup(auth,new GoogleAuthProvider())}catch(err){console.error(err);$('authError').textContent=err.message==='native-google-bridge-unavailable'?'Не удалось связаться с Android-входом. Полностью закройте приложение и откройте снова.':'Не удалось войти через Google: '+(err.code||err.message||'ошибка')}});

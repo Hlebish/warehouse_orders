@@ -10,7 +10,7 @@ import { NOTIFICATION_CATEGORIES, NOTIFICATION_CATEGORY_KEYS, normalizeNotificat
 import { searchClients, searchProducts } from './client-directory.mjs';
 import { shipmentOrderDateKey as getShipmentOrderDateKey, shipmentItemsForDate as buildShipmentItemsForDate } from './warehouse-operations.mjs';
 const firebaseApp=initializeApp(firebaseConfig),auth=getAuth(firebaseApp),db=getFirestore(firebaseApp),messaging=getMessaging(firebaseApp),storage=getStorage(firebaseApp),staffAuth=getAuth(initializeApp(firebaseConfig,'amp-staff-provisioner'));
-const warehouseFunctions=getFunctions(firebaseApp,'europe-west1'),enqueueWarehousePush=httpsCallable(warehouseFunctions,'enqueueWarehousePush');
+const warehouseFunctions=getFunctions(firebaseApp,'europe-west1'),enqueueWarehousePush=httpsCallable(warehouseFunctions,'enqueueWarehousePush'),syncStaffDirectoryCallable=httpsCallable(warehouseFunctions,'syncStaffDirectory');
 let signedInUser=null,profileName='',canManageUsers=false,profileUnsubscribe=null,ordersUnsubscribe=null,chatUnsubscribe=null,chatBadgeUnsubscribe=null,chatUnreadReceiptUnsubscribe=null,notificationsUnsubscribe=null,serverCache=new Map(),entryUnsubscribes=new Map(),defectEntryUnsubscribes=new Map(),pendingWrites=new Set(),pendingOrderData=new Map(),initialCloudLoad=true;
 let chatLegacyHistoryLoaded=false,chatLegacyHistoryLoading=false,chatLegacyHistoryCursor=null;
 let ordersRetryTimer=null,ordersRetryDelay=3000,ordersConnectionNoticeShown=false,ordersListenerBlocked=false;
@@ -966,6 +966,7 @@ function renderStaffPanel(){
 }
 function startPresence(user){
  stopPresence();if(!user)return;
+ if(canManageUsers)void syncStaffDirectoryCallable().then(result=>console.info('Каталог сотрудников синхронизирован:',result.data?.count??0)).catch(err=>console.warn('Не удалось синхронизировать каталог сотрудников',err));
  const roleLabel=roles[state.role]||'Сотрудник';
  void setDoc(doc(db,'staffDirectory',user.uid),{displayName:profileName||roleLabel,role:state.role,roleLabel,active:true,avatarUrl:user.photoURL||''},{merge:true})
   .catch(err=>console.warn('Не удалось обновить карточку сотрудника',err));

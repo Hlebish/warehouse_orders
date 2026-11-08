@@ -4055,6 +4055,7 @@ document.addEventListener('touchend',e=>{if(!tracking||!e.changedTouches||e.chan
 })();
 window.handleNativeBack=function(){
   if(!$('imageViewer').hidden){if(imageViewerHistoryEntry){history.back();return true;}closeImageViewer(true);return true;}
+  if(window.handleBuybackBack?.())return true;
   if(!modal.hidden){
     if(modalHistoryEntry){history.back();return true;}
     closeModal(true);return true;

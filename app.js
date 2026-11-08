@@ -4233,8 +4233,11 @@ showAuth();
     return false;
   };
 
-  document.addEventListener('pointerdown', (event) => {
-    if (!isMobileUi() || event.button !== 0) return;
+  // Dismiss on click, not pointerdown. Closing during pointerdown removes the
+  // backdrop before the browser dispatches click, allowing that same tap to
+  // activate a control underneath the dialog ("click-through").
+  document.addEventListener('click', (event) => {
+    if (!isMobileUi()) return;
     const target = event.target;
     if (!(target instanceof Element)) return;
 
@@ -4242,6 +4245,11 @@ showAuth();
       '#modalBackdrop, #imageViewer, .buyback-stat-modal, [data-overlay], [data-drawer-backdrop]'
     );
     if (!backdrop || target !== backdrop) return;
+
+    // Consume the backdrop tap so it can never reach the page behind the overlay.
+    event.preventDefault();
+    event.stopPropagation();
+    event.stopImmediatePropagation();
 
     // Never dismiss the create-order flow from an accidental outside tap.
     if (isCreateOrderDialog(backdrop)) return;

@@ -169,7 +169,7 @@ service cloud.firestore {
           && request.resource.data.notificationRecipientIds is list
           && request.resource.data.notificationRecipientIds.size() == 1
           && request.resource.data.mentionUserIds == request.resource.data.notificationRecipientIds
-          && request.resource.data.mentionUserIds.hasAll(get(/databases/$(database)/documents/directChats/$(threadId)).data.participants.remove(request.auth.uid))
+          && request.resource.data.mentionUserIds.hasAll([get(/databases/$(database)/documents/directChats/$(threadId)).data.participants[0] == request.auth.uid ? get(/databases/$(database)/documents/directChats/$(threadId)).data.participants[1] : get(/databases/$(database)/documents/directChats/$(threadId)).data.participants[0]])
           && request.resource.data.isUrgent is bool
           && request.resource.data.urgentAckBy is list
           && request.resource.data.urgentAckBy.size() == 0;

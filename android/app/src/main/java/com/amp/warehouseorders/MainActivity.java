@@ -445,10 +445,14 @@ public class MainActivity extends AppCompatActivity {
         updateProgressDialog.show();
     }
     private void finishUpdateCheckingDialog(String title, String message) {
+        // Capture the manual-check state before posting to the UI thread.
+        // The worker's finally block resets forceUpdateCheckRequested immediately;
+        // reading the field inside the posted Runnable used to hide the result dialog.
+        final boolean showResult = forceUpdateCheckRequested;
         mainHandler.post(() -> {
             if (updateProgressDialog != null && updateProgressDialog.isShowing()) updateProgressDialog.dismiss();
             updateProgressDialog = null;
-            if (forceUpdateCheckRequested && !isFinishing() && !isDestroyed()) {
+            if (showResult && !isFinishing() && !isDestroyed()) {
                 new androidx.appcompat.app.AlertDialog.Builder(this).setTitle(title).setMessage(message)
                     .setPositiveButton("Понятно", null).show();
             }

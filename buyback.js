@@ -626,7 +626,12 @@ buybackStatModal.className='buyback-stat-modal';
 buybackStatModal.hidden=true;
 buybackStatModal.innerHTML='<section class="buyback-stat-dialog" role="dialog" aria-modal="true" aria-labelledby="buybackStatTitle"><header><div><span class="eyebrow">ОБЗОР ТОВАРА</span><h3 id="buybackStatTitle">Товары</h3><p id="buybackStatSubtitle"></p></div><button type="button" class="buyback-stat-close" aria-label="Закрыть">×</button></header><div class="buyback-stat-items" id="buybackStatItems"></div></section>';
 document.body.append(buybackStatModal);
-function closeBuybackStatModal(){buybackStatModal.hidden=true}
+let buybackStatHistoryEntry=false;
+function closeBuybackStatModal(fromPopState=false){
+ if(buybackStatModal.hidden)return;
+ buybackStatModal.hidden=true;
+ if(buybackStatHistoryEntry){buybackStatHistoryEntry=false;if(!fromPopState)history.back();}
+}
 function openBuybackItemFromStat(itemId){
  const item=items.find(x=>x.id===itemId);if(!item)return;
  const days=elapsedDays(item.receivedAt);
@@ -651,7 +656,7 @@ buybackStatModal.addEventListener('click',e=>{
 buybackStatModal.addEventListener('keydown',e=>{
  if((e.key==='Enter'||e.key===' ')&&e.target.matches('[data-buyback-stat-item]')){e.preventDefault();openBuybackItemFromStat(e.target.dataset.buybackStatItem)}
 });
-document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!buybackStatModal.hidden)closeBuybackStatModal()});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!buybackStatModal.hidden){e.preventDefault();closeBuybackStatModal()}});
 function openBuybackStatModal(category){
  const nowActive=items.filter(x=>x.status==='active'&&elapsedDays(x.receivedAt)<14);
  const matches=category==='active'?nowActive:category==='approaching'?nowActive.filter(x=>elapsedDays(x.receivedAt)>=6&&elapsedDays(x.receivedAt)<10):category==='critical'?nowActive.filter(x=>elapsedDays(x.receivedAt)>=10&&elapsedDays(x.receivedAt)<14):items.filter(x=>x.status==='expired'||(x.status==='active'&&elapsedDays(x.receivedAt)>=14));
@@ -664,6 +669,7 @@ function openBuybackStatModal(category){
  return '<article class="buyback-stat-item" data-buyback-stat-item="'+escapeHtml(item.id)+'" tabindex="0" role="button" aria-label="Открыть товар '+escapeHtml(item.article||'Без артикула')+'"><div class="buyback-stat-item-main"><b>'+escapeHtml(item.article||'Без артикула')+'</b><span>× '+escapeHtml(item.quantity??1)+'</span></div>'+(item.name?'<div class="buyback-stat-item-name">'+escapeHtml(item.name)+'</div>':'')+'<div class="buyback-stat-item-meta">'+(item.supplier?escapeHtml(item.supplier)+' · ':'')+'Приём: '+escapeHtml(item.receivedAt||'—')+' · '+Math.max(0,days)+' дн. на складе'+(item.shippedAt?' · Отгружен: '+escapeHtml(item.shippedAt):'')+'</div><span class="buyback-stat-item-status '+(isExpired?'expired':days>=10?'critical':days>=6?'approaching':'')+'">'+state+'</span></article>';
  }).join(''):'<div class="buyback-stat-empty">В этой категории товаров нет.</div>';
  buybackStatModal.hidden=false;
+ if(!buybackStatHistoryEntry){try{history.pushState({...history.state,buybackStatModal:true},'');buybackStatHistoryEntry=true}catch{buybackStatHistoryEntry=false}}
 }
 
 nav?.addEventListener('click',open);
@@ -676,6 +682,7 @@ document.addEventListener('keydown',e=>{
  if(!overlay.hidden){e.preventDefault();close()}
 });
 window.addEventListener('popstate',()=>{
+ if(buybackStatHistoryEntry&&!buybackStatModal.hidden){buybackStatHistoryEntry=false;closeBuybackStatModal(true);return}
  if(!overlay.hidden){buybackHistoryEntry=false;close(true)}
 });
 overlay.querySelectorAll('[data-status]').forEach(btn=>btn.addEventListener('click',()=>{selectedStatus=btn.dataset.status;visibleBuybackCount=100;render()}));

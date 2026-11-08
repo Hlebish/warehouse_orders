@@ -184,7 +184,7 @@ function watchNotifications(){
     const next=snap.docs.map(d=>({id:d.id,...d.data(),at:d.data().createdAt||d.data().at||isoNow()}));
     if(!initialSnapshot){
       const freshNotices=next.filter(n=>!knownNoticeIds.has(n.id)&&!n.read&&isFreshLiveNotice(n));
-      const attentionNotices=freshNotices.filter(shouldShowAttentionToast);
+      const attentionNotices=freshNotices.filter(shouldShowAttentionToast);\n      freshNotices.forEach(showInAppNoticePopup);
       if(attentionNotices.length===1)showAttentionToast(attentionNotices[0]);
       else if(attentionNotices.length>1)showAttentionToastBatch(attentionNotices);
       if(window.warehouseDesktop?.isDesktopApp){
@@ -210,7 +210,7 @@ function watchNotifications(){
   },err=>console.error('Не удалось загрузить историю уведомлений',err));
 }
 function flagOn(n,key){return n?.[key]===true||n?.[key]==='true'||n?.[key]===1}
-function isMentionNotice(n){const t=String(n?.title||'').toLocaleLowerCase('ru');return flagOn(n,'isMention')||t.includes('упомянули вас')||t.includes('вас упомянули')||n?.category==='mention'||(n?.category==='replies'&&n?.target==='chat'&&!flagOn(n,'isReply'))}
+function isMentionNotice(n){if(n?.directChatThreadId)return false;const t=String(n?.title||'').toLocaleLowerCase('ru');return flagOn(n,'isMention')||t.includes('упомянули вас')||t.includes('вас упомянули')||n?.category==='mention'}
 function shouldShowAttentionToast(n){return isMentionNotice(n)||flagOn(n,'isReply')}
 function unreadMentionNotices(){return state.notices.filter(n=>!n.read&&isMentionNotice(n))}
 function paintMentionCenter(){const b=$('mentionCenterButton'),c=$('mentionCenterCount'),l=$('mentionCenterLabel');if(!b||!c||!l)return;const n=unreadMentionNotices().length;c.textContent=String(n);b.hidden=n===0;l.textContent=n===1?'Вас упомянули':`У вас ${n} новых упоминания`}
@@ -248,6 +248,25 @@ function playNotificationSound(){
     if(playback&&typeof playback.catch==='function')playback.catch(()=>{});
   }catch(_){}
 }
+const activeInAppPopups=new Set();
+function showInAppNoticePopup(n){
+ if(!n||!window.matchMedia?.('(min-width: 900px)').matches)return;
+ const key=String(n.eventId||n.id||'');if(!key||activeInAppPopups.has(key))return;
+ activeInAppPopups.add(key);
+ const stack=$('toastStack');if(!stack)return;
+ const card=document.createElement('article');card.className='in-app-notice-popup';
+ const heading=n.directChatThreadId?'Новое личное сообщение':n.isUrgent?'🚨 Срочное сообщение':isMentionNotice(n)?'Вас упомянули':n.isReply?'Вам ответили':n.target==='chat'?'Новое сообщение в общем чате':'Новое уведомление';
+ const sender=String(n.title||'Заказы · Склад');
+ const message=String(n.message||n.body||'Откройте, чтобы посмотреть подробности');
+ const title=document.createElement('b');title.textContent=heading;
+ const who=document.createElement('strong');who.textContent=sender;
+ const body=document.createElement('p');body.textContent=message;
+ const actions=document.createElement('div');actions.className='in-app-notice-actions';
+ const open=document.createElement('button');open.type='button';open.className='small-button primary-soft';open.textContent='Открыть';open.addEventListener('click',()=>{card.remove();activeInAppPopups.delete(key);openMentionNotice(n)});
+ const close=document.createElement('button');close.type='button';close.className='small-button';close.textContent='Закрыть';close.addEventListener('click',()=>{card.remove();activeInAppPopups.delete(key)});
+ actions.append(open,close);card.append(title,who,body,actions);stack.append(card);
+ setTimeout(()=>{card.remove();activeInAppPopups.delete(key)},12000);
+}
 function showAttentionToast(n){
   const now=Date.now();
   for(const [key,time] of shownAttentionToastKeys){if(now-time>15000)shownAttentionToastKeys.delete(key);}
@@ -261,7 +280,7 @@ function showAttentionToast(n){
   shownAttentionToastKeys.set(semanticKey,now);
   while(shownAttentionToastKeys.size>600)shownAttentionToastKeys.delete(shownAttentionToastKeys.keys().next().value);
   const heading=isMentionNotice(n)||flagOn(n,'isMention')?'Вас упомянули':flagOn(n,'isReply')?'Вам ответили':(n?.target==='chat'||n?.category==='chat')?'Новое сообщение в общем чате':'Новое сообщение';
-  const t=toast(`${heading} · ${sender}: ${message}`,String(n.orderId||''));
+  const t=toast(`${heading} · ${sender}: ${message}`,String(n.orderId||''));\n  showInAppNoticePopup(n);
   t.classList.add('mention-toast');t.setAttribute('role','button');t.tabIndex=0;
   t.setAttribute('aria-label',`${heading} от ${sender}. Открыть сообщение`);
   t.addEventListener('click',()=>openMentionNotice(n));
@@ -275,7 +294,7 @@ function showAttentionToastBatch(items){
  if(mentions)parts.push(`упоминаний: ${mentions}`);
  if(replies)parts.push(`ответов: ${replies}`);
  if(chats)parts.push(`сообщений: ${chats}`);
- const t=toast(`Новые уведомления · ${parts.join(', ')}`);
+ items.forEach(showInAppNoticePopup);\n const t=toast(`Новые уведомления · ${parts.join(', ')}`);
  t.classList.add('mention-toast');t.setAttribute('role','button');t.tabIndex=0;
  t.addEventListener('click',()=>openMentionCenter());
  t.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openMentionCenter()}});
@@ -301,7 +320,7 @@ function showDirectUrgentAlert(message,peer,messageId=''){
  showModal('Срочное сообщение',body,[button('✓ Подтвердить получение','ack-direct-urgent-alert','primary-button')],'ТРЕБУЕТСЯ ВНИМАНИЕ');
  modal.querySelector('[data-action="ack-direct-urgent-alert"]')?.addEventListener('click',async()=>{if(messageId)await acknowledgeDirectUrgentMessage(messageId);closeModal();});
 }
-function openMentionCenter(){const items=unreadMentionNotices();if(!items.length){showNotifications();return}const body='<div class="mention-center-list">'+items.map(n=>'<button type="button" class="mention-center-item" data-mention-notice="'+esc(n.id)+'"><b>'+esc(n.title||'Вас упомянули')+'</b><span>'+esc(n.message||n.body||'Новое упоминание')+'</span><small>'+esc(fmtDateTime(n.createdAt||n.at))+'</small></button>').join('')+'</div>';showModal('Новые упоминания',body,[button('Все уведомления','show-notifications','small-button'),button('Закрыть','close')],'ВАС УПОМЯНУЛИ')}
+function openMentionCenter(){const items=unreadMentionNotices();if(!items.length){toast('Новых упоминаний через @ нет.');return}const body='<div class="mention-center-list">'+items.map(n=>'<button type="button" class="mention-center-item" data-mention-notice="'+esc(n.id)+'"><b>'+esc(n.title||'Вас упомянули')+'</b><span>'+esc(n.message||n.body||'Новое упоминание')+'</span><small>'+esc(fmtDateTime(n.createdAt||n.at))+'</small></button>').join('')+'</div>';showModal('Новые упоминания',body,[button('Все уведомления','show-notifications','small-button'),button('Закрыть','close')],'ВАС УПОМЯНУЛИ')}
 function watchChatBadge(){
   chatBadgeUnsubscribe?.();
   chatUnreadReceiptUnsubscribe?.();

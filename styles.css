@@ -8127,3 +8127,22 @@ body.dark-theme .direct-chat-form textarea{background:#1d242b;color:#f1f4f6;bord
 /* Private staff chat must always render above the staff drawer and its scrim. */
 #modalBackdrop{z-index:1300!important}
 #staffProfileMessage{position:relative!important;inset:auto!important;display:block!important;width:100%!important;margin:14px 0 0!important;min-height:42px}
+
+
+/* One-tap private message action in each staff row */
+.staff-presence-row{display:flex;align-items:center;gap:6px;width:100%}
+.staff-presence-row .staff-presence-item{flex:1;min-width:0}
+.staff-presence-message{flex:0 0 36px;width:36px;height:36px;display:grid;place-items:center;border:1px solid #35414b;border-radius:10px;background:#20272e;color:#cbd5da;font-size:17px;cursor:pointer;transition:background .15s,border-color .15s,color .15s}
+.staff-presence-message:hover,.staff-presence-message:focus-visible{background:#29343b;border-color:#5b7569;color:#8ee0b1;outline:none}
+.staff-presence-message:active{transform:scale(.96)}
+.direct-chat-urgent{border:1px solid #a63c35!important;background:#3a211f!important}
+.direct-chat-urgent .chat-message-text{color:inherit}
+.direct-chat-urgent-acknowledged{display:block;margin-top:8px;color:#78c99a;font-size:11px}
+.direct-chat-urgent-toggle{display:flex;align-items:center;gap:7px;flex-wrap:wrap;padding:8px 10px;border:1px solid #6f3834;border-radius:9px;background:#382321;color:#f0b0a9;font-size:12px}
+.direct-chat-urgent-toggle input{accent-color:#d34a3f}
+.direct-chat-urgent-toggle small{flex-basis:100%;padding-left:23px;color:#c99a95;font-size:10px}
+.direct-chat-form{flex-wrap:wrap}
+.direct-chat-form textarea{flex:1 1 100%}
+.direct-chat-form .direct-chat-urgent-toggle{flex:1 1 auto}
+.direct-chat-form .primary-button{flex:0 0 auto}
+@media(max-width:700px){.staff-presence-message{width:40px;height:40px;flex-basis:40px}.direct-chat-form .primary-button{width:auto;min-width:112px}}

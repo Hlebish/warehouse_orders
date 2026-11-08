@@ -280,7 +280,28 @@ function showAttentionToastBatch(items){
  t.addEventListener('click',()=>openMentionCenter());
  t.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openMentionCenter()}});
 }
-function openMentionNotice(n){if(n?.orderId){closeModal();openOrder(String(n.orderId));return}if(n?.target==='chat'||n?.category==='chat'||n?.category==='replies'){openChat();return}showNotifications()}
+async function openMentionNotice(n){
+ if(n?.orderId){closeModal();openOrder(String(n.orderId));return;}
+ if(n?.directChatThreadId&&n?.authorId){
+  closeModal();
+  try{
+   const peerSnap=await getDoc(doc(db,'staffDirectory',String(n.authorId)));
+   if(peerSnap.exists()){
+    const peer={uid:String(n.authorId),...peerSnap.data()};
+    await openDirectChat(peer);
+    if(n.isUrgent===true)showDirectUrgentAlert(n.message||n.body||'Срочное обращение',peer);
+    return;
+   }
+  }catch(err){console.error('Не удалось открыть личный чат из уведомления',err);}
+ }
+ if(n?.target==='chat'||n?.category==='chat'||n?.category==='replies'){openChat();return;}
+ showNotifications();
+}
+function showDirectUrgentAlert(message,peer){
+ const body='<div class="direct-urgent-alert"><div class="direct-urgent-alert-icon">🚨</div><h3>СРОЧНОЕ ЛИЧНОЕ ОБРАЩЕНИЕ</h3><b>'+esc(peer?.displayName||'Сотрудник')+'</b><p>'+esc(message)+'</p><small>Отправитель ожидает подтверждения получения.</small></div>';
+ showModal('Срочное сообщение',body,[button('✓ Подтвердить получение','ack-direct-urgent-alert','primary-button')],'ТРЕБУЕТСЯ ВНИМАНИЕ');
+ modal.querySelector('[data-action="ack-direct-urgent-alert"]')?.addEventListener('click',()=>{closeModal();toast('Откройте личный чат и подтвердите получение сообщения.');});
+}
 function openMentionCenter(){const items=unreadMentionNotices();if(!items.length){showNotifications();return}const body='<div class="mention-center-list">'+items.map(n=>'<button type="button" class="mention-center-item" data-mention-notice="'+esc(n.id)+'"><b>'+esc(n.title||'Вас упомянули')+'</b><span>'+esc(n.message||n.body||'Новое упоминание')+'</span><small>'+esc(fmtDateTime(n.createdAt||n.at))+'</small></button>').join('')+'</div>';showModal('Новые упоминания',body,[button('Все уведомления','show-notifications','small-button'),button('Закрыть','close')],'ВАС УПОМЯНУЛИ')}
 function watchChatBadge(){
   chatBadgeUnsubscribe?.();
@@ -589,7 +610,9 @@ function queuePush(title,body,authorId,orderId='',target='site',category='',reci
     recipientUserId:String(recipientUserId||''),
     isMention:attention.isMention===true,
     isReply:attention.isReply===true,
-    forceAll:attention.forceAll===true
+    forceAll:attention.forceAll===true,
+    directChatThreadId:String(attention.directChatThreadId||''),
+    isUrgent:attention.isUrgent===true
   };
   // Defects, decisions, questions, replies, mentions, and explicit test pushes
   // stay immediate; routine edits/messages are coalesced into a short burst.
@@ -2967,7 +2990,7 @@ function renderChatMessages(options={}){
 
 function sendChatMessage(){ $('chatForm')?.requestSubmit(); }
 
-let directChatTarget=null;
+let directChatTarget=null;\nconst shownDirectUrgentAlerts=new Set();
 function directChatThreadId(uidA,uidB){return [String(uidA),String(uidB)].sort().join('__');}
 function renderDirectChatMessages(messages){
  const box=$('directChatMessages');if(!box)return;
@@ -2977,6 +3000,11 @@ function renderDirectChatMessages(messages){
   const urgentPending=message.isUrgent===true&&!mine&&!(Array.isArray(message.urgentAckBy)&&message.urgentAckBy.includes(signedInUser?.uid));
   return '<article class="chat-message '+(mine?'mine':'')+(message.isUrgent?' direct-chat-urgent':'')+'" data-direct-message-id="'+esc(message.id)+'"><div class="chat-message-head"><b>'+esc(mine?'Вы':directChatTarget?.displayName||'Сотрудник')+'</b><time>'+esc(fmtDateTime(message.createdAt))+'</time></div>'+(message.isUrgent?'<div class="chat-urgent-banner">🚨 СРОЧНОЕ ОБРАЩЕНИЕ</div>':'')+'<div class="chat-message-text">'+renderChatText(message.text||'')+'</div>'+(urgentPending?'<button type="button" class="chat-urgent-ack" data-direct-urgent-ack="'+esc(message.id)+'">✓ Подтвердить получение</button>':(message.isUrgent&&!mine?'<small class="direct-urgent-acknowledged">✓ Получение подтверждено</small>':''))+'</article>';
  }).join('');
+ const pendingUrgent=messages.find(message=>message.isUrgent===true&&message.authorId!==signedInUser?.uid&&!(Array.isArray(message.urgentAckBy)&&message.urgentAckBy.includes(signedInUser?.uid))&&!shownDirectUrgentAlerts.has(message.id));
+ if(pendingUrgent&&directChatTarget){
+  shownDirectUrgentAlerts.add(pendingUrgent.id);
+  showDirectUrgentAlert(pendingUrgent.text||'Срочное обращение',directChatTarget);
+ }
  box.scrollTop=box.scrollHeight;
 }
 async function acknowledgeDirectUrgentMessage(messageId){
@@ -3029,7 +3057,7 @@ async function openDirectChat(person){
     directStage='обновление последнего сообщения в directChats/'+threadId;
     await setDoc(threadRef,{participants,updatedAt:serverTimestamp(),lastMessage:textValue.slice(0,180),lastMessageAt:serverTimestamp(),lastSenderId:signedInUser.uid},{merge:true});
     directStage='постановка push-уведомления';
-    await queuePush(urgent?'🚨 СРОЧНО · '+profileName:profileName,textValue.slice(0,300),signedInUser.uid,'','chat','replies',person.uid,{isMention:true});
+    await queuePush(urgent?'🚨 СРОЧНОЕ ЛИЧНОЕ СООБЩЕНИЕ · '+profileName:profileName,textValue.slice(0,300),signedInUser.uid,'','chat','replies',person.uid,{isMention:true,directChatThreadId:threadId,isUrgent:urgent});
     const urgentToggle=$('directChatUrgent');if(urgentToggle)urgentToggle.checked=false;
     if(input){input.value='';input.disabled=false;input.focus();}
    }catch(err){
@@ -3041,7 +3069,6 @@ async function openDirectChat(person){
     if(input)input.disabled=false;
    }
   });
-  setTimeout(()=>$('directChatInput')?.focus(),60);
  }catch(err){
   console.error('Не удалось открыть личную переписку',err);
   toast(err?.code==='permission-denied'?'Нет доступа к личным чатам. Сначала опубликуйте firestore.rules.':'Не удалось открыть личную переписку.');
@@ -3238,7 +3265,6 @@ function openChat(){
       $('chatForm')?.requestSubmit();
     }
   });
-  setTimeout(()=>$('chatInput')?.focus(),50);
 }
 
 async function loadShipmentCategoryMap(){

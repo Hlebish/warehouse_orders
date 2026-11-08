@@ -8374,3 +8374,14 @@ body:has(.staff-presence-panel.open) .main-area{
   z-index:1200!important;
  }
 }
+
+/* Direct-message unread counts per employee, separate from online presence dots. */
+.staff-rail-unread-count,.staff-unread-count{
+ display:grid!important;place-items:center!important;min-width:17px!important;height:17px!important;
+ padding:0 4px!important;border:2px solid #151a20!important;border-radius:999px!important;
+ background:#f2c94c!important;color:#28220c!important;font-size:9px!important;
+ line-height:1!important;font-weight:800!important;font-style:normal!important;
+ box-shadow:0 1px 4px #0005!important;white-space:nowrap!important;
+}
+.staff-rail-avatar .staff-rail-unread-count{right:-4px!important;top:-3px!important}
+.staff-presence-item .staff-unread-count{right:-5px!important;top:-4px!important}

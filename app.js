@@ -1018,10 +1018,13 @@ function startPresence(user){
  presenceHeartbeat=setInterval(()=>{if(document.visibilityState==='visible')void writePresence()},15000);
  presenceExpiryTimer=setInterval(renderStaffPanel,10000);
 }
+function isStaffPanelDesktopLayout(){return window.matchMedia('(min-width: 721px)').matches}
 function openStaffPanel(open=true){
  const panel=$('staffPresencePanel'),backdrop=$('staffPresenceBackdrop'),button=$('staffPresenceToggle');
  if(!panel||!backdrop)return;
- panel.classList.toggle('open',open);backdrop.hidden=!open;
+ panel.classList.toggle('open',open);
+ // On desktop the staff list is a permanent side column, not a modal overlay.
+ backdrop.hidden=!open||isStaffPanelDesktopLayout();
  button?.setAttribute('aria-expanded',String(open));
  if(!open)$('staffProfileCard').hidden=true;
 }
@@ -1030,6 +1033,13 @@ $('staffPresenceClose')?.addEventListener('click',()=>openStaffPanel(false));
 $('staffPresenceBackdrop')?.addEventListener('click',()=>openStaffPanel(false));
 $('staffProfileClose')?.addEventListener('click',()=>$('staffProfileCard').hidden=true);
 document.addEventListener('keydown',e=>{if(e.key==='Escape')openStaffPanel(false)});
+// Default: keep the staff presence panel visible on desktop (browser and desktop app).
+// On phones it remains a normal, manually opened drawer to preserve usable screen space.
+if(isStaffPanelDesktopLayout())openStaffPanel(true);
+window.addEventListener('resize',()=>{
+ const panel=$('staffPresencePanel');
+ if(panel?.classList.contains('open'))$('staffPresenceBackdrop').hidden=isStaffPanelDesktopLayout();
+});
 document.addEventListener('focusin',e=>{
  const el=e.target;if(!(el instanceof HTMLElement)||!el.matches('input,textarea,[contenteditable="true"]'))return;
  const inChat=el.id==='chatInput'||!!el.closest('#chatModal,#chatPanel,.chat-modal,.chat-panel,[data-chat-composer]');

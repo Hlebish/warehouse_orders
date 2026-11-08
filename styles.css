@@ -8465,3 +8465,7 @@ body:has(.staff-presence-panel.open) .main-area{
 @media(prefers-reduced-motion:reduce){
  .staff-presence-panel,.staff-presence-backdrop,.staff-presence-content,.staff-presence-rail,.staff-urgent-card{transition:none!important}
 }
+
+
+/* A global display override must never make a hidden staff scrim intercept the workspace. */
+.staff-presence-backdrop[hidden]{display:none!important;pointer-events:none!important}

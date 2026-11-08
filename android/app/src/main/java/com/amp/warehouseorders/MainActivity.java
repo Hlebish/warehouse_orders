@@ -92,7 +92,8 @@ public class MainActivity extends AppCompatActivity {
         }
     };
     private volatile boolean updateCheckInProgress;
-    private boolean updateDialogVisible;\n    private androidx.appcompat.app.AlertDialog updateProgressDialog;
+    private boolean updateDialogVisible;
+    private androidx.appcompat.app.AlertDialog updateProgressDialog;
     private boolean activityResumed;
     private boolean installPermissionSettingsOpened;
     private volatile boolean forceUpdateCheckRequested;
@@ -549,6 +550,7 @@ public class MainActivity extends AppCompatActivity {
             }
             if (!downloadUrl.startsWith("https://github.com/Hlebish/warehouse_orders/releases/download/")) return null;
             return new AndroidRelease(versionCode, "1.0." + versionCode, downloadUrl);
+        } finally {
             connection.disconnect();
         }
     }

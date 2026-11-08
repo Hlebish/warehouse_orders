@@ -413,8 +413,11 @@ exports.syncStaffDirectory = onCall(async request => {
     if (writes === 450) { await batch.commit(); writes = 0; }
   }
   if (writes) await batch.commit();
-  logger.info('Staff directory synchronized', { actorUid: request.auth.uid, activeStaff: activeProfiles.size });
-  return { ok: true, count: activeProfiles.size };
+  const staff = [...activeProfiles.entries()].map(([uid, profile]) => ({ uid, ...profile }));
+  logger.info('Staff directory synchronized', { actorUid: request.auth.uid, activeStaff: staff.length });
+  // Return the sanitized directory directly. This avoids relying on a client
+  // collection listener for the initial staff list while keeping presence realtime.
+  return { ok: true, count: staff.length, staff };
 });
 
 // All client notification requests pass through this callable. Admin SDK writes

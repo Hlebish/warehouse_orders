@@ -289,7 +289,6 @@ async function openMentionNotice(n){
    if(peerSnap.exists()){
     const peer={uid:String(n.authorId),...peerSnap.data()};
     await openDirectChat(peer);
-    if(n.isUrgent===true)showDirectUrgentAlert(n.message||n.body||'Срочное обращение',peer);
     return;
    }
   }catch(err){console.error('Не удалось открыть личный чат из уведомления',err);}
@@ -297,10 +296,10 @@ async function openMentionNotice(n){
  if(n?.target==='chat'||n?.category==='chat'||n?.category==='replies'){openChat();return;}
  showNotifications();
 }
-function showDirectUrgentAlert(message,peer){
+function showDirectUrgentAlert(message,peer,messageId=''){
  const body='<div class="direct-urgent-alert"><div class="direct-urgent-alert-icon">🚨</div><h3>СРОЧНОЕ ЛИЧНОЕ ОБРАЩЕНИЕ</h3><b>'+esc(peer?.displayName||'Сотрудник')+'</b><p>'+esc(message)+'</p><small>Отправитель ожидает подтверждения получения.</small></div>';
  showModal('Срочное сообщение',body,[button('✓ Подтвердить получение','ack-direct-urgent-alert','primary-button')],'ТРЕБУЕТСЯ ВНИМАНИЕ');
- modal.querySelector('[data-action="ack-direct-urgent-alert"]')?.addEventListener('click',()=>{closeModal();toast('Откройте личный чат и подтвердите получение сообщения.');});
+ modal.querySelector('[data-action="ack-direct-urgent-alert"]')?.addEventListener('click',async()=>{if(messageId)await acknowledgeDirectUrgentMessage(messageId);closeModal();});
 }
 function openMentionCenter(){const items=unreadMentionNotices();if(!items.length){showNotifications();return}const body='<div class="mention-center-list">'+items.map(n=>'<button type="button" class="mention-center-item" data-mention-notice="'+esc(n.id)+'"><b>'+esc(n.title||'Вас упомянули')+'</b><span>'+esc(n.message||n.body||'Новое упоминание')+'</span><small>'+esc(fmtDateTime(n.createdAt||n.at))+'</small></button>').join('')+'</div>';showModal('Новые упоминания',body,[button('Все уведомления','show-notifications','small-button'),button('Закрыть','close')],'ВАС УПОМЯНУЛИ')}
 function watchChatBadge(){
@@ -3003,7 +3002,7 @@ function renderDirectChatMessages(messages){
  const pendingUrgent=messages.find(message=>message.isUrgent===true&&message.authorId!==signedInUser?.uid&&!(Array.isArray(message.urgentAckBy)&&message.urgentAckBy.includes(signedInUser?.uid))&&!shownDirectUrgentAlerts.has(message.id));
  if(pendingUrgent&&directChatTarget){
   shownDirectUrgentAlerts.add(pendingUrgent.id);
-  showDirectUrgentAlert(pendingUrgent.text||'Срочное обращение',directChatTarget);
+  showDirectUrgentAlert(pendingUrgent.text||'Срочное обращение',directChatTarget,pendingUrgent.id);
  }
  box.scrollTop=box.scrollHeight;
 }

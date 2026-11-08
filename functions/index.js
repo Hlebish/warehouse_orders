@@ -166,6 +166,9 @@ async function createNotificationHistory(data, eventId) {
       category,
       isMention: data.isMention === true || data.isMention === 'true',
       isReply: data.isReply === true || data.isReply === 'true',
+      authorId: String(data.authorId || ''),
+      directChatThreadId: String(data.directChatThreadId || ''),
+      isUrgent: data.isUrgent === true,
       notificationTag: notificationTagFor(data, eventId, category, data.target === 'chat' ? 'chat' : 'site', recipientUserId),
       expiresAt: Number(data.expiresAt) || null,
       eventId,
@@ -468,6 +471,11 @@ exports.enqueueWarehousePush = onCall(async request => {
   const recipientUserId = String(input.recipientUserId || '');
   const requestedOrderVersion = String(input.orderVersion || '').slice(0, 200);
   const forceAll = input.forceAll === true;
+  const directChatThreadId = String(input.directChatThreadId || '');
+  const isUrgent = input.isUrgent === true;
+  if (directChatThreadId && (!recipientUserId || category !== 'replies' || target !== 'chat' || directChatThreadId.length > 300)) {
+    throw new HttpsError('invalid-argument', 'Некорректный адрес личного сообщения.');
+  }
 
   if (!target || !allowedCategories.has(category) || title.length < 1 || title.length > 120 || body.length > 500 || recipientUserId.length > 128) {
     throw new HttpsError('invalid-argument', 'Некорректные данные уведомления.');
@@ -525,6 +533,8 @@ exports.enqueueWarehousePush = onCall(async request => {
     orderNumber,
     isMention: input.isMention === true,
     isReply: input.isReply === true,
+    directChatThreadId,
+    isUrgent,
     forceAll,
     orderVersion,
     createdAt: new Date(now).toISOString(),

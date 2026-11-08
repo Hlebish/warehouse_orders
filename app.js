@@ -1101,6 +1101,7 @@ function openStaffPanel(open=true){
 }
 $('staffPresenceToggle')?.addEventListener('click',()=>openStaffPanel(!$('staffPresencePanel').classList.contains('open')));
 $('staffPresenceExpand')?.addEventListener('click',()=>openStaffPanel(true));
+$('staffPresencePanel')?.addEventListener('click',event=>{if(!$('staffPresencePanel').classList.contains('open')&&event.target===$('staffPresencePanel'))openStaffPanel(true);});
 $('staffPresenceClose')?.addEventListener('click',()=>openStaffPanel(false));
 $('staffPresenceBackdrop')?.addEventListener('click',()=>openStaffPanel(false));
 $('staffProfileClose')?.addEventListener('click',()=>$('staffProfileCard').hidden=true);

@@ -8258,3 +8258,57 @@ body.dark-theme .direct-chat-form textarea{background:#1d242b;color:#f1f4f6;bord
 @media(prefers-reduced-motion:reduce){.staff-presence-panel{transition:none!important}}
 
 body:has(.staff-presence-panel) .main-area{margin-right:0!important}
+
+/* Staff dock v2: reserve real layout width; never cover the workspace. */
+.staff-presence-panel{
+ position:fixed!important;z-index:30!important;top:84px!important;right:0!important;bottom:0!important;
+ width:64px!important;height:auto!important;min-width:0!important;padding:10px 7px!important;
+ box-sizing:border-box!important;display:flex!important;flex-direction:column!important;
+ overflow:hidden!important;transform:none!important;border:1px solid #303943!important;
+ border-right:0!important;border-bottom:0!important;border-radius:16px 0 0 0!important;
+ background:#151a20!important;box-shadow:-5px 0 20px #0002!important;
+ transition:width .2s ease!important;color:#e8edf0!important;
+}
+.staff-presence-panel.open{
+ width:320px!important;padding:16px!important;overflow-y:auto!important;overflow-x:hidden!important;
+ border-radius:16px 0 0 0!important;
+}
+.main-area{margin-right:64px!important;transition:margin-right .2s ease!important;min-width:0!important}
+body:has(.staff-presence-panel.open) .main-area{margin-right:320px!important}
+.staff-presence-panel .staff-presence-rail{display:flex!important;flex-direction:column!important;align-items:center!important;gap:9px!important;width:100%!important;min-height:0!important}
+.staff-presence-panel .staff-presence-content{display:none!important;min-width:0!important}
+.staff-presence-panel.open .staff-presence-rail{display:none!important}
+.staff-presence-panel.open .staff-presence-content{display:block!important}
+.staff-presence-panel .staff-rail-expand{width:42px!important;height:42px!important;flex:0 0 42px!important}
+.staff-presence-panel .staff-rail-avatars{display:flex!important;flex-direction:column!important;align-items:center!important;gap:7px!important;width:100%!important;overflow-y:auto!important}
+.staff-presence-panel .staff-rail-avatar{width:40px!important;height:40px!important;flex:0 0 40px!important}
+.staff-presence-panel .staff-rail-avatar .staff-avatar{width:36px!important;height:36px!important;flex-basis:36px!important}
+.staff-presence-panel.open .staff-presence-list{max-height:none!important;overflow:visible!important}
+.staff-presence-panel.open .staff-presence-item{min-width:0!important}
+.staff-presence-panel .staff-presence-backdrop{display:none!important}
+@media(max-width:720px){
+ .staff-presence-panel{
+  top:80px!important;bottom:0!important;width:46px!important;padding:7px 4px!important;
+  border-radius:12px 0 0 0!important;
+ }
+ .staff-presence-panel.open{width:196px!important;padding:10px 8px!important}
+ .main-area{margin-right:46px!important}
+ body:has(.staff-presence-panel.open) .main-area{margin-right:196px!important}
+ .staff-presence-panel .staff-rail-expand{width:34px!important;height:34px!important;flex-basis:34px!important;font-size:17px!important}
+ .staff-presence-panel .staff-rail-avatar{width:32px!important;height:32px!important;flex-basis:32px!important}
+ .staff-presence-panel .staff-rail-avatar .staff-avatar{width:28px!important;height:28px!important;flex-basis:28px!important;font-size:10px!important}
+ .staff-presence-panel .staff-rail-avatars{gap:5px!important}
+ .staff-presence-panel.open .staff-presence-content{font-size:12px!important}
+ .staff-presence-panel.open .staff-panel-header h2{font-size:15px!important}
+ .staff-presence-panel.open .staff-presence-item{padding:6px 3px!important;gap:6px!important}
+ .staff-presence-panel.open .staff-avatar{width:30px!important;height:30px!important;flex-basis:30px!important}
+ .staff-presence-panel.open .staff-presence-copy b{font-size:11px!important}
+ .staff-presence-panel.open .staff-presence-copy small{font-size:9px!important}
+ .staff-presence-panel.open .staff-presence-message{min-width:30px!important;width:30px!important;height:30px!important;padding:4px!important}
+ .staff-presence-panel.open .staff-presence-message span{display:none!important}
+ .staff-presence-toggle{display:none!important}
+}
+@media(min-width:721px){
+ .main-area{margin-right:64px!important}
+ body:has(.staff-presence-panel.open) .main-area{margin-right:320px!important}
+}

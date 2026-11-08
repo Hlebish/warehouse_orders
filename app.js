@@ -1007,38 +1007,57 @@ function presenceLastSeenLabel(value){
  return 'Был(а) в сети '+date.toLocaleDateString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric'})+' в '+clock;
 }
 function renderStaffPanel(){
- const list=$('staffPresenceList');if(!list)return;
+ const list=$('staffPresenceList'),rail=$('staffPresenceRailAvatars');if(!list||!rail)return;
  const now=Date.now(),items=[...staffDirectory.values()].filter(x=>x.active===true).map(person=>{
   const p=staffPresence.get(person.uid),lastSeen=Number(p?.updatedAt||0),online=!!p&&p.active===true&&lastSeen>0&&now-lastSeen<45000;
   return {...person,online,lastSeen,activity:online?(p.activity||'В приложении'):'Не в сети'};
  }).sort((x,y)=>Number(y.online)-Number(x.online)||String(x.displayName).localeCompare(String(y.displayName),'ru'));
  const onlineCount=items.filter(x=>x.online).length;
- $('staffPresenceCount').textContent=String(onlineCount);if($('staffPresenceBadge'))$('staffPresenceBadge').textContent=String(onlineCount);
+ const unreadSenders=new Set((Array.isArray(state.notices)?state.notices:[]).filter(n=>!n.read&&n.directChatThreadId&&n.authorId).map(n=>String(n.authorId)));
+ $('staffPresenceCount').textContent=String(onlineCount);
+ $('staffPresenceRailCount').textContent=String(onlineCount);
+ if($('staffPresenceBadge'))$('staffPresenceBadge').textContent=String(onlineCount);
  $('staffPresenceSummary').textContent=onlineCount+' в сети · '+items.length+' сотрудников';
+ rail.innerHTML=items.length?items.map(person=>{
+  const initials=String(person.displayName||'?').trim().split(/\\s+/).slice(0,2).map(x=>x[0]||'').join('').toLocaleUpperCase('ru');
+  const avatar=person.avatarUrl?'<img src="'+esc(person.avatarUrl)+'" alt="">':'<span>'+esc(initials||'?')+'</span>';
+  const unread=unreadSenders.has(String(person.uid));
+  return '<button type="button" class="staff-rail-avatar" data-staff-rail-id="'+esc(person.uid)+'" title="'+esc(person.displayName||'Сотрудник')+'" aria-label="'+esc(person.displayName||'Сотрудник')+(person.online?', онлайн':'')+(unread?', новое сообщение':'')+'"><span class="staff-avatar">'+avatar+'<i class="'+(person.online?'is-online':'')+'"></i></span>'+(unread?'<b class="staff-rail-unread" aria-label="Новое сообщение"></b>':'')+'</button>';
+ }).join(''):'<span class="staff-rail-loading">—</span>';
  list.innerHTML=items.length?items.map(person=>{
-  const initials=String(person.displayName||'?').trim().split(/\s+/).slice(0,2).map(x=>x[0]||'').join('').toLocaleUpperCase('ru');
+  const initials=String(person.displayName||'?').trim().split(/\\s+/).slice(0,2).map(x=>x[0]||'').join('').toLocaleUpperCase('ru');
   const avatar=person.avatarUrl?'<img src="'+esc(person.avatarUrl)+'" alt="">':'<span>'+esc(initials||'?')+'</span>';
   const sub=person.online?person.activity:person.roleLabel;
   const lastSeen=!person.online?'<small class="staff-last-seen">'+esc(presenceLastSeenLabel(person.lastSeen))+'</small>':'';
-  const profileButton='<button type="button" class="staff-presence-item" data-staff-id="'+esc(person.uid)+'"><span class="staff-avatar">'+avatar+'<i class="'+(person.online?'is-online':'')+'"></i></span><span class="staff-presence-copy"><b>'+esc(person.displayName||'Сотрудник')+'</b><small>'+esc(sub||'Сотрудник')+'</small>'+lastSeen+'</span><span class="staff-presence-state '+(person.online?'online':'')+'">'+(person.online?'●':'○')+'</span></button>';
+  const unread=unreadSenders.has(String(person.uid));
+  const profileButton='<button type="button" class="staff-presence-item" data-staff-id="'+esc(person.uid)+'"><span class="staff-avatar">'+avatar+'<i class="'+(person.online?'is-online':'')+'"></i>'+(unread?'<b class="staff-unread-dot" aria-label="Новое сообщение"></b>':'')+'</span><span class="staff-presence-copy"><b>'+esc(person.displayName||'Сотрудник')+'</b><small>'+esc(sub||'Сотрудник')+'</small>'+lastSeen+'</span><span class="staff-presence-state '+(person.online?'online':'')+'">'+(person.online?'●':'○')+'</span></button>';
   const messageButton=person.uid!==signedInUser?.uid?'<button type="button" class="staff-presence-message" data-staff-message-id="'+esc(person.uid)+'" aria-label="Написать '+esc(person.displayName||'сотруднику')+'" title="Написать личное сообщение"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.75 5.75h14.5a1.75 1.75 0 0 1 1.75 1.75v9a1.75 1.75 0 0 1-1.75 1.75H9l-4.25 2v-3.75A1.75 1.75 0 0 1 3 14.75v-7a2 2 0 0 1 1.75-2Z"/><path d="m7.5 9 4.5 3.5L16.5 9"/></svg><span>Написать</span></button>':'';
   return '<div class="staff-presence-row">'+profileButton+messageButton+'</div>';
  }).join(''):'<div class="staff-empty">'+(staffDirectoryLoadError?'Не удалось загрузить сотрудников. Повторяем попытку…':'Список сотрудников пока пуст')+'</div>';
+ rail.querySelectorAll('[data-staff-rail-id]').forEach(button=>button.addEventListener('click',()=>{
+  openStaffPanel(true);
+  const person=items.find(x=>x.uid===button.dataset.staffRailId);
+  if(person)showStaffProfile(person);
+ }));
  list.querySelectorAll('[data-staff-id]').forEach(button=>button.addEventListener('click',()=>{
-  const person=items.find(x=>x.uid===button.dataset.staffId);if(!person)return;
-  const initials=String(person.displayName||'?').trim().split(/\s+/).slice(0,2).map(x=>x[0]||'').join('').toLocaleUpperCase('ru');
-  $('staffProfileAvatar').textContent=initials||'?';$('staffProfileName').textContent=person.displayName||'Сотрудник';
-  $('staffProfileRole').textContent=person.roleLabel||'Сотрудник';
-  $('staffProfileStatus').textContent=person.online?'● Сейчас онлайн':'○ Не в сети';
-  $('staffProfileActivity').textContent=person.online?person.activity:presenceLastSeenLabel(person.lastSeen);
-  const messageButton=$('staffProfileMessage');
-  if(messageButton){messageButton.dataset.staffId=person.uid;messageButton.hidden=person.uid===signedInUser?.uid;}
-  $('staffProfileCard').hidden=false;
+  const person=items.find(x=>x.uid===button.dataset.staffId);if(person)showStaffProfile(person);
  }));
  list.querySelectorAll('[data-staff-message-id]').forEach(button=>button.addEventListener('click',event=>{
   event.preventDefault();event.stopPropagation();
   const person=items.find(x=>x.uid===button.dataset.staffMessageId);if(person)void openDirectChat(person);
  }));
+}
+function showStaffProfile(person){
+ const initials=String(person.displayName||'?').trim().split(/\\s+/).slice(0,2).map(x=>x[0]||'').join('').toLocaleUpperCase('ru');
+ const avatar=$('staffProfileAvatar');
+ if(person.avatarUrl){avatar.innerHTML='<img src="'+esc(person.avatarUrl)+'" alt="">';}else{avatar.textContent=initials||'?';}
+ $('staffProfileName').textContent=person.displayName||'Сотрудник';
+ $('staffProfileRole').textContent=person.roleLabel||'Сотрудник';
+ $('staffProfileStatus').textContent=person.online?'● Сейчас онлайн':'○ Не в сети';
+ $('staffProfileActivity').textContent=person.online?person.activity:presenceLastSeenLabel(person.lastSeen);
+ const messageButton=$('staffProfileMessage');
+ if(messageButton){messageButton.dataset.staffId=person.uid;messageButton.hidden=person.uid===signedInUser?.uid;}
+ $('staffProfileCard').hidden=false;
 }
 async function loadStaffDirectory(){
  if(!signedInUser)return;
@@ -1073,25 +1092,21 @@ function startPresence(user){
 function isStaffPanelDesktopLayout(){return window.matchMedia('(min-width: 721px)').matches}
 function openStaffPanel(open=true){
  const panel=$('staffPresencePanel'),backdrop=$('staffPresenceBackdrop'),button=$('staffPresenceToggle');
- if(!panel||!backdrop)return;
+ if(!panel)return;
  panel.classList.toggle('open',open);
- // On desktop the staff list is a permanent side column, not a modal overlay.
- backdrop.hidden=!open||isStaffPanelDesktopLayout();
+ if(backdrop)backdrop.hidden=true;
  button?.setAttribute('aria-expanded',String(open));
- if(!open)$('staffProfileCard').hidden=true;
+ $('staffPresenceExpand')?.setAttribute('aria-expanded',String(open));
+ if(!open&&$('staffProfileCard'))$('staffProfileCard').hidden=true;
 }
 $('staffPresenceToggle')?.addEventListener('click',()=>openStaffPanel(!$('staffPresencePanel').classList.contains('open')));
+$('staffPresenceExpand')?.addEventListener('click',()=>openStaffPanel(true));
 $('staffPresenceClose')?.addEventListener('click',()=>openStaffPanel(false));
 $('staffPresenceBackdrop')?.addEventListener('click',()=>openStaffPanel(false));
 $('staffProfileClose')?.addEventListener('click',()=>$('staffProfileCard').hidden=true);
 document.addEventListener('keydown',e=>{if(e.key==='Escape')openStaffPanel(false)});
-// Default: keep the staff presence panel visible on desktop (browser and desktop app).
-// On phones it remains a normal, manually opened drawer to preserve usable screen space.
-if(isStaffPanelDesktopLayout())openStaffPanel(true);
-window.addEventListener('resize',()=>{
- const panel=$('staffPresencePanel');
- if(panel?.classList.contains('open'))$('staffPresenceBackdrop').hidden=isStaffPanelDesktopLayout();
-});
+// Keep the staff dock collapsed by default on desktop and mobile; it never changes workspace width.
+openStaffPanel(false);
 document.addEventListener('focusin',e=>{
  const el=e.target;if(!(el instanceof HTMLElement)||!el.matches('input,textarea,[contenteditable="true"]'))return;
  const inChat=el.id==='chatInput'||!!el.closest('#chatModal,#chatPanel,.chat-modal,.chat-panel,[data-chat-composer]');
@@ -3052,6 +3067,7 @@ async function openDirectChat(person){
  const profileCard=$('staffProfileCard');if(profileCard)profileCard.hidden=true;
  directChatTarget=person;
  const threadId=directChatThreadId(signedInUser.uid,person.uid);
+ void markNotificationItemsRead((Array.isArray(state.notices)?state.notices:[]).filter(n=>!n.read&&n.directChatThreadId===threadId));
  const threadRef=doc(db,'directChats',threadId);
  const participants=[signedInUser.uid,person.uid].sort();
  try{

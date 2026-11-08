@@ -123,6 +123,51 @@ service cloud.firestore {
       allow delete: if activeUser() && request.auth.uid == staffId;
     }
 
+    // Private one-to-one employee conversations. Only the two active participants
+    // can read the thread or its messages.
+    match /directChats/{threadId} {
+      allow read: if activeUser()
+        && resource.data.participants is list
+        && request.auth.uid in resource.data.participants;
+      allow create: if activeUser()
+        && request.resource.data.keys().hasOnly(['participants','createdAt','updatedAt','lastMessage','lastMessageAt','lastSenderId'])
+        && request.resource.data.participants is list
+        && request.resource.data.participants.size() == 2
+        && request.resource.data.participants.hasAll([request.auth.uid])
+        && get(/databases/$(database)/documents/users/$(request.resource.data.participants[0])).data.active == true
+        && get(/databases/$(database)/documents/users/$(request.resource.data.participants[1])).data.active == true
+        && request.resource.data.lastSenderId == request.auth.uid
+        && request.resource.data.lastMessage is string
+        && request.resource.data.lastMessage.size() <= 180;
+      allow update: if activeUser()
+        && resource.data.participants is list
+        && request.auth.uid in resource.data.participants
+        && request.resource.data.participants == resource.data.participants
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['updatedAt','lastMessage','lastMessageAt','lastSenderId'])
+        && request.resource.data.lastSenderId == request.auth.uid
+        && request.resource.data.lastMessage is string
+        && request.resource.data.lastMessage.size() <= 180;
+      allow delete: if false;
+
+      match /messages/{messageId} {
+        function directChatParticipant() {
+          return activeUser()
+            && get(/databases/$(database)/documents/directChats/$(threadId)).data.participants is list
+            && request.auth.uid in get(/databases/$(database)/documents/directChats/$(threadId)).data.participants;
+        }
+        allow read: if directChatParticipant();
+        allow create: if directChatParticipant()
+          && request.resource.data.keys().hasOnly(['text','authorId','authorName','createdAt'])
+          && request.resource.data.authorId == request.auth.uid
+          && request.resource.data.authorName is string
+          && request.resource.data.text is string
+          && request.resource.data.text.size() > 0
+          && request.resource.data.text.size() <= 1000
+          && request.resource.data.createdAt is timestamp;
+        allow update, delete: if false;
+      }
+    }
+
     match /chatMessages/{messageId} {
       allow read: if activeUser();
       allow create: if activeUser()

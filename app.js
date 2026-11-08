@@ -11,7 +11,7 @@ import { searchClients, searchProducts } from './client-directory.mjs';
 import { shipmentOrderDateKey as getShipmentOrderDateKey, shipmentItemsForDate as buildShipmentItemsForDate } from './warehouse-operations.mjs';
 const firebaseApp=initializeApp(firebaseConfig),auth=getAuth(firebaseApp),db=getFirestore(firebaseApp),messaging=getMessaging(firebaseApp),storage=getStorage(firebaseApp),staffAuth=getAuth(initializeApp(firebaseConfig,'amp-staff-provisioner'));
 const warehouseFunctions=getFunctions(firebaseApp,'europe-west1'),enqueueWarehousePush=httpsCallable(warehouseFunctions,'enqueueWarehousePush'),getStaffDirectoryCallable=httpsCallable(warehouseFunctions,'getStaffDirectory');
-let signedInUser=null,profileName='',canManageUsers=false,profileUnsubscribe=null,ordersUnsubscribe=null,chatUnsubscribe=null,chatBadgeUnsubscribe=null,chatUnreadReceiptUnsubscribe=null,notificationsUnsubscribe=null,serverCache=new Map(),entryUnsubscribes=new Map(),defectEntryUnsubscribes=new Map(),pendingWrites=new Set(),pendingOrderData=new Map(),initialCloudLoad=true;
+let signedInUser=null,profileName='',canManageUsers=false,profileUnsubscribe=null,ordersUnsubscribe=null,chatUnsubscribe=null,directChatUnsubscribe=null,chatBadgeUnsubscribe=null,chatUnreadReceiptUnsubscribe=null,notificationsUnsubscribe=null,serverCache=new Map(),entryUnsubscribes=new Map(),defectEntryUnsubscribes=new Map(),pendingWrites=new Set(),pendingOrderData=new Map(),initialCloudLoad=true;
 let chatLegacyHistoryLoaded=false,chatLegacyHistoryLoading=false,chatLegacyHistoryCursor=null;
 let ordersRetryTimer=null,ordersRetryDelay=3000,ordersConnectionNoticeShown=false,ordersListenerBlocked=false;
 const roles={warehouse:'Кладовщик',manager:'Менеджер',chief_accountant:'Главный бухгалтер',accountant:'Бухгалтер',director:'Директор'};
@@ -942,11 +942,22 @@ async function writePresence(){
  try{await setDoc(doc(db,'presence',signedInUser.uid),{active:true,activity:currentActivity,updatedAt:Date.now()},{merge:true})}
  catch(err){console.warn('Не удалось обновить присутствие сотрудника',err)}
 }
+function presenceLastSeenLabel(value){
+ const time=Number(value||0);
+ if(!Number.isFinite(time)||time<=0)return 'Последний визит неизвестен';
+ const date=new Date(time),now=new Date();
+ const clock=date.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});
+ const dayStart=new Date(now.getFullYear(),now.getMonth(),now.getDate()).getTime();
+ const visitDay=new Date(date.getFullYear(),date.getMonth(),date.getDate()).getTime();
+ if(visitDay===dayStart)return 'Был(а) в сети сегодня в '+clock;
+ if(visitDay===dayStart-86400000)return 'Был(а) в сети вчера в '+clock;
+ return 'Был(а) в сети '+date.toLocaleDateString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric'})+' в '+clock;
+}
 function renderStaffPanel(){
  const list=$('staffPresenceList');if(!list)return;
  const now=Date.now(),items=[...staffDirectory.values()].filter(x=>x.active===true).map(person=>{
-  const p=staffPresence.get(person.uid),online=!!p&&p.active===true&&now-Number(p.updatedAt||0)<45000;
-  return {...person,online,activity:online?(p.activity||'В приложении'):'Не в сети',updatedAt:p?.updatedAt||0};
+  const p=staffPresence.get(person.uid),lastSeen=Number(p?.updatedAt||0),online=!!p&&p.active===true&&lastSeen>0&&now-lastSeen<45000;
+  return {...person,online,lastSeen,activity:online?(p.activity||'В приложении'):'Не в сети'};
  }).sort((x,y)=>Number(y.online)-Number(x.online)||String(x.displayName).localeCompare(String(y.displayName),'ru'));
  const onlineCount=items.filter(x=>x.online).length;
  $('staffPresenceCount').textContent=String(onlineCount);if($('staffPresenceBadge'))$('staffPresenceBadge').textContent=String(onlineCount);
@@ -954,14 +965,19 @@ function renderStaffPanel(){
  list.innerHTML=items.length?items.map(person=>{
   const initials=String(person.displayName||'?').trim().split(/\s+/).slice(0,2).map(x=>x[0]||'').join('').toLocaleUpperCase('ru');
   const avatar=person.avatarUrl?'<img src="'+esc(person.avatarUrl)+'" alt="">':'<span>'+esc(initials||'?')+'</span>';
-  return '<button type="button" class="staff-presence-item" data-staff-id="'+esc(person.uid)+'"><span class="staff-avatar">'+avatar+'<i class="'+(person.online?'is-online':'')+'"></i></span><span class="staff-presence-copy"><b>'+esc(person.displayName||'Сотрудник')+'</b><small>'+esc(person.online?person.activity:person.roleLabel)+'</small></span><span class="staff-presence-state '+(person.online?'online':'')+'">'+(person.online?'●':'○')+'</span></button>';
+  const sub=person.online?person.activity:person.roleLabel;
+  const lastSeen=!person.online?'<small class="staff-last-seen">'+esc(presenceLastSeenLabel(person.lastSeen))+'</small>':'';
+  return '<button type="button" class="staff-presence-item" data-staff-id="'+esc(person.uid)+'"><span class="staff-avatar">'+avatar+'<i class="'+(person.online?'is-online':'')+'"></i></span><span class="staff-presence-copy"><b>'+esc(person.displayName||'Сотрудник')+'</b><small>'+esc(sub||'Сотрудник')+'</small>'+lastSeen+'</span><span class="staff-presence-state '+(person.online?'online':'')+'">'+(person.online?'●':'○')+'</span></button>';
  }).join(''):'<div class="staff-empty">'+(staffDirectoryLoadError?'Не удалось загрузить сотрудников. Повторяем попытку…':'Список сотрудников пока пуст')+'</div>';
  list.querySelectorAll('[data-staff-id]').forEach(button=>button.addEventListener('click',()=>{
   const person=items.find(x=>x.uid===button.dataset.staffId);if(!person)return;
   const initials=String(person.displayName||'?').trim().split(/\s+/).slice(0,2).map(x=>x[0]||'').join('').toLocaleUpperCase('ru');
   $('staffProfileAvatar').textContent=initials||'?';$('staffProfileName').textContent=person.displayName||'Сотрудник';
-  $('staffProfileRole').textContent=person.roleLabel||'Сотрудник';$('staffProfileActivity').textContent=person.online?person.activity:'Не в сети';
+  $('staffProfileRole').textContent=person.roleLabel||'Сотрудник';
   $('staffProfileStatus').textContent=person.online?'● Сейчас онлайн':'○ Не в сети';
+  $('staffProfileActivity').textContent=person.online?person.activity:presenceLastSeenLabel(person.lastSeen);
+  const messageButton=$('staffProfileMessage');
+  if(messageButton){messageButton.dataset.staffId=person.uid;messageButton.hidden=person.uid===signedInUser?.uid;}
   $('staffProfileCard').hidden=false;
  }));
 }
@@ -1296,6 +1312,7 @@ function showModal(title,body,buttons=[],eyebrow='КАРТОЧКА ЗАКАЗА'
 function closeModal(fromPop=false){
   chatUnsubscribe?.();
   chatUnsubscribe=null;
+  directChatUnsubscribe?.();directChatUnsubscribe=null;
   if(modal.hidden)return;
   if(orderReturnModalSnapshot){
     if(selectedId){entryUnsubscribes.get(selectedId)?.();entryUnsubscribes.delete(selectedId);}
@@ -2932,8 +2949,69 @@ function renderChatMessages(options={}){
 }
 
 function sendChatMessage(){ $('chatForm')?.requestSubmit(); }
+
+let directChatTarget=null;
+function directChatThreadId(uidA,uidB){return [String(uidA),String(uidB)].sort().join('__');}
+function renderDirectChatMessages(messages){
+ const box=$('directChatMessages');if(!box)return;
+ if(!messages.length){box.innerHTML='<div class="chat-empty">Это начало вашей переписки. Напишите первое сообщение 🙂</div>';return;}
+ box.innerHTML=messages.map(message=>{
+  const mine=message.authorId===signedInUser?.uid;
+  return '<article class="chat-message '+(mine?'mine':'')+'"><div class="chat-message-head"><b>'+esc(mine?'Вы':directChatTarget?.displayName||'Сотрудник')+'</b><time>'+esc(fmtDateTime(message.createdAt))+'</time></div><div class="chat-message-text">'+renderChatText(message.text||'')+'</div></article>';
+ }).join('');
+ box.scrollTop=box.scrollHeight;
+}
+async function openDirectChat(person){
+ if(!signedInUser||!person?.uid||person.uid===signedInUser.uid)return;
+ directChatUnsubscribe?.();directChatUnsubscribe=null;
+ chatUnsubscribe?.();chatUnsubscribe=null;
+ directChatTarget=person;
+ const threadId=directChatThreadId(signedInUser.uid,person.uid);
+ const threadRef=doc(db,'directChats',threadId);
+ const participants=[signedInUser.uid,person.uid].sort();
+ try{
+  await setDoc(threadRef,{participants,createdAt:serverTimestamp(),updatedAt:serverTimestamp(),lastMessage:'',lastMessageAt:serverTimestamp(),lastSenderId:signedInUser.uid},{merge:true});
+  showModal('Личный чат','<div class="direct-chat-shell"><div class="direct-chat-person"><span class="staff-avatar">'+esc(String(person.displayName||'С').trim().split(/\\s+/).slice(0,2).map(x=>x[0]||'').join('').toLocaleUpperCase('ru'))+'</span><div><b>'+esc(person.displayName||'Сотрудник')+'</b><small>'+esc(person.roleLabel||'Сотрудник')+'</small></div></div><div class="direct-chat-messages" id="directChatMessages"><div class="chat-empty">Загрузка переписки…</div></div><form class="direct-chat-form" id="directChatForm"><textarea id="directChatInput" maxlength="1000" rows="2" placeholder="Напишите личное сообщение…" autocomplete="off"></textarea><button type="submit" class="primary-button">Отправить</button></form></div>',[button('Закрыть','close')],'ЛИЧНАЯ ПЕРЕПИСКА');
+  const messagesQuery=query(collection(db,'directChats',threadId,'messages'),orderBy('createdAt','desc'),limit(100));
+  directChatUnsubscribe=onSnapshot(messagesQuery,snap=>{
+   const messages=snap.docs.map(d=>({id:d.id,...d.data()})).reverse();
+   renderDirectChatMessages(messages);
+  },err=>{
+   console.error('Не удалось загрузить личную переписку',err);
+   const box=$('directChatMessages');if(box)box.innerHTML='<div class="danger-note">Не удалось загрузить переписку. Проверьте правила Firestore.</div>';
+  });
+  const form=$('directChatForm'),input=$('directChatInput');
+  form?.addEventListener('submit',async event=>{
+   event.preventDefault();
+   const textValue=input?.value.trim()||'';
+   if(!textValue||!signedInUser)return;
+   const send=form.querySelector('button[type="submit"]');
+   if(send)send.disabled=true;
+   if(input)input.disabled=true;
+   try{
+    const messageRef=doc(collection(db,'directChats',threadId,'messages'));
+    await setDoc(messageRef,{text:textValue.slice(0,1000),authorId:signedInUser.uid,authorName:profileName,createdAt:serverTimestamp()});
+    await setDoc(threadRef,{participants,updatedAt:serverTimestamp(),lastMessage:textValue.slice(0,180),lastMessageAt:serverTimestamp(),lastSenderId:signedInUser.uid},{merge:true});
+    void queuePush(profileName,textValue.slice(0,300),signedInUser.uid,'','chat','chat',person.uid);
+    if(input){input.value='';input.disabled=false;input.focus();}
+   }catch(err){
+    console.error('Не удалось отправить личное сообщение',err);
+    toast(err?.code==='permission-denied'?'Нет доступа к личной переписке. Проверьте публикацию firestore.rules.':'Не удалось отправить личное сообщение.');
+   }finally{
+    if(send)send.disabled=false;
+    if(input)input.disabled=false;
+   }
+  });
+  setTimeout(()=>$('directChatInput')?.focus(),60);
+ }catch(err){
+  console.error('Не удалось открыть личную переписку',err);
+  toast(err?.code==='permission-denied'?'Нет доступа к личным чатам. Сначала опубликуйте firestore.rules.':'Не удалось открыть личную переписку.');
+ }
+}
+
 function openChat(){
   if(!signedInUser)return;
+  directChatUnsubscribe?.();directChatUnsubscribe=null;
   chatUnsubscribe?.();
   chatMessages=[];olderChatMessages=[];chatOldestCursor=null;hasOlderChatMessages=true;loadingOlderChatMessages=false;chatLegacyHistoryLoaded=false;chatLegacyHistoryLoading=false;chatLegacyHistoryCursor=null;chatPendingScrollRestore=null;chatReplyTo=null;chatFilterText='';chatFilterMode='all';
   knownChatPeople=[];loadCurrentChatPeople();
@@ -3725,6 +3803,10 @@ document.addEventListener('focusout',e=>{
 });
 
 document.addEventListener('click',e=>{
+  const directSend=e.target.closest('[data-action="send-direct-chat"]');
+  if(directSend){e.preventDefault();$('directChatForm')?.requestSubmit();return;}
+  const profileMessage=e.target.closest('#staffProfileMessage');
+  if(profileMessage){e.preventDefault();const person=staffDirectory.get(profileMessage.dataset.staffId||'');if(person)void openDirectChat(person);return;}
   const productSuggestion=e.target.closest('[data-product-article]');
   if(productSuggestion){e.preventDefault();chooseArticleSuggestion(productSuggestion);return;}
   const noticeCard=e.target.closest('[data-notice-id]');

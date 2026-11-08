@@ -966,20 +966,24 @@ function renderStaffPanel(){
 }
 function startPresence(user){
  stopPresence();if(!user)return;
+ // Always keep the Firestore listener as the primary live source. The callable
+ // supplements it with a server-built directory, but must never blank the UI.
+ const roleLabel=roles[state.role]||'Сотрудник';
+ void setDoc(doc(db,'staffDirectory',user.uid),{displayName:profileName||roleLabel,role:state.role,roleLabel,active:true,avatarUrl:user.photoURL||''},{merge:true})
+  .catch(err=>console.warn('Не удалось обновить карточку сотрудника',err));
+ directoryUnsubscribe=onSnapshot(collection(db,'staffDirectory'),snap=>{
+  staffDirectory.clear();
+  snap.forEach(d=>staffDirectory.set(d.id,{uid:d.id,...d.data()}));
+  renderStaffPanel();
+  console.info('Каталог сотрудников из Firestore:',staffDirectory.size);
+ },err=>console.warn('Не удалось загрузить список сотрудников из Firestore',err));
  void syncStaffDirectoryCallable().then(result=>{
   const staff=Array.isArray(result.data?.staff)?result.data.staff:[];
-  if(staff.length){
-   staffDirectory.clear();
-   staff.forEach(person=>{if(person?.uid&&person.active===true)staffDirectory.set(person.uid,person)});
-   renderStaffPanel();
-   console.info('Каталог сотрудников загружен через сервер:',staffDirectory.size);
-   return;
-  }
-  // Backward-compatible fallback until the updated callable is deployed.
-  directoryUnsubscribe=onSnapshot(collection(db,'staffDirectory'),snap=>{
-   staffDirectory.clear();snap.forEach(d=>staffDirectory.set(d.id,{uid:d.id,...d.data()}));renderStaffPanel();
-  },err=>console.warn('Не удалось загрузить список сотрудников',err));
- }).catch(err=>console.warn('Не удалось загрузить каталог сотрудников',err));
+  if(!staff.length){console.warn('Сервер вернул пустой каталог сотрудников; оставляю Firestore listener');return}
+  staff.forEach(person=>{if(person?.uid&&person.active===true)staffDirectory.set(person.uid,person)});
+  renderStaffPanel();
+  console.info('Каталог сотрудников дополнен сервером:',staff.length);
+ }).catch(err=>console.warn('Не удалось синхронизировать каталог сотрудников; используется Firestore listener',err));
  presenceUnsubscribe=onSnapshot(collection(db,'presence'),snap=>{
   staffPresence.clear();snap.forEach(d=>staffPresence.set(d.id,d.data()));renderStaffPanel();
  },err=>console.warn('Не удалось загрузить присутствие сотрудников',err));

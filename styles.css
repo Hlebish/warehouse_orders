@@ -8385,3 +8385,12 @@ body:has(.staff-presence-panel.open) .main-area{
 }
 .staff-rail-avatar .staff-rail-unread-count{right:-4px!important;top:-3px!important}
 .staff-presence-item .staff-unread-count{right:-5px!important;top:-4px!important}
+
+
+/* Mobile staff rail: align its top edge with the workspace header (below the OS status bar). */
+@media(max-width:720px){
+ .staff-presence-panel{
+  top:0!important;
+  border-radius:0!important;
+ }
+}

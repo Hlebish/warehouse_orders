@@ -968,10 +968,17 @@ function startPresence(user){
  stopPresence();if(!user)return;
  void syncStaffDirectoryCallable().then(result=>{
   const staff=Array.isArray(result.data?.staff)?result.data.staff:[];
-  staffDirectory.clear();
-  staff.forEach(person=>{if(person?.uid&&person.active===true)staffDirectory.set(person.uid,person)});
-  renderStaffPanel();
-  console.info('Каталог сотрудников загружен:',staffDirectory.size);
+  if(staff.length){
+   staffDirectory.clear();
+   staff.forEach(person=>{if(person?.uid&&person.active===true)staffDirectory.set(person.uid,person)});
+   renderStaffPanel();
+   console.info('Каталог сотрудников загружен через сервер:',staffDirectory.size);
+   return;
+  }
+  // Backward-compatible fallback until the updated callable is deployed.
+  directoryUnsubscribe=onSnapshot(collection(db,'staffDirectory'),snap=>{
+   staffDirectory.clear();snap.forEach(d=>staffDirectory.set(d.id,{uid:d.id,...d.data()}));renderStaffPanel();
+  },err=>console.warn('Не удалось загрузить список сотрудников',err));
  }).catch(err=>console.warn('Не удалось загрузить каталог сотрудников',err));
  presenceUnsubscribe=onSnapshot(collection(db,'presence'),snap=>{
   staffPresence.clear();snap.forEach(d=>staffPresence.set(d.id,d.data()));renderStaffPanel();

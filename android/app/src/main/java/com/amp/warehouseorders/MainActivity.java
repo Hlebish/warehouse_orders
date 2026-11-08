@@ -422,7 +422,13 @@ public class MainActivity extends AppCompatActivity {
 
     private void forceCheckForAppUpdate() {
         if (downloadedUpdateFile != null && downloadedUpdateFile.exists()) { showPendingAppUpdateIfReady(); return; }
-        if (updateCheckInProgress) { if (updateProgressDialog == null || !updateProgressDialog.isShowing()) showUpdateCheckingDialog(); return; }
+        if (updateCheckInProgress) {
+            // A periodic background check may already be running. Treat the user's
+            // tap as a manual request so its eventual result is still displayed.
+            forceUpdateCheckRequested = true;
+            if (updateProgressDialog == null || !updateProgressDialog.isShowing()) showUpdateCheckingDialog();
+            return;
+        }
         forceUpdateCheckRequested = true;
         getSharedPreferences(PREFS, MODE_PRIVATE).edit().putLong(PREF_UPDATE_CHECKED_AT, 0L).apply();
         showUpdateCheckingDialog();

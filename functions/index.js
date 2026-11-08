@@ -582,9 +582,13 @@ exports.sendWarehousePush = onDocumentCreated({ document: 'pushQueue/{eventId}',
       error: String(error?.message || error)
     });
   });
-  const link = target === 'chat'
-    ? `${siteUrl}?chat=1`
-    : (orderId ? `${siteUrl}?order=${encodeURIComponent(orderId)}` : siteUrl);
+  const directChatThreadId = String(data.directChatThreadId || '');
+  const senderId = String(data.authorId || '');
+  const link = directChatThreadId && senderId
+    ? `${siteUrl}?directChat=${encodeURIComponent(directChatThreadId)}&peer=${encodeURIComponent(senderId)}`
+    : (target === 'chat'
+      ? `${siteUrl}?chat=1`
+      : (orderId ? `${siteUrl}?order=${encodeURIComponent(orderId)}` : siteUrl));
 
   try {
     const tokenDocs = await collectTokens(category, recipientUserId, String(data.authorId || ''), data.forceAll === true, Boolean(data.buybackItemId));
@@ -625,6 +629,8 @@ exports.sendWarehousePush = onDocumentCreated({ document: 'pushQueue/{eventId}',
             orderId,
             target,
             category,
+            directChatThreadId,
+            authorId: senderId,
             notificationTag,
             isMention: String(data.isMention === true || data.isMention === 'true'),
             isReply: String(data.isReply === true || data.isReply === 'true'),

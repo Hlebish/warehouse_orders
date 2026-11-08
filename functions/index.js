@@ -373,6 +373,50 @@ exports.import1COrder = onRequest(
 );
 
 
+// Admin-only backfill for the safe staff directory. It imports every active warehouse
+// profile regardless of the Firebase Authentication sign-in provider (Google or email/password).
+exports.syncStaffDirectory = onCall(async request => {
+  if (!request.auth?.uid) throw new HttpsError('unauthenticated', 'Требуется авторизация.');
+  const actorSnap = await db.collection('users').doc(request.auth.uid).get();
+  const actor = actorSnap.data() || {};
+  if (!actorSnap.exists || actor.active !== true || !(actor.admin === true || actor.role === 'director')) {
+    throw new HttpsError('permission-denied', 'Синхронизация доступна только администратору.');
+  }
+
+  const usersSnap = await db.collection('users').get();
+  const activeProfiles = new Map();
+  for (const userDoc of usersSnap.docs) {
+    const profile = userDoc.data() || {};
+    if (profile.active !== true || !['warehouse', 'manager', 'chief_accountant', 'accountant', 'director'].includes(profile.role)) continue;
+    const roleLabels = { warehouse: 'Кладовщик', manager: 'Менеджер', chief_accountant: 'Главный бухгалтер', accountant: 'Бухгалтер', director: 'Директор' };
+    activeProfiles.set(userDoc.id, {
+      displayName: String(profile.displayName || roleLabels[profile.role]).slice(0, 100),
+      role: profile.role,
+      roleLabel: roleLabels[profile.role],
+      active: true,
+      avatarUrl: typeof profile.avatarUrl === 'string' ? profile.avatarUrl.slice(0, 1000) : ''
+    });
+  }
+
+  const directorySnap = await db.collection('staffDirectory').get();
+  const batch = db.batch();
+  let writes = 0;
+  for (const [uid, profile] of activeProfiles) {
+    batch.set(db.collection('staffDirectory').doc(uid), profile, { merge: true });
+    writes++;
+    if (writes === 450) { await batch.commit(); writes = 0; }
+  }
+  for (const staffDoc of directorySnap.docs) {
+    if (activeProfiles.has(staffDoc.id)) continue;
+    batch.set(staffDoc.ref, { active: false }, { merge: true });
+    writes++;
+    if (writes === 450) { await batch.commit(); writes = 0; }
+  }
+  if (writes) await batch.commit();
+  logger.info('Staff directory synchronized', { actorUid: request.auth.uid, activeStaff: activeProfiles.size });
+  return { ok: true, count: activeProfiles.size };
+});
+
 // All client notification requests pass through this callable. Admin SDK writes
 // avoid brittle client-side pushQueue rule evaluation while preserving strict
 // authentication, recipient, category and administrator checks.

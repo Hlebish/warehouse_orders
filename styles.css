@@ -8312,3 +8312,33 @@ body:has(.staff-presence-panel.open) .main-area{margin-right:320px!important}
  .main-area{margin-right:64px!important}
  body:has(.staff-presence-panel.open) .main-area{margin-right:320px!important}
 }
+
+/* Staff dock v3: the narrow rail owns its permanent slot.
+   Only the expanded drawer overlays the page; expanding never reflows orders. */
+:root{--staff-dock-slot:64px}
+.main-area,
+body:has(.staff-presence-panel) .main-area,
+body:has(.staff-presence-panel.open) .main-area{
+ margin-right:var(--staff-dock-slot)!important;
+ transition:none!important;
+}
+.staff-presence-panel{
+ right:0!important;
+ width:var(--staff-dock-slot)!important;
+ transition:width .18s ease!important;
+}
+.staff-presence-panel.open{
+ width:320px!important;
+ z-index:1200!important;
+ box-shadow:-16px 0 45px #0008!important;
+}
+@media(max-width:720px){
+ :root{--staff-dock-slot:46px}
+ .main-area,
+ body:has(.staff-presence-panel) .main-area,
+ body:has(.staff-presence-panel.open) .main-area{
+  margin-right:var(--staff-dock-slot)!important;
+ }
+ .staff-presence-panel{width:var(--staff-dock-slot)!important}
+ .staff-presence-panel.open{width:min(196px,calc(100vw - 12px))!important}
+}

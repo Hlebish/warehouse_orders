@@ -626,11 +626,15 @@ buybackStatModal.className='buyback-stat-modal';
 buybackStatModal.hidden=true;
 buybackStatModal.innerHTML='<section class="buyback-stat-dialog" role="dialog" aria-modal="true" aria-labelledby="buybackStatTitle"><header><div><span class="eyebrow">ОБЗОР ТОВАРА</span><h3 id="buybackStatTitle">Товары</h3><p id="buybackStatSubtitle"></p></div><button type="button" class="buyback-stat-close" aria-label="Закрыть">×</button></header><div class="buyback-stat-items" id="buybackStatItems"></div></section>';
 document.body.append(buybackStatModal);
-let buybackStatHistoryEntry=false;
-function closeBuybackStatModal(fromPopState=false){
+let buybackStatHistoryEntry=false,ignoreBuybackStatBackPop=false;
+function closeBuybackStatModal(fromPopState=false,preserveHistory=false){
  if(buybackStatModal.hidden)return;
  buybackStatModal.hidden=true;
- if(buybackStatHistoryEntry){buybackStatHistoryEntry=false;if(!fromPopState)history.back();}
+ if(buybackStatHistoryEntry){
+  buybackStatHistoryEntry=false;
+  if(preserveHistory){history.replaceState({...history.state,buybackStatModal:false,buybackPanelOpen:true},'');}
+  else if(!fromPopState){ignoreBuybackStatBackPop=true;history.back();}
+ }
 }
 function openBuybackItemFromStat(itemId){
  const item=items.find(x=>x.id===itemId);if(!item)return;
@@ -639,7 +643,7 @@ function openBuybackItemFromStat(itemId){
  visibleBuybackCount=Math.max(visibleBuybackCount,items.length);
  selectedSupplier='';
  const supplierFilter=$('buybackSupplierFilter');if(supplierFilter)supplierFilter.value='';
- closeBuybackStatModal();
+ closeBuybackStatModal(false,true);
  open();
  render();
  const card=[...document.querySelectorAll('[data-buyback-item-id]')].find(el=>el.dataset.buybackItemId===itemId);
@@ -682,6 +686,7 @@ document.addEventListener('keydown',e=>{
  if(!overlay.hidden){e.preventDefault();close()}
 });
 window.addEventListener('popstate',()=>{
+ if(ignoreBuybackStatBackPop){ignoreBuybackStatBackPop=false;return}
  if(buybackStatHistoryEntry&&!buybackStatModal.hidden){buybackStatHistoryEntry=false;closeBuybackStatModal(true);return}
  if(!overlay.hidden){buybackHistoryEntry=false;close(true)}
 });

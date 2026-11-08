@@ -399,12 +399,12 @@ exports.syncStaffDirectory = onCall(async request => {
   }
 
   const directorySnap = await db.collection('staffDirectory').get();
-  const batch = db.batch();
+  let batch = db.batch();
   let writes = 0;
   for (const [uid, profile] of activeProfiles) {
     batch.set(db.collection('staffDirectory').doc(uid), profile, { merge: true });
     writes++;
-    if (writes === 450) { await batch.commit(); writes = 0; }
+    if (writes === 450) { await batch.commit(); batch = db.batch(); writes = 0; }
   }
   for (const staffDoc of directorySnap.docs) {
     if (activeProfiles.has(staffDoc.id)) continue;

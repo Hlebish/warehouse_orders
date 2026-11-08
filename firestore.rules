@@ -157,14 +157,31 @@ service cloud.firestore {
         }
         allow read: if directChatParticipant();
         allow create: if directChatParticipant()
-          && request.resource.data.keys().hasOnly(['text','authorId','authorName','createdAt'])
+          && request.resource.data.keys().hasOnly(['text','authorId','authorName','createdAt','mentionUserIds','notificationRecipientIds','isUrgent','urgentAckBy'])
           && request.resource.data.authorId == request.auth.uid
           && request.resource.data.authorName is string
           && request.resource.data.text is string
           && request.resource.data.text.size() > 0
           && request.resource.data.text.size() <= 1000
-          && request.resource.data.createdAt is timestamp;
-        allow update, delete: if false;
+          && request.resource.data.createdAt is timestamp
+          && request.resource.data.mentionUserIds is list
+          && request.resource.data.mentionUserIds.size() == 1
+          && request.resource.data.notificationRecipientIds is list
+          && request.resource.data.notificationRecipientIds.size() == 1
+          && request.resource.data.mentionUserIds == request.resource.data.notificationRecipientIds
+          && request.resource.data.mentionUserIds.hasAll(get(/databases/$(database)/documents/directChats/$(threadId)).data.participants.remove(request.auth.uid))
+          && request.resource.data.isUrgent is bool
+          && request.resource.data.urgentAckBy is list
+          && request.resource.data.urgentAckBy.size() == 0;
+        allow update: if directChatParticipant()
+          && resource.data.authorId != request.auth.uid
+          && resource.data.isUrgent == true
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['urgentAckBy'])
+          && request.resource.data.urgentAckBy is list
+          && request.resource.data.urgentAckBy.hasAll(resource.data.urgentAckBy)
+          && request.resource.data.urgentAckBy.hasAll([request.auth.uid])
+          && request.resource.data.urgentAckBy.size() <= resource.data.urgentAckBy.size() + 1;
+        allow delete: if false;
       }
     }
 

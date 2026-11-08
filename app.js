@@ -184,7 +184,8 @@ function watchNotifications(){
     const next=snap.docs.map(d=>({id:d.id,...d.data(),at:d.data().createdAt||d.data().at||isoNow()}));
     if(!initialSnapshot){
       const freshNotices=next.filter(n=>!knownNoticeIds.has(n.id)&&!n.read&&isFreshLiveNotice(n));
-      const attentionNotices=freshNotices.filter(shouldShowAttentionToast);\n      freshNotices.forEach(showInAppNoticePopup);
+      const attentionNotices=freshNotices.filter(shouldShowAttentionToast);
+      freshNotices.forEach(showInAppNoticePopup);
       if(attentionNotices.length===1)showAttentionToast(attentionNotices[0]);
       else if(attentionNotices.length>1)showAttentionToastBatch(attentionNotices);
       if(window.warehouseDesktop?.isDesktopApp){
@@ -280,7 +281,8 @@ function showAttentionToast(n){
   shownAttentionToastKeys.set(semanticKey,now);
   while(shownAttentionToastKeys.size>600)shownAttentionToastKeys.delete(shownAttentionToastKeys.keys().next().value);
   const heading=isMentionNotice(n)||flagOn(n,'isMention')?'Вас упомянули':flagOn(n,'isReply')?'Вам ответили':(n?.target==='chat'||n?.category==='chat')?'Новое сообщение в общем чате':'Новое сообщение';
-  const t=toast(`${heading} · ${sender}: ${message}`,String(n.orderId||''));\n  showInAppNoticePopup(n);
+  const t=toast(`${heading} · ${sender}: ${message}`,String(n.orderId||''));
+  showInAppNoticePopup(n);
   t.classList.add('mention-toast');t.setAttribute('role','button');t.tabIndex=0;
   t.setAttribute('aria-label',`${heading} от ${sender}. Открыть сообщение`);
   t.addEventListener('click',()=>openMentionNotice(n));
@@ -294,7 +296,8 @@ function showAttentionToastBatch(items){
  if(mentions)parts.push(`упоминаний: ${mentions}`);
  if(replies)parts.push(`ответов: ${replies}`);
  if(chats)parts.push(`сообщений: ${chats}`);
- items.forEach(showInAppNoticePopup);\n const t=toast(`Новые уведомления · ${parts.join(', ')}`);
+ items.forEach(showInAppNoticePopup);
+ const t=toast(`Новые уведомления · ${parts.join(', ')}`);
  t.classList.add('mention-toast');t.setAttribute('role','button');t.tabIndex=0;
  t.addEventListener('click',()=>openMentionCenter());
  t.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openMentionCenter()}});
@@ -3008,7 +3011,8 @@ function renderChatMessages(options={}){
 
 function sendChatMessage(){ $('chatForm')?.requestSubmit(); }
 
-let directChatTarget=null;\nconst shownDirectUrgentAlerts=new Set();
+let directChatTarget=null;
+const shownDirectUrgentAlerts=new Set();
 function directChatThreadId(uidA,uidB){return [String(uidA),String(uidB)].sort().join('__');}
 function renderDirectChatMessages(messages){
  const box=$('directChatMessages');if(!box)return;

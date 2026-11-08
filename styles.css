@@ -8166,3 +8166,20 @@ body.dark-theme .direct-chat-form textarea{background:#1d242b;color:#f1f4f6;bord
 .staff-presence-message:hover,.staff-presence-message:focus-visible{background:#244235!important;border-color:#4e9b70!important;color:#c8f5d8!important;box-shadow:0 0 0 3px #45a66b20;outline:none}
 .staff-presence-message:active{transform:translateY(1px) scale(.98)}
 @media(max-width:700px){.staff-presence-message{min-width:40px;width:40px!important;height:40px;padding:0!important;border-radius:11px!important}.staff-presence-message span{display:none}.staff-presence-message svg{width:18px;height:18px;flex-basis:18px}}
+
+/* Административная панель тестирования */
+.admin-tests{display:grid;gap:14px}
+.admin-tests-intro{display:grid;gap:6px;padding:15px 16px;border:1px solid var(--line);border-radius:12px;background:var(--surface,#171b20)}
+.admin-tests-intro b{font-size:14px}
+.admin-tests-intro span{font-size:12px;line-height:1.55;color:var(--muted)}
+.admin-test-list{display:grid;gap:9px}
+.admin-test-card{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:14px;border:1px solid var(--line);border-radius:11px;background:var(--card,#171b20)}
+.admin-test-copy{display:grid;gap:5px;min-width:0}
+.admin-test-copy>b{font-size:13px}
+.admin-test-copy>span{font-size:11px;line-height:1.45;color:var(--muted)}
+.admin-test-result{font-size:10px;color:var(--muted)}
+.admin-test-result[data-state="success"]{color:#45b889}
+.admin-test-result[data-state="error"]{color:#e17a7a}
+.admin-test-result[data-state="pending"]{color:#d5a64d}
+.admin-tests-modal .modal-body{max-height:min(72vh,760px)}
+@media(max-width:600px){.admin-test-card{align-items:flex-start}.admin-test-card>.small-button{flex-shrink:0}.admin-tests-intro{padding:12px}}

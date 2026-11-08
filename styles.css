@@ -8210,3 +8210,49 @@ body.dark-theme .direct-chat-form textarea{background:#1d242b;color:#f1f4f6;bord
 .mention-center-button b{min-width:26px;height:26px;font-size:13px}
 @media(min-width:900px){.toast-stack:has(.in-app-notice-popup){display:flex;flex-direction:column;align-items:flex-end;gap:10px;top:18px;right:20px;bottom:auto;left:auto;width:auto;max-width:calc(100vw - 40px);pointer-events:none}.toast-stack .in-app-notice-popup{pointer-events:auto}}
 @media(max-width:600px){.mention-center-button{bottom:14px;max-width:calc(100vw - 24px);padding:11px 16px;font-size:13px}}
+
+/* Compact staff dock: collapsed avatar rail by default, expandable without moving the workspace. */
+.staff-presence-panel{
+ position:fixed!important;z-index:1200!important;top:88px!important;right:12px!important;bottom:12px!important;
+ width:64px!important;height:auto!important;padding:9px!important;box-sizing:border-box!important;
+ display:flex!important;flex-direction:column!important;overflow:hidden!important;
+ transform:none!important;border:1px solid #35414b!important;border-radius:18px!important;
+ background:#151a20!important;box-shadow:0 12px 38px #0004!important;color:#e8edf0!important;
+ transition:width .22s ease,padding .22s ease!important;
+}
+.staff-presence-panel.open{width:min(340px,calc(100vw - 24px))!important;padding:20px 16px!important;overflow:auto!important}
+.staff-presence-rail{display:flex;flex-direction:column;align-items:center;gap:12px;width:100%;min-height:0}
+.staff-rail-expand{position:relative;display:grid;place-items:center;width:44px;height:44px;flex:0 0 44px;border:1px solid #35414b;border-radius:14px;background:#202a31;color:#dce9e3;font-size:22px;cursor:pointer}
+.staff-rail-expand i{position:absolute;right:-5px;top:-5px;min-width:18px;height:18px;padding:0 4px;display:grid;place-items:center;border:2px solid #151a20;border-radius:99px;background:#58c58a;color:#10251a;font-size:10px;font-style:normal;font-weight:800}
+.staff-rail-avatars{display:flex;flex-direction:column;align-items:center;gap:9px;width:100%;overflow:auto;scrollbar-width:none}
+.staff-rail-avatars::-webkit-scrollbar{display:none}
+.staff-rail-avatar{position:relative;width:44px;height:44px;flex:0 0 44px;padding:2px;border:0;border-radius:50%;background:transparent;cursor:pointer}
+.staff-rail-avatar:hover,.staff-rail-avatar:focus-visible{background:#35443e;outline:none}
+.staff-rail-avatar .staff-avatar{width:40px;height:40px;flex-basis:40px;border:2px solid #151a20}
+.staff-rail-avatar .staff-avatar i{right:-1px;bottom:-1px}
+.staff-rail-unread,.staff-unread-dot{position:absolute;width:11px;height:11px;border:2px solid #151a20;border-radius:50%;background:#f2c94c;right:-1px;top:-1px;box-shadow:0 0 0 2px #f2c94c22}
+.staff-presence-content{display:none;min-width:0}
+.staff-presence-panel.open .staff-presence-content{display:block}
+.staff-presence-panel.open .staff-presence-rail{display:none}
+.staff-presence-panel.open .staff-panel-header{padding-bottom:16px}
+.staff-presence-panel.open .staff-presence-list{padding-bottom:8px}
+.staff-presence-panel:not(.open) .staff-presence-content{display:none!important}
+.staff-presence-panel:not(.open) .staff-presence-rail{display:flex!important}
+.staff-presence-panel .staff-profile-card[hidden]{display:none!important}
+.staff-presence-panel .staff-profile-avatar img{width:100%;height:100%;object-fit:cover;border-radius:50%}
+.staff-presence-panel .staff-presence-backdrop{display:none!important}
+.staff-presence-panel .staff-rail-loading{color:#84938c;font-size:12px;padding:8px}
+.main-area{margin-right:0!important;transition:none!important}
+@media(max-width:700px){
+ .staff-presence-panel{top:78px!important;right:7px!important;bottom:8px!important;width:52px!important;padding:6px!important;border-radius:15px!important}
+ .staff-presence-panel.open{width:min(292px,calc(100vw - 14px))!important;padding:16px 12px!important}
+ .staff-rail-expand{width:38px;height:38px;flex-basis:38px;border-radius:12px;font-size:19px}
+ .staff-rail-avatars{gap:7px}
+ .staff-rail-avatar{width:38px;height:38px;flex-basis:38px}
+ .staff-rail-avatar .staff-avatar{width:34px;height:34px;flex-basis:34px;font-size:11px}
+ .staff-presence-panel.open .staff-presence-item{padding:8px 6px;gap:8px}
+ .staff-presence-panel.open .staff-avatar{width:36px;height:36px;flex-basis:36px}
+ .staff-presence-panel.open .staff-presence-copy b{font-size:12px}
+ .staff-presence-panel.open .staff-presence-message{min-width:38px!important;width:38px!important;height:38px!important}
+}
+@media(prefers-reduced-motion:reduce){.staff-presence-panel{transition:none!important}}

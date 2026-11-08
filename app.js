@@ -3020,17 +3020,22 @@ async function openDirectChat(person){
    const send=form.querySelector('button[type="submit"]');
    if(send)send.disabled=true;
    if(input)input.disabled=true;
+   let directStage='подготовка сообщения';
    try{
     const messageRef=doc(collection(db,'directChats',threadId,'messages'));
     const urgent=$('directChatUrgent')?.checked===true;
+    directStage='запись сообщения в directChats/'+threadId+'/messages';
     await setDoc(messageRef,{text:textValue.slice(0,1000),authorId:signedInUser.uid,authorName:profileName,createdAt:serverTimestamp(),mentionUserIds:[person.uid],notificationRecipientIds:[person.uid],isUrgent:urgent,urgentAckBy:[]});
+    directStage='обновление последнего сообщения в directChats/'+threadId;
     await setDoc(threadRef,{participants,updatedAt:serverTimestamp(),lastMessage:textValue.slice(0,180),lastMessageAt:serverTimestamp(),lastSenderId:signedInUser.uid},{merge:true});
+    directStage='постановка push-уведомления';
     await queuePush(urgent?'🚨 СРОЧНО · '+profileName:profileName,textValue.slice(0,300),signedInUser.uid,'','chat','replies',person.uid,{isMention:true});
     const urgentToggle=$('directChatUrgent');if(urgentToggle)urgentToggle.checked=false;
     if(input){input.value='';input.disabled=false;input.focus();}
    }catch(err){
-    console.error('Не удалось отправить личное сообщение',err);
-    toast(err?.code==='permission-denied'?'Нет доступа к личной переписке. Проверьте публикацию firestore.rules.':'Не удалось отправить личное сообщение.');
+    console.error('Не удалось отправить личное сообщение. Этап:',directStage,err);
+    const code=String(err?.code||'').replace(/^.*?\//,'');
+    toast('Ошибка на этапе «'+directStage+'»'+(code?' ('+code+')':'')+'.');
    }finally{
     if(send)send.disabled=false;
     if(input)input.disabled=false;

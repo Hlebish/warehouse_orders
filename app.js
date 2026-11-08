@@ -2966,6 +2966,8 @@ async function openDirectChat(person){
  if(!signedInUser||!person?.uid||person.uid===signedInUser.uid)return;
  directChatUnsubscribe?.();directChatUnsubscribe=null;
  chatUnsubscribe?.();chatUnsubscribe=null;
+ openStaffPanel(false);
+ const profileCard=$('staffProfileCard');if(profileCard)profileCard.hidden=true;
  directChatTarget=person;
  const threadId=directChatThreadId(signedInUser.uid,person.uid);
  const threadRef=doc(db,'directChats',threadId);
@@ -3881,11 +3883,12 @@ document.addEventListener('touchend',e=>{if(!tracking||!e.changedTouches||e.chan
 })();
 window.handleNativeBack=function(){
   if(!$('imageViewer').hidden){$('imageViewer').hidden=true;$('imageViewerImage').removeAttribute('src');return true;}
-  if($('sidebar').classList.contains('open')){closeSidebar();return true;}
   if(!modal.hidden){
     if(modalHistoryEntry){history.back();return true;}
     closeModal(true);return true;
   }
+  if($('staffPresencePanel').classList.contains('open')){openStaffPanel(false);return true;}
+  if($('sidebar').classList.contains('open')){closeSidebar();return true;}
   return true;
 };
 window.addEventListener('popstate',()=>{
@@ -3893,6 +3896,7 @@ window.addEventListener('popstate',()=>{
     closeModal(true);
     return;
   }
+  if($('staffPresencePanel').classList.contains('open')){openStaffPanel(false);return;}
   if($('sidebar').classList.contains('open')){
     closeSidebar(true);
     return;

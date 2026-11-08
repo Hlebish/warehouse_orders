@@ -8105,3 +8105,20 @@ button:active:not(:disabled){transform:scale(.992)}
 .staff-profile-card h3{margin:0 0 5px;font-size:16px}.staff-profile-card p{margin:0 0 10px;color:#9aaab3;font-size:12px}.staff-profile-card span{display:block;color:#74d39a;font-size:12px}.staff-profile-card small{display:block;margin-top:8px;color:#b3c0c7;font-size:12px}
 @media(max-width:700px){.staff-presence-toggle{min-width:36px;height:36px;padding:0 7px}.staff-presence-panel{width:min(340px,94vw);padding:20px 14px}}
 @media(prefers-reduced-motion:reduce){.staff-presence-panel{transition:none}}
+
+/* Last seen and private staff conversations */
+.staff-presence-copy .staff-last-seen{color:#7f9a91;font-size:10px;white-space:normal;line-height:1.3}
+.staff-profile-card .staff-profile-message{display:block;width:100%;margin-top:14px;padding:10px 12px;font-size:12px}
+.modal:has(.direct-chat-shell){display:flex;flex-direction:column;overflow:hidden}
+.modal:has(.direct-chat-shell) .modal-body{display:flex;flex:1;flex-direction:column;min-height:0;overflow:hidden}
+.modal:has(.direct-chat-shell) .modal-foot{flex-shrink:0}
+.direct-chat-shell{display:flex;flex-direction:column;gap:12px;min-height:0;height:100%}
+.direct-chat-person{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--surface,#f7f8fa)}
+.direct-chat-person>div{display:grid;gap:3px}.direct-chat-person small{color:#8b969f;font-size:11px}
+.direct-chat-messages{display:flex;flex:1;flex-direction:column;gap:8px;min-height:180px;max-height:52vh;overflow-y:auto;padding:8px 3px}
+.direct-chat-form{display:flex;gap:8px;align-items:end}
+.direct-chat-form textarea{flex:1;min-width:0;min-height:44px;max-height:120px;resize:vertical;border:1px solid var(--line);border-radius:9px;padding:10px;color:var(--text);background:var(--surface,#fff)}
+.direct-chat-form .primary-button{white-space:nowrap}
+@media(max-width:700px){.direct-chat-form{flex-direction:column;align-items:stretch}.direct-chat-form .primary-button{width:100%}.direct-chat-messages{max-height:48vh}}
+body.dark-theme .direct-chat-person{background:#1c242c;border-color:#35414b}
+body.dark-theme .direct-chat-form textarea{background:#1d242b;color:#f1f4f6;border-color:#3c4852}

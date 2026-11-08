@@ -116,10 +116,16 @@
 
     <div class="staff-presence-backdrop" id="staffPresenceBackdrop" hidden></div>
     <aside class="staff-presence-panel" id="staffPresencePanel" aria-label="Сотрудники">
-      <div class="staff-panel-header"><div><span class="eyebrow">КОМАНДА</span><h2>Сотрудники</h2><p id="staffPresenceSummary">Загружаем присутствие…</p></div><button type="button" id="staffPresenceClose" aria-label="Закрыть панель">×</button></div>
-      <div class="staff-online-heading"><span>СЕЙЧАС В СЕТИ</span><b id="staffPresenceCount">0</b></div>
-      <div class="staff-presence-list" id="staffPresenceList"><div class="staff-empty">Загружаем сотрудников…</div></div>
-      <section class="staff-profile-card" id="staffProfileCard" hidden><button type="button" id="staffProfileClose" aria-label="Закрыть профиль">×</button><div class="staff-profile-avatar" id="staffProfileAvatar">?</div><h3 id="staffProfileName">Сотрудник</h3><p id="staffProfileRole"></p><span id="staffProfileStatus"></span><small id="staffProfileActivity"></small><button type="button" class="small-button primary-soft staff-profile-message" id="staffProfileMessage">✉ Написать сообщение</button></section>
+      <div class="staff-presence-rail" id="staffPresenceRail">
+        <button type="button" class="staff-rail-expand" id="staffPresenceExpand" aria-label="Развернуть список сотрудников" title="Сотрудники"><span>♙</span><i id="staffPresenceRailCount">0</i></button>
+        <div class="staff-rail-avatars" id="staffPresenceRailAvatars"><span class="staff-rail-loading">…</span></div>
+      </div>
+      <div class="staff-presence-content">
+        <div class="staff-panel-header"><div><span class="eyebrow">КОМАНДА</span><h2>Сотрудники</h2><p id="staffPresenceSummary">Загружаем присутствие…</p></div><button type="button" id="staffPresenceClose" aria-label="Свернуть панель">×</button></div>
+        <div class="staff-online-heading"><span>СЕЙЧАС В СЕТИ</span><b id="staffPresenceCount">0</b></div>
+        <div class="staff-presence-list" id="staffPresenceList"><div class="staff-empty">Загружаем сотрудников…</div></div>
+        <section class="staff-profile-card" id="staffProfileCard" hidden><button type="button" id="staffProfileClose" aria-label="Закрыть профиль">×</button><div class="staff-profile-avatar" id="staffProfileAvatar">?</div><h3 id="staffProfileName">Сотрудник</h3><p id="staffProfileRole"></p><span id="staffProfileStatus"></span><small id="staffProfileActivity"></small><button type="button" class="small-button primary-soft staff-profile-message" id="staffProfileMessage">✉ Написать сообщение</button></section>
+      </div>
     </aside>
     <main class="main-area">
       <header class="topbar">

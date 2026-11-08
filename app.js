@@ -209,7 +209,7 @@ function watchNotifications(){
       }
     }
     initialSnapshot=false;
-    knownNoticeIds=new Set(next.map(n=>n.id));state.notices=next;paintNotices();paintMentionCenter();
+    knownNoticeIds=new Set(next.map(n=>n.id));state.notices=next;paintNotices();paintMentionCenter();renderStaffPanel();
   },err=>console.error('Не удалось загрузить историю уведомлений',err));
 }
 function flagOn(n,key){return n?.[key]===true||n?.[key]==='true'||n?.[key]===1}

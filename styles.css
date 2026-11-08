@@ -8116,10 +8116,14 @@ button:active:not(:disabled){transform:scale(.992)}
 .direct-chat-person{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--surface,#f7f8fa)}
 .direct-chat-person>div{display:grid;gap:3px}.direct-chat-person small{color:#8b969f;font-size:11px}
 .direct-chat-messages{display:flex;flex:1;flex-direction:column;gap:8px;min-height:180px;max-height:52vh;overflow-y:auto;padding:8px 3px}
-.direct-chat-form{display:flex;gap:8px;align-items:end}
+.direct-chat-form{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"input send" "urgent urgent";gap:8px;align-items:end;min-width:0}
+.direct-chat-form textarea{grid-area:input}
+.direct-chat-form .direct-chat-send{grid-area:send;display:inline-flex;align-items:center;justify-content:center;gap:7px;min-width:112px;min-height:44px;padding:0 13px;white-space:nowrap}
+.direct-chat-send svg{width:17px;height:17px;flex:0 0 auto}
+.direct-chat-urgent-toggle{grid-area:urgent}
 .direct-chat-form textarea{flex:1;min-width:0;min-height:44px;max-height:120px;resize:vertical;border:1px solid var(--line);border-radius:9px;padding:10px;color:var(--text);background:var(--surface,#fff)}
 .direct-chat-form .primary-button{white-space:nowrap}
-@media(max-width:700px){.direct-chat-form{flex-direction:column;align-items:stretch}.direct-chat-form .primary-button{width:100%}.direct-chat-messages{max-height:48vh}}
+@media(max-width:700px){.direct-chat-form{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"input send" "urgent urgent";align-items:end}.direct-chat-form .direct-chat-send{width:auto;min-width:48px;padding:0 12px}.direct-chat-send span{display:none}.direct-chat-send svg{width:20px;height:20px}.direct-chat-messages{max-height:48vh;min-height:120px}}
 body.dark-theme .direct-chat-person{background:#1c242c;border-color:#35414b}
 body.dark-theme .direct-chat-form textarea{background:#1d242b;color:#f1f4f6;border-color:#3c4852}
 
@@ -8183,3 +8187,13 @@ body.dark-theme .direct-chat-form textarea{background:#1d242b;color:#f1f4f6;bord
 .admin-test-result[data-state="pending"]{color:#d5a64d}
 .admin-tests-modal .modal-body{max-height:min(72vh,760px)}
 @media(max-width:600px){.admin-test-card{align-items:flex-start}.admin-test-card>.small-button{flex-shrink:0}.admin-tests-intro{padding:12px}}
+
+@media(max-width:700px){
+ .modal:has(.direct-chat-shell){max-height:calc(100dvh - 12px);height:auto}
+ .modal:has(.direct-chat-shell) .modal-body{min-height:0}
+ .direct-chat-shell{gap:8px}
+ .direct-chat-person{padding:6px 9px}
+ .direct-chat-messages{min-height:90px}
+ .direct-chat-form textarea{min-height:44px;max-height:88px;padding:9px}
+ .direct-chat-urgent-toggle{padding:7px 9px}
+}

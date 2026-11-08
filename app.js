@@ -10,7 +10,7 @@ import { NOTIFICATION_CATEGORIES, NOTIFICATION_CATEGORY_KEYS, normalizeNotificat
 import { searchClients, searchProducts } from './client-directory.mjs';
 import { shipmentOrderDateKey as getShipmentOrderDateKey, shipmentItemsForDate as buildShipmentItemsForDate } from './warehouse-operations.mjs';
 const firebaseApp=initializeApp(firebaseConfig),auth=getAuth(firebaseApp),db=getFirestore(firebaseApp),messaging=getMessaging(firebaseApp),storage=getStorage(firebaseApp),staffAuth=getAuth(initializeApp(firebaseConfig,'amp-staff-provisioner'));
-const warehouseFunctions=getFunctions(firebaseApp,'europe-west1'),enqueueWarehousePush=httpsCallable(warehouseFunctions,'enqueueWarehousePush'),syncStaffDirectoryCallable=httpsCallable(warehouseFunctions,'syncStaffDirectory');
+const warehouseFunctions=getFunctions(firebaseApp,'europe-west1'),enqueueWarehousePush=httpsCallable(warehouseFunctions,'enqueueWarehousePush'),getStaffDirectoryCallable=httpsCallable(warehouseFunctions,'getStaffDirectory');
 let signedInUser=null,profileName='',canManageUsers=false,profileUnsubscribe=null,ordersUnsubscribe=null,chatUnsubscribe=null,chatBadgeUnsubscribe=null,chatUnreadReceiptUnsubscribe=null,notificationsUnsubscribe=null,serverCache=new Map(),entryUnsubscribes=new Map(),defectEntryUnsubscribes=new Map(),pendingWrites=new Set(),pendingOrderData=new Map(),initialCloudLoad=true;
 let chatLegacyHistoryLoaded=false,chatLegacyHistoryLoading=false,chatLegacyHistoryCursor=null;
 let ordersRetryTimer=null,ordersRetryDelay=3000,ordersConnectionNoticeShown=false,ordersListenerBlocked=false;
@@ -920,14 +920,15 @@ function resumeOrdersListener(){if(signedInUser&&!ordersUnsubscribe&&!ordersList
 window.addEventListener('online',resumeOrdersListener);
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')resumeOrdersListener()});
 
-let presenceUnsubscribe=null,directoryUnsubscribe=null,presenceHeartbeat=null,presenceExpiryTimer=null,currentActivity='В приложении',activityResetTimer=null;
+let presenceUnsubscribe=null,presenceHeartbeat=null,presenceExpiryTimer=null,staffDirectoryRetryTimer=null,currentActivity='В приложении',activityResetTimer=null,staffDirectoryLoadError=false;
 const staffPresence=new Map(),staffDirectory=new Map();
 function stopPresence(){
  if(presenceHeartbeat!==null){clearInterval(presenceHeartbeat);presenceHeartbeat=null}
  if(presenceExpiryTimer!==null){clearInterval(presenceExpiryTimer);presenceExpiryTimer=null}
  if(activityResetTimer!==null){clearTimeout(activityResetTimer);activityResetTimer=null}
- presenceUnsubscribe?.();presenceUnsubscribe=null;directoryUnsubscribe?.();directoryUnsubscribe=null;
- staffPresence.clear();staffDirectory.clear();renderStaffPanel();
+ presenceUnsubscribe?.();presenceUnsubscribe=null;
+ if(staffDirectoryRetryTimer!==null){clearTimeout(staffDirectoryRetryTimer);staffDirectoryRetryTimer=null}
+ staffPresence.clear();staffDirectory.clear();staffDirectoryLoadError=false;renderStaffPanel();
 }
 function setWarehouseActivity(label='В приложении',duration=12000){
  currentActivity=String(label||'В приложении').slice(0,80);
@@ -944,7 +945,7 @@ async function writePresence(){
 function renderStaffPanel(){
  const list=$('staffPresenceList');if(!list)return;
  const now=Date.now(),items=[...staffDirectory.values()].filter(x=>x.active===true).map(person=>{
-  const p=staffPresence.get(person.uid),online=!!p&&p.active===true&&now-Number(p.updatedAt||0)<75000;
+  const p=staffPresence.get(person.uid),online=!!p&&p.active===true&&now-Number(p.updatedAt||0)<45000;
   return {...person,online,activity:online?(p.activity||'В приложении'):'Не в сети',updatedAt:p?.updatedAt||0};
  }).sort((x,y)=>Number(y.online)-Number(x.online)||String(x.displayName).localeCompare(String(y.displayName),'ru'));
  const onlineCount=items.filter(x=>x.online).length;
@@ -954,7 +955,7 @@ function renderStaffPanel(){
   const initials=String(person.displayName||'?').trim().split(/\s+/).slice(0,2).map(x=>x[0]||'').join('').toLocaleUpperCase('ru');
   const avatar=person.avatarUrl?'<img src="'+esc(person.avatarUrl)+'" alt="">':'<span>'+esc(initials||'?')+'</span>';
   return '<button type="button" class="staff-presence-item" data-staff-id="'+esc(person.uid)+'"><span class="staff-avatar">'+avatar+'<i class="'+(person.online?'is-online':'')+'"></i></span><span class="staff-presence-copy"><b>'+esc(person.displayName||'Сотрудник')+'</b><small>'+esc(person.online?person.activity:person.roleLabel)+'</small></span><span class="staff-presence-state '+(person.online?'online':'')+'">'+(person.online?'●':'○')+'</span></button>';
- }).join(''):'<div class="staff-empty">Список сотрудников пока пуст</div>';
+ }).join(''):'<div class="staff-empty">'+(staffDirectoryLoadError?'Не удалось загрузить сотрудников. Повторяем попытку…':'Список сотрудников пока пуст')+'</div>';
  list.querySelectorAll('[data-staff-id]').forEach(button=>button.addEventListener('click',()=>{
   const person=items.find(x=>x.uid===button.dataset.staffId);if(!person)return;
   const initials=String(person.displayName||'?').trim().split(/\s+/).slice(0,2).map(x=>x[0]||'').join('').toLocaleUpperCase('ru');
@@ -964,32 +965,35 @@ function renderStaffPanel(){
   $('staffProfileCard').hidden=false;
  }));
 }
+async function loadStaffDirectory(){
+ if(!signedInUser)return;
+ try{
+  const result=await getStaffDirectoryCallable();
+  const staff=Array.isArray(result.data?.staff)?result.data.staff:[];
+  staffDirectory.clear();
+  staff.forEach(person=>{if(person?.uid&&person.active===true)staffDirectory.set(person.uid,person)});
+  staffDirectoryLoadError=false;
+  renderStaffPanel();
+  console.info('Каталог сотрудников загружен с сервера:',staffDirectory.size);
+ }catch(err){
+  staffDirectoryLoadError=true;
+  renderStaffPanel();
+  console.warn('Не удалось загрузить каталог сотрудников с сервера',err);
+  if(staffDirectoryRetryTimer!==null)clearTimeout(staffDirectoryRetryTimer);
+  staffDirectoryRetryTimer=setTimeout(()=>{staffDirectoryRetryTimer=null;if(signedInUser)void loadStaffDirectory()},15000);
+ }
+}
 function startPresence(user){
  stopPresence();if(!user)return;
- // Always keep the Firestore listener as the primary live source. The callable
- // supplements it with a server-built directory, but must never blank the UI.
- const roleLabel=roles[state.role]||'Сотрудник';
- void setDoc(doc(db,'staffDirectory',user.uid),{displayName:profileName||roleLabel,role:state.role,roleLabel,active:true,avatarUrl:user.photoURL||''},{merge:true})
-  .catch(err=>console.warn('Не удалось обновить карточку сотрудника',err));
- directoryUnsubscribe=onSnapshot(collection(db,'staffDirectory'),snap=>{
-  staffDirectory.clear();
-  snap.forEach(d=>staffDirectory.set(d.id,{uid:d.id,...d.data()}));
-  renderStaffPanel();
-  console.info('Каталог сотрудников из Firestore:',staffDirectory.size);
- },err=>console.warn('Не удалось загрузить список сотрудников из Firestore',err));
- void syncStaffDirectoryCallable().then(result=>{
-  const staff=Array.isArray(result.data?.staff)?result.data.staff:[];
-  if(!staff.length){console.warn('Сервер вернул пустой каталог сотрудников; оставляю Firestore listener');return}
-  staff.forEach(person=>{if(person?.uid&&person.active===true)staffDirectory.set(person.uid,person)});
-  renderStaffPanel();
-  console.info('Каталог сотрудников дополнен сервером:',staff.length);
- }).catch(err=>console.warn('Не удалось синхронизировать каталог сотрудников; используется Firestore listener',err));
+ void loadStaffDirectory();
  presenceUnsubscribe=onSnapshot(collection(db,'presence'),snap=>{
   staffPresence.clear();snap.forEach(d=>staffPresence.set(d.id,d.data()));renderStaffPanel();
  },err=>console.warn('Не удалось загрузить присутствие сотрудников',err));
  currentActivity='В приложении';void writePresence();
- presenceHeartbeat=setInterval(()=>{if(document.visibilityState==='visible')void writePresence()},25000);
- presenceExpiryTimer=setInterval(renderStaffPanel,15000);
+ // Realtime snapshots deliver changes immediately; the heartbeat only refreshes
+ // the online lease. 15 seconds is a light write rate for a small staff team.
+ presenceHeartbeat=setInterval(()=>{if(document.visibilityState==='visible')void writePresence()},15000);
+ presenceExpiryTimer=setInterval(renderStaffPanel,10000);
 }
 function openStaffPanel(open=true){
  const panel=$('staffPresencePanel'),backdrop=$('staffPresenceBackdrop'),button=$('staffPresenceToggle');

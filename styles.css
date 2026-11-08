@@ -8430,9 +8430,12 @@ body:has(.staff-presence-panel.open) .main-area{
  transition:opacity .13s ease,transform .2s ease;
 }
 .staff-presence-panel.open .staff-presence-rail{
+ display:flex!important;
  opacity:0;
+ visibility:hidden;
  transform:translateX(8px);
  pointer-events:none;
+ transition:opacity .13s ease,transform .2s ease,visibility 0s linear .2s;
 }
 .staff-presence-panel:not(.open) .staff-presence-content{display:block!important}
 .staff-presence-panel.open{overflow-x:hidden!important}

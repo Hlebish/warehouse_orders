@@ -966,7 +966,7 @@ function renderStaffPanel(){
 }
 function startPresence(user){
  stopPresence();if(!user)return;
- if(canManageUsers)void syncStaffDirectoryCallable().then(result=>console.info('Каталог сотрудников синхронизирован:',result.data?.count??0)).catch(err=>console.warn('Не удалось синхронизировать каталог сотрудников',err));
+ void syncStaffDirectoryCallable().then(result=>{console.info('Каталог сотрудников синхронизирован:',result.data?.count??0)}).catch(err=>console.warn('Не удалось синхронизировать каталог сотрудников',err));
  const roleLabel=roles[state.role]||'Сотрудник';
  void setDoc(doc(db,'staffDirectory',user.uid),{displayName:profileName||roleLabel,role:state.role,roleLabel,active:true,avatarUrl:user.photoURL||''},{merge:true})
   .catch(err=>console.warn('Не удалось обновить карточку сотрудника',err));

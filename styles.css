@@ -8464,3 +8464,55 @@ body:has(.staff-presence-panel.open) .main-area{
 
 /* A global display override must never make a hidden staff scrim intercept the workspace. */
 .staff-presence-backdrop[hidden]{display:none!important;pointer-events:none!important}
+
+
+/* Desktop staff drawer: overlay the workspace instead of resizing/reflowing it. */
+@media(min-width:721px){
+ .main-area,
+ body:has(.staff-presence-panel) .main-area,
+ body:has(.staff-presence-panel.open) .main-area{
+  margin-right:64px!important;
+  width:auto!important;
+  max-width:none!important;
+  transition:none!important;
+ }
+ .staff-presence-panel{
+  top:0!important;
+  bottom:0!important;
+  width:64px!important;
+  padding:10px 6px!important;
+  z-index:1200!important;
+  transition:width .22s cubic-bezier(.2,.75,.25,1)!important;
+ }
+ .staff-presence-panel.open{
+  width:320px!important;
+  padding:18px 14px!important;
+ }
+ .staff-presence-panel .staff-presence-rail{
+  display:flex!important;
+  flex:1 1 auto!important;
+  min-height:0!important;
+  gap:7px!important;
+ }
+ .staff-presence-panel .staff-rail-expand{
+  width:38px!important;height:38px!important;flex:0 0 38px!important;
+ }
+ .staff-presence-panel .staff-rail-avatars{
+  display:flex!important;
+  flex:1 1 auto!important;
+  min-height:0!important;
+  max-height:none!important;
+  overflow-y:auto!important;
+  overflow-x:hidden!important;
+  gap:5px!important;
+  padding:2px 0 8px!important;
+ }
+ .staff-presence-panel .staff-rail-avatar{
+  width:36px!important;height:36px!important;flex:0 0 36px!important;
+ }
+ .staff-presence-panel .staff-rail-avatar .staff-avatar{
+  width:32px!important;height:32px!important;flex-basis:32px!important;
+ }
+ .staff-presence-panel.open .staff-presence-rail{display:none!important}
+ .staff-presence-backdrop{z-index:1190!important}
+}

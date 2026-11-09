@@ -168,6 +168,7 @@ async function createNotificationHistory(data, eventId) {
       isReply: data.isReply === true || data.isReply === 'true',
       authorId: String(data.authorId || ''),
       directChatThreadId: String(data.directChatThreadId || ''),
+      directMessageId: String(data.directMessageId || ''),
       isUrgent: data.isUrgent === true,
       notificationTag: notificationTagFor(data, eventId, category, data.target === 'chat' ? 'chat' : 'site', recipientUserId),
       expiresAt: Number(data.expiresAt) || null,
@@ -503,10 +504,12 @@ exports.enqueueWarehousePush = onCall(async request => {
   const isDeletedOrder = input.isDeleted === true;
   const forceAll = input.forceAll === true;
   const directChatThreadId = String(input.directChatThreadId || '');
+  const directMessageId = String(input.directMessageId || '');
   const isUrgent = input.isUrgent === true;
   if (directChatThreadId && (!recipientUserId || category !== 'replies' || target !== 'chat' || directChatThreadId.length > 300)) {
     throw new HttpsError('invalid-argument', 'Некорректный адрес личного сообщения.');
   }
+  if (directMessageId && !directChatThreadId) throw new HttpsError('invalid-argument', 'Для личного сообщения не указан чат.');
 
   if (!target || !allowedCategories.has(category) || title.length < 1 || title.length > 120 || body.length > 500 || recipientUserId.length > 128) {
     throw new HttpsError('invalid-argument', 'Некорректные данные уведомления.');
@@ -519,6 +522,17 @@ exports.enqueueWarehousePush = onCall(async request => {
     const recipientSnap = await db.collection('users').doc(recipientUserId).get();
     if (!recipientSnap.exists || recipientSnap.data()?.active !== true) {
       throw new HttpsError('failed-precondition', 'Получатель не найден или отключён.');
+    }
+  }
+  if (directMessageId) {
+    const thread = await db.collection('directChats').doc(directChatThreadId).get();
+    const participants = thread.data()?.participants;
+    if (!thread.exists || !Array.isArray(participants) || !participants.includes(uid) || !participants.includes(recipientUserId)) {
+      throw new HttpsError('permission-denied', 'Получатель не входит в этот личный чат.');
+    }
+    const directMessage = await thread.ref.collection('messages').doc(directMessageId).get();
+    if (!directMessage.exists || directMessage.data()?.authorId !== uid) {
+      throw new HttpsError('permission-denied', 'Личное сообщение не найдено или не принадлежит отправителю.');
     }
   }
 
@@ -574,6 +588,7 @@ exports.enqueueWarehousePush = onCall(async request => {
     isMention: input.isMention === true,
     isReply: input.isReply === true,
     directChatThreadId,
+    directMessageId,
     isUrgent,
     isDeleted: isDeletedOrder,
     forceAll,
@@ -671,6 +686,7 @@ exports.sendWarehousePush = onDocumentCreated({ document: 'pushQueue/{eventId}',
             target,
             category,
             directChatThreadId,
+            directMessageId: String(data.directMessageId || ''),
             authorId: senderId,
             notificationTag,
             isMention: String(data.isMention === true || data.isMention === 'true'),

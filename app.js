@@ -216,7 +216,7 @@ function watchNotifications(){
 }
 function flagOn(n,key){return n?.[key]===true||n?.[key]==='true'||n?.[key]===1}
 function isMentionNotice(n){if(n?.directChatThreadId)return false;const t=String(n?.title||'').toLocaleLowerCase('ru');return flagOn(n,'isMention')||t.includes('упомянули вас')||t.includes('вас упомянули')||n?.category==='mention'}
-function shouldShowAttentionToast(n){return isMentionNotice(n)||flagOn(n,'isReply')}
+function shouldShowAttentionToast(n){return isMentionNotice(n)||flagOn(n,'isReply')||!!(n?.directChatThreadId&&flagOn(n,'isUrgent'))}
 function isInboxNotice(n){return isMentionNotice(n)||flagOn(n,'isReply')||!!n?.directChatThreadId||n?.target==='chat'}
 const notificationSound=new Audio('./elivered-message-sound.mp3');
 notificationSound.preload='auto';
@@ -277,12 +277,14 @@ function showInAppNoticePopup(n){
 }
 function showAttentionToast(n){
   if(!n)return;
+  if(n.directChatThreadId&&flagOn(n,'isUrgent')){openUrgentDirectNotice(n);renderStaffPanel();return;}
   if(n.directChatThreadId){showInAppNoticePopup(n);renderStaffPanel();return;}
   renderStaffPanel();
 }
 function showAttentionToastBatch(items){
  if(!items.length)return;
- items.filter(n=>n?.directChatThreadId).forEach(showInAppNoticePopup);
+ items.filter(n=>n?.directChatThreadId&&flagOn(n,'isUrgent')).forEach(openUrgentDirectNotice);
+ items.filter(n=>n?.directChatThreadId&&!flagOn(n,'isUrgent')).forEach(showInAppNoticePopup);
  renderStaffPanel();
 }
 async function openPendingDirectChat(){
@@ -307,10 +309,59 @@ async function openMentionNotice(n){
  if(n?.target==='chat'||n?.category==='chat'||n?.category==='replies'){openChat();return;}
  showNotifications();
 }
-function showDirectUrgentAlert(message,peer,messageId=''){
- const body='<div class="direct-urgent-alert"><div class="direct-urgent-alert-icon">🚨</div><h3>СРОЧНОЕ ЛИЧНОЕ ОБРАЩЕНИЕ</h3><b>'+esc(peer?.displayName||'Сотрудник')+'</b><p>'+esc(message)+'</p><small>Отправитель ожидает подтверждения получения.</small></div>';
- showModal('Срочное сообщение',body,[button('✓ Подтвердить получение','ack-direct-urgent-alert','primary-button')],'ТРЕБУЕТСЯ ВНИМАНИЕ');
- modal.querySelector('[data-action="ack-direct-urgent-alert"]')?.addEventListener('click',async()=>{if(messageId)await acknowledgeDirectUrgentMessage(messageId);closeModal();});
+function showDirectUrgentAlert(message,peer,messageId='',threadId='',noticeId=''){
+ const info={message:String(message||'Срочное обращение'),peer,messageId,threadId:threadId||(directChatTarget?directChatThreadId(signedInUser?.uid,directChatTarget.uid):''),noticeId:String(noticeId||'')};
+ const notice=state.notices.find(n=>!n.read&&n.directChatThreadId===info.threadId&&n.authorId===peer?.uid&&flagOn(n,'isUrgent'));
+ if(!info.noticeId)info.noticeId=String(notice?.id||'');
+ const key=info.noticeId||`${info.threadId}:${messageId}`;
+ urgentDirectAlertCache.set(key,info);
+ document.querySelector('.direct-urgent-fullscreen')?.remove();
+ const overlay=document.createElement('div');overlay.className='direct-urgent-fullscreen';overlay.setAttribute('role','alertdialog');overlay.setAttribute('aria-modal','true');overlay.setAttribute('aria-labelledby','directUrgentTitle');
+ const card=document.createElement('section');card.className='direct-urgent-fullscreen-card';
+ const icon=document.createElement('div');icon.className='direct-urgent-fullscreen-icon';icon.textContent='🚨';
+ const title=document.createElement('h2');title.id='directUrgentTitle';title.textContent='СРОЧНОЕ ЛИЧНОЕ СООБЩЕНИЕ';
+ const sender=document.createElement('b');sender.className='direct-urgent-fullscreen-sender';sender.textContent=peer?.displayName||'Сотрудник';
+ const text=document.createElement('p');text.className='direct-urgent-fullscreen-message';text.textContent=info.message;
+ const hint=document.createElement('small');hint.textContent='Отправитель ждёт подтверждения прочтения.';
+ const actions=document.createElement('div');actions.className='direct-urgent-fullscreen-actions';
+ const ack=document.createElement('button');ack.type='button';ack.className='primary-button';ack.textContent='✓ Отметить прочитанным';ack.addEventListener('click',()=>void acknowledgeDirectUrgentMessage(messageId,info.threadId,info.noticeId));
+ const hide=document.createElement('button');hide.type='button';hide.className='secondary-button';hide.textContent='Скрыть';hide.addEventListener('click',()=>hideUrgentDirectAlert(key));
+ actions.append(ack,hide);card.append(icon,title,sender,text,hint,actions);overlay.append(card);document.body.append(overlay);
+ activeUrgentDirectOverlay=overlay;
+ syncUrgentDirectTrayItem(key,info);
+}
+const urgentDirectAlertCache=new Map(),openedUrgentNoticeIds=new Set(),hiddenUrgentNoticeIds=new Set();
+let activeUrgentDirectOverlay=null;
+function isUrgentNoticeHidden(id){if(!id)return false;if(hiddenUrgentNoticeIds.has(id))return true;try{return sessionStorage.getItem('hiddenUrgentDirect:'+id)==='1'}catch{return false}}
+async function openUrgentDirectNotice(notice){
+ const key=String(notice?.id||notice?.eventId||'');if(!key||isUrgentNoticeHidden(key)||openedUrgentNoticeIds.has(key))return;
+ openedUrgentNoticeIds.add(key);
+ if(notice.directMessageId){
+  const threadId=String(notice.directChatThreadId||''),messageId=String(notice.directMessageId);
+  const peer=staffDirectory.get(String(notice.authorId||''))||{uid:String(notice.authorId||''),displayName:String(notice.title||'Сотрудник')};
+  try{
+   const message=await getDoc(doc(db,'directChats',threadId,'messages',messageId));
+   if(message.exists()&&Array.isArray(message.data()?.urgentAckBy)&&message.data().urgentAckBy.includes(signedInUser?.uid)){
+    await markNotificationItemsRead([notice]);renderStaffPanel();return;
+   }
+   showDirectUrgentAlert(message.exists()?message.data()?.text:notice.message||notice.body,peer,messageId,threadId,key);
+  }catch(err){console.warn('Не удалось проверить подтверждение срочного сообщения',err);showDirectUrgentAlert(notice.message||notice.body,peer,messageId,threadId,key)}
+  return;
+ }
+ if(activeUrgentDirectOverlay&&directChatTarget?.uid===String(notice.authorId||''))return;
+ await openMentionNotice(notice);
+}
+function syncUrgentDirectTrayItem(key,info){
+ const stack=$('toastStack');if(!stack||!info)return;
+ let item=[...stack.querySelectorAll('[data-urgent-direct-tray]')].find(node=>node.dataset.urgentDirectTray===key);
+ if(!item){item=document.createElement('button');item.type='button';item.className='urgent-direct-tray';item.dataset.urgentDirectTray=key;item.addEventListener('click',()=>{const cached=urgentDirectAlertCache.get(key);if(cached)showDirectUrgentAlert(cached.message,cached.peer,cached.messageId,cached.threadId,cached.noticeId);else{hiddenUrgentNoticeIds.delete(key);try{sessionStorage.removeItem('hiddenUrgentDirect:'+key)}catch{}const n=state.notices.find(x=>x.id===key);if(n)void openMentionNotice(n)}});stack.append(item)}
+ item.textContent='🚨 Срочное сообщение от '+String(info.peer?.displayName||'сотрудника')+' · Показать';
+}
+function hideUrgentDirectAlert(key){
+ activeUrgentDirectOverlay?.remove();activeUrgentDirectOverlay=null;
+ hiddenUrgentNoticeIds.add(key);try{sessionStorage.setItem('hiddenUrgentDirect:'+key,'1')}catch{}
+ const info=urgentDirectAlertCache.get(key);if(info)syncUrgentDirectTrayItem(key,info);
+ if(info?.threadId&&directChatTarget?.uid&&directChatThreadId(signedInUser?.uid,directChatTarget.uid)===info.threadId&&!modal.hidden&&$('modalTitle')?.textContent==='Личный чат')closeModal();
 }
 function watchChatBadge(){
   chatBadgeUnsubscribe?.();
@@ -621,6 +672,7 @@ function queuePush(title,body,authorId,orderId='',target='site',category='',reci
     forceAll:attention.forceAll===true,
     isDeleted:attention.isDeleted===true,
     directChatThreadId:String(attention.directChatThreadId||''),
+    directMessageId:String(attention.directMessageId||''),
     isUrgent:attention.isUrgent===true
   };
   // Mentions, urgent direct messages, explicit tests, and deletions stay immediate.
@@ -1038,6 +1090,19 @@ function renderStaffPanel(){
   .filter(n=>!n.read&&flagOn(n,'isUrgent')&&n.directChatThreadId&&n.authorId&&String(n.authorId)!==String(signedInUser?.uid||''))
   .sort((a,b)=>(asDate(b.createdAt||b.at)?.getTime()||0)-(asDate(a.createdAt||a.at)?.getTime()||0));
  const urgentList=$('staffUrgentList'),urgentCount=$('staffUrgentCount'),urgentSection=$('staffUrgentSection');
+ const urgentNoticeIds=new Set(urgentNotices.map(n=>String(n.id)));
+ $('toastStack')?.querySelectorAll('[data-urgent-direct-tray]').forEach(item=>{
+  if(!urgentNoticeIds.has(item.dataset.urgentDirectTray)&&!urgentDirectAlertCache.has(item.dataset.urgentDirectTray))item.remove();
+ });
+ urgentNotices.forEach(n=>{
+  const key=String(n.id),peer=staffDirectory.get(String(n.authorId));
+  let cached=urgentDirectAlertCache.get(key);
+  if(!cached)cached=[...urgentDirectAlertCache.entries()].find(([oldKey,value])=>oldKey!==key&&value.threadId===n.directChatThreadId&&value.peer?.uid===n.authorId)?.[1];
+  if(cached){const oldKey=[...urgentDirectAlertCache.entries()].find(([,value])=>value===cached)?.[0];if(oldKey&&oldKey!==key){urgentDirectAlertCache.delete(oldKey);$('toastStack')?.querySelectorAll('[data-urgent-direct-tray]').forEach(item=>{if(item.dataset.urgentDirectTray===oldKey)item.remove()})}cached.noticeId=key;urgentDirectAlertCache.set(key,cached);}
+  syncUrgentDirectTrayItem(key,cached||{message:String(n.message||n.body||''),peer:peer||{displayName:n.title||'Сотрудник'},messageId:'',threadId:String(n.directChatThreadId||''),noticeId:key});
+ });
+ const autoOpenUrgent=urgentNotices.find(n=>!isUrgentNoticeHidden(String(n.id))&&!openedUrgentNoticeIds.has(String(n.id)));
+ if(autoOpenUrgent)openUrgentDirectNotice(autoOpenUrgent);
  if(urgentCount)urgentCount.textContent=String(urgentNotices.length);
  if(urgentSection)urgentSection.hidden=urgentNotices.length===0;
  if(urgentList){
@@ -3151,10 +3216,22 @@ function renderDirectChatMessages(messages){
  }
  box.scrollTop=box.scrollHeight;
 }
-async function acknowledgeDirectUrgentMessage(messageId){
- if(!signedInUser||!directChatTarget?.uid||!messageId)return;
+async function acknowledgeDirectUrgentMessage(messageId,threadId='',noticeId=''){
+ if(!signedInUser||!messageId)return;
+ const resolvedThreadId=threadId||(directChatTarget?.uid?directChatThreadId(signedInUser.uid,directChatTarget.uid):'');
+ if(!resolvedThreadId)return;
+ const closeDirectChat=!!activeUrgentDirectOverlay;
  try{
-  await updateDoc(doc(db,'directChats',directChatThreadId(signedInUser.uid,directChatTarget.uid),'messages',messageId),{urgentAckBy:arrayUnion(signedInUser.uid)});
+  await updateDoc(doc(db,'directChats',resolvedThreadId,'messages',messageId),{urgentAckBy:arrayUnion(signedInUser.uid)});
+  const relatedNotices=(Array.isArray(state.notices)?state.notices:[]).filter(n=>!n.read&&(noticeId?n.id===noticeId:n.directMessageId===messageId));
+  if(relatedNotices.length)await markNotificationItemsRead(relatedNotices);
+  const alertKey=noticeId||`${resolvedThreadId}:${messageId}`;
+  urgentDirectAlertCache.delete(alertKey);openedUrgentNoticeIds.delete(alertKey);hiddenUrgentNoticeIds.delete(alertKey);
+  try{sessionStorage.removeItem('hiddenUrgentDirect:'+alertKey)}catch{}
+  document.querySelectorAll('[data-urgent-direct-tray]').forEach(item=>{if(item.dataset.urgentDirectTray===alertKey)item.remove()});
+  activeUrgentDirectOverlay?.remove();activeUrgentDirectOverlay=null;
+  renderStaffPanel();
+  if(closeDirectChat&&directChatTarget?.uid&&directChatThreadId(signedInUser.uid,directChatTarget.uid)===resolvedThreadId&&!modal.hidden&&$('modalTitle')?.textContent==='Личный чат')closeModal();
   toast('Получение срочного обращения подтверждено.');
  }catch(err){console.error('Не удалось подтвердить срочное личное сообщение',err);toast('Не удалось подтвердить получение. Проверьте соединение.');}
 }
@@ -3165,7 +3242,7 @@ async function openDirectChat(person){
  openStaffPanel(false);
  directChatTarget=person;
  const threadId=directChatThreadId(signedInUser.uid,person.uid);
- void markNotificationItemsRead((Array.isArray(state.notices)?state.notices:[]).filter(n=>!n.read&&n.directChatThreadId===threadId));
+  void markNotificationItemsRead((Array.isArray(state.notices)?state.notices:[]).filter(n=>!n.read&&n.directChatThreadId===threadId&&!flagOn(n,'isUrgent')));
  const threadRef=doc(db,'directChats',threadId);
  const participants=[signedInUser.uid,person.uid].sort();
  try{
@@ -3204,7 +3281,7 @@ async function openDirectChat(person){
     directStage='обновление последнего сообщения в directChats/'+threadId;
     await updateDoc(threadRef,{updatedAt:serverTimestamp(),lastMessage:textValue.slice(0,180),lastMessageAt:serverTimestamp(),lastSenderId:signedInUser.uid});
     directStage='постановка push-уведомления';
-    await queuePush(urgent?'🚨 СРОЧНОЕ ЛИЧНОЕ СООБЩЕНИЕ · '+profileName:profileName,textValue.slice(0,300),signedInUser.uid,'','chat','replies',person.uid,{isMention:true,directChatThreadId:threadId,isUrgent:urgent});
+    await queuePush(urgent?'🚨 СРОЧНОЕ ЛИЧНОЕ СООБЩЕНИЕ · '+profileName:profileName,textValue.slice(0,300),signedInUser.uid,'','chat','replies',person.uid,{isMention:true,directChatThreadId:threadId,directMessageId:messageRef.id,isUrgent:urgent});
     const urgentToggle=$('directChatUrgent');if(urgentToggle)urgentToggle.checked=false;
     if(input){input.value='';input.disabled=false;input.focus();}
    }catch(err){

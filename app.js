@@ -1138,7 +1138,11 @@ $('staffPresenceToggle')?.addEventListener('click',()=>openStaffPanel(!$('staffP
 $('staffPresenceExpand')?.addEventListener('click',()=>openStaffPanel(true));
 $('staffPresencePanel')?.addEventListener('click',event=>{if(!$('staffPresencePanel').classList.contains('open')&&event.target===$('staffPresencePanel'))openStaffPanel(true);});
 $('staffPresenceClose')?.addEventListener('click',()=>openStaffPanel(false));
-$('staffPresenceBackdrop')?.addEventListener('click',()=>openStaffPanel(false));
+$('staffPresenceBackdrop')?.addEventListener('click',()=>{
+ const orderCreateOpen=!modal.hidden&&$('modalEyebrow')?.textContent?.trim()==='НОВЫЙ ЗАКАЗ';
+ if(orderCreateOpen)return;
+ openStaffPanel(false);
+});
 $('staffProfileClose')?.addEventListener('click',()=>$('staffProfileCard').hidden=true);
 document.addEventListener('keydown',e=>{if(e.key==='Escape')openStaffPanel(false)});
 // Keep the staff dock collapsed by default on desktop and mobile; it never changes workspace width.

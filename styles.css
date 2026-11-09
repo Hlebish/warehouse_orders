@@ -8459,6 +8459,28 @@ body:has(.staff-presence-panel.open) .main-area{
 /* A global display override must never make a hidden staff scrim intercept the workspace. */
 .staff-presence-backdrop[hidden]{display:none!important;pointer-events:none!important}
 
+/* In the Windows shell the expanded team drawer needs its full width reserved;
+   the web browser keeps the existing compact overlay behavior. This explicit
+   state also avoids depending on :has() support in older installed Electron. */
+@media(min-width:721px){
+ html.warehouse-desktop-app.warehouse-staff-drawer-open .main-area{margin-right:320px!important;transition:margin-right .22s ease!important}
+}
+
+/* Defect photos must sit above their order dialog (including on Android and
+   when opened from archived orders). */
+.image-viewer:not([hidden]){
+  position:fixed!important;inset:0!important;z-index:30001!important;
+  width:100vw!important;height:100vh!important;height:100dvh!important;
+  padding:max(56px,env(safe-area-inset-top,0px)) 16px max(16px,env(safe-area-inset-bottom,0px))!important;
+  background:rgba(3,6,10,.97)!important;
+}
+.image-viewer:not([hidden]) img{
+  display:block!important;max-width:min(100%,1600px)!important;
+  max-height:calc(100vh - 96px)!important;max-height:calc(100dvh - 96px)!important;
+  width:auto!important;height:auto!important;object-fit:contain!important;touch-action:pinch-zoom;
+}
+.image-viewer-close{z-index:1;top:max(12px,env(safe-area-inset-top,0px))!important;right:max(12px,env(safe-area-inset-right,0px))!important}
+
 
 /* Desktop staff drawer: overlay the workspace instead of resizing/reflowing it. */
 @media(min-width:721px){

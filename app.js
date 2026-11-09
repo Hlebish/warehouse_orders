@@ -9,6 +9,7 @@ import { canTransitionOrderStatus } from './order-workflow.mjs';
 import { NOTIFICATION_CATEGORIES, NOTIFICATION_CATEGORY_KEYS, normalizeNotificationSettings, groupNotifications } from './notification-settings.mjs';
 import { searchClients, searchProducts } from './client-directory.mjs';
 import { shipmentOrderDateKey as getShipmentOrderDateKey, shipmentItemsForDate as buildShipmentItemsForDate } from './warehouse-operations.mjs';
+document.documentElement.classList.toggle('warehouse-desktop-app',window.warehouseDesktop?.isDesktopApp===true);
 const firebaseApp=initializeApp(firebaseConfig),auth=getAuth(firebaseApp),db=getFirestore(firebaseApp),messaging=getMessaging(firebaseApp),storage=getStorage(firebaseApp),staffAuth=getAuth(initializeApp(firebaseConfig,'amp-staff-provisioner'));
 const warehouseFunctions=getFunctions(firebaseApp,'europe-west1'),enqueueWarehousePush=httpsCallable(warehouseFunctions,'enqueueWarehousePush'),getStaffDirectoryCallable=httpsCallable(warehouseFunctions,'getStaffDirectory');
 let signedInUser=null,profileName='',canManageUsers=false,profileUnsubscribe=null,ordersUnsubscribe=null,chatUnsubscribe=null,directChatUnsubscribe=null,chatBadgeUnsubscribe=null,chatUnreadReceiptUnsubscribe=null,notificationsUnsubscribe=null,serverCache=new Map(),entryUnsubscribes=new Map(),defectEntryUnsubscribes=new Map(),pendingWrites=new Set(),pendingOrderData=new Map(),initialCloudLoad=true;
@@ -1108,6 +1109,7 @@ function openStaffPanel(open=true){
  if(!panel)return;
  if(staffBackdropHideTimer!==null){clearTimeout(staffBackdropHideTimer);staffBackdropHideTimer=null;}
  panel.classList.toggle('open',open);
+ document.documentElement.classList.toggle('warehouse-staff-drawer-open',open);
  // Fade the scrim in/out without allowing taps to reach the workspace underneath.
  if(backdrop){
   if(open){

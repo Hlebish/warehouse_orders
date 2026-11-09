@@ -614,12 +614,13 @@ function queuePush(title,body,authorId,orderId='',target='site',category='',reci
     isMention:attention.isMention===true,
     isReply:attention.isReply===true,
     forceAll:attention.forceAll===true,
+    isDeleted:attention.isDeleted===true,
     directChatThreadId:String(attention.directChatThreadId||''),
     isUrgent:attention.isUrgent===true
   };
   // Defects, decisions, questions, replies, mentions, and explicit test pushes
   // stay immediate; routine edits/messages are coalesced into a short burst.
-  if(attention.isMention===true||attention.isReply===true||attention.forceAll===true||IMMEDIATE_PUSH_CATEGORIES.has(normalizedCategory)){
+  if(attention.isMention===true||attention.isReply===true||attention.forceAll===true||attention.isDeleted===true||IMMEDIATE_PUSH_CATEGORIES.has(normalizedCategory)){
     return submitWarehousePush(payload);
   }
   const key=JSON.stringify([authorId,normalizedTarget,normalizedCategory,payload.recipientUserId,normalizedTarget==='site'?payload.orderId:'']);
@@ -1053,34 +1054,19 @@ function renderStaffPanel(){
   const sub=person.online?person.activity:person.roleLabel;
   const lastSeen=!person.online?'<small class="staff-last-seen">'+esc(presenceLastSeenLabel(person.lastSeen))+'</small>':'';
   const unreadCount=unreadCountsBySender.get(String(person.uid))||0;
-  const profileButton='<button type="button" class="staff-presence-item" data-staff-id="'+esc(person.uid)+'"><span class="staff-avatar">'+avatar+'<i class="'+(person.online?'is-online':'')+'"></i>'+(unreadCount?'<b class="staff-unread-dot staff-unread-count" aria-label="'+unreadCount+' непрочитанных сообщений">'+(unreadCount>99?'99+':unreadCount)+'</b>':'')+'</span><span class="staff-presence-copy"><b>'+esc(person.displayName||'Сотрудник')+'</b><small>'+esc(sub||'Сотрудник')+'</small>'+lastSeen+'</span><span class="staff-presence-state '+(person.online?'online':'')+'">'+(person.online?'●':'○')+'</span></button>';
+  const profileButton='<div class="staff-presence-item"><span class="staff-avatar">'+avatar+'<i class="'+(person.online?'is-online':'')+'"></i>'+(unreadCount?'<b class="staff-unread-dot staff-unread-count" aria-label="'+unreadCount+' непрочитанных сообщений">'+(unreadCount>99?'99+':unreadCount)+'</b>':'')+'</span><span class="staff-presence-copy"><b>'+esc(person.displayName||'Сотрудник')+'</b><small>'+esc(sub||'Сотрудник')+'</small>'+lastSeen+'</span><span class="staff-presence-state '+(person.online?'online':'')+'">'+(person.online?'●':'○')+'</span></div>';
   const messageButton=person.uid!==signedInUser?.uid?'<button type="button" class="staff-presence-message" data-staff-message-id="'+esc(person.uid)+'" aria-label="Написать '+esc(person.displayName||'сотруднику')+'" title="Написать личное сообщение"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.75 5.75h14.5a1.75 1.75 0 0 1 1.75 1.75v9a1.75 1.75 0 0 1-1.75 1.75H9l-4.25 2v-3.75A1.75 1.75 0 0 1 3 14.75v-7a2 2 0 0 1 1.75-2Z"/><path d="m7.5 9 4.5 3.5L16.5 9"/></svg><span>Написать</span></button>':'';
   return '<div class="staff-presence-row">'+profileButton+messageButton+'</div>';
  }).join(''):'<div class="staff-empty">'+(staffDirectoryLoadError?'Не удалось загрузить сотрудников. Повторяем попытку…':'Список сотрудников пока пуст')+'</div>';
  rail.querySelectorAll('[data-staff-rail-id]').forEach(button=>button.addEventListener('click',()=>{
-  openStaffPanel(true);
   const person=items.find(x=>x.uid===button.dataset.staffRailId);
-  if(person)showStaffProfile(person);
- }));
- list.querySelectorAll('[data-staff-id]').forEach(button=>button.addEventListener('click',()=>{
-  const person=items.find(x=>x.uid===button.dataset.staffId);if(person)showStaffProfile(person);
+  if(person&&person.uid!==signedInUser?.uid)void openDirectChat(person);
+  else openStaffPanel(true);
  }));
  list.querySelectorAll('[data-staff-message-id]').forEach(button=>button.addEventListener('click',event=>{
   event.preventDefault();event.stopPropagation();
   const person=items.find(x=>x.uid===button.dataset.staffMessageId);if(person)void openDirectChat(person);
  }));
-}
-function showStaffProfile(person){
- const initials=String(person.displayName||'?').trim().split(/\\s+/).slice(0,2).map(x=>x[0]||'').join('').toLocaleUpperCase('ru');
- const avatar=$('staffProfileAvatar');
- if(person.avatarUrl){avatar.innerHTML='<img src="'+esc(person.avatarUrl)+'" alt="">';}else{avatar.textContent=initials||'?';}
- $('staffProfileName').textContent=person.displayName||'Сотрудник';
- $('staffProfileRole').textContent=person.roleLabel||'Сотрудник';
- $('staffProfileStatus').textContent=person.online?'● Сейчас онлайн':'○ Не в сети';
- $('staffProfileActivity').textContent=person.online?person.activity:presenceLastSeenLabel(person.lastSeen);
- const messageButton=$('staffProfileMessage');
- if(messageButton){messageButton.dataset.staffId=person.uid;messageButton.hidden=person.uid===signedInUser?.uid;}
- $('staffProfileCard').hidden=false;
 }
 async function loadStaffDirectory(){
  if(!signedInUser)return;
@@ -1137,7 +1123,6 @@ function openStaffPanel(open=true){
  }
  button?.setAttribute('aria-expanded',String(open));
  $('staffPresenceExpand')?.setAttribute('aria-expanded',String(open));
- if(!open&&$('staffProfileCard'))$('staffProfileCard').hidden=true;
 }
 $('staffPresenceToggle')?.addEventListener('click',()=>openStaffPanel(!$('staffPresencePanel').classList.contains('open')));
 $('staffPresenceExpand')?.addEventListener('click',()=>openStaffPanel(true));
@@ -1168,7 +1153,6 @@ document.addEventListener('pointerdown',event=>{
  const orderCreateOpen=!modal.hidden&&$('modalEyebrow')?.textContent?.trim()==='НОВЫЙ ЗАКАЗ';
  if(!orderCreateOpen)openStaffPanel(false);
 },true);
-$('staffProfileClose')?.addEventListener('click',()=>$('staffProfileCard').hidden=true);
 document.addEventListener('keydown',e=>{if(e.key==='Escape')openStaffPanel(false)});
 // Keep the staff dock collapsed by default on desktop and mobile; it never changes workspace width.
 openStaffPanel(false);
@@ -2579,7 +2563,7 @@ async function confirmDefectCancel(){const reason=$('defectReason')?.value.trim(
 function deleteOrder(){if(!canManageUsers)return;const current=state.orders.find(x=>x.id===selectedId);if(current&&hasPendingDefect(current)){toast('Нельзя удалить заказ, пока не рассмотрен дефект.');return;}const o=state.orders.find(x=>x.id===selectedId);if(!o)return;showModal('Удалить карточку?',`<div class="danger-note">Заказ № ${esc(o.number)} и его записи сначала сохранятся в отдельной истории удалённых заказов, а затем исчезнут из общего списка.</div>`,[button('Назад','back-detail'),button('Удалить карточку','confirm-delete','small-button danger')],'УДАЛЕНИЕ ЗАКАЗА')}
 function deleteEntry(entryId){const o=state.orders.find(x=>x.id===selectedId),entry=o.entries.find(x=>x.id===entryId);if(!entry||state.role!=='director')return;showModal('Удалить запись?',`<div class="danger-note">Комментарий и прикреплённые к нему фото будут удалены. Действие попадёт в журнал директора.</div>`,[button('Назад','back-detail'),button('Удалить запись','confirm-delete-entry:'+entryId,'small-button danger')],'ДЕЙСТВИЕ ДИРЕКТОРА')}
 function confirmDeleteEntry(entryId){const o=state.orders.find(x=>x.id===selectedId),entry=o.entries.find(x=>x.id===entryId);if(!entry)return;const label=entry.article?`дефект артикула ${entry.article}`:({comment:'комментарий',question:'вопрос',decision:'решение',viewed:'отметку о просмотре'})[entry.kind]||'запись';o.entries=o.entries.filter(x=>x.id!==entryId);state.notices.unshift({id:crypto.randomUUID(),message:`Директор удалил ${label} из заказа № ${o.number}`,orderId:null,at:isoNow(),read:false,kind:'audit'});save();render();toast('Удаление внесено в журнал действий.');openOrder(o.id)}
-async function confirmDelete(){if(!canManageUsers)return;const o=state.orders.find(x=>x.id===selectedId);if(!o)return;let archived=false;try{const sourceRef=doc(db,'orders',o.id),sourceSnap=await getDoc(sourceRef);if(!sourceSnap.exists()){toast('Заказ уже удалён или недоступен.');return}const sourceEntries=await getDocs(collection(db,'orders',o.id,'entries')),archiveRef=doc(db,'deletedOrders',o.id),archiveSnap=await getDoc(archiveRef);if(!archiveSnap.exists()||archiveSnap.data().complete!==true){if(!archiveSnap.exists()){const data=sourceSnap.data();await setDoc(archiveRef,{sourceOrderId:o.id,number:data.number||o.number,client:data.client||o.client||'',status:data.status||o.status,createdAt:data.createdAt||o.createdAt,createdBy:data.createdBy||'',createdByName:data.createdByName||o.author||'',entriesCount:sourceEntries.size,deletedAt:isoNow(),deletedBy:signedInUser.uid,deletedByName:profileName,deletedByEmail:signedInUser.email||'',complete:false})}for(let i=0;i<sourceEntries.docs.length;i+=450){const batch=writeBatch(db);for(const entrySnap of sourceEntries.docs.slice(i,i+450)){const entry=entryFromCloud(entrySnap.id,entrySnap.data());batch.set(doc(db,'deletedOrders',o.id,'entries',entrySnap.id),entryToCloud(entry))}await batch.commit()}await updateDoc(archiveRef,{complete:true})}archived=true;for(let i=0;i<sourceEntries.docs.length;i+=450){const batch=writeBatch(db);for(const entrySnap of sourceEntries.docs.slice(i,i+450))batch.delete(entrySnap.ref);await batch.commit()}await writeAudit('Удалён заказ',`Заказ № ${o.number}; статус: ${o.status}`,o.id);await queuePush(`Заказ № ${o.number} удалён`,`Заказ удалён администратором ${profileName || 'сотрудником'}.`,signedInUser.uid,o.id,'site','editing');await deleteDoc(sourceRef);entryUnsubscribes.get(o.id)?.();entryUnsubscribes.delete(o.id);serverCache.delete(o.id);state.orders=state.orders.filter(x=>x.id!==o.id);state.notices.unshift({id:crypto.randomUUID(),message:`Администратор ${profileName} удалил заказ № ${o.number}`,orderId:null,at:isoNow(),read:false,kind:'audit'});closeModal();render();toast('Заказ удалён и сохранён в истории.')}catch(err){console.error('Не удалось удалить заказ с архивированием',err);toast(archived?'Заказ сохранён в истории, но оригинал удалить не удалось. Повторите операцию позже.':'Не удалось заархивировать заказ. Оригинал сохранён. Проверьте правила Firestore и повторите попытку.')}}
+async function confirmDelete(){if(!canManageUsers)return;const o=state.orders.find(x=>x.id===selectedId);if(!o)return;let archived=false;try{const sourceRef=doc(db,'orders',o.id),sourceSnap=await getDoc(sourceRef);if(!sourceSnap.exists()){toast('Заказ уже удалён или недоступен.');return}const sourceEntries=await getDocs(collection(db,'orders',o.id,'entries')),archiveRef=doc(db,'deletedOrders',o.id),archiveSnap=await getDoc(archiveRef);if(!archiveSnap.exists()||archiveSnap.data().complete!==true){if(!archiveSnap.exists()){const data=sourceSnap.data();await setDoc(archiveRef,{sourceOrderId:o.id,number:data.number||o.number,client:data.client||o.client||'',status:data.status||o.status,createdAt:data.createdAt||o.createdAt,createdBy:data.createdBy||'',createdByName:data.createdByName||o.author||'',entriesCount:sourceEntries.size,deletedAt:isoNow(),deletedBy:signedInUser.uid,deletedByName:profileName,deletedByEmail:signedInUser.email||'',complete:false})}for(let i=0;i<sourceEntries.docs.length;i+=450){const batch=writeBatch(db);for(const entrySnap of sourceEntries.docs.slice(i,i+450)){const entry=entryFromCloud(entrySnap.id,entrySnap.data());batch.set(doc(db,'deletedOrders',o.id,'entries',entrySnap.id),entryToCloud(entry))}await batch.commit()}await updateDoc(archiveRef,{complete:true})}archived=true;for(let i=0;i<sourceEntries.docs.length;i+=450){const batch=writeBatch(db);for(const entrySnap of sourceEntries.docs.slice(i,i+450))batch.delete(entrySnap.ref);await batch.commit()}await writeAudit('Удалён заказ',`Заказ № ${o.number}; статус: ${o.status}`,o.id);await queuePush(`Заказ № ${o.number} удалён`,`Заказ удалён администратором ${profileName || 'сотрудником'}.`,signedInUser.uid,o.id,'site','editing','',{isDeleted:true});await deleteDoc(sourceRef);entryUnsubscribes.get(o.id)?.();entryUnsubscribes.delete(o.id);serverCache.delete(o.id);state.orders=state.orders.filter(x=>x.id!==o.id);state.notices.unshift({id:crypto.randomUUID(),message:`Администратор ${profileName} удалил заказ № ${o.number}`,orderId:null,at:isoNow(),read:false,kind:'audit'});closeModal();render();toast('Заказ удалён и сохранён в истории.')}catch(err){console.error('Не удалось удалить заказ с архивированием',err);toast(archived?'Заказ сохранён в истории, но оригинал удалить не удалось. Повторите операцию позже.':'Не удалось заархивировать заказ. Оригинал сохранён. Проверьте правила Firestore и повторите попытку.')}}
 async function showDeletedOrders(){
  if(!canManageUsers)return;
  let archives=[],cursor=null,hasMore=true,loading=false;
@@ -3129,7 +3113,6 @@ async function openDirectChat(person){
  directChatUnsubscribe?.();directChatUnsubscribe=null;
  chatUnsubscribe?.();chatUnsubscribe=null;
  openStaffPanel(false);
- const profileCard=$('staffProfileCard');if(profileCard)profileCard.hidden=true;
  directChatTarget=person;
  const threadId=directChatThreadId(signedInUser.uid,person.uid);
  void markNotificationItemsRead((Array.isArray(state.notices)?state.notices:[]).filter(n=>!n.read&&n.directChatThreadId===threadId));
@@ -4024,8 +4007,6 @@ document.addEventListener('focusout',e=>{
 document.addEventListener('click',e=>{
   const directSend=e.target.closest('[data-action="send-direct-chat"]');
   if(directSend){e.preventDefault();$('directChatForm')?.requestSubmit();return;}
-  const profileMessage=e.target.closest('#staffProfileMessage');
-  if(profileMessage){e.preventDefault();const person=staffDirectory.get(profileMessage.dataset.staffId||'');if(person)void openDirectChat(person);return;}
   const productSuggestion=e.target.closest('[data-product-article]');
   if(productSuggestion){e.preventDefault();chooseArticleSuggestion(productSuggestion);return;}
   const noticeCard=e.target.closest('[data-notice-id]');

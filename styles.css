@@ -8087,12 +8087,11 @@ button:active:not(:disabled){transform:scale(.992)}
 .staff-presence-panel.open{transform:translateX(0)}
 .staff-panel-header{display:flex;align-items:flex-start;justify-content:space-between;padding-bottom:20px;border-bottom:1px solid #303943}
 .staff-panel-header h2{margin:5px 0;font-size:22px}.staff-panel-header p{margin:0;color:#91a0aa;font-size:12px}
-.staff-panel-header>button,.staff-profile-card>#staffProfileClose{width:34px;height:34px;border:0;border-radius:9px;background:#252d35;color:#dce5e9;font-size:23px;cursor:pointer}
+.staff-panel-header>button{width:34px;height:34px;border:0;border-radius:9px;background:#252d35;color:#dce5e9;font-size:23px;cursor:pointer}
 .staff-online-heading{display:flex;justify-content:space-between;align-items:center;margin:22px 2px 10px;color:#91a0aa;font-size:10px;font-weight:800;letter-spacing:.12em}
 .staff-online-heading b{color:#8ed9ae;font-size:12px}
 .staff-presence-list{display:flex;flex-direction:column;gap:5px}
-.staff-presence-item{display:flex;align-items:center;gap:11px;width:100%;padding:10px 9px;border:0;border-radius:11px;background:transparent;color:inherit;text-align:left;cursor:pointer}
-.staff-presence-item:hover{background:#242c34}
+.staff-presence-item{display:flex;align-items:center;gap:11px;width:100%;padding:10px 9px;border:0;border-radius:11px;background:transparent;color:inherit;text-align:left}
 .staff-avatar{position:relative;flex:0 0 40px;width:40px;height:40px;display:grid;place-items:center;border-radius:50%;background:#2c3a42;color:#c9e9db;font-weight:700;overflow:visible}
 .staff-avatar img{width:100%;height:100%;object-fit:cover;border-radius:50%}
 .staff-avatar i{position:absolute;right:-1px;bottom:0;width:12px;height:12px;border:2px solid #151a20;border-radius:50%;background:#68747c}
@@ -8100,16 +8099,11 @@ button:active:not(:disabled){transform:scale(.992)}
 .staff-presence-copy{display:flex;flex:1;min-width:0;flex-direction:column;gap:4px}.staff-presence-copy b{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.staff-presence-copy small{color:#91a0aa;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .staff-presence-state{color:#77848c;font-size:12px}.staff-presence-state.online{color:#66ce94}
 .staff-empty{padding:24px 12px;color:#87949d;text-align:center;font-size:12px}
-.staff-profile-card{position:relative;margin-top:22px;padding:20px;border:1px solid #35414b;border-radius:15px;background:#1c242c;text-align:center}
-.staff-profile-card>#staffProfileClose{position:absolute;top:9px;right:9px;width:28px;height:28px;font-size:19px}
-.staff-profile-avatar{display:grid;place-items:center;width:58px;height:58px;margin:0 auto 10px;border-radius:50%;background:#304b48;color:#b9f0d2;font-size:20px;font-weight:800}
-.staff-profile-card h3{margin:0 0 5px;font-size:16px}.staff-profile-card p{margin:0 0 10px;color:#9aaab3;font-size:12px}.staff-profile-card span{display:block;color:#74d39a;font-size:12px}.staff-profile-card small{display:block;margin-top:8px;color:#b3c0c7;font-size:12px}
 @media(max-width:700px){.staff-presence-toggle{min-width:36px;height:36px;padding:0 7px}.staff-presence-panel{width:min(340px,94vw);padding:20px 14px}}
 @media(prefers-reduced-motion:reduce){.staff-presence-panel{transition:none}}
 
 /* Last seen and private staff conversations */
 .staff-presence-copy .staff-last-seen{color:#7f9a91;font-size:10px;white-space:normal;line-height:1.3}
-.staff-profile-card .staff-profile-message{display:block;width:100%;margin-top:14px;padding:10px 12px;font-size:12px}
 .modal:has(.direct-chat-shell){display:flex;flex-direction:column;overflow:hidden}
 .modal:has(.direct-chat-shell) .modal-body{display:flex;flex:1;flex-direction:column;min-height:0;overflow:hidden}
 .modal:has(.direct-chat-shell) .modal-foot{flex-shrink:0}
@@ -8131,7 +8125,6 @@ body.dark-theme .direct-chat-form textarea{background:#1d242b;color:#f1f4f6;bord
 
 /* Private staff chat must always render above the staff drawer and its scrim. */
 #modalBackdrop{z-index:1300!important}
-#staffProfileMessage{position:relative!important;inset:auto!important;display:block!important;width:100%!important;margin:14px 0 0!important;min-height:42px}
 
 
 /* One-tap private message action in each staff row */

@@ -470,6 +470,7 @@ exports.enqueueWarehousePush = onCall(async request => {
   const orderId = String(input.orderId || '');
   const recipientUserId = String(input.recipientUserId || '');
   const requestedOrderVersion = String(input.orderVersion || '').slice(0, 200);
+  const isDeletedOrder = input.isDeleted === true;
   const forceAll = input.forceAll === true;
   const directChatThreadId = String(input.directChatThreadId || '');
   const isUrgent = input.isUrgent === true;
@@ -495,14 +496,23 @@ exports.enqueueWarehousePush = onCall(async request => {
   let orderVersion = '';
   let orderNumber = '';
   if (orderCategories.has(category)) {
-    if (target !== 'site' || !orderId || recipientUserId) {
-      throw new HttpsError('invalid-argument', 'Для уведомления по заказу нужны сайт и действующий заказ.');
+    if (isDeletedOrder) {
+      if (category !== 'editing' || target !== 'site' || !orderId || recipientUserId
+        || !(profileSnap.data()?.admin === true || profileSnap.data()?.role === 'director')) {
+        throw new HttpsError('permission-denied', 'Уведомление об удалении заказа доступно только администратору.');
+      }
+      orderNumber = String(input.orderNumber || '').slice(0, 80);
+      if (!orderNumber) throw new HttpsError('invalid-argument', 'Для уведомления об удалении нужен номер заказа.');
+    } else {
+      if (target !== 'site' || !orderId || recipientUserId) {
+        throw new HttpsError('invalid-argument', 'Для уведомления по заказу нужны сайт и действующий заказ.');
+      }
+      const orderSnap = await db.collection('orders').doc(orderId).get();
+      if (!orderSnap.exists) throw new HttpsError('failed-precondition', 'Заказ для уведомления не найден.');
+      const orderData = orderSnap.data() || {};
+      orderVersion = requestedOrderVersion || orderVersionKey(orderData);
+      orderNumber = String(orderData.number || '').slice(0, 80);
     }
-    const orderSnap = await db.collection('orders').doc(orderId).get();
-    if (!orderSnap.exists) throw new HttpsError('failed-precondition', 'Заказ для уведомления не найден.');
-    const orderData = orderSnap.data() || {};
-    orderVersion = requestedOrderVersion || orderVersionKey(orderData);
-    orderNumber = String(orderData.number || '').slice(0, 80);
   } else if (category === 'replies') {
     if (!recipientUserId || (target === 'site' && !orderId) || (target === 'chat' && orderId)) {
       throw new HttpsError('invalid-argument', 'Для ответа необходимо указать получателя и корректную цель.');
@@ -526,7 +536,7 @@ exports.enqueueWarehousePush = onCall(async request => {
     title,
     body,
     authorId: uid,
-    orderId,
+    orderId: isDeletedOrder ? '' : orderId,
     target,
     category,
     recipientUserId,
@@ -535,6 +545,7 @@ exports.enqueueWarehousePush = onCall(async request => {
     isReply: input.isReply === true,
     directChatThreadId,
     isUrgent,
+    isDeleted: isDeletedOrder,
     forceAll,
     orderVersion,
     createdAt: new Date(now).toISOString(),

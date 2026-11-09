@@ -555,9 +555,8 @@ async function save(){
  }
 }
 const pendingPushBatches=new Map();
-const PUSH_BATCH_QUIET_MS=2500;
+const PUSH_BATCH_QUIET_MS=5000;
 const PUSH_BATCH_MAX_MS=10000;
-const IMMEDIATE_PUSH_CATEGORIES=new Set(['defects','questions','decisions','replies']);
 async function submitWarehousePush(payload){
   try{
     // Enqueue through an authenticated callable so all notification requests
@@ -589,7 +588,7 @@ function flushPushBatch(key){
   if(signedInUser?.uid!==batch.authorId)return;
   const orderIds=[...new Set(batch.events.map(item=>item.orderId).filter(Boolean))];
   const eventCount=batch.events.length;
-  const categoryTitles={orders:'Новые заказы',assembly:'Сборка заказов',status:'Изменения статусов',editing:'Изменения заказов',comments:'Новые комментарии',chat:'Общий чат',likes:'Реакции в чате'};
+  const categoryTitles={orders:'Новые заказы',assembly:'Сборка заказов',status:'Изменения статусов',editing:'Изменения заказов',defects:'Новые дефекты',questions:'Новые вопросы',decisions:'Новые решения',replies:'Новые ответы',comments:'Новые комментарии',chat:'Общий чат',likes:'Реакции в чате'};
   const summaryBody=batch.target==='chat'
     ?`За короткое время: ${eventCount} ${plural(eventCount,'новое сообщение','новых сообщения','новых сообщений')}.`
     :`За короткое время: ${eventCount} ${plural(eventCount,'изменение','изменения','изменений')}${batch.events[0].orderNumber?` в заказе № ${batch.events[0].orderNumber}`:''}.`;
@@ -601,7 +600,7 @@ function flushPushBatch(key){
     orderNumber:batch.events[batch.events.length-1].orderNumber||'',
     orderVersion:batch.events[batch.events.length-1].orderVersion||'',
     isMention:false,
-    isReply:false
+    isReply:batch.events.some(item=>item.isReply===true)
   };
   void submitWarehousePush(payload);
 }
@@ -624,9 +623,10 @@ function queuePush(title,body,authorId,orderId='',target='site',category='',reci
     directChatThreadId:String(attention.directChatThreadId||''),
     isUrgent:attention.isUrgent===true
   };
-  // Defects, decisions, questions, replies, mentions, and explicit test pushes
-  // stay immediate; routine edits/messages are coalesced into a short burst.
-  if(attention.isMention===true||attention.isReply===true||attention.forceAll===true||attention.isDeleted===true||IMMEDIATE_PUSH_CATEGORIES.has(normalizedCategory)){
+  // Mentions, urgent direct messages, explicit tests, and deletions stay immediate.
+  // Routine order, defect, decision, question and reply events share the same
+  // five-second quiet window, capped at ten seconds from the first event.
+  if(attention.isMention===true||attention.forceAll===true||attention.isDeleted===true||attention.isUrgent===true||attention.directChatThreadId){
     return submitWarehousePush(payload);
   }
   const key=JSON.stringify([authorId,normalizedTarget,normalizedCategory,payload.recipientUserId,normalizedTarget==='site'?payload.orderId:'']);

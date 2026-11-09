@@ -187,7 +187,7 @@ function watchNotifications(){
     if(!initialSnapshot){
       const freshNotices=next.filter(n=>!knownNoticeIds.has(n.id)&&!n.read&&isFreshLiveNotice(n));
       const attentionNotices=freshNotices.filter(shouldShowAttentionToast);
-      freshNotices.forEach(showInAppNoticePopup);
+      freshNotices.filter(n=>!isInboxNotice(n)).forEach(showInAppNoticePopup);
       if(attentionNotices.length===1)showAttentionToast(attentionNotices[0]);
       else if(attentionNotices.length>1)showAttentionToastBatch(attentionNotices);
       if(window.warehouseDesktop?.isDesktopApp){
@@ -209,15 +209,13 @@ function watchNotifications(){
       }
     }
     initialSnapshot=false;
-    knownNoticeIds=new Set(next.map(n=>n.id));state.notices=next;paintNotices();paintMentionCenter();renderStaffPanel();
+    knownNoticeIds=new Set(next.map(n=>n.id));state.notices=next;paintNotices();renderStaffPanel();
   },err=>console.error('Не удалось загрузить историю уведомлений',err));
 }
 function flagOn(n,key){return n?.[key]===true||n?.[key]==='true'||n?.[key]===1}
 function isMentionNotice(n){if(n?.directChatThreadId)return false;const t=String(n?.title||'').toLocaleLowerCase('ru');return flagOn(n,'isMention')||t.includes('упомянули вас')||t.includes('вас упомянули')||n?.category==='mention'}
 function shouldShowAttentionToast(n){return isMentionNotice(n)||flagOn(n,'isReply')}
-function unreadMentionNotices(){return state.notices.filter(n=>!n.read&&isMentionNotice(n))}
-function paintMentionCenter(){const b=$('mentionCenterButton'),c=$('mentionCenterCount'),l=$('mentionCenterLabel');if(!b||!c||!l)return;const n=unreadMentionNotices().length;c.textContent=String(n);b.hidden=n===0;l.textContent=n===1?'Вас упомянули':`У вас ${n} новых упоминания`}
-const shownAttentionToastKeys=new Map();
+function isInboxNotice(n){return isMentionNotice(n)||flagOn(n,'isReply')||!!n?.directChatThreadId||n?.target==='chat'}
 const notificationSound=new Audio('./elivered-message-sound.mp3');
 notificationSound.preload='auto';
 notificationSound.volume=1;
@@ -254,10 +252,12 @@ function playNotificationSound(){
 const activeInAppPopups=new Set();
 function showInAppNoticePopup(n){
  if(!n||!window.matchMedia?.('(min-width: 900px)').matches)return;
+ if(isInboxNotice(n))return;
  const key=String(n.eventId||n.id||'');if(!key||activeInAppPopups.has(key))return;
  activeInAppPopups.add(key);
  const stack=$('toastStack');if(!stack)return;
  const card=document.createElement('article');card.className='in-app-notice-popup';
+ card.dataset.noticeKey=key;
  const heading=n.directChatThreadId?'Новое личное сообщение':n.isUrgent?'🚨 Срочное сообщение':isMentionNotice(n)?'Вас упомянули':n.isReply?'Вам ответили':n.target==='chat'?'Новое сообщение в общем чате':'Новое уведомление';
  const sender=String(n.title||'Заказы · Склад');
  const message=String(n.message||n.body||'Откройте, чтобы посмотреть подробности');
@@ -268,41 +268,16 @@ function showInAppNoticePopup(n){
  const open=document.createElement('button');open.type='button';open.className='small-button primary-soft';open.textContent='Открыть';open.addEventListener('click',()=>{card.remove();activeInAppPopups.delete(key);openMentionNotice(n)});
  const close=document.createElement('button');close.type='button';close.className='small-button';close.textContent='Закрыть';close.addEventListener('click',()=>{card.remove();activeInAppPopups.delete(key)});
  actions.append(open,close);card.append(title,who,body,actions);stack.append(card);
+ while(stack.querySelectorAll('.in-app-notice-popup').length>3){const oldest=stack.querySelector('.in-app-notice-popup');if(!oldest)break;activeInAppPopups.delete(oldest.dataset.noticeKey||'');oldest.remove();}
  setTimeout(()=>{card.remove();activeInAppPopups.delete(key)},12000);
 }
 function showAttentionToast(n){
-  const now=Date.now();
-  for(const [key,time] of shownAttentionToastKeys){if(now-time>15000)shownAttentionToastKeys.delete(key);}
-  const sender=String(n.title||'Сотрудник');
-  const rawMessage=String(n.message||n.body||'Откройте, чтобы посмотреть сообщение');
-  const message=rawMessage.length>180?rawMessage.slice(0,177)+'…':rawMessage;
-  const semanticKey='semantic:'+[`${n.target||''}`,sender,message,String(n.orderId||'')].join('|').toLocaleLowerCase('ru');
-  const eventKey='event:'+String(n.eventId||n.id||semanticKey);
-  if(shownAttentionToastKeys.has(eventKey)||shownAttentionToastKeys.has(semanticKey))return;
-  shownAttentionToastKeys.set(eventKey,now);
-  shownAttentionToastKeys.set(semanticKey,now);
-  while(shownAttentionToastKeys.size>600)shownAttentionToastKeys.delete(shownAttentionToastKeys.keys().next().value);
-  const heading=isMentionNotice(n)||flagOn(n,'isMention')?'Вас упомянули':flagOn(n,'isReply')?'Вам ответили':(n?.target==='chat'||n?.category==='chat')?'Новое сообщение в общем чате':'Новое сообщение';
-  const t=toast(`${heading} · ${sender}: ${message}`,String(n.orderId||''));
-  showInAppNoticePopup(n);
-  t.classList.add('mention-toast');t.setAttribute('role','button');t.tabIndex=0;
-  t.setAttribute('aria-label',`${heading} от ${sender}. Открыть сообщение`);
-  t.addEventListener('click',()=>openMentionNotice(n));
-  t.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openMentionNotice(n)}});
+  if(!n)return;
+  renderStaffPanel();
 }
 function showAttentionToastBatch(items){
- const mentions=items.filter(isMentionNotice).length;
- const replies=items.filter(n=>flagOn(n,'isReply')).length;
- const chats=items.length-mentions-replies;
- const parts=[];
- if(mentions)parts.push(`упоминаний: ${mentions}`);
- if(replies)parts.push(`ответов: ${replies}`);
- if(chats)parts.push(`сообщений: ${chats}`);
- items.forEach(showInAppNoticePopup);
- const t=toast(`Новые уведомления · ${parts.join(', ')}`);
- t.classList.add('mention-toast');t.setAttribute('role','button');t.tabIndex=0;
- t.addEventListener('click',()=>openMentionCenter());
- t.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openMentionCenter()}});
+ if(!items.length)return;
+ renderStaffPanel();
 }
 async function openPendingDirectChat(){
  const threadId=String(pendingDirectChatThreadId||''),peerId=String(pendingDirectChatPeerId||'');
@@ -331,7 +306,6 @@ function showDirectUrgentAlert(message,peer,messageId=''){
  showModal('Срочное сообщение',body,[button('✓ Подтвердить получение','ack-direct-urgent-alert','primary-button')],'ТРЕБУЕТСЯ ВНИМАНИЕ');
  modal.querySelector('[data-action="ack-direct-urgent-alert"]')?.addEventListener('click',async()=>{if(messageId)await acknowledgeDirectUrgentMessage(messageId);closeModal();});
 }
-function openMentionCenter(){const items=unreadMentionNotices();if(!items.length){toast('Новых упоминаний через @ нет.');return}const body='<div class="mention-center-list">'+items.map(n=>'<button type="button" class="mention-center-item" data-mention-notice="'+esc(n.id)+'"><b>'+esc(n.title||'Вас упомянули')+'</b><span>'+esc(n.message||n.body||'Новое упоминание')+'</span><small>'+esc(fmtDateTime(n.createdAt||n.at))+'</small></button>').join('')+'</div>';showModal('Новые упоминания',body,[button('Все уведомления','show-notifications','small-button'),button('Закрыть','close')],'ВАС УПОМЯНУЛИ')}
 function watchChatBadge(){
   chatBadgeUnsubscribe?.();
   chatUnreadReceiptUnsubscribe?.();
@@ -875,7 +849,7 @@ onMessage(messaging,payload=>{
     notify(message,orderId,target,target==='chat'?'chat':'orders');
   }
 });
-function stopCloud(){flushOrdersCache();if(ordersRetryTimer!==null){clearTimeout(ordersRetryTimer);ordersRetryTimer=null}ordersRetryDelay=3000;ordersConnectionNoticeShown=false;ordersListenerBlocked=false;profileUnsubscribe?.();ordersUnsubscribe?.();chatUnsubscribe?.();chatBadgeUnsubscribe?.();chatUnreadReceiptUnsubscribe?.();notificationsUnsubscribe?.();profileUnsubscribe=ordersUnsubscribe=chatUnsubscribe=chatBadgeUnsubscribe=chatUnreadReceiptUnsubscribe=notificationsUnsubscribe=null;chatUnreadReceiptCount=0;chatLegacyUnread=false;chatUnread=false;for(const stop of entryUnsubscribes.values())stop();entryUnsubscribes.clear();for(const stop of defectEntryUnsubscribes.values())stop();defectEntryUnsubscribes.clear();serverCache.clear();state.orders=[];state.notices=[];paintMentionCenter()}
+function stopCloud(){flushOrdersCache();if(ordersRetryTimer!==null){clearTimeout(ordersRetryTimer);ordersRetryTimer=null}ordersRetryDelay=3000;ordersConnectionNoticeShown=false;ordersListenerBlocked=false;profileUnsubscribe?.();ordersUnsubscribe?.();chatUnsubscribe?.();chatBadgeUnsubscribe?.();chatUnreadReceiptUnsubscribe?.();notificationsUnsubscribe?.();profileUnsubscribe=ordersUnsubscribe=chatUnsubscribe=chatBadgeUnsubscribe=chatUnreadReceiptUnsubscribe=notificationsUnsubscribe=null;chatUnreadReceiptCount=0;chatLegacyUnread=false;chatUnread=false;for(const stop of entryUnsubscribes.values())stop();entryUnsubscribes.clear();for(const stop of defectEntryUnsubscribes.values())stop();defectEntryUnsubscribes.clear();serverCache.clear();state.orders=[];state.notices=[]}
 function watchOrderEntries(id){
  if(!id||entryUnsubscribes.has(id))return;
  let firstEntries=true;
@@ -972,11 +946,11 @@ function resumeOrdersListener(){if(signedInUser&&!ordersUnsubscribe&&!ordersList
 window.addEventListener('online',resumeOrdersListener);
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')resumeOrdersListener()});
 
-let presenceUnsubscribe=null,presenceHeartbeat=null,presenceExpiryTimer=null,staffDirectoryRetryTimer=null,directThreadsUnsubscribe=null,currentActivity='В приложении',activityResetTimer=null,staffDirectoryLoadError=false,directThreadsLoadError=false;
+let presenceUnsubscribe=null,presenceHeartbeat=null,presenceExpiryTimer=null,staffDirectoryRetryTimer=null,directThreadsUnsubscribe=null,currentActivity='В приложении',activityResetTimer=null,staffDirectoryLoadError=false,directThreadsLoadError=false,directThreadsErrorCode='';
 const staffPresence=new Map(),staffDirectory=new Map(),directThreads=new Map();
 function stopPresence(){
  directChatUnsubscribe?.();directChatUnsubscribe=null;directChatTarget=null;
- directThreadsUnsubscribe?.();directThreadsUnsubscribe=null;directThreads.clear();directThreadsLoadError=false;
+ directThreadsUnsubscribe?.();directThreadsUnsubscribe=null;directThreads.clear();directThreadsLoadError=false;directThreadsErrorCode='';
  if(presenceHeartbeat!==null){clearInterval(presenceHeartbeat);presenceHeartbeat=null}
  if(presenceExpiryTimer!==null){clearInterval(presenceExpiryTimer);presenceExpiryTimer=null}
  if(activityResetTimer!==null){clearTimeout(activityResetTimer);activityResetTimer=null}
@@ -1019,19 +993,32 @@ function renderStaffPanel(){
   const sender=String(n.authorId);unreadCountsBySender.set(sender,(unreadCountsBySender.get(sender)||0)+1);
  });
  const totalUnreadDirectMessages=[...unreadCountsBySender.values()].reduce((sum,count)=>sum+count,0);
+ const attentionNotices=(Array.isArray(state.notices)?state.notices:[]).filter(n=>!n.read&&!n.directChatThreadId&&(isMentionNotice(n)||flagOn(n,'isReply')));
  const inbox=$('staffInboxList'),inboxCount=$('staffInboxCount');
  const recentThreads=[...directThreads.values()].filter(thread=>Array.isArray(thread.participants)&&thread.participants.includes(signedInUser?.uid)).sort((a,b)=>(asDate(b.lastMessageAt||b.updatedAt)?.getTime()||0)-(asDate(a.lastMessageAt||a.updatedAt)?.getTime()||0)).slice(0,12);
- if(inboxCount)inboxCount.textContent=String(recentThreads.length);
+ const inboxEntries=[...recentThreads.map(thread=>({kind:'thread',thread,at:asDate(thread.lastMessageAt||thread.updatedAt)?.getTime()||0})),...attentionNotices.map(notice=>({kind:'notice',notice,at:asDate(notice.createdAt||notice.at)?.getTime()||0}))].sort((a,b)=>b.at-a.at).slice(0,20);
+ const inboxUnread=totalUnreadDirectMessages+attentionNotices.length;
+ if(inboxCount)inboxCount.textContent=String(inboxEntries.length);
  if(inbox){
-  inbox.innerHTML=recentThreads.length?recentThreads.map(thread=>{
+  inbox.innerHTML=inboxEntries.length?inboxEntries.map(entry=>{
+   if(entry.kind==='notice'){
+    const notice=entry.notice,authorId=String(notice.authorId||''),person=staffDirectory.get(authorId),name=person?.displayName||notice.title||'Сотрудник';
+    const isMention=isMentionNotice(notice),order=notice.orderNumber||notice.orderId;
+    const label=isMention?(order?'Упоминание в заказе № '+order:'Упоминание в общем чате'):'Ответ в '+(notice.target==='chat'?'общем чате':'заказе');
+    const preview=String(notice.message||notice.body||'Новое сообщение').replace(/\s+/g,' ').slice(0,90);
+    const avatar=person?.avatarUrl?'<img src="'+esc(person.avatarUrl)+'" alt="">':'<span>'+esc(String(name).trim().split(/\s+/).slice(0,2).map(x=>x[0]||'').join('').toLocaleUpperCase('ru')||'?')+'</span>';
+    return '<button type="button" class="staff-inbox-item staff-inbox-notice" data-staff-notice-id="'+esc(notice.id)+'"><span class="staff-avatar">'+avatar+'</span><span class="staff-inbox-copy"><span class="staff-inbox-title"><b>'+esc(name)+'</b><time>'+esc(fmtDateTime(notice.createdAt||notice.at))+'</time></span><small><i>'+esc(label)+'</i> · '+esc(preview)+'</small></span><b class="staff-inbox-unread">•</b></button>';
+   }
+   const thread=entry.thread;
    const peerId=thread.participants.find(uid=>uid!==signedInUser?.uid),peer=staffDirectory.get(peerId),peerName=peer?.displayName||'Сотрудник';
    const unreadCount=unreadCountsBySender.get(String(peerId))||0,when=thread.lastMessageAt||thread.updatedAt;
    const preview=String(thread.lastMessage||'Переписка начата').replace(/\s+/g,' ').slice(0,90);
    const avatar=peer?.avatarUrl?'<img src="'+esc(peer.avatarUrl)+'" alt="">':'<span>'+esc(String(peerName).trim().split(/\s+/).slice(0,2).map(x=>x[0]||'').join('').toLocaleUpperCase('ru')||'?')+'</span>';
    const sender=thread.lastSenderId===signedInUser?.uid?'Вы: ':'';
-   return '<button type="button" class="staff-inbox-item" data-staff-inbox-id="'+esc(peerId||'')+'"><span class="staff-avatar">'+avatar+'<i class="'+(staffPresence.get(peerId)?.active&&Date.now()-Number(staffPresence.get(peerId)?.updatedAt||0)<45000?'is-online':'')+'"></i></span><span class="staff-inbox-copy"><span class="staff-inbox-title"><b>'+esc(peerName)+'</b><time>'+esc(when?fmtDateTime(when):'')+'</time></span><small>'+esc(sender+preview)+'</small></span>'+(unreadCount?'<b class="staff-inbox-unread">'+(unreadCount>99?'99+':unreadCount)+'</b>':'')+'</button>';
-  }).join(''):(directThreadsLoadError?'<div class="staff-empty">Не удалось загрузить переписки. Проверьте соединение.</div>':'<div class="staff-empty">Личных переписок пока нет. Напишите сотруднику ниже.</div>');
+   return '<button type="button" class="staff-inbox-item" data-staff-inbox-id="'+esc(peerId||'')+'"><span class="staff-avatar">'+avatar+'<i class="'+(staffPresence.get(peerId)?.active&&Date.now()-Number(staffPresence.get(peerId)?.updatedAt||0)<45000?'is-online':'')+'"></i></span><span class="staff-inbox-copy"><span class="staff-inbox-title"><b>'+esc(peerName)+'</b><time>'+esc(when?fmtDateTime(when):'')+'</time></span><small><i>Личный чат</i> · '+esc(sender+preview)+'</small></span>'+(unreadCount?'<b class="staff-inbox-unread">'+(unreadCount>99?'99+':unreadCount)+'</b>':'')+'</button>';
+  }).join(''):(directThreadsLoadError?'<div class="staff-empty">Не удалось загрузить переписки ('+esc(directThreadsErrorCode||'ошибка')+'). Проверьте доступ Firestore.</div>':'<div class="staff-empty">Входящих пока нет. Начните личный чат ниже.</div>');
   inbox.querySelectorAll('[data-staff-inbox-id]').forEach(button=>button.addEventListener('click',()=>{const person=staffDirectory.get(button.dataset.staffInboxId);if(person)void openDirectChat(person)}));
+  inbox.querySelectorAll('[data-staff-notice-id]').forEach(button=>button.addEventListener('click',()=>{const notice=attentionNotices.find(item=>item.id===button.dataset.staffNoticeId);if(notice){void markNotificationItemsRead([notice]);void openMentionNotice(notice)}}));
  }
  const urgentNotices=(Array.isArray(state.notices)?state.notices:[])
   .filter(n=>!n.read&&flagOn(n,'isUrgent')&&n.directChatThreadId&&n.authorId&&String(n.authorId)!==String(signedInUser?.uid||''))
@@ -1051,8 +1038,8 @@ function renderStaffPanel(){
   }));
  }
  $('staffPresenceCount').textContent=String(onlineCount);
- $('staffPresenceRailCount').textContent=String(totalUnreadDirectMessages);
- if($('staffPresenceBadge'))$('staffPresenceBadge').textContent=String(totalUnreadDirectMessages);
+ $('staffPresenceRailCount').textContent=String(inboxUnread);
+ if($('staffPresenceBadge'))$('staffPresenceBadge').textContent=String(inboxUnread);
  $('staffPresenceSummary').textContent=onlineCount+' в сети · '+items.length+' сотрудников';
  rail.innerHTML=items.length?items.map(person=>{
   const initials=String(person.displayName||'?').trim().split(/\\s+/).slice(0,2).map(x=>x[0]||'').join('').toLocaleUpperCase('ru');
@@ -1120,8 +1107,8 @@ function startPresence(user){
   staffPresence.clear();snap.forEach(d=>staffPresence.set(d.id,d.data()));renderStaffPanel();
  },err=>console.warn('Не удалось загрузить присутствие сотрудников',err));
  directThreadsUnsubscribe=onSnapshot(query(collection(db,'directChats'),where('participants','array-contains',user.uid)),snap=>{
-  directThreads.clear();snap.forEach(d=>directThreads.set(d.id,{id:d.id,...d.data()}));directThreadsLoadError=false;renderStaffPanel();
- },err=>{directThreadsLoadError=true;renderStaffPanel();console.warn('Не удалось загрузить список личных переписок',err)});
+  directThreads.clear();snap.forEach(d=>directThreads.set(d.id,{id:d.id,...d.data()}));directThreadsLoadError=false;directThreadsErrorCode='';renderStaffPanel();
+ },err=>{directThreadsLoadError=true;directThreadsErrorCode=String(err?.code||'').replace(/^.*?\//,'');renderStaffPanel();console.warn('Не удалось загрузить список личных переписок',err)});
  currentActivity='В приложении';void writePresence();
  // Realtime snapshots deliver changes immediately; the heartbeat only refreshes
  // the online lease. 15 seconds is a light write rate for a small staff team.
@@ -1172,6 +1159,14 @@ document.addEventListener('click',event=>{
  const orderCreateOpen=!modal.hidden&&$('modalEyebrow')?.textContent?.trim()==='НОВЫЙ ЗАКАЗ';
  if(orderCreateOpen)return;
  openStaffPanel(false);
+},true);
+document.addEventListener('pointerdown',event=>{
+ if(!isStaffPanelDesktopLayout())return;
+ const panel=$('staffPresencePanel'),toggle=$('staffPresenceToggle');
+ if(!panel?.classList.contains('open')||!(event.target instanceof Node))return;
+ if(panel.contains(event.target)||toggle?.contains(event.target))return;
+ const orderCreateOpen=!modal.hidden&&$('modalEyebrow')?.textContent?.trim()==='НОВЫЙ ЗАКАЗ';
+ if(!orderCreateOpen)openStaffPanel(false);
 },true);
 $('staffProfileClose')?.addEventListener('click',()=>$('staffProfileCard').hidden=true);
 document.addEventListener('keydown',e=>{if(e.key==='Escape')openStaffPanel(false)});
@@ -2136,7 +2131,7 @@ async function loadWarehouseMapAddresses(orderArticles){
     elements.forEach(el=>{el.textContent='📍 Адрес временно недоступен'});
   }
 }
-function openOrder(id){const o=state.orders.find(x=>x.id===id);if(!o)return;if(selectedId&&selectedId!==id){entryUnsubscribes.get(selectedId)?.();entryUnsubscribes.delete(selectedId);}watchOrderEntries(id);if(!modal.hidden&&!orderReturnModalSnapshot&&!/^Заказ №/.test($('modalTitle').textContent)){orderReturnModalSnapshot={title:$('modalTitle').textContent,eyebrow:$('modalEyebrow').textContent,body:$('modalBody').innerHTML,foot:$('modalFoot').innerHTML};}selectedId=id;const isManager=isManagerRole()||canManageUsers,isWarehouse=state.role==='warehouse'||canManageUsers,isDirector=state.role==='director',hasOpenDefect=hasPendingDefect(o),shipmentLocked=isShipmentLocked(o);const locked=shipmentLocked;const lockedButton=(label,action,cls='small-button',reason='Недоступно для вашей роли')=>'<button type="button" class="'+cls+' role-action-locked" disabled aria-disabled="true" title="'+esc(reason)+'"><span class="role-action-ban" aria-hidden="true">🚫</span>'+label+'</button>';const actionButton=(label,action,cls,allowed,reason)=>allowed?button(label,action,cls):lockedButton(label,action,cls,reason);let actions='';actions+='<div class="detail-action-group detail-action-roles">'+actionButton('📋 Менеджер','open-manager-actions','small-button action-category manager-category',isManager&&!locked,'Доступно менеджерам и администраторам')+actionButton('📦 Кладовщик','open-warehouse-actions','small-button action-category warehouse-category',isWarehouse&&!locked,'Доступно кладовщику и администраторам')+'</div>';actions+='<div class="detail-action-group detail-action-edit">'+actionButton('✎ Редактировать','open-edit-menu','small-button neutral-edit-button',!locked,'Редактирование недоступно после отгрузки')+'</div>';const utilityActions=actionButton('＋ Добавить комментарий','add-comment','small-button primary-soft',true,'')+actionButton('↩ Возврат','open-return','small-button primary-soft',isWarehouse&&(!o.returnCancelled||canManageUsers)&&!locked,'Возврат доступен кладовщику и администраторам')+actionButton(o.assemblyInProgress?'✓ Завершить сборку':'▶ Начать сборку','toggle-assembly','small-button '+(o.assemblyInProgress?'good':'primary-soft'),isWarehouse&&o.status!=='Отгружен кладовщиком','Сборка доступна кладовщику и администраторам');actions+='<div class="detail-action-group detail-action-utility">'+utilityActions+'</div>';actions+='<div class="detail-action-group detail-action-bottom">'+actionButton('⚠ Дефект','add-defect','small-button danger',isWarehouse&&!locked&&!hasOpenDefect,'Создавать дефекты может кладовщик или администратор/директор')+actionButton('🗑 Удалить карточку','delete-order','small-button danger',canManageUsers&&!locked&&!hasOpenDefect,'Удалять заказы может только администратор или директор')+'</div>';if(shipmentLocked)actions='<div class="danger-note">🔒 🔒 После отгрузки или статуса «Клиент забрал самовывозом» менеджер, бухгалтер и главный бухгалтер больше не могут редактировать, отменять или удалять заказ.</div>'+actions;else if(hasOpenDefect)actions='<div class="defect-order-lock-note">⚠ По заказу есть нерассмотренный дефект. Сборку и редактирование можно продолжать; смена статуса будет доступна после решения.</div>'+actions;let articlesHtml='<div class="detail-section-title">Артикулы заказа · '+(o.articles||[]).length+'</div>';
+function openOrder(id){const o=state.orders.find(x=>x.id===id);if(!o)return;if(selectedId&&selectedId!==id){entryUnsubscribes.get(selectedId)?.();entryUnsubscribes.delete(selectedId);}watchOrderEntries(id);if(!modal.hidden&&!orderReturnModalSnapshot&&!/^Заказ №/.test($('modalTitle').textContent)){orderReturnModalSnapshot={title:$('modalTitle').textContent,eyebrow:$('modalEyebrow').textContent,body:$('modalBody').innerHTML,foot:$('modalFoot').innerHTML};}selectedId=id;const isManager=isManagerRole()||canManageUsers,isWarehouse=state.role==='warehouse'||canManageUsers,isDirector=state.role==='director',hasOpenDefect=hasPendingDefect(o),shipmentLocked=isShipmentLocked(o);const locked=shipmentLocked;const lockedButton=(label,action,cls='small-button',reason='Недоступно для вашей роли')=>'<button type="button" class="'+cls+' role-action-locked" disabled aria-disabled="true" title="'+esc(reason)+'"><span class="role-action-ban" aria-hidden="true">🚫</span>'+label+'</button>';const actionButton=(label,action,cls,allowed,reason)=>allowed?button(label,action,cls):lockedButton(label,action,cls,reason);let actions='';actions+='<div class="detail-action-group detail-action-roles">'+actionButton('📋 Менеджер','open-manager-actions','small-button action-category manager-category',isManager&&!locked,'Доступно менеджерам и администраторам')+actionButton('📦 Кладовщик','open-warehouse-actions','small-button action-category warehouse-category',isWarehouse&&!locked,'Доступно кладовщику и администраторам')+'</div>';actions+='<div class="detail-action-group detail-action-edit">'+actionButton('✎ Редактировать','open-edit-menu','small-button neutral-edit-button',!locked,'Редактирование недоступно после отгрузки')+'</div>';const utilityActions=actionButton('＋ Добавить комментарий','add-comment','small-button primary-soft',true,'')+actionButton('↩ Возврат','open-return','small-button primary-soft',isWarehouse&&(!o.returnCancelled||canManageUsers)&&!locked,'Возврат доступен кладовщику и администраторам')+actionButton(o.assemblyInProgress?'✓ Завершить сборку':'▶ Начать сборку','toggle-assembly','small-button '+(o.assemblyInProgress?'good':'primary-soft'),isWarehouse&&o.status!=='Отгружен кладовщиком','Сборка доступна кладовщику и администраторам');actions+='<div class="detail-action-group detail-action-utility">'+utilityActions+'</div>';if(!hasOpenDefect)actions+='<div class="detail-action-group detail-action-bottom">'+actionButton('⚠ Дефект','add-defect','small-button danger',isWarehouse&&!locked,'Создавать дефекты может кладовщик или администратор/директор')+actionButton('🗑 Удалить карточку','delete-order','small-button danger',canManageUsers&&!locked,'Удалять заказы может только администратор или директор')+'</div>';if(shipmentLocked)actions='<div class="danger-note">🔒 🔒 После отгрузки или статуса «Клиент забрал самовывозом» менеджер, бухгалтер и главный бухгалтер больше не могут редактировать, отменять или удалять заказ.</div>'+actions;else if(hasOpenDefect)actions='<div class="defect-order-lock-note">⚠ По заказу есть нерассмотренный дефект. Сборку и редактирование можно продолжать; смена статуса будет доступна после решения.</div>'+actions;let articlesHtml='<div class="detail-section-title">Артикулы заказа · '+(o.articles||[]).length+'</div>';
 if(hasOpenDefect){articlesHtml+='<div class="defect-click-hint"><span class="defect-click-hint-icon">⚠</span><span><b>ТРЕБУЕТСЯ РЕШЕНИЕ ПО ДЕФЕКТУ</b><small>Нажмите на красную позицию ниже, чтобы открыть фото и вынести решение.</small></span><span class="defect-click-arrow">↓</span></div>';}
 if((o.articles||[]).length){
   articlesHtml+='<div class="order-articles-list">'+o.articles.map((x,i)=>{
@@ -2146,7 +2141,7 @@ if((o.articles||[]).length){
       :(state.role==='warehouse'||canManageUsers)&&!shipmentLocked
         ?button(collected?'✓ Собрано':'☐ Собрано','toggle-collected:'+i,'small-button '+(collected?'good':'primary-soft'))
         :'<button type="button" class="small-button role-action-locked" disabled aria-disabled="true" title="Отмечать сборку может кладовщик или администратор"><span class="role-action-ban" aria-hidden="true">🚫</span>'+(collected?'✓ Собрано':'☐ Собрано')+'</button>';
-    const pendingItemDefect=itemDefects.some(e=>!e.decision);return '<div class="order-article-view '+(collected?'article-collected':'')+(removedByDefect?' article-removed':'')+(pendingItemDefect?' article-defect-pending':'')+(pendingItemDefect?'" data-defect-article="'+i:'')+'"><span class="article-main"><span style="display:flex;align-items:center;flex-wrap:wrap;gap:7px"><b>'+esc(x.article)+'</b><small class="warehouse-map-address" data-map-location-article="'+esc(String(x.article||''))+'" style="display:inline;font-size:12px;color:var(--muted,#89919d)">📍 Адрес: загружается…</small></span>'+(itemDefects.length?'<span class="defect-article-badge">ДЕФЕКТ</span>':'')+(removedByDefect?'<span class="removed-article-badge">УДАЛЕНА ИЗ ЗАКАЗА</span>':'')+'<small>'+(removedByDefect?'Не отгружается':collected?'Собрано':'Не собрано')+'</small></span><span style="display:flex;align-items:center;gap:8px"><span>'+(Number(x.quantity)||1)+' шт.</span>'+collectedControl+'<button type="button" class="small-button primary-soft" data-action="show-on-map" data-map-article="'+esc(String(x.article||''))+'">🗺️ На карте</button></span></div>';
+    const pendingItemDefect=itemDefects.some(e=>!e.decision);return '<div class="order-article-view '+(collected?'article-collected':'')+(removedByDefect?' article-removed':'')+(pendingItemDefect?' article-defect-pending':'')+(pendingItemDefect?'" data-defect-article="'+i:'')+'"><span class="article-main"><span style="display:flex;align-items:center;flex-wrap:wrap;gap:7px"><b>'+esc(x.article)+'</b><small class="warehouse-map-address" data-map-location-article="'+esc(String(x.article||''))+'" style="display:inline;font-size:12px;color:var(--muted,#89919d)">📍 Адрес: загружается…</small></span>'+(itemDefects.length?'<span class="defect-article-badge">'+(pendingItemDefect?(isManager||canManageUsers?'Рассмотреть':'Ожидает решения'):'Дефект')+'</span>':'')+(removedByDefect?'<span class="removed-article-badge">УДАЛЕНА ИЗ ЗАКАЗА</span>':'')+'<small>'+(removedByDefect?'Не отгружается':collected?'Собрано':'Не собрано')+'</small></span><span style="display:flex;align-items:center;gap:8px"><span>'+(Number(x.quantity)||1)+' шт.</span>'+collectedControl+'<button type="button" class="small-button primary-soft" data-action="show-on-map" data-map-article="'+esc(String(x.article||''))+'">🗺️ На карте</button></span></div>';
   }).join('')+'</div>';
 }else{
   articlesHtml+='<div class="danger-note">Артикулы не указаны.</div>';
@@ -4159,7 +4154,6 @@ document.addEventListener('change',e=>{
 document.addEventListener('click',e=>{
   const oc=e.target.closest('[data-open-order-comment]');if(oc){e.preventDefault();openOrder(oc.dataset.openOrderComment);return;}
   const mi=e.target.closest('[data-mention-notice]');if(mi){const n=state.notices.find(x=>x.id===mi.dataset.mentionNotice);if(n){markNotificationItemsRead([n]);openMentionNotice(n)}return;}
-  if(e.target.closest('#mentionCenterButton')){openMentionCenter();return;}
   if(e.target.closest('[data-action="show-notifications"]')){showNotifications();return;}
 });
 

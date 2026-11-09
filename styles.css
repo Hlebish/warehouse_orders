@@ -8615,3 +8615,65 @@ body:has(.staff-presence-panel.open) .main-area{
  .staff-inbox-list{max-height:30dvh}
 }
 @media(prefers-reduced-motion:reduce){.staff-presence-panel,.staff-presence-panel .staff-presence-content,.staff-presence-panel .staff-presence-rail{transition:none!important}}
+
+/* Compact notification stack: general notices and defect reminders share the lower-right corner. */
+@media(min-width:721px){
+ #toastStack,.toast-stack{
+  position:fixed!important;top:auto!important;right:16px!important;bottom:16px!important;left:auto!important;
+  transform:none!important;display:flex!important;flex-direction:column!important;align-items:stretch!important;
+  gap:7px!important;width:min(320px,calc(100vw - 32px))!important;max-width:min(320px,calc(100vw - 32px))!important;
+  max-height:min(42dvh,360px)!important;overflow:auto!important;justify-items:stretch!important;
+ }
+}
+#toastStack .toast,.toast-stack .toast{
+ width:100%!important;min-width:0!important;max-width:100%!important;box-sizing:border-box!important;
+ padding:9px 11px!important;border-radius:10px!important;font-size:10px!important;line-height:1.35!important;
+ white-space:normal!important;overflow-wrap:anywhere!important;box-shadow:0 7px 22px #0006!important;
+}
+.in-app-notice-popup{
+ width:100%!important;max-width:100%!important;max-height:132px!important;overflow:auto!important;
+ padding:9px 11px!important;border-radius:10px!important;border-left-width:3px!important;
+}
+.in-app-notice-popup>b{font-size:11px!important;margin-bottom:3px!important}
+.in-app-notice-popup>strong{font-size:10px!important}
+.in-app-notice-popup>p{font-size:10px!important;line-height:1.3!important;margin:4px 0 7px!important}
+.in-app-notice-actions{gap:5px!important}
+.in-app-notice-actions .small-button{min-height:25px!important;padding:4px 8px!important;font-size:9px!important}
+#toastStack .toast.defect-toast,.toast-stack .toast.defect-toast{
+ border:1px solid #dc5961!important;outline:0!important;border-radius:9px!important;
+ padding:9px 11px!important;font-size:10px!important;box-shadow:0 6px 18px #b4231844!important;
+ animation:none!important;
+}
+@media(max-width:720px){
+ #toastStack,.toast-stack{
+  top:auto!important;right:10px!important;bottom:calc(10px + env(safe-area-inset-bottom,0px))!important;left:auto!important;
+  width:min(320px,calc(100vw - 20px))!important;max-width:calc(100vw - 20px)!important;
+  max-height:min(36dvh,260px)!important;overflow:auto!important;
+ }
+ .in-app-notice-popup{max-height:120px!important}
+}
+
+/* A defect is explained once and resolved from the article or its decision dialog. */
+.defect-click-hint{display:none!important}
+.defect-order-lock-note{margin:7px 0!important;padding:7px 10px!important;border-radius:8px!important;font-size:10px!important;line-height:1.35!important}
+.order-article-view.article-defect-pending{
+ min-height:56px!important;animation:none!important;transform:none!important;cursor:pointer!important;
+ background:#2b1b1d!important;border:1px solid #9b4249!important;
+ box-shadow:inset 3px 0 #d45961!important;color:#f1e7e8!important;
+}
+.order-article-view.article-defect-pending:hover{background:#382124!important;transform:none!important}
+.order-article-view.article-defect-pending .defect-article-badge{
+ background:#52262a!important;color:#ffced1!important;border:1px solid #874047!important;
+ box-shadow:none!important;font-weight:700!important;
+}
+.defect-comment-box{margin-top:7px!important;padding:9px!important;border-radius:9px!important}
+.defect-comment-heading>b{font-size:10px!important}
+.defect-comment-status{font-size:9px!important;padding:3px 6px!important}
+.defect-comment-article,.defect-comment-description{font-size:10px!important;line-height:1.4!important;margin-top:5px!important}
+.defect-comment-photos{grid-template-columns:repeat(auto-fill,minmax(76px,96px))!important;gap:6px!important;margin-top:7px!important}
+.defect-comment-photos img{height:74px!important}
+.defect-comment-photos .small-button{display:none!important}
+.defect-comment-no-photos,.defect-comment-hint{font-size:9px!important;margin-top:5px!important}
+.defect-comment-actions{display:none!important}
+.staff-inbox-item.staff-inbox-notice .staff-inbox-copy small i,
+.staff-inbox-item .staff-inbox-copy small i{font-style:normal;color:#8edbb0;font-weight:700}

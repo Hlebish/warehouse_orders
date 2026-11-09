@@ -153,7 +153,7 @@ async function createNotificationHistory(data, eventId) {
     if (data.buybackItemId && !canAccessBuybackProfile(profile)) continue;
     if (authorId && user.id === authorId && !(data.forceAll === true && recipientUserId === user.id)) continue;
     const settings = profile.notificationSettings || {};
-    if (!notificationCategoryEnabled(settings, category) && !data.buybackItemId && data.forceAll !== true) continue;
+    if (!notificationCategoryEnabled(settings, category) && !data.buybackItemId && data.forceAll !== true && !data.directChatThreadId) continue;
 
     const notificationRef = user.ref.collection('notifications').doc(eventId);
     batch.set(notificationRef, {
@@ -190,7 +190,7 @@ async function createNotificationHistory(data, eventId) {
   return count;
 }
 
-async function collectTokens(category='orders', recipientUserId='', authorId='', forceAll=false, buybackOnly=false) {
+async function collectTokens(category='orders', recipientUserId='', authorId='', forceAll=false, buybackOnly=false, directChat=false) {
   // Direct notifications should never enumerate every employee's devices.
   const users = recipientUserId
     ? await db.collection('users').doc(recipientUserId).get().then(user =>
@@ -201,7 +201,7 @@ async function collectTokens(category='orders', recipientUserId='', authorId='',
     const profile = user.data() || {};
     if (buybackOnly && !canAccessBuybackProfile(profile)) return false;
     if (authorId && user.id === authorId && !(forceAll && recipientUserId === user.id)) return false;
-    return forceAll || buybackOnly || notificationCategoryEnabled(profile.notificationSettings || {}, category);
+    return forceAll || buybackOnly || directChat || notificationCategoryEnabled(profile.notificationSettings || {}, category);
   });
 
   // Only read push-token subcollections for users who can receive this event.
@@ -450,6 +450,36 @@ exports.getStaffDirectory = onCall(async request => {
   return { ok: true, count: staff.length, staff };
 });
 
+// Read only the current employee's private conversation summaries. The client
+// falls back to this endpoint if Firestore cannot authorize its inbox query.
+exports.getDirectChatThreads = onCall(async request => {
+  const uid = request.auth?.uid;
+  if (!uid) throw new HttpsError('unauthenticated', 'Требуется авторизация.');
+  const profile = await db.collection('users').doc(uid).get();
+  const allowedRoles = ['warehouse', 'manager', 'chief_accountant', 'accountant', 'director'];
+  if (!profile.exists || profile.data()?.active !== true || !allowedRoles.includes(profile.data()?.role)) {
+    throw new HttpsError('permission-denied', 'Активный профиль сотрудника не найден.');
+  }
+  const snapshot = await db.collection('directChats')
+    .where('participants', 'array-contains', uid)
+    .limit(100)
+    .get();
+  const millis = value => value?.toMillis?.() || (Number.isFinite(value) ? value : null);
+  return {
+    threads: snapshot.docs.map(item => {
+      const data = item.data() || {};
+      return {
+        id: item.id,
+        participants: Array.isArray(data.participants) ? data.participants.filter(value => typeof value === 'string') : [],
+        lastMessage: String(data.lastMessage || '').slice(0, 180),
+        lastSenderId: String(data.lastSenderId || ''),
+        lastMessageAt: millis(data.lastMessageAt),
+        updatedAt: millis(data.updatedAt)
+      };
+    })
+  };
+});
+
 // All client notification requests pass through this callable. Admin SDK writes
 // avoid brittle client-side pushQueue rule evaluation while preserving strict
 // authentication, recipient, category and administrator checks.
@@ -602,7 +632,7 @@ exports.sendWarehousePush = onDocumentCreated({ document: 'pushQueue/{eventId}',
       : (orderId ? `${siteUrl}?order=${encodeURIComponent(orderId)}` : siteUrl));
 
   try {
-    const tokenDocs = await collectTokens(category, recipientUserId, String(data.authorId || ''), data.forceAll === true, Boolean(data.buybackItemId));
+    const tokenDocs = await collectTokens(category, recipientUserId, String(data.authorId || ''), data.forceAll === true, Boolean(data.buybackItemId), Boolean(directChatThreadId));
 
     if (!tokenDocs.length) {
       await historyPromise;

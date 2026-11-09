@@ -105,6 +105,7 @@ body{background:#f1f5f2;color:#182820}
   stroke-linecap: round;
   stroke-linejoin: round;
 }
+
 /* AMP mint-green visual redesign */
 :root{--amp-green:#10cf69;--amp-green-dark:#08b95a;--amp-mint:#e9f8ef;--amp-ink:#17362a;--amp-line:#dcebe2}
 html{background:#e1f2e7}
@@ -8565,3 +8566,52 @@ body:has(.staff-presence-panel.open) .main-area{
  }
  .staff-presence-panel.open .staff-presence-rail{display:none!important}
 }
+
+/* Staff drawer: keep the workspace and drawer contents stable while opening. */
+.staff-presence-panel{
+ box-sizing:border-box!important;top:60px!important;bottom:0!important;height:auto!important;
+ width:64px!important;max-height:calc(100dvh - 60px)!important;overflow:hidden!important;
+ border-radius:14px 0 0 0!important;contain:layout paint!important;
+}
+.staff-presence-panel.open{
+ width:min(380px,calc(100vw - 20px))!important;max-width:calc(100vw - 20px)!important;
+ height:auto!important;max-height:calc(100dvh - 60px)!important;padding:0!important;
+ overflow:hidden!important;border-radius:16px 0 0 0!important;
+}
+.staff-presence-panel .staff-presence-content{
+ position:absolute!important;inset:0!important;display:flex!important;flex-direction:column!important;
+ width:100%!important;height:100%!important;min-height:0!important;box-sizing:border-box!important;
+ padding:18px 16px 14px!important;overflow-y:auto!important;overflow-x:hidden!important;
+ opacity:0;visibility:hidden;transform:none!important;
+ transition:opacity .14s ease,visibility 0s linear .14s!important;
+}
+.staff-presence-panel.open .staff-presence-content{
+ opacity:1;visibility:visible;transform:none!important;
+ transition:opacity .16s ease .12s,visibility 0s!important;
+}
+.staff-presence-panel .staff-presence-rail{transition:opacity .1s ease!important}
+.staff-presence-panel.open .staff-presence-rail{display:none!important}
+.staff-presence-panel.open .staff-panel-header{position:sticky;top:-18px;flex:0 0 auto;margin:-18px -16px 4px;padding:18px 16px 10px;background:#151a20;z-index:4}
+.staff-presence-panel.open .staff-presence-list{max-height:none!important;overflow:visible!important}
+.staff-inbox-section{margin:0 0 18px;flex:0 0 auto}
+.staff-inbox-list{display:grid;gap:5px;max-height:min(34vh,270px);overflow-y:auto;overscroll-behavior:contain;padding:2px 2px 4px}
+.staff-inbox-item{display:flex;align-items:center;gap:10px;width:100%;min-width:0;padding:9px;border:1px solid #2b333c;border-radius:12px;background:#1b2128;color:#e8edf0;text-align:left;cursor:pointer;transition:background .15s,border-color .15s}
+.staff-inbox-item:hover,.staff-inbox-item:focus-visible{background:#242c35;border-color:#465565;outline:none}
+.staff-inbox-item .staff-avatar{position:relative;flex:0 0 38px;width:38px;height:38px}
+.staff-inbox-copy{display:grid;gap:4px;flex:1;min-width:0}
+.staff-inbox-title{display:flex;align-items:center;justify-content:space-between;gap:8px;min-width:0}
+.staff-inbox-title b,.staff-inbox-copy small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.staff-inbox-title b{font-size:12px;color:#f0f3f6}
+.staff-inbox-title time{flex:0 0 auto;font-size:9px;color:#8b98a6}
+.staff-inbox-copy small{font-size:10px;color:#a8b3bf}
+.staff-inbox-unread{display:grid;place-items:center;flex:0 0 auto;min-width:20px;height:20px;padding:0 5px;border-radius:99px;background:#d5a928;color:#211b09;font-size:10px}
+.staff-inbox-section+.staff-online-heading{margin-top:2px}
+.staff-presence-content .staff-empty{padding:12px 6px;color:#98a5b2;font-size:11px;line-height:1.45}
+@media(max-width:720px){
+ .staff-presence-panel{top:0!important;bottom:0!important;max-height:100dvh!important;border-radius:0!important}
+ .staff-presence-panel.open{width:min(380px,100vw)!important;max-width:100vw!important;max-height:100dvh!important;border-radius:0!important}
+ .staff-presence-panel .staff-presence-content{padding:calc(16px + env(safe-area-inset-top)) 14px calc(14px + env(safe-area-inset-bottom))!important}
+ .staff-presence-panel.open .staff-panel-header{top:calc(-16px - env(safe-area-inset-top));margin:calc(-16px - env(safe-area-inset-top)) -14px 4px;padding:calc(16px + env(safe-area-inset-top)) 14px 10px}
+ .staff-inbox-list{max-height:30dvh}
+}
+@media(prefers-reduced-motion:reduce){.staff-presence-panel,.staff-presence-panel .staff-presence-content,.staff-presence-panel .staff-presence-rail{transition:none!important}}

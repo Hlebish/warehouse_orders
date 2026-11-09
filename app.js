@@ -972,10 +972,11 @@ function resumeOrdersListener(){if(signedInUser&&!ordersUnsubscribe&&!ordersList
 window.addEventListener('online',resumeOrdersListener);
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')resumeOrdersListener()});
 
-let presenceUnsubscribe=null,presenceHeartbeat=null,presenceExpiryTimer=null,staffDirectoryRetryTimer=null,currentActivity='В приложении',activityResetTimer=null,staffDirectoryLoadError=false;
-const staffPresence=new Map(),staffDirectory=new Map();
+let presenceUnsubscribe=null,presenceHeartbeat=null,presenceExpiryTimer=null,staffDirectoryRetryTimer=null,directThreadsUnsubscribe=null,currentActivity='В приложении',activityResetTimer=null,staffDirectoryLoadError=false,directThreadsLoadError=false;
+const staffPresence=new Map(),staffDirectory=new Map(),directThreads=new Map();
 function stopPresence(){
  directChatUnsubscribe?.();directChatUnsubscribe=null;directChatTarget=null;
+ directThreadsUnsubscribe?.();directThreadsUnsubscribe=null;directThreads.clear();directThreadsLoadError=false;
  if(presenceHeartbeat!==null){clearInterval(presenceHeartbeat);presenceHeartbeat=null}
  if(presenceExpiryTimer!==null){clearInterval(presenceExpiryTimer);presenceExpiryTimer=null}
  if(activityResetTimer!==null){clearTimeout(activityResetTimer);activityResetTimer=null}
@@ -1018,6 +1019,20 @@ function renderStaffPanel(){
   const sender=String(n.authorId);unreadCountsBySender.set(sender,(unreadCountsBySender.get(sender)||0)+1);
  });
  const totalUnreadDirectMessages=[...unreadCountsBySender.values()].reduce((sum,count)=>sum+count,0);
+ const inbox=$('staffInboxList'),inboxCount=$('staffInboxCount');
+ const recentThreads=[...directThreads.values()].filter(thread=>Array.isArray(thread.participants)&&thread.participants.includes(signedInUser?.uid)).sort((a,b)=>(asDate(b.lastMessageAt||b.updatedAt)?.getTime()||0)-(asDate(a.lastMessageAt||a.updatedAt)?.getTime()||0)).slice(0,12);
+ if(inboxCount)inboxCount.textContent=String(recentThreads.length);
+ if(inbox){
+  inbox.innerHTML=recentThreads.length?recentThreads.map(thread=>{
+   const peerId=thread.participants.find(uid=>uid!==signedInUser?.uid),peer=staffDirectory.get(peerId),peerName=peer?.displayName||'Сотрудник';
+   const unreadCount=unreadCountsBySender.get(String(peerId))||0,when=thread.lastMessageAt||thread.updatedAt;
+   const preview=String(thread.lastMessage||'Переписка начата').replace(/\s+/g,' ').slice(0,90);
+   const avatar=peer?.avatarUrl?'<img src="'+esc(peer.avatarUrl)+'" alt="">':'<span>'+esc(String(peerName).trim().split(/\s+/).slice(0,2).map(x=>x[0]||'').join('').toLocaleUpperCase('ru')||'?')+'</span>';
+   const sender=thread.lastSenderId===signedInUser?.uid?'Вы: ':'';
+   return '<button type="button" class="staff-inbox-item" data-staff-inbox-id="'+esc(peerId||'')+'"><span class="staff-avatar">'+avatar+'<i class="'+(staffPresence.get(peerId)?.active&&Date.now()-Number(staffPresence.get(peerId)?.updatedAt||0)<45000?'is-online':'')+'"></i></span><span class="staff-inbox-copy"><span class="staff-inbox-title"><b>'+esc(peerName)+'</b><time>'+esc(when?fmtDateTime(when):'')+'</time></span><small>'+esc(sender+preview)+'</small></span>'+(unreadCount?'<b class="staff-inbox-unread">'+(unreadCount>99?'99+':unreadCount)+'</b>':'')+'</button>';
+  }).join(''):(directThreadsLoadError?'<div class="staff-empty">Не удалось загрузить переписки. Проверьте соединение.</div>':'<div class="staff-empty">Личных переписок пока нет. Напишите сотруднику ниже.</div>');
+  inbox.querySelectorAll('[data-staff-inbox-id]').forEach(button=>button.addEventListener('click',()=>{const person=staffDirectory.get(button.dataset.staffInboxId);if(person)void openDirectChat(person)}));
+ }
  const urgentNotices=(Array.isArray(state.notices)?state.notices:[])
   .filter(n=>!n.read&&flagOn(n,'isUrgent')&&n.directChatThreadId&&n.authorId&&String(n.authorId)!==String(signedInUser?.uid||''))
   .sort((a,b)=>(asDate(b.createdAt||b.at)?.getTime()||0)-(asDate(a.createdAt||a.at)?.getTime()||0));
@@ -1104,6 +1119,9 @@ function startPresence(user){
  presenceUnsubscribe=onSnapshot(collection(db,'presence'),snap=>{
   staffPresence.clear();snap.forEach(d=>staffPresence.set(d.id,d.data()));renderStaffPanel();
  },err=>console.warn('Не удалось загрузить присутствие сотрудников',err));
+ directThreadsUnsubscribe=onSnapshot(query(collection(db,'directChats'),where('participants','array-contains',user.uid)),snap=>{
+  directThreads.clear();snap.forEach(d=>directThreads.set(d.id,{id:d.id,...d.data()}));directThreadsLoadError=false;renderStaffPanel();
+ },err=>{directThreadsLoadError=true;renderStaffPanel();console.warn('Не удалось загрузить список личных переписок',err)});
  currentActivity='В приложении';void writePresence();
  // Realtime snapshots deliver changes immediately; the heartbeat only refreshes
  // the online lease. 15 seconds is a light write rate for a small staff team.

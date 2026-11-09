@@ -1143,6 +1143,18 @@ $('staffPresenceBackdrop')?.addEventListener('click',()=>{
  if(orderCreateOpen)return;
  openStaffPanel(false);
 });
+// Use the actual pointer target as the source of truth; this also works if the scrim
+// is visually suppressed by an older desktop CSS rule.
+document.addEventListener('click',event=>{
+ const panel=$('staffPresencePanel'),toggle=$('staffPresenceToggle');
+ if(!panel?.classList.contains('open'))return;
+ const target=event.target;
+ if(!(target instanceof Node))return;
+ if(panel.contains(target)||toggle?.contains(target))return;
+ const orderCreateOpen=!modal.hidden&&$('modalEyebrow')?.textContent?.trim()==='НОВЫЙ ЗАКАЗ';
+ if(orderCreateOpen)return;
+ openStaffPanel(false);
+},true);
 $('staffProfileClose')?.addEventListener('click',()=>$('staffProfileCard').hidden=true);
 document.addEventListener('keydown',e=>{if(e.key==='Escape')openStaffPanel(false)});
 // Keep the staff dock collapsed by default on desktop and mobile; it never changes workspace width.

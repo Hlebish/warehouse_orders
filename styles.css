@@ -8516,3 +8516,52 @@ body:has(.staff-presence-panel.open) .main-area{
  .staff-presence-panel.open .staff-presence-rail{display:none!important}
  .staff-presence-backdrop{z-index:1190!important}
 }
+
+
+/* Desktop staff rail correction: stay below the topbar, show every colleague, and scroll only if needed. */
+@media(min-width:721px){
+ .staff-presence-panel{
+  top:60px!important;
+  bottom:0!important;
+  height:auto!important;
+  padding:10px 6px 12px!important;
+  overflow:hidden!important;
+ }
+ .staff-presence-panel.open{
+  top:60px!important;
+  bottom:0!important;
+  padding:18px 14px!important;
+  overflow-x:hidden!important;
+  overflow-y:auto!important;
+ }
+ .staff-presence-panel:not(.open) .staff-presence-rail{
+  display:flex!important;
+  flex:1 1 auto!important;
+  height:100%!important;
+  min-height:0!important;
+  overflow:hidden!important;
+ }
+ .staff-presence-panel:not(.open) .staff-rail-avatars{
+  display:flex!important;
+  flex:1 1 auto!important;
+  min-height:0!important;
+  height:auto!important;
+  max-height:none!important;
+  overflow-y:auto!important;
+  overflow-x:hidden!important;
+  align-items:center!important;
+  justify-content:flex-start!important;
+  gap:6px!important;
+  padding:2px 0 8px!important;
+ }
+ .staff-presence-panel:not(.open) .staff-rail-avatar{
+  display:block!important;
+  flex:0 0 36px!important;
+  width:36px!important;
+  height:36px!important;
+ }
+ .staff-presence-panel:not(.open) .staff-rail-avatar .staff-avatar{
+  width:32px!important;height:32px!important;flex-basis:32px!important;
+ }
+ .staff-presence-panel.open .staff-presence-rail{display:none!important}
+}

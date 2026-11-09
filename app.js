@@ -184,7 +184,8 @@ function watchNotifications(){
   };
   const q=query(collection(db,'users',signedInUser.uid,'notifications'),orderBy('createdAt','desc'),limit(100));
   notificationsUnsubscribe=onSnapshot(q,snap=>{
-    const next=snap.docs.map(d=>({id:d.id,...d.data(),at:d.data().createdAt||d.data().at||isoNow()}));
+    const next=snap.docs.map(d=>({id:d.id,...d.data(),at:d.data().createdAt||d.data().at||isoNow()}))
+      .filter(n=>!n.authorId||String(n.authorId)!==String(signedInUser.uid));
     if(!initialSnapshot){
       const freshNotices=next.filter(n=>!knownNoticeIds.has(n.id)&&!n.read&&isFreshLiveNotice(n));
       const attentionNotices=freshNotices.filter(shouldShowAttentionToast);
@@ -252,12 +253,14 @@ function playNotificationSound(){
 }
 const activeInAppPopups=new Set();
 function showInAppNoticePopup(n){
- if(!n||!window.matchMedia?.('(min-width: 900px)').matches)return;
- if(isInboxNotice(n))return;
+ if(!n)return;
+ const isDirectChat=!!n.directChatThreadId;
+ if(!isDirectChat&&!window.matchMedia?.('(min-width: 900px)').matches)return;
+ if(isInboxNotice(n)&&!isDirectChat)return;
  const key=String(n.eventId||n.id||'');if(!key||activeInAppPopups.has(key))return;
  activeInAppPopups.add(key);
  const stack=$('toastStack');if(!stack)return;
- const card=document.createElement('article');card.className='in-app-notice-popup';
+ const card=document.createElement('article');card.className='in-app-notice-popup'+(isDirectChat?' direct-chat-notice-popup':'');
  card.dataset.noticeKey=key;
  const heading=n.directChatThreadId?'Новое личное сообщение':n.isUrgent?'🚨 Срочное сообщение':isMentionNotice(n)?'Вас упомянули':n.isReply?'Вам ответили':n.target==='chat'?'Новое сообщение в общем чате':'Новое уведомление';
  const sender=String(n.title||'Заказы · Склад');
@@ -274,10 +277,12 @@ function showInAppNoticePopup(n){
 }
 function showAttentionToast(n){
   if(!n)return;
+  if(n.directChatThreadId){showInAppNoticePopup(n);renderStaffPanel();return;}
   renderStaffPanel();
 }
 function showAttentionToastBatch(items){
  if(!items.length)return;
+ items.filter(n=>n?.directChatThreadId).forEach(showInAppNoticePopup);
  renderStaffPanel();
 }
 async function openPendingDirectChat(){
@@ -824,6 +829,7 @@ function shouldPlayPushSound(n,now=Date.now()){
 }
 onMessage(messaging,payload=>{
   const n=payload.data||payload.notification||{};
+  if(n.authorId&&String(n.authorId)===String(signedInUser?.uid||''))return;
   const orderId=String(n.orderId||'');
   const target=String(n.target||'site');
   if(n.title){
@@ -1000,7 +1006,7 @@ function renderStaffPanel(){
  const recentThreads=[...directThreads.values()].filter(thread=>Array.isArray(thread.participants)&&thread.participants.includes(signedInUser?.uid)).sort((a,b)=>(asDate(b.lastMessageAt||b.updatedAt)?.getTime()||0)-(asDate(a.lastMessageAt||a.updatedAt)?.getTime()||0)).slice(0,12);
  const inboxEntries=[...recentThreads.map(thread=>({kind:'thread',thread,at:asDate(thread.lastMessageAt||thread.updatedAt)?.getTime()||0})),...attentionNotices.map(notice=>({kind:'notice',notice,at:asDate(notice.createdAt||notice.at)?.getTime()||0}))].sort((a,b)=>b.at-a.at).slice(0,20);
  const inboxUnread=totalUnreadDirectMessages+attentionNotices.length;
- if(inboxCount)inboxCount.textContent=String(inboxEntries.length);
+ if(inboxCount)inboxCount.textContent=String(inboxUnread);
  if(inbox){
   inbox.innerHTML=inboxEntries.length?inboxEntries.map(entry=>{
    if(entry.kind==='notice'){
@@ -3121,7 +3127,10 @@ async function openDirectChat(person){
  const threadRef=doc(db,'directChats',threadId);
  const participants=[signedInUser.uid,person.uid].sort();
  try{
-  await setDoc(threadRef,{participants,createdAt:serverTimestamp(),updatedAt:serverTimestamp(),lastMessage:'',lastMessageAt:serverTimestamp(),lastSenderId:signedInUser.uid},{merge:true});
+  await runTransaction(db,async transaction=>{
+   const threadSnapshot=await transaction.get(threadRef);
+   if(!threadSnapshot.exists())transaction.set(threadRef,{participants,createdAt:serverTimestamp(),updatedAt:serverTimestamp(),lastMessage:'',lastMessageAt:serverTimestamp(),lastSenderId:signedInUser.uid});
+  });
   showModal('Личный чат','<div class="direct-chat-shell"><div class="direct-chat-person"><span class="staff-avatar">'+esc(String(person.displayName||'С').trim().split(/\\s+/).slice(0,2).map(x=>x[0]||'').join('').toLocaleUpperCase('ru'))+'</span><div><b>'+esc(person.displayName||'Сотрудник')+'</b><small>'+esc(person.roleLabel||'Сотрудник')+'</small></div></div><div class="direct-chat-messages" id="directChatMessages"><div class="chat-empty">Загрузка переписки…</div></div><form class="direct-chat-form" id="directChatForm"><textarea id="directChatInput" maxlength="1000" rows="2" placeholder="Напишите личное сообщение…" autocomplete="off"></textarea><button type="submit" class="primary-button direct-chat-send" aria-label="Отправить сообщение" title="Отправить сообщение"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22 2 11 13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="m22 2-7 20-4-9-9-4Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg><span>Отправить</span></button><label class="direct-chat-urgent-toggle"><input type="checkbox" id="directChatUrgent"><span>🚨 Срочное обращение</span><small>Получателю придёт приоритетное уведомление, потребуется подтвердить получение</small></label></form></div>',[button('Закрыть','close')],'ЛИЧНАЯ ПЕРЕПИСКА');
   const messagesQuery=query(collection(db,'directChats',threadId,'messages'),orderBy('createdAt','desc'),limit(100));
   directChatUnsubscribe=onSnapshot(messagesQuery,snap=>{
@@ -3151,7 +3160,7 @@ async function openDirectChat(person){
     directStage='запись сообщения в directChats/'+threadId+'/messages';
     await setDoc(messageRef,{text:textValue.slice(0,1000),authorId:signedInUser.uid,authorName:profileName,createdAt:serverTimestamp(),mentionUserIds:[person.uid],notificationRecipientIds:[person.uid],isUrgent:urgent,urgentAckBy:[]});
     directStage='обновление последнего сообщения в directChats/'+threadId;
-    await setDoc(threadRef,{participants,updatedAt:serverTimestamp(),lastMessage:textValue.slice(0,180),lastMessageAt:serverTimestamp(),lastSenderId:signedInUser.uid},{merge:true});
+    await updateDoc(threadRef,{updatedAt:serverTimestamp(),lastMessage:textValue.slice(0,180),lastMessageAt:serverTimestamp(),lastSenderId:signedInUser.uid});
     directStage='постановка push-уведомления';
     await queuePush(urgent?'🚨 СРОЧНОЕ ЛИЧНОЕ СООБЩЕНИЕ · '+profileName:profileName,textValue.slice(0,300),signedInUser.uid,'','chat','replies',person.uid,{isMention:true,directChatThreadId:threadId,isUrgent:urgent});
     const urgentToggle=$('directChatUrgent');if(urgentToggle)urgentToggle.checked=false;

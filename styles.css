@@ -8194,6 +8194,9 @@ body.dark-theme .direct-chat-form textarea{background:#1d242b;color:#f1f4f6;bord
 
 /* Desktop in-app notification cards: visible but separate from the mention center. */
 .in-app-notice-popup{width:min(390px,calc(100vw - 32px));padding:16px 18px;border:1px solid #3b8b69;border-left:4px solid #24a36a;border-radius:14px;background:var(--panel,#171e24);color:var(--text,#edf2f4);box-shadow:0 16px 44px #0005;pointer-events:auto;animation:noticePopupIn .2s ease}
+.direct-chat-notice-popup{border-color:#3c83eb;border-left-color:#3888ff;background:linear-gradient(135deg,rgba(35,80,143,.34),var(--panel,#171e24) 58%);box-shadow:0 16px 44px #0007,0 0 0 1px #3888ff33}
+.direct-chat-notice-popup>strong{color:#a8ceff}
+.direct-chat-notice-popup .primary-soft{background:#2878df;color:#fff;border-color:#2878df}
 .in-app-notice-popup>b{display:block;font-size:14px;margin-bottom:8px}
 .in-app-notice-popup>strong{display:block;font-size:12px;color:#8edbb0}
 .in-app-notice-popup>p{margin:7px 0 13px;font-size:13px;line-height:1.45;overflow-wrap:anywhere}
@@ -8204,6 +8207,7 @@ body.dark-theme .direct-chat-form textarea{background:#1d242b;color:#f1f4f6;bord
 .mention-center-button b{min-width:26px;height:26px;font-size:13px}
 @media(min-width:900px){.toast-stack:has(.in-app-notice-popup){display:flex;flex-direction:column;align-items:flex-end;gap:10px;top:18px;right:20px;bottom:auto;left:auto;width:auto;max-width:calc(100vw - 40px);pointer-events:none}.toast-stack .in-app-notice-popup{pointer-events:auto}}
 @media(max-width:600px){.mention-center-button{bottom:14px;max-width:calc(100vw - 24px);padding:11px 16px;font-size:13px}}
+@media(max-width:720px){.toast-stack:has(.direct-chat-notice-popup){top:calc(8px + env(safe-area-inset-top,0px));bottom:auto;left:10px;right:10px;width:auto;transform:none}.direct-chat-notice-popup{width:100%;max-width:100%;padding:13px 15px}.direct-chat-notice-popup>b{font-size:14px}.direct-chat-notice-popup>strong{font-size:12px}.direct-chat-notice-popup>p{font-size:13px;line-height:1.4}}
 
 /* Compact staff dock: collapsed avatar rail by default, expandable without moving the workspace. */
 .staff-presence-panel{

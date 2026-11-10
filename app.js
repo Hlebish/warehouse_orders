@@ -3252,7 +3252,10 @@ const shownDirectUrgentAlerts=new Set();
 function directChatThreadId(uidA,uidB){return [String(uidA),String(uidB)].sort().join('__');}
 function renderDirectChatMessages(messages){
  const box=$('directChatMessages');if(!box)return;
- if(!messages.length){box.innerHTML='<div class="chat-empty">Это начало вашей переписки. Напишите первое сообщение 🙂</div>';return;}
+ const hadRenderedMessages=box.dataset.messagesRendered==='true';
+ const wasAtBottom=box.scrollHeight-box.clientHeight-box.scrollTop<80;
+ const previousScrollTop=box.scrollTop;
+ if(!messages.length){box.innerHTML='<div class="chat-empty">Это начало вашей переписки. Напишите первое сообщение 🙂</div>';box.dataset.messagesRendered='true';return;}
  box.innerHTML=messages.map(message=>{
   const mine=message.authorId===signedInUser?.uid;
   const peerRead=mine&&!!directChatTarget?.uid&&Array.isArray(message.readBy)&&message.readBy.includes(directChatTarget.uid);
@@ -3264,7 +3267,9 @@ function renderDirectChatMessages(messages){
   shownDirectUrgentAlerts.add(pendingUrgent.id);
   showDirectUrgentAlert(pendingUrgent.text||'Срочное обращение',directChatTarget,pendingUrgent.id);
  }
- box.scrollTop=box.scrollHeight;
+ box.dataset.messagesRendered='true';
+ if(!hadRenderedMessages||wasAtBottom)box.scrollTop=box.scrollHeight;
+ else box.scrollTop=previousScrollTop;
 }
 async function acknowledgeDirectUrgentMessage(messageId,threadId='',noticeId=''){
  if(!signedInUser||!messageId)return;

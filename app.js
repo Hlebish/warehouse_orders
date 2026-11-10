@@ -3317,7 +3317,7 @@ async function openDirectChat(person,requestedThreadId=''){
   directChatUnsubscribe=onSnapshot(messagesQuery,snap=>{
    const messages=snap.docs.map(d=>({id:d.id,...d.data()})).reverse();
    const unreadIncoming=messages.filter(message=>message.authorId!==signedInUser.uid&&!(Array.isArray(message.readBy)&&message.readBy.includes(signedInUser.uid)));
-   if(unreadIncoming.length){const receiptBatch=writeBatch(db);unreadIncoming.forEach(message=>receiptBatch.update(doc(db,'directChats',threadId,'messages',message.id),{readBy:arrayUnion(signedInUser.uid)}));void receiptBatch.commit().catch(error=>console.warn('Не удалось отметить личные сообщения прочитанными',error));}
+   if(unreadIncoming.length){const receiptBatch=writeBatch(db);unreadIncoming.forEach(message=>receiptBatch.update(doc(db,'directChats',threadId,'messages',message.id),{readBy:arrayUnion(message.authorId,signedInUser.uid)}));void receiptBatch.commit().catch(error=>console.warn('Не удалось отметить личные сообщения прочитанными',error));}
    renderDirectChatMessages(messages);
   },err=>{
    console.error('Не удалось загрузить личную переписку',err);

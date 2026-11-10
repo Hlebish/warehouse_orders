@@ -2180,16 +2180,26 @@ async function loadWarehouseMapAddresses(orderArticles){
     const chunks=[];
     for(let i=0;i<unique.length;i+=100)chunks.push(unique.slice(i,i+100));
     const responses=await Promise.all(chunks.map(async articles=>{
-      const response=await fetch(WAREHOUSE_MAP_LOOKUP_URL,{
-        method:'POST',
-        headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
-        cache:'no-store',
-        body:JSON.stringify({articles})
-      });
-      if(!response.ok)throw new Error('Warehouse Map lookup failed: '+response.status);
-      const data=await response.json();
-      if(data?.ok!==true||!Array.isArray(data.results))throw new Error('Invalid Warehouse Map response');
-      return data.results;
+      let chunkToken=token,refreshed=false;
+      for(let attempt=0;attempt<3;attempt++){
+        try{
+          const response=await fetch(WAREHOUSE_MAP_LOOKUP_URL,{
+            method:'POST',
+            headers:{'Authorization':'Bearer '+chunkToken,'Content-Type':'application/json'},
+            cache:'no-store',
+            body:JSON.stringify({articles})
+          });
+          if(response.status===401&&!refreshed){chunkToken=await auth.currentUser.getIdToken(true);refreshed=true;continue}
+          if(!response.ok){const error=new Error('Warehouse Map lookup failed: '+response.status);error.status=response.status;if([429,502,503,504].includes(response.status)&&attempt<2){await new Promise(resolve=>setTimeout(resolve,350*(attempt+1)));continue}throw error}
+          const data=await response.json();
+          if(data?.ok!==true||!Array.isArray(data.results))throw new Error('Invalid Warehouse Map response');
+          return data.results;
+        }catch(error){
+          if(error?.status||attempt>=2)throw error;
+          await new Promise(resolve=>setTimeout(resolve,350*(attempt+1)));
+        }
+      }
+      throw new Error('Warehouse Map lookup failed after retries');
     }));
     const resultMap=new Map(responses.flat().map(item=>[normalizeMapArticleForUi(item.article),item]));
     for(const article of unique){
@@ -2203,7 +2213,8 @@ async function loadWarehouseMapAddresses(orderArticles){
     }
   }catch(error){
     console.warn('Warehouse Map address lookup unavailable:',error);
-    elements.forEach(el=>{el.textContent='📍 Адрес временно недоступен'});
+    const message=error?.status===403?'📍 Нет доступа к адресам хранения':'📍 Адрес временно недоступен';
+    elements.forEach(el=>{el.textContent=message});
   }
 }
 function openOrder(id){const o=state.orders.find(x=>x.id===id);if(!o)return;if(selectedId&&selectedId!==id){entryUnsubscribes.get(selectedId)?.();entryUnsubscribes.delete(selectedId);}watchOrderEntries(id);if(!modal.hidden&&!orderReturnModalSnapshot&&!/^Заказ №/.test($('modalTitle').textContent)){orderReturnModalSnapshot={title:$('modalTitle').textContent,eyebrow:$('modalEyebrow').textContent,body:$('modalBody').innerHTML,foot:$('modalFoot').innerHTML};}selectedId=id;const isManager=isManagerRole()||canManageUsers,isWarehouse=state.role==='warehouse'||canManageUsers,isDirector=state.role==='director',hasOpenDefect=hasPendingDefect(o),shipmentLocked=isShipmentLocked(o);const locked=shipmentLocked;const lockedButton=(label,action,cls='small-button',reason='Недоступно для вашей роли')=>'<button type="button" class="'+cls+' role-action-locked" disabled aria-disabled="true" title="'+esc(reason)+'"><span class="role-action-ban" aria-hidden="true">🚫</span>'+label+'</button>';const actionButton=(label,action,cls,allowed,reason)=>allowed?button(label,action,cls):lockedButton(label,action,cls,reason);let actions='';actions+='<div class="detail-action-group detail-action-roles">'+actionButton('📋 Менеджер','open-manager-actions','small-button action-category manager-category',isManager&&!locked,'Доступно менеджерам и администраторам')+actionButton('📦 Кладовщик','open-warehouse-actions','small-button action-category warehouse-category',isWarehouse&&!locked,'Доступно кладовщику и администраторам')+'</div>';actions+='<div class="detail-action-group detail-action-edit">'+actionButton('✎ Редактировать','open-edit-menu','small-button neutral-edit-button',!locked,'Редактирование недоступно после отгрузки')+'</div>';const utilityActions=actionButton('＋ Добавить комментарий','add-comment','small-button primary-soft',true,'')+actionButton('↩ Возврат','open-return','small-button primary-soft',isWarehouse&&(!o.returnCancelled||canManageUsers)&&!locked,'Возврат доступен кладовщику и администраторам')+actionButton(o.assemblyInProgress?'✓ Завершить сборку':'▶ Начать сборку','toggle-assembly','small-button '+(o.assemblyInProgress?'good':'primary-soft'),isWarehouse&&o.status!=='Отгружен кладовщиком','Сборка доступна кладовщику и администраторам');actions+='<div class="detail-action-group detail-action-utility">'+utilityActions+'</div>';if(!hasOpenDefect)actions+='<div class="detail-action-group detail-action-bottom">'+actionButton('⚠ Дефект','add-defect','small-button danger',isWarehouse&&!locked,'Создавать дефекты может кладовщик или администратор/директор')+actionButton('🗑 Удалить карточку','delete-order','small-button danger',canManageUsers&&!locked,'Удалять заказы может только администратор или директор')+'</div>';if(shipmentLocked)actions='<div class="danger-note">🔒 🔒 После отгрузки или статуса «Клиент забрал самовывозом» менеджер, бухгалтер и главный бухгалтер больше не могут редактировать, отменять или удалять заказ.</div>'+actions;else if(hasOpenDefect)actions='<div class="defect-order-lock-note">⚠ По заказу есть нерассмотренный дефект. Сборку и редактирование можно продолжать; смена статуса будет доступна после решения.</div>'+actions;let articlesHtml='<div class="detail-section-title">Артикулы заказа · '+(o.articles||[]).length+'</div>';

@@ -80,6 +80,7 @@ public class MainActivity extends AppCompatActivity {
     private WebView webView;
     private View networkErrorView;
     private String lastPageUrl = SITE_URL;
+    private String pendingNotificationLink = "";
     private GoogleSignInClient googleSignInClient;
     private ValueCallback<Uri[]> filePathCallback;
     private final ExecutorService shareExecutor = Executors.newSingleThreadExecutor();
@@ -171,6 +172,7 @@ public class MainActivity extends AppCompatActivity {
                 requestWebViewRedraw();
                 view.postDelayed(MainActivity.this::requestWebViewRedraw, 250);
                 view.postDelayed(MainActivity.this::requestWebViewRedraw, 700);
+                view.postDelayed(MainActivity.this::dispatchPendingNotificationLink, 300);
             }
 
             @Override
@@ -319,18 +321,29 @@ public class MainActivity extends AppCompatActivity {
         String notificationLink = intent == null ? null : intent.getStringExtra("notification_link");
         if (notificationLink == null || notificationLink.isEmpty() || webView == null) return;
         String safeUrl = notificationUrlFrom(intent);
+        pendingNotificationLink = safeUrl;
         webView.post(() -> {
             String currentUrl = webView.getUrl();
             if (currentUrl == null || currentUrl.equals("about:blank")) {
                 webView.loadUrl(safeUrl);
                 return;
             }
-            webView.evaluateJavascript(
-                "window.handleNativeNotificationLink && window.handleNativeNotificationLink(" +
-                    JSONObject.quote(safeUrl) + ")",
-                null
-            );
+            dispatchPendingNotificationLink();
         });
+    }
+
+    private void dispatchPendingNotificationLink() {
+        if (webView == null || pendingNotificationLink.isEmpty()) return;
+        String link = pendingNotificationLink;
+        webView.evaluateJavascript(
+            "(function(){return typeof window.handleNativeNotificationLink==='function' && " +
+                "window.handleNativeNotificationLink(" + JSONObject.quote(link) + ");})()",
+            result -> {
+                if ("true".equals(result) && link.equals(pendingNotificationLink)) {
+                    pendingNotificationLink = "";
+                }
+            }
+        );
     }
 
     @Override

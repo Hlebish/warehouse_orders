@@ -59,6 +59,15 @@ function pluralRu(value, one, few, many) {
   return n > 10 && n < 20 ? many : last > 1 && last < 5 ? few : last === 1 ? one : many;
 }
 function notificationCopy(data, count, category) {
+  if (data.directChatThreadId) {
+    const rawSender = String(data.title || 'Сотрудник').trim();
+    const sender = rawSender.replace(/^🚨\s*СРОЧНОЕ\s+ЛИЧНОЕ\s+СООБЩЕНИЕ\s*·\s*/iu, '') || 'Сотрудник';
+    const message = String(data.body || 'Новое сообщение').trim();
+    return {
+      title: data.isUrgent === true ? '🚨 Срочное личное сообщение' : 'Личное сообщение',
+      body: `${sender}: ${message}`.slice(0, 500)
+    };
+  }
   const titles = { orders: 'Новые заказы', assembly: 'Сборка заказов', status: 'Изменения статусов', editing: 'Изменения заказов', comments: 'Новые комментарии', chat: 'Общий чат', likes: 'Реакции в чате' };
   const counts = {
     orders: ['новый заказ', 'новых заказа', 'новых заказов'],

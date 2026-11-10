@@ -291,20 +291,32 @@ async function openPendingDirectChat(){
  const threadId=String(pendingDirectChatThreadId||''),peerId=String(pendingDirectChatPeerId||'');
  if(!threadId||!peerId||!signedInUser)return;
  pendingDirectChatThreadId='';pendingDirectChatPeerId='';
- await openMentionNotice({directChatThreadId:threadId,authorId:peerId});
+ const peer=await resolveDirectChatPeer(peerId);
+ if(!peer){toast('Не удалось найти отправителя личного сообщения. Обновите список сотрудников и откройте уведомление ещё раз.');return;}
+ await openDirectChat(peer,threadId);
+}
+async function resolveDirectChatPeer(peerId){
+ const id=String(peerId||'');if(!id)return null;
+ const cached=staffDirectory.get(id);if(cached)return cached;
+ try{
+  const peerSnap=await getDoc(doc(db,'staffDirectory',id));
+  if(peerSnap.exists()){const peer={uid:id,...peerSnap.data()};staffDirectory.set(id,peer);return peer;}
+ }catch(error){console.warn('Не удалось прочитать отправителя из каталога сотрудников',error);}
+ try{
+  const result=await getStaffDirectoryCallable();
+  const staff=Array.isArray(result.data?.staff)?result.data.staff:[];
+  staff.forEach(person=>{if(person?.uid&&person.active===true)staffDirectory.set(person.uid,person)});
+  return staffDirectory.get(id)||null;
+ }catch(error){console.warn('Не удалось обновить каталог для личного уведомления',error);return null;}
 }
 async function openMentionNotice(n){
  if(n?.orderId){closeModal();openOrder(String(n.orderId));return;}
  if(n?.directChatThreadId&&n?.authorId){
   closeModal();
-  try{
-   const peerSnap=await getDoc(doc(db,'staffDirectory',String(n.authorId)));
-   if(peerSnap.exists()){
-    const peer={uid:String(n.authorId),...peerSnap.data()};
-    await openDirectChat(peer);
-    return;
-   }
-  }catch(err){console.error('Не удалось открыть личный чат из уведомления',err);}
+  const peer=await resolveDirectChatPeer(n.authorId);
+  if(!peer){toast('Не удалось найти отправителя личного сообщения. Обновите список сотрудников и откройте уведомление ещё раз.');return;}
+  await openDirectChat(peer,n.directChatThreadId);
+  return;
  }
  if(n?.target==='chat'||n?.category==='chat'||n?.category==='replies'){openChat();return;}
  showNotifications();
@@ -1124,7 +1136,7 @@ function renderStaffPanel(){
   const initials=String(person.displayName||'?').trim().split(/\\s+/).slice(0,2).map(x=>x[0]||'').join('').toLocaleUpperCase('ru');
   const avatar=person.avatarUrl?'<img src="'+esc(person.avatarUrl)+'" alt="">':'<span>'+esc(initials||'?')+'</span>';
   const unreadCount=unreadCountsBySender.get(String(person.uid))||0;
-  return '<button type="button" class="staff-rail-avatar" data-staff-rail-id="'+esc(person.uid)+'" title="'+esc(person.displayName||'Сотрудник')+(unreadCount?' · непрочитанных: '+unreadCount:'')+'" aria-label="'+esc(person.displayName||'Сотрудник')+(person.online?', онлайн':'')+(unreadCount?', непрочитанных сообщений: '+unreadCount:'')+'"><span class="staff-avatar">'+avatar+'<i class="'+(person.online?'is-online':'')+'"></i></span>'+(unreadCount?'<b class="staff-rail-unread staff-rail-unread-count">'+(unreadCount>99?'99+':unreadCount)+'</b>':'')+'</button>';
+  return '<button type="button" class="staff-rail-avatar'+(unreadCount?' has-direct-unread':'')+'" data-staff-rail-id="'+esc(person.uid)+'" title="'+esc(person.displayName||'Сотрудник')+(unreadCount?' · непрочитанных: '+unreadCount:'')+'" aria-label="'+esc(person.displayName||'Сотрудник')+(person.online?', онлайн':'')+(unreadCount?', непрочитанных сообщений: '+unreadCount:'')+'"><span class="staff-avatar">'+avatar+'<i class="'+(person.online?'is-online':'')+'"></i></span>'+(unreadCount?'<b class="staff-rail-unread staff-rail-unread-count">'+(unreadCount>99?'99+':unreadCount)+'</b>':'')+'</button>';
  }).join(''):'<span class="staff-rail-loading">—</span>';
  list.innerHTML=items.length?items.map(person=>{
   const initials=String(person.displayName||'?').trim().split(/\\s+/).slice(0,2).map(x=>x[0]||'').join('').toLocaleUpperCase('ru');
@@ -1132,7 +1144,7 @@ function renderStaffPanel(){
   const sub=person.online?person.activity:person.roleLabel;
   const lastSeen=!person.online?'<small class="staff-last-seen">'+esc(presenceLastSeenLabel(person.lastSeen))+'</small>':'';
   const unreadCount=unreadCountsBySender.get(String(person.uid))||0;
-  const profileButton='<div class="staff-presence-item"><span class="staff-avatar">'+avatar+'<i class="'+(person.online?'is-online':'')+'"></i>'+(unreadCount?'<b class="staff-unread-dot staff-unread-count" aria-label="'+unreadCount+' непрочитанных сообщений">'+(unreadCount>99?'99+':unreadCount)+'</b>':'')+'</span><span class="staff-presence-copy"><b>'+esc(person.displayName||'Сотрудник')+'</b><small>'+esc(sub||'Сотрудник')+'</small>'+lastSeen+'</span><span class="staff-presence-state '+(person.online?'online':'')+'">'+(person.online?'●':'○')+'</span></div>';
+  const profileButton='<div class="staff-presence-item'+(unreadCount?' has-direct-unread':'')+'"><span class="staff-avatar">'+avatar+'<i class="'+(person.online?'is-online':'')+'"></i>'+(unreadCount?'<b class="staff-unread-dot staff-unread-count" aria-label="'+unreadCount+' непрочитанных сообщений">'+(unreadCount>99?'99+':unreadCount)+'</b>':'')+'</span><span class="staff-presence-copy"><b>'+esc(person.displayName||'Сотрудник')+'</b><small>'+esc(sub||'Сотрудник')+'</small>'+lastSeen+'</span><span class="staff-presence-state '+(person.online?'online':'')+'">'+(person.online?'●':'○')+'</span></div>';
   const messageButton=person.uid!==signedInUser?.uid?'<button type="button" class="staff-presence-message" data-staff-message-id="'+esc(person.uid)+'" aria-label="Написать '+esc(person.displayName||'сотруднику')+'" title="Написать личное сообщение"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.75 5.75h14.5a1.75 1.75 0 0 1 1.75 1.75v9a1.75 1.75 0 0 1-1.75 1.75H9l-4.25 2v-3.75A1.75 1.75 0 0 1 3 14.75v-7a2 2 0 0 1 1.75-2Z"/><path d="m7.5 9 4.5 3.5L16.5 9"/></svg><span>Написать</span></button>':'';
   return '<div class="staff-presence-row">'+profileButton+messageButton+'</div>';
  }).join(''):'<div class="staff-empty">'+(staffDirectoryLoadError?'Не удалось загрузить сотрудников. Повторяем попытку…':'Список сотрудников пока пуст')+'</div>';
@@ -2377,9 +2389,9 @@ async function saveArticles(){
    toast('Не удалось сохранить артикулы: '+(String(err?.code||'').replace(/^.*?\//,'')||'проверьте доступ и соединение'));
  }
 }
-function addComment(){loadCurrentChatPeople();showModal('Добавить комментарий',`<form id="entryForm"><div class="field entry-mention-wrap"><label for="entryText">Сообщение *</label><textarea id="entryText" required placeholder="Напишите комментарий; используйте @ для упоминания" autocomplete="off"></textarea><div id="entryMentionSuggestions" class="chat-mention-suggestions entry-mention-suggestions" hidden></div></div><div class="field"><label class="important-message-option"><input id="entryImportant" type="checkbox"> <span>⚠ Сделать важным сообщением</span></label></div><div class="field"><label for="entryPhotos">Фото (необязательно)</label><div class="upload-box">Прикрепить фотографии<input id="entryPhotos" type="file" accept="image/*" multiple></div><span class="field-hint">Можно отправить обычный текст без артикула и фотографий.</span></div></form>`,[button('Назад','back-detail'),button('Отправить','save-entry','primary-button')],'КОММЕНТАРИЙ');modal.dataset.replyToEntryId='';$('entryKind')?.remove()}
-function replyToEntry(entryId){loadCurrentChatPeople();const o=state.orders.find(x=>x.id===selectedId),entry=o?.entries.find(x=>x.id===entryId);if(!o||!entry||entry.kind!=='comment'){toast('Не удалось найти комментарий для ответа.');return;}showModal('Ответ на комментарий',`<div class="timeline-reply-reference"><b>${esc(entry.author||'Сотрудник')}</b><div>${esc(String(entry.text||'').slice(0,500))}${String(entry.text||'').length>500?'…':''}</div></div><form id="entryForm"><div class="field entry-mention-wrap"><label for="entryText">Ваш ответ *</label><textarea id="entryText" required placeholder="Напишите ответ…" autocomplete="off"></textarea><div id="entryMentionSuggestions" class="chat-mention-suggestions entry-mention-suggestions" hidden></div></div><div class="field"><label for="entryPhotos">Фото (необязательно)</label><div class="upload-box">Прикрепить фотографии<input id="entryPhotos" type="file" accept="image/*" multiple></div></div></form>`,[button('Назад','back-detail'),button('Отправить ответ','save-entry','primary-button')],'ОТВЕТ НА КОММЕНТАРИЙ');modal.dataset.replyToEntryId=entry.id;}
-function addDefect(){const o=state.orders.find(x=>x.id===selectedId);if(!o)return;if(!canEditOrder(o)){toast('После отгрузки заказ заблокирован для этой роли.');return;}const options=(o.articles||[]).map((x,i)=>`<label class="defect-multi-option"><input type="checkbox" name="defectArticleIndex" value="${i}"><span><b>${esc(x.article)}</b> · ${Number(x.quantity)||1} шт. · позиция ${i+1}</span></label>`).join('');if(!options){toast('В заказе нет позиций для выбора дефекта.');return;}showModal('Добавить дефект',`<form id="entryForm"><input id="entryKind" type="hidden" value="defect"><div class="field"><label>Позиции с дефектом * (можно выбрать несколько)</label><div class="defect-multi-list">${options}</div></div><div class="field"><label for="entryText">Описание дефекта *</label><textarea id="entryText" required placeholder="Опишите, что не так с деталью"></textarea></div><div class="field"><label for="entryPhotos">Фото дефекта (необязательно)</label><div class="upload-box">Прикрепить фотографии<input id="entryPhotos" type="file" accept="image/*" multiple></div><span class="field-hint">Прикреплённые фото будут добавлены к первой отмеченной позиции.</span></div></form>`,[button('Назад','back-detail'),button('Добавить дефект','save-entry','primary-button')],'ДЕФЕКТ ДЕТАЛИ')}
+function addComment(){loadCurrentChatPeople();showModal('Добавить комментарий',`<form id="entryForm"><div class="field entry-mention-wrap"><label for="entryText">Сообщение *</label><textarea id="entryText" required placeholder="Напишите комментарий; используйте @ для упоминания" autocomplete="off"></textarea><div id="entryMentionSuggestions" class="chat-mention-suggestions entry-mention-suggestions" hidden></div></div><div class="field"><label class="important-message-option"><input id="entryImportant" type="checkbox"> <span>⚠ Сделать важным сообщением</span></label></div><div class="field"><label for="entryPhotos">Фото (необязательно)</label><div class="upload-box">Прикрепить фотографии<input id="entryPhotos" type="file" accept="image/*" multiple></div><span class="field-hint">Можно отправить обычный текст без артикула и фотографий.</span></div></form>`,[button('Назад','back-detail'),button('Отправить','save-entry','primary-button')],'КОММЕНТАРИЙ');modal.dataset.replyToEntryId='';modal.dataset.entryDraftId=crypto.randomUUID();$('entryKind')?.remove()}
+function replyToEntry(entryId){loadCurrentChatPeople();const o=state.orders.find(x=>x.id===selectedId),entry=o?.entries.find(x=>x.id===entryId);if(!o||!entry||entry.kind!=='comment'){toast('Не удалось найти комментарий для ответа.');return;}showModal('Ответ на комментарий',`<div class="timeline-reply-reference"><b>${esc(entry.author||'Сотрудник')}</b><div>${esc(String(entry.text||'').slice(0,500))}${String(entry.text||'').length>500?'…':''}</div></div><form id="entryForm"><div class="field entry-mention-wrap"><label for="entryText">Ваш ответ *</label><textarea id="entryText" required placeholder="Напишите ответ…" autocomplete="off"></textarea><div id="entryMentionSuggestions" class="chat-mention-suggestions entry-mention-suggestions" hidden></div></div><div class="field"><label for="entryPhotos">Фото (необязательно)</label><div class="upload-box">Прикрепить фотографии<input id="entryPhotos" type="file" accept="image/*" multiple></div></div></form>`,[button('Назад','back-detail'),button('Отправить ответ','save-entry','primary-button')],'ОТВЕТ НА КОММЕНТАРИЙ');modal.dataset.replyToEntryId=entry.id;modal.dataset.entryDraftId=crypto.randomUUID();}
+function addDefect(){const o=state.orders.find(x=>x.id===selectedId);if(!o)return;if(!canEditOrder(o)){toast('После отгрузки заказ заблокирован для этой роли.');return;}const options=(o.articles||[]).map((x,i)=>`<label class="defect-multi-option"><input type="checkbox" name="defectArticleIndex" value="${i}"><span><b>${esc(x.article)}</b> · ${Number(x.quantity)||1} шт. · позиция ${i+1}</span></label>`).join('');if(!options){toast('В заказе нет позиций для выбора дефекта.');return;}showModal('Добавить дефект',`<form id="entryForm"><input id="entryKind" type="hidden" value="defect"><div class="field"><label>Позиции с дефектом * (можно выбрать несколько)</label><div class="defect-multi-list">${options}</div></div><div class="field"><label for="entryText">Описание дефекта *</label><textarea id="entryText" required placeholder="Опишите, что не так с деталью"></textarea></div><div class="field"><label for="entryPhotos">Фото дефекта (необязательно)</label><div class="upload-box">Прикрепить фотографии<input id="entryPhotos" type="file" accept="image/*" multiple></div><span class="field-hint">Прикреплённые фото будут добавлены к первой отмеченной позиции.</span></div></form>`,[button('Назад','back-detail'),button('Добавить дефект','save-entry','primary-button')],'ДЕФЕКТ ДЕТАЛИ');modal.dataset.entryDraftId=crypto.randomUUID();modal.dataset.entryDraftIds='{}'}
 function editDefect(entryId){const o=state.orders.find(x=>x.id===selectedId),e=o?.entries.find(x=>x.id===entryId);if(!o||!e||e.kind!=='defect'||e.decision||!(state.role==='warehouse'||canManageUsers)||!canEditOrder(o)){toast('Редактировать можно только нерассмотренный дефект в доступном для редактирования заказе.');return;}const options=(o.articles||[]).map((x,i)=>`<option value="${i}"${(Number.isInteger(e.articleIndex)?e.articleIndex===i:x.article===e.article)?' selected':''}>${esc(x.article)} · ${Number(x.quantity)||1} шт. · позиция ${i+1}</option>`).join('');showModal('Редактировать дефект',`<form id="editDefectForm"><div class="field"><label for="editDefectArticleIndex">Позиция заказа *</label><select id="editDefectArticleIndex" required>${options}</select></div><div class="field"><label for="editDefectText">Описание дефекта *</label><textarea id="editDefectText" required>${esc(e.text||'')}</textarea></div><div class="field"><label>Текущие фото</label><div class="photo-grid">${(e.photos||[]).map(p=>`<img src="${p}" alt="Фото дефекта" data-photo="${p}">`).join('')||'<span class="field-hint">Фото не прикреплены.</span>'}</div></div><div class="field"><label for="editDefectPhotos">Добавить фото</label><div class="upload-box">Прикрепить фотографии<input id="editDefectPhotos" type="file" accept="image/*" multiple></div><span class="field-hint">Существующие фото сохранятся; всего не более пяти фото.</span></div></form>`,[button('Назад','back-detail'),button('Сохранить дефект','save-defect-edit','primary-button')],'РЕДАКТИРОВАНИЕ ДЕФЕКТА');modal.dataset.editDefectId=entryId;}
 async function saveDefectEdit(){const o=state.orders.find(x=>x.id===selectedId),id=modal.dataset.editDefectId,e=o?.entries.find(x=>x.id===id);if(!o||!e||e.kind!=='defect'||e.decision||!(state.role==='warehouse'||canManageUsers)||!canEditOrder(o)){toast('Редактирование недоступно для этого заказа.');return;}const articleIndex=Number($('editDefectArticleIndex')?.value),article=o.articles?.[articleIndex]?.article,text=$('editDefectText')?.value.trim()||'';if(!article||!Number.isInteger(articleIndex)||articleIndex<0||!text){toast('Выберите позицию и заполните описание.');return;}try{const blobs=await readPhotos($('editDefectPhotos')?.files||[]);if((e.photos||[]).length+blobs.length>5){toast('Всего можно прикрепить не более пяти фото.');return;}const added=await uploadPhotos(o.id,e.id,blobs);e.article=article;e.articleIndex=articleIndex;e.text=text;e.photos=[...(e.photos||[]),...added];await save();await writeAudit('Изменён дефект',`Артикул: ${article}`,o.id,{entryId:id});closeModal();render();openOrder(o.id);toast('Дефект обновлён.');}catch(err){console.error(err);toast(err.message||'Не удалось сохранить дефект.');}}
 async function saveOrder(){
@@ -2551,15 +2563,19 @@ async function saveEntry(){
 if(!o)return;if(kind!=='comment'&&!canEditOrder(o)){toast('После отгрузки заказ заблокирован для этой роли.');return;}if(hasPendingDefect(o)&&kind!=='comment'){toast('Пока дефект не рассмотрен, можно добавлять только комментарии.');return}const sendButton=document.querySelector('[data-action="save-entry"]');
 entrySending=true;
 if(sendButton){sendButton.disabled=true;sendButton.textContent='Отправка…';}
+let draftEntryIds={};try{draftEntryIds=JSON.parse(modal.dataset.entryDraftIds||'{}')}catch{}
+if(kind==='defect')articleIndexes.forEach(index=>{draftEntryIds[String(index)]||=crypto.randomUUID()});
+if(kind==='defect')modal.dataset.entryDraftIds=JSON.stringify(draftEntryIds);
+const entryId=kind==='defect'?draftEntryIds[String(articleIndexes[0])]:String(modal.dataset.entryDraftId||crypto.randomUUID());
+modal.dataset.entryDraftId=entryId;
 const previousStatus=o.status;
 let defectCommitted=false;
  const addedEntryIds=[];
 try{
 const photoBlobs=await readPhotos($('entryPhotos').files);const important=kind==='comment'&&$('entryImportant')?.checked===true;
-const entryId=crypto.randomUUID();
 const photos=await uploadPhotos(o.id,entryId,photoBlobs);
  if(kind==='defect'){
-  const createdAt=isoNow(),author=profileName||roles[state.role],entries=articleIndexes.map((idx,n)=>({id:n===0?entryId:crypto.randomUUID(),kind,article:o.articles[idx].article,articleIndex:idx,text,important:false,authorId:signedInUser.uid,author,createdAt,photos:n===0?photos:[]}));
+  const createdAt=isoNow(),author=profileName||roles[state.role],entries=articleIndexes.map((idx,n)=>({id:draftEntryIds[String(idx)],kind,article:o.articles[idx].article,articleIndex:idx,text,important:false,authorId:signedInUser.uid,author,createdAt,photos:n===0?photos:[]}));
   const updatedAt=isoNow(),orderRef=doc(db,'orders',o.id),batch=writeBatch(db);
   batch.update(orderRef,{status:'Дефект',updatedAt,updatedBy:signedInUser.uid,updatedByName:profileName});
   for(const entry of entries)batch.set(doc(db,'orders',o.id,'entries',entry.id),entryToCloud(entry));
@@ -2573,7 +2589,7 @@ const photos=await uploadPhotos(o.id,entryId,photoBlobs);
   await queuePush(o.client||'Клиент не указан','Добавлен дефект',signedInUser.uid,o.id,'site','defects');
   closeModal();render();const defectToast=toast(`⚠️ ДЕФЕКТ · Заказ № ${o.number}`,o.id);defectToast.classList.add('defect-toast');notify(`Дефект к заказу № ${o.number}`,o.id);openOrder(o.id);
  }else{
-  const entry={id:entryId,kind,article:'',...(replyTarget?{replyToEntryId:replyTarget.id,replyToAuthorId:replyTarget.authorId||'',replyToAuthorName:replyTarget.author||'Сотрудника',replyToText:String(replyTarget.text||'').slice(0,500)}:{}),text,important,authorId:signedInUser.uid,author:profileName||roles[state.role],createdAt:isoNow(),photos};addedEntryIds.push(entry.id);o.entries.push(entry);await save();if(replyTarget?.authorId&&replyTarget.authorId!==signedInUser.uid){await queuePush(profileName||roles[state.role],`Ответ на ваш комментарий: ${text}`,signedInUser.uid,o.id,'site','replies',replyTarget.authorId,{isReply:true});}const tokens=[...text.matchAll(/(^|[\s])@([\p{L}\p{N}_-]{2,})/gu)].map(x=>x[2].toLocaleLowerCase('ru'));const mentioned=[...new Map(knownChatPeople.map(p=>[p.id,p])).values()].filter(p=>p.id&&p.id!==signedInUser.uid&&p.id!==replyTarget?.authorId&&tokens.includes(chatMentionToken(p.name).toLocaleLowerCase('ru')));await Promise.all(mentioned.map(p=>queuePush(profileName||roles[state.role],text,signedInUser.uid,o.id,'site','replies',p.id,{isMention:true})));await writeAudit('Добавлен комментарий',text,o.id,{entryId});closeModal();render();toast('Запись добавлена в историю заказа.');notify(`Комментарий к заказу № ${o.number}`,o.id);openOrder(o.id)
+  const entry={id:entryId,kind,article:'',...(replyTarget?{replyToEntryId:replyTarget.id,replyToAuthorId:replyTarget.authorId||'',replyToAuthorName:replyTarget.author||'Сотрудника',replyToText:String(replyTarget.text||'').slice(0,500)}:{}),text,important,authorId:signedInUser.uid,author:profileName||roles[state.role],createdAt:isoNow(),photos};addedEntryIds.push(entry.id);o.entries=(o.entries||[]).filter(existing=>existing.id!==entry.id);o.entries.push(entry);await save();if(replyTarget?.authorId&&replyTarget.authorId!==signedInUser.uid){await queuePush(profileName||roles[state.role],`Ответ на ваш комментарий: ${text}`,signedInUser.uid,o.id,'site','replies',replyTarget.authorId,{isReply:true});}const tokens=[...text.matchAll(/(^|[\s])@([\p{L}\p{N}_-]{2,})/gu)].map(x=>x[2].toLocaleLowerCase('ru'));const mentioned=[...new Map(knownChatPeople.map(p=>[p.id,p])).values()].filter(p=>p.id&&p.id!==signedInUser.uid&&p.id!==replyTarget?.authorId&&tokens.includes(chatMentionToken(p.name).toLocaleLowerCase('ru')));await Promise.all(mentioned.map(p=>queuePush(profileName||roles[state.role],text,signedInUser.uid,o.id,'site','replies',p.id,{isMention:true})));await writeAudit('Добавлен комментарий',text,o.id,{entryId});closeModal();render();toast('Запись добавлена в историю заказа.');notify(`Комментарий к заказу № ${o.number}`,o.id);openOrder(o.id)
  }
  }catch(e){if(addedEntryIds.length)o.entries=o.entries.filter(entry=>!addedEntryIds.includes(entry.id));if(kind==='defect'&&!defectCommitted)o.status=previousStatus;render();toast(defectCommitted?'Дефект сохранён, но не удалось обновить уведомления.':e.message)}
 finally{entrySending=false;if(sendButton){sendButton.disabled=false;sendButton.textContent=kind==='defect'?'Добавить дефект':'Отправить';}}}
@@ -3246,20 +3262,27 @@ async function acknowledgeDirectUrgentMessage(messageId,threadId='',noticeId='')
   toast('Получение срочного обращения подтверждено.');
  }catch(err){console.error('Не удалось подтвердить срочное личное сообщение',err);toast('Не удалось подтвердить получение. Проверьте соединение.');}
 }
-async function openDirectChat(person){
+async function openDirectChat(person,requestedThreadId=''){
  if(!signedInUser||!person?.uid||person.uid===signedInUser.uid)return;
  directChatUnsubscribe?.();directChatUnsubscribe=null;
  chatUnsubscribe?.();chatUnsubscribe=null;
  openStaffPanel(false);
  directChatTarget=person;
- const threadId=directChatThreadId(signedInUser.uid,person.uid);
+ const canonicalThreadId=directChatThreadId(signedInUser.uid,person.uid),threadId=String(requestedThreadId||canonicalThreadId);
   void markNotificationItemsRead((Array.isArray(state.notices)?state.notices:[]).filter(n=>!n.read&&n.directChatThreadId===threadId&&!flagOn(n,'isUrgent')));
  const threadRef=doc(db,'directChats',threadId);
  const participants=[signedInUser.uid,person.uid].sort();
  try{
   await runTransaction(db,async transaction=>{
    const threadSnapshot=await transaction.get(threadRef);
-   if(!threadSnapshot.exists())transaction.set(threadRef,{participants,createdAt:serverTimestamp(),updatedAt:serverTimestamp(),lastMessage:'',lastMessageAt:serverTimestamp(),lastSenderId:signedInUser.uid});
+   if(!threadSnapshot.exists()){
+    if(threadId!==canonicalThreadId)throw new Error('Личный чат из уведомления больше недоступен.');
+    transaction.set(threadRef,{participants,createdAt:serverTimestamp(),updatedAt:serverTimestamp(),lastMessage:'',lastMessageAt:serverTimestamp(),lastSenderId:signedInUser.uid});
+   }
+   else{
+    const existingParticipants=Array.isArray(threadSnapshot.data()?.participants)?threadSnapshot.data().participants.map(String):[];
+    if(participants.some(uid=>!existingParticipants.includes(uid)))throw new Error('Уведомление ссылается на другой личный чат.');
+   }
   });
   showModal('Личный чат','<div class="direct-chat-shell"><div class="direct-chat-person"><span class="staff-avatar">'+esc(String(person.displayName||'С').trim().split(/\\s+/).slice(0,2).map(x=>x[0]||'').join('').toLocaleUpperCase('ru'))+'</span><div><b>'+esc(person.displayName||'Сотрудник')+'</b><small>'+esc(person.roleLabel||'Сотрудник')+'</small></div></div><div class="direct-chat-messages" id="directChatMessages"><div class="chat-empty">Загрузка переписки…</div></div><form class="direct-chat-form" id="directChatForm"><textarea id="directChatInput" maxlength="1000" rows="2" placeholder="Напишите личное сообщение…" autocomplete="off"></textarea><button type="submit" class="primary-button direct-chat-send" aria-label="Отправить сообщение" title="Отправить сообщение"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22 2 11 13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="m22 2-7 20-4-9-9-4Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg><span>Отправить</span></button><label class="direct-chat-urgent-toggle"><input type="checkbox" id="directChatUrgent"><span>🚨 Срочное обращение</span><small>Получателю придёт приоритетное уведомление, потребуется подтвердить получение</small></label></form></div>',[button('Закрыть','close')],'ЛИЧНАЯ ПЕРЕПИСКА');
   const messagesQuery=query(collection(db,'directChats',threadId,'messages'),orderBy('createdAt','desc'),limit(100));

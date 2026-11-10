@@ -8761,6 +8761,26 @@ body:has(.staff-presence-panel.open) .main-area{
 }
 @media(prefers-reduced-motion:reduce){.urgent-direct-tray{animation:none!important}}
 
+/* Keep unread counts inside the narrow staff rail and highlight the sender. */
+.staff-rail-avatar.has-direct-unread{overflow:visible!important}
+.staff-rail-avatar.has-direct-unread::before{
+ content:'';position:absolute;inset:0;border:2px solid #ff4058;border-radius:50%;
+ box-shadow:0 0 0 2px #ff405833,0 0 16px #ff405899;pointer-events:none;
+ animation:staffSenderPulse 1.45s ease-in-out infinite;
+}
+.staff-rail-avatar .staff-rail-unread-count{
+ right:0!important;top:0!important;z-index:2;min-width:23px!important;height:23px!important;
+ padding:0 5px!important;border:2px solid #151a20!important;font-size:11px!important;
+}
+.staff-presence-item.has-direct-unread>.staff-avatar{
+ box-shadow:0 0 0 3px #ff4058,0 0 17px #ff405899;
+ animation:staffSenderPulse 1.45s ease-in-out infinite;
+}
+@keyframes staffSenderPulse{
+ 50%{box-shadow:0 0 0 5px #ff405844,0 0 22px #ff4058cc}
+}
+@media(prefers-reduced-motion:reduce){.staff-rail-avatar.has-direct-unread::before,.staff-presence-item.has-direct-unread>.staff-avatar{animation:none!important}}
+
 /* In the Windows app, reserve real inner workspace width for the staff dock.
    Padding keeps child controls inside the visible column even when ancestors
    have fixed or full-width sizing rules. */

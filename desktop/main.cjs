@@ -363,13 +363,20 @@ async function retryAppConnection() {
   if (!showingOfflinePage || offlineRetryInProgress || !mainWindow || mainWindow.isDestroyed()) return;
   offlineRetryInProgress = true;
   try {
-    const response = await fetch(APP_URL, { cache: 'no-store', signal: AbortSignal.timeout(8000) });
+    const response = await net.fetch(APP_URL, { cache: 'no-store', signal: AbortSignal.timeout(10000) });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    showingOfflinePage = false;
-    if (offlineRetryTimer) clearInterval(offlineRetryTimer);
-    offlineRetryTimer = null;
+    // Keep the offline page and retry loop active until the real page finishes
+    // loading. A successful connectivity probe alone does not guarantee that
+    // Chromium can complete the navigation; clearing the flag early stranded
+    // users on a failed/blank load with no further retries.
     await mainWindow.loadURL(APP_URL);
+    if (mainWindow?.webContents.getURL().startsWith(APP_URL)) {
+      showingOfflinePage = false;
+      if (offlineRetryTimer) clearInterval(offlineRetryTimer);
+      offlineRetryTimer = null;
+    }
   } catch (error) {
+    showingOfflinePage = true;
     console.info('[Warehouse Orders] Still waiting for network:', String(error?.message || error));
     mainWindow?.webContents.send('warehouse:offline-status', 'Соединения пока нет. Повторим проверку автоматически.');
   } finally {

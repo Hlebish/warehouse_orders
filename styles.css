@@ -8781,6 +8781,22 @@ body:has(.staff-presence-panel.open) .main-area{
 }
 @media(prefers-reduced-motion:reduce){.staff-rail-avatar.has-direct-unread::before,.staff-presence-item.has-direct-unread>.staff-avatar{animation:none!important}}
 
+/* Keep unread counters to a small corner tab while retaining the sender pulse. */
+.staff-rail-avatar .staff-rail-unread-count{
+ right:3px!important;top:3px!important;min-width:15px!important;height:15px!important;
+ padding:0 3px!important;border-width:1.5px!important;font-size:8px!important;
+}
+.staff-presence-item .staff-unread-count{
+ right:-2px!important;top:-2px!important;min-width:15px!important;height:15px!important;
+ padding:0 3px!important;border-width:1.5px!important;font-size:8px!important;
+}
+.profile-avatar-editor{display:grid;justify-items:center;gap:12px;padding:6px 0 12px;text-align:center}
+.profile-avatar-preview{width:104px;height:104px;display:grid;place-items:center;overflow:hidden;border-radius:50%;background:#294b3d;color:#e5f5eb;font-size:26px;font-weight:800;box-shadow:0 0 0 3px #58c58a55}
+.profile-avatar-preview img{width:100%;height:100%;object-fit:cover}
+.profile-avatar-picker{position:relative;cursor:pointer}
+.profile-button .avatar{overflow:hidden;flex:0 0 36px;width:36px;height:36px}
+.profile-button .avatar img{display:block;width:100%;height:100%;object-fit:cover;border-radius:50%}
+
 /* In the Windows app, reserve real inner workspace width for the staff dock.
    Padding keeps child controls inside the visible column even when ancestors
    have fixed or full-width sizing rules. */

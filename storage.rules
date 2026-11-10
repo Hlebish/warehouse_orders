@@ -19,6 +19,16 @@ service firebase.storage {
       allow delete: if activeUser() && request.auth.uid == userId;
     }
 
+    match /avatars/{userId}/{fileName} {
+      allow read: if activeUser();
+      allow create, update: if activeUser()
+        && request.auth.uid == userId
+        && fileName == 'profile.jpg'
+        && request.resource.size <= 3 * 1024 * 1024
+        && request.resource.contentType == 'image/jpeg';
+      allow delete: if activeUser() && request.auth.uid == userId && fileName == 'profile.jpg';
+    }
+
     match /orders/{orderId}/{entryId}/{fileName} {
       allow read: if activeUser();
       allow create: if activeUser()

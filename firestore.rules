@@ -68,6 +68,12 @@ service cloud.firestore {
           ||
           (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['extraPhoneNotifications'])
             && request.resource.data.extraPhoneNotifications is bool)
+          ||
+          (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['avatarUrl'])
+            && request.resource.data.avatarUrl is string
+            && request.resource.data.avatarUrl.size() <= 1000
+            && (request.resource.data.avatarUrl == ''
+              || request.resource.data.avatarUrl.matches('^https://firebasestorage\\.googleapis\\.com/.*$')))
         ))
         || isDirector()
         || (canManageUsers() && request.auth.uid != userId
@@ -106,7 +112,9 @@ service cloud.firestore {
         && request.resource.data.roleLabel.size() <= 60
         && request.resource.data.active == true
         && request.resource.data.avatarUrl is string
-        && request.resource.data.avatarUrl.size() <= 1000;
+        && request.resource.data.avatarUrl.size() <= 1000
+        && (request.resource.data.avatarUrl == ''
+          || request.resource.data.avatarUrl.matches('^https://firebasestorage\\.googleapis\\.com/.*$'));
       allow delete: if activeUser() && request.auth.uid == staffId;
     }
 

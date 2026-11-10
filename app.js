@@ -1076,7 +1076,10 @@ function renderStaffPanel(){
  const totalUnreadDirectMessages=[...unreadCountsBySender.values()].reduce((sum,count)=>sum+count,0);
  const hasUnreadDirectMessages=totalUnreadDirectMessages>0;
  $('staffPresencePanel')?.classList.toggle('has-direct-unread',hasUnreadDirectMessages);
- $('staffPresenceExpand')?.classList.toggle('has-direct-unread',hasUnreadDirectMessages);
+ const staffExpandButton=$('staffPresenceExpand');
+ staffExpandButton?.classList.toggle('has-direct-unread',hasUnreadDirectMessages);
+ staffExpandButton?.setAttribute('aria-label',hasUnreadDirectMessages?`Личные сообщения: ${totalUnreadDirectMessages} непрочитанных. Открыть сотрудников`:'Развернуть список сотрудников');
+ staffExpandButton?.setAttribute('title',hasUnreadDirectMessages?`Непрочитанные личные сообщения: ${totalUnreadDirectMessages}`:'Сотрудники');
  $('staffPresenceToggle')?.classList.toggle('has-direct-unread',hasUnreadDirectMessages);
  const attentionNotices=(Array.isArray(state.notices)?state.notices:[]).filter(n=>!n.read&&!n.directChatThreadId&&(isMentionNotice(n)||flagOn(n,'isReply')));
  const inbox=$('staffInboxList'),inboxCount=$('staffInboxCount');
@@ -1136,7 +1139,7 @@ function renderStaffPanel(){
   }));
  }
  $('staffPresenceCount').textContent=String(onlineCount);
- $('staffPresenceRailCount').textContent=String(inboxUnread);
+ $('staffPresenceRailCount').textContent=totalUnreadDirectMessages>99?'99+':String(totalUnreadDirectMessages);
  if($('staffPresenceBadge'))$('staffPresenceBadge').textContent=String(inboxUnread);
  $('staffPresenceSummary').textContent=onlineCount+' в сети · '+items.length+' сотрудников';
  rail.innerHTML=items.length?items.map(person=>{

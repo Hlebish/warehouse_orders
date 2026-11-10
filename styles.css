@@ -8790,6 +8790,19 @@ body:has(.staff-presence-panel.open) .main-area{
  right:-2px!important;top:-2px!important;min-width:15px!important;height:15px!important;
  padding:0 3px!important;border-width:1.5px!important;font-size:8px!important;
 }
+.staff-rail-expand.has-direct-unread{
+ background:#ff4058!important;border-color:#ff4058!important;border-radius:11px!important;color:#fff!important;
+ box-shadow:0 0 0 3px #ff405833,0 4px 14px #ff405866!important;
+ animation:staffDockUnreadPulse 1.8s ease-in-out infinite;
+}
+.staff-rail-expand.has-direct-unread>span{display:none!important}
+.staff-rail-expand.has-direct-unread>i{
+ inset:0!important;right:0!important;top:0!important;width:100%!important;height:100%!important;min-width:0!important;
+ padding:0!important;border:0!important;border-radius:inherit!important;background:transparent!important;color:#fff!important;
+ font-size:14px!important;font-style:normal!important;font-weight:900!important;box-shadow:none!important;animation:none!important;
+}
+@keyframes staffDockUnreadPulse{50%{box-shadow:0 0 0 5px #ff405822,0 4px 18px #ff405899}}
+@media(prefers-reduced-motion:reduce){.staff-rail-expand.has-direct-unread{animation:none!important}}
 .profile-avatar-editor{display:grid;justify-items:center;gap:12px;padding:6px 0 12px;text-align:center}
 .profile-avatar-preview{width:104px;height:104px;display:grid;place-items:center;overflow:hidden;border-radius:50%;background:#294b3d;color:#e5f5eb;font-size:26px;font-weight:800;box-shadow:0 0 0 3px #58c58a55}
 .profile-avatar-preview img{width:100%;height:100%;object-fit:cover}

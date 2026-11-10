@@ -3311,6 +3311,12 @@ async function openDirectChat(person,requestedThreadId=''){
    if(ack){event.preventDefault();void acknowledgeDirectUrgentMessage(ack.dataset.directUrgentAck);}
   });
   const form=$('directChatForm'),input=$('directChatInput');
+  input?.addEventListener('keydown',event=>{
+   if(!isPhoneDevice()&&event.key==='Enter'&&!event.shiftKey&&!event.isComposing){
+    event.preventDefault();
+    form?.requestSubmit();
+   }
+  });
   form?.addEventListener('submit',async event=>{
    event.preventDefault();
    const textValue=input?.value.trim()||'';

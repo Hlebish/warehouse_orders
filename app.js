@@ -943,15 +943,20 @@ async function openPendingNotificationOrder(){
  const id=String(pendingNotificationOrderId||'');if(!id||!signedInUser)return;
  history.replaceState({},'',location.pathname+location.hash);
  const cached=state.orders.find(order=>order.id===id);
- if(cached){pendingNotificationOrderId='';openOrder(id);return;}
+ // Show the locally cached card immediately, then fetch this exact order from
+ // the server. The full collection listener can take several seconds on mobile.
+ if(cached)openOrder(id);
  if(pendingNotificationLoadId===id)return;
  pendingNotificationLoadId=id;
  try{
-  const snap=await getDoc(doc(db,'orders',id));
+  let snap;
+  try{snap=await getDocFromServer(doc(db,'orders',id));}
+  catch(serverError){console.info('Не удалось быстро перечитать заказ с сервера; используем доступный источник',serverError);snap=await getDoc(doc(db,'orders',id));}
   if(pendingNotificationOrderId!==id||!snap.exists())return;
-  const data=snap.data(),prior=serverCache.get(id);
-  const order={id,number:data.number||'',client:data.client||'',clientId:data.clientId||'',deliveryType:['city','pickup','post','kamyanske'].includes(data.deliveryType)?data.deliveryType:'city',status:data.status||'Создан',returnCancelled:data.returnCancelled===true||(Array.isArray(data.returns)&&data.returns.some(r=>r?.status==='cancelled')),articles:Array.isArray(data.articles)?data.articles:[],createdAt:data.createdAt,updatedAt:data.updatedAt,transferredAt:data.transferredAt,resumedAt:data.resumedAt,assembledAt:data.assembledAt,shippedAt:data.shippedAt,assemblyInProgress:data.assemblyInProgress===true,assemblyStartedAt:data.assemblyStartedAt,assemblyStartedBy:data.assemblyStartedBy,assemblyStartedByName:data.assemblyStartedByName,returns:Array.isArray(data.returns)?data.returns:[],author:data.createdByName||'Сотрудник',createdBy:data.createdBy,updatedBy:data.updatedBy,updatedByName:data.updatedByName,entries:prior?.entries||[]};
-  state.orders.unshift(order);serverCache.set(id,{...order,articles:order.articles.map(item=>({...item})),entries:order.entries.map(entry=>({...entry}))});saveOrdersCache();pendingNotificationOrderId='';render();openOrder(id);
+  const data=snap.data(),prior=serverCache.get(id),existingIndex=state.orders.findIndex(order=>order.id===id);
+  const order={...(existingIndex>=0?state.orders[existingIndex]:{}),id,number:data.number||'',client:data.client||'',clientId:data.clientId||'',deliveryType:['city','pickup','post','kamyanske'].includes(data.deliveryType)?data.deliveryType:'city',status:data.status||'Создан',returnCancelled:data.returnCancelled===true||(Array.isArray(data.returns)&&data.returns.some(r=>r?.status==='cancelled')),articles:Array.isArray(data.articles)?data.articles:[],createdAt:data.createdAt,updatedAt:data.updatedAt,transferredAt:data.transferredAt,resumedAt:data.resumedAt,assembledAt:data.assembledAt,shippedAt:data.shippedAt,assemblyInProgress:data.assemblyInProgress===true,assemblyStartedAt:data.assemblyStartedAt,assemblyStartedBy:data.assemblyStartedBy,assemblyStartedByName:data.assemblyStartedByName,returns:Array.isArray(data.returns)?data.returns:[],author:data.createdByName||'Сотрудник',createdBy:data.createdBy,updatedBy:data.updatedBy,updatedByName:data.updatedByName,entries:prior?.entries||state.orders[existingIndex]?.entries||[]};
+  if(existingIndex>=0)state.orders[existingIndex]=order;else state.orders.unshift(order);
+  serverCache.set(id,{...order,articles:order.articles.map(item=>({...item})),entries:order.entries.map(entry=>({...entry}))});saveOrdersCache();pendingNotificationOrderId='';render();openOrder(id);
  }catch(error){console.warn('Не удалось быстро открыть заказ из уведомления',error);}
  finally{if(pendingNotificationLoadId===id)pendingNotificationLoadId='';}
 }

@@ -179,9 +179,10 @@ service cloud.firestore {
           && request.resource.data.text.size() > 0
           && request.resource.data.text.size() <= 1000
           && request.resource.data.keys().hasOnly(['text','authorId','authorName','createdAt','mentionUserIds','notificationRecipientIds','isUrgent','urgentAckBy','readBy'])
-          && request.resource.data.readBy is list
-          && request.resource.data.readBy.size() == 1
-          && request.resource.data.readBy.hasAll([request.auth.uid]);
+          && (!request.resource.data.keys().hasAny(['readBy'])
+            || (request.resource.data.readBy is list
+              && request.resource.data.readBy.size() == 1
+              && request.resource.data.readBy.hasAll([request.auth.uid])));
         allow update: if directChatParticipant()
           && (
             (resource.data.authorId != request.auth.uid

@@ -8797,10 +8797,21 @@ body:has(.staff-presence-panel.open) .main-area{
 .profile-button .avatar{overflow:hidden;flex:0 0 36px;width:36px;height:36px}
 .profile-button .avatar img{display:block;width:100%;height:100%;object-fit:cover;border-radius:50%}
 
-/* In the Windows app, reserve real inner workspace width for the staff dock.
+/* Reserve real workspace width for the staff dock in desktop browsers and the Windows app.
    Padding keeps child controls inside the visible column even when ancestors
    have fixed or full-width sizing rules. */
 @media(min-width:721px){
+ body:has(.staff-presence-panel:not(.open)) .main-area,
+ body:has(.staff-presence-panel.open) .main-area{
+  box-sizing:border-box!important;
+  width:auto!important;
+  max-width:none!important;
+  min-width:0!important;
+  margin-right:0!important;
+  transition:padding-right .22s cubic-bezier(.2,.75,.25,1)!important;
+ }
+ body:has(.staff-presence-panel:not(.open)) .main-area{padding-right:64px!important}
+ body:has(.staff-presence-panel.open) .main-area{padding-right:320px!important}
  html.warehouse-desktop-app body:has(.staff-presence-panel:not(.open)) .main-area{
   box-sizing:border-box!important;
   width:auto!important;

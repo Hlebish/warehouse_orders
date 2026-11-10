@@ -61,11 +61,11 @@
     });
   })();
   </script>
-  <link rel="stylesheet" href="styles.css?v=2026.11.10.07.square-unread">
+  <link rel="stylesheet" href="styles.css?v=2026.11.10.08.direct-read-route">
 
 <script>
 (() => {
-  const VERSION = '2026.11.10.07';
+  const VERSION = '2026.11.10.08';
   const KEY = 'warehouse_orders_app_version';
   try { localStorage.setItem(KEY, VERSION); } catch {}
 })();
@@ -204,7 +204,7 @@
           <div class="table-wrap"><table><thead><tr><th>ЗАКАЗ</th><th>КЛИЕНТ</th><th>СТАТУС</th><th>ДОСТАВКА</th><th>КОММЕНТАРИИ</th><th>СОЗДАН</th><th></th></tr></thead><tbody id="ordersBody"></tbody></table><div class="empty-state" id="emptyState"><div class="empty-icon">▤</div><b>Заказов пока нет</b><span>Добавьте номер заказа после сборки.</span><button class="secondary-button" id="emptyAddButton">＋ Добавить заказ</button></div></div>
           <div class="table-footer"><span id="listSummary">0 заказов</span><span>История сохраняется в карточке заказа</span></div><div class="table-pagination" id="ordersPagination" aria-label="Страницы заказов" hidden></div>
         </section>
-        <footer class="page-footer"><span>Заказы · внутренняя система</span><span>Доступ по учётным записям сотрудников</span><span class="site-version">Версия сайта 2026.11.10.07</span></footer>
+        <footer class="page-footer"><span>Заказы · внутренняя система</span><span>Доступ по учётным записям сотрудников</span><span class="site-version">Версия сайта 2026.11.10.08</span></footer>
       </section>
     </main>
   </div>
@@ -212,7 +212,7 @@
   <div class="modal-backdrop" id="modalBackdrop" hidden><section class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle"><div class="modal-head"><div><span class="eyebrow" id="modalEyebrow">НОВАЯ КАРТОЧКА</span><h2 id="modalTitle">Добавить заказ</h2></div><button class="close-button" id="closeModal" aria-label="Закрыть">×</button></div><div class="modal-body" id="modalBody"></div><div class="modal-foot" id="modalFoot"></div></section></div>
   <div class="image-viewer" id="imageViewer" hidden role="dialog" aria-modal="true" aria-label="Просмотр фотографии"><button class="image-viewer-close" id="closeImageViewer" aria-label="Закрыть">×</button><img id="imageViewerImage" alt="Фото из комментария"></div>
   <div class="toast-stack" id="toastStack" aria-live="polite"></div>
-  <script type="module" src="app.js?v=2026.11.10.07.square-unread"></script>
+  <script type="module" src="app.js?v=2026.11.10.08.direct-read-route"></script>
   <script type="module" src="buyback.js?v=2026.11.03.05.buyback-sync"></script>
   <script type="module" src="buyback-import.js?v=2026.11.02.08.interface-improvements"></script>
 </body>

@@ -197,7 +197,9 @@ function watchNotifications(){
         freshNotices.forEach(n=>{
           if(shouldPlayPushSound(n))playNotificationSound();
           const target=n.target==='chat'?'chat':'site';
-          const link=target==='chat'
+          const link=n.directChatThreadId&&n.authorId
+            ?'https://hlebish.github.io/warehouse_orders/?directChat='+encodeURIComponent(String(n.directChatThreadId))+'&peer='+encodeURIComponent(String(n.authorId))
+            :target==='chat'
             ? 'https://hlebish.github.io/warehouse_orders/?chat=1'
             : (n.orderId?'https://hlebish.github.io/warehouse_orders/?order='+encodeURIComponent(String(n.orderId)):'https://hlebish.github.io/warehouse_orders/');
           showForegroundPushNotification({
@@ -292,9 +294,14 @@ async function openPendingDirectChat(){
  const threadId=String(pendingDirectChatThreadId||''),peerId=String(pendingDirectChatPeerId||'');
  if(!threadId||!peerId||!signedInUser)return;
  pendingDirectChatThreadId='';pendingDirectChatPeerId='';
- const peer=await resolveDirectChatPeer(peerId);
+ await openDirectChatByIds(threadId,peerId);
+}
+async function openDirectChatByIds(threadId,peerId){
+ const requestedThreadId=String(threadId||''),id=String(peerId||'');
+ if(!requestedThreadId||!id||!signedInUser)return;
+ const peer=await resolveDirectChatPeer(id);
  if(!peer){toast('Не удалось найти отправителя личного сообщения. Обновите список сотрудников и откройте уведомление ещё раз.');return;}
- await openDirectChat(peer,threadId);
+ await openDirectChat(peer,requestedThreadId);
 }
 async function resolveDirectChatPeer(peerId){
  const id=String(peerId||'');if(!id)return null;
@@ -3248,8 +3255,9 @@ function renderDirectChatMessages(messages){
  if(!messages.length){box.innerHTML='<div class="chat-empty">Это начало вашей переписки. Напишите первое сообщение 🙂</div>';return;}
  box.innerHTML=messages.map(message=>{
   const mine=message.authorId===signedInUser?.uid;
+  const peerRead=mine&&!!directChatTarget?.uid&&Array.isArray(message.readBy)&&message.readBy.includes(directChatTarget.uid);
   const urgentPending=message.isUrgent===true&&!mine&&!(Array.isArray(message.urgentAckBy)&&message.urgentAckBy.includes(signedInUser?.uid));
-  return '<article class="chat-message '+(mine?'mine':'')+(message.isUrgent?' direct-chat-urgent':'')+'" data-direct-message-id="'+esc(message.id)+'"><div class="chat-message-head"><b>'+esc(mine?'Вы':directChatTarget?.displayName||'Сотрудник')+'</b><time>'+esc(fmtDateTime(message.createdAt))+'</time></div>'+(message.isUrgent?'<div class="chat-urgent-banner">🚨 СРОЧНОЕ ОБРАЩЕНИЕ</div>':'')+'<div class="chat-message-text">'+renderChatText(message.text||'')+'</div>'+(urgentPending?'<button type="button" class="chat-urgent-ack" data-direct-urgent-ack="'+esc(message.id)+'">✓ Подтвердить получение</button>':(message.isUrgent&&!mine?'<small class="direct-urgent-acknowledged">✓ Получение подтверждено</small>':''))+'</article>';
+  return '<article class="chat-message '+(mine?'mine':'')+(message.isUrgent?' direct-chat-urgent':'')+'" data-direct-message-id="'+esc(message.id)+'"><div class="chat-message-head"><b>'+esc(mine?'Вы':directChatTarget?.displayName||'Сотрудник')+'</b><time>'+esc(fmtDateTime(message.createdAt))+'</time></div>'+(message.isUrgent?'<div class="chat-urgent-banner">🚨 СРОЧНОЕ ОБРАЩЕНИЕ</div>':'')+'<div class="chat-message-text">'+renderChatText(message.text||'')+'</div>'+(mine?'<small class="direct-chat-read-status '+(peerRead?'is-read':'')+'" title="'+(peerRead?'Собеседник прочитал сообщение':'Сообщение отправлено')+'">'+(peerRead?'✓✓ Прочитано':'✓ Отправлено')+'</small>':'')+(urgentPending?'<button type="button" class="chat-urgent-ack" data-direct-urgent-ack="'+esc(message.id)+'">✓ Подтвердить получение</button>':(message.isUrgent&&!mine?'<small class="direct-urgent-acknowledged">✓ Получение подтверждено</small>':''))+'</article>';
  }).join('');
  const pendingUrgent=messages.find(message=>message.isUrgent===true&&message.authorId!==signedInUser?.uid&&!(Array.isArray(message.urgentAckBy)&&message.urgentAckBy.includes(signedInUser?.uid))&&!shownDirectUrgentAlerts.has(message.id));
  if(pendingUrgent&&directChatTarget){
@@ -3303,6 +3311,8 @@ async function openDirectChat(person,requestedThreadId=''){
   const messagesQuery=query(collection(db,'directChats',threadId,'messages'),orderBy('createdAt','desc'),limit(100));
   directChatUnsubscribe=onSnapshot(messagesQuery,snap=>{
    const messages=snap.docs.map(d=>({id:d.id,...d.data()})).reverse();
+   const unreadIncoming=messages.filter(message=>message.authorId!==signedInUser.uid&&!(Array.isArray(message.readBy)&&message.readBy.includes(signedInUser.uid)));
+   if(unreadIncoming.length){const receiptBatch=writeBatch(db);unreadIncoming.forEach(message=>receiptBatch.update(doc(db,'directChats',threadId,'messages',message.id),{readBy:arrayUnion(signedInUser.uid)}));void receiptBatch.commit().catch(error=>console.warn('Не удалось отметить личные сообщения прочитанными',error));}
    renderDirectChatMessages(messages);
   },err=>{
    console.error('Не удалось загрузить личную переписку',err);
@@ -3332,7 +3342,7 @@ async function openDirectChat(person,requestedThreadId=''){
     const messageRef=doc(collection(db,'directChats',threadId,'messages'));
     const urgent=$('directChatUrgent')?.checked===true;
     directStage='запись сообщения в directChats/'+threadId+'/messages';
-    await setDoc(messageRef,{text:textValue.slice(0,1000),authorId:signedInUser.uid,authorName:profileName,createdAt:serverTimestamp(),mentionUserIds:[person.uid],notificationRecipientIds:[person.uid],isUrgent:urgent,urgentAckBy:[]});
+    await setDoc(messageRef,{text:textValue.slice(0,1000),authorId:signedInUser.uid,authorName:profileName,createdAt:serverTimestamp(),mentionUserIds:[person.uid],notificationRecipientIds:[person.uid],isUrgent:urgent,urgentAckBy:[],readBy:[signedInUser.uid]});
     directStage='обновление последнего сообщения в directChats/'+threadId;
     await updateDoc(threadRef,{updatedAt:serverTimestamp(),lastMessage:textValue.slice(0,180),lastMessageAt:serverTimestamp(),lastSenderId:signedInUser.uid});
     directStage='постановка push-уведомления';
@@ -4111,7 +4121,7 @@ function showNotifications(){
     const rows=groups.map(group=>{
       const entries=group.entries,n=group.latest,ids=entries.map(item=>item.id),unreadCount=group.unreadCount;
       const tone=notificationTone(n);
-      const openButton=n.orderId?'<button type="button" class="small-button primary-soft" data-open="'+esc(n.orderId)+'">Открыть заказ</button>':n.target==='chat'?'<button type="button" class="small-button primary-soft" data-open-chat="1">Открыть чат</button>':'';
+      const openButton=n.directChatThreadId&&n.authorId?'<button type="button" class="small-button primary-soft" data-open-direct-chat-thread="'+esc(n.directChatThreadId)+'" data-open-direct-chat-peer="'+esc(n.authorId)+'">Открыть личный чат</button>':n.orderId?'<button type="button" class="small-button primary-soft" data-open="'+esc(n.orderId)+'">Открыть заказ</button>':n.target==='chat'?'<button type="button" class="small-button primary-soft" data-open-chat="1">Открыть чат</button>':'';
       return '<article role="button" tabindex="0" aria-label="Отметить уведомления прочитанными" class="notification-entry notification-'+tone+' '+(unreadCount?'unread':'')+'" data-notice-id="'+esc(n.id)+'" data-notice-ids="'+esc(ids.join(','))+'"><span class="notification-dot"></span><div><b>'+esc(n.title||'Уведомление')+'</b><p>'+esc(n.message||n.body||'Новое событие')+'</p><small>'+fmtDateTime(n.createdAt||n.at)+'</small>'+(entries.length>1?'<span class="notification-group-count">'+entries.length+' событий · '+(unreadCount?unreadCount+' новых':'прочитано')+'</span>':'')+'</div><div class="notification-group-actions">'+openButton+'</div></article>';
     }).join('');
     const listEl=$('notificationList');if(listEl)listEl.innerHTML=rows||'<div class="danger-note">Уведомлений по фильтрам нет.</div>';
@@ -4243,12 +4253,14 @@ document.addEventListener('click',e=>{
     const notices=state.notices.filter(n=>noticeIds.includes(n.id));
     const openButton=e.target.closest('[data-open]');
     const openChatButton=e.target.closest('[data-open-chat]');
+    const openDirectChatButton=e.target.closest('[data-open-direct-chat-thread]');
     if(notices.some(n=>!n.read))markNotificationItemsRead(notices).then(result=>{
       const summary=$('notificationUnreadCount');
       if(summary)summary.textContent=String(state.notices.filter(n=>!n.read).length);
       if(noticeCard.isConnected){const remaining=notices.filter(n=>!n.read).length;noticeCard.classList.toggle('unread',remaining>0);noticeCard.setAttribute('aria-label',remaining?'Отметить уведомления прочитанными':'Прочитанные уведомления');const badge=noticeCard.querySelector('.notification-group-count');if(badge)badge.textContent=notices.length+' событий · '+(remaining?remaining+' новых':'прочитано');}
     });
-    if(openButton){e.preventDefault();openOrder(openButton.dataset.open);}
+    if(openDirectChatButton){e.preventDefault();closeModal();void openDirectChatByIds(openDirectChatButton.dataset.openDirectChatThread,openDirectChatButton.dataset.openDirectChatPeer);}
+    else if(openButton){e.preventDefault();openOrder(openButton.dataset.open);}
     else if(openChatButton){e.preventDefault();openChat();}
     return;
   }

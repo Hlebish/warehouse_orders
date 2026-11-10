@@ -178,15 +178,29 @@ service cloud.firestore {
           && request.resource.data.text is string
           && request.resource.data.text.size() > 0
           && request.resource.data.text.size() <= 1000
-          && request.resource.data.keys().hasOnly(['text','authorId','authorName','createdAt','mentionUserIds','notificationRecipientIds','isUrgent','urgentAckBy']);
+          && request.resource.data.keys().hasOnly(['text','authorId','authorName','createdAt','mentionUserIds','notificationRecipientIds','isUrgent','urgentAckBy','readBy'])
+          && request.resource.data.readBy is list
+          && request.resource.data.readBy.size() == 1
+          && request.resource.data.readBy.hasAll([request.auth.uid]);
         allow update: if directChatParticipant()
-          && resource.data.authorId != request.auth.uid
-          && resource.data.isUrgent == true
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['urgentAckBy'])
-          && request.resource.data.urgentAckBy is list
-          && request.resource.data.urgentAckBy.hasAll(resource.data.urgentAckBy)
-          && request.resource.data.urgentAckBy.hasAll([request.auth.uid])
-          && request.resource.data.urgentAckBy.size() <= resource.data.urgentAckBy.size() + 1;
+          && (
+            (resource.data.authorId != request.auth.uid
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['readBy'])
+              && request.resource.data.readBy is list
+              && request.resource.data.readBy.size() <= 2
+              && request.resource.data.readBy.hasAll([resource.data.authorId,request.auth.uid])
+              && (!(resource.data.keys().hasAny(['readBy']) && resource.data.readBy is list)
+                || (request.resource.data.readBy.hasAll(resource.data.readBy)
+                  && request.resource.data.readBy.size() <= resource.data.readBy.size() + 1)))
+            ||
+            (resource.data.authorId != request.auth.uid
+              && resource.data.isUrgent == true
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['urgentAckBy'])
+              && request.resource.data.urgentAckBy is list
+              && request.resource.data.urgentAckBy.hasAll(resource.data.urgentAckBy)
+              && request.resource.data.urgentAckBy.hasAll([request.auth.uid])
+              && request.resource.data.urgentAckBy.size() <= resource.data.urgentAckBy.size() + 1)
+          );
         allow delete: if false;
       }
     }

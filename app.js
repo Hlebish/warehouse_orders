@@ -1074,7 +1074,11 @@ function renderStaffPanel(){
  const now=Date.now(),items=[...staffDirectory.values()].filter(x=>x.active===true).map(person=>{
   const p=staffPresence.get(person.uid),lastSeen=Number(p?.updatedAt||0),online=!!p&&p.active===true&&lastSeen>0&&now-lastSeen<45000;
   return {...person,online,lastSeen,activity:online?(p.activity||'В приложении'):'Не в сети'};
- }).sort((x,y)=>Number(y.online)-Number(x.online)||String(x.displayName).localeCompare(String(y.displayName),'ru'));
+ }).sort((x,y)=>{
+  const rolePriority={director:0,chief_accountant:1,accountant:1,manager:2,warehouse:3};
+  const roleOrder=(rolePriority[x.role]??4)-(rolePriority[y.role]??4);
+  return roleOrder||String(x.displayName||'').localeCompare(String(y.displayName||''),'ru')||String(x.uid).localeCompare(String(y.uid));
+ });
  const onlineCount=items.filter(x=>x.online).length;
  const unreadCountsBySender=new Map();
  (Array.isArray(state.notices)?state.notices:[]).filter(n=>!n.read&&n.directChatThreadId&&n.authorId&&String(n.authorId)!==String(signedInUser?.uid||'')).forEach(n=>{

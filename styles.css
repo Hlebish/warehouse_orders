@@ -8760,3 +8760,25 @@ body:has(.staff-presence-panel.open) .main-area{
  .urgent-direct-tray{font-size:12px;padding:11px 13px}
 }
 @media(prefers-reduced-motion:reduce){.urgent-direct-tray{animation:none!important}}
+
+/* In the Windows app, keep the staff rail/drawer beside the workspace.
+   Size the main column explicitly so the fixed panel cannot cover its content. */
+@media(min-width:721px){
+ html.warehouse-desktop-app .main-area{
+  box-sizing:border-box!important;
+  width:auto!important;
+  max-width:none!important;
+  min-width:0!important;
+  margin-right:64px!important;
+  transition:margin-right .22s cubic-bezier(.2,.75,.25,1)!important;
+ }
+ html.warehouse-desktop-app.warehouse-staff-drawer-open .main-area{
+  margin-right:320px!important;
+ }
+ html.warehouse-desktop-app .staff-presence-panel{
+  width:64px!important;
+ }
+ html.warehouse-desktop-app .staff-presence-panel.open{
+  width:320px!important;
+ }
+}

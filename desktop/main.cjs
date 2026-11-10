@@ -18,6 +18,21 @@ let showingOfflinePage = false;
 let offlineRetryTimer = null;
 let offlineRetryInProgress = false;
 const activeNotifications = new Map();
+const hasSingleInstanceLock = app.requestSingleInstanceLock();
+
+if (!hasSingleInstanceLock) {
+  app.quit();
+} else {
+  app.on('second-instance', (_event, commandLine) => {
+    // The login-startup copy is deliberately hidden; a manual second launch
+    // should raise the existing window instead of creating another process.
+    if (commandLine.includes('--hidden')) return;
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.show();
+    mainWindow.focus();
+  });
+}
 
 app.setAppUserModelId('ua.amp.warehouseorders');
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
@@ -402,6 +417,7 @@ function createTray() {
 }
 
 app.whenReady().then(() => {
+  if (!hasSingleInstanceLock) return;
   ipcMain.handle('warehouse:get-app-version', () => app.getVersion());
   ipcMain.on('warehouse:retry-app-connection', event => {
     if (mainWindow && event.sender === mainWindow.webContents) retryAppConnection();

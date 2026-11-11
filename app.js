@@ -584,7 +584,9 @@ async function save(){
          }else{
            const actionLabel=e.kind==='decision'?'Добавлено решение':e.kind==='question'?'Добавлен вопрос':'Новый комментарий';
            const category=e.replyToEntryId&&e.replyToAuthorId?'replies':e.kind==='decision'?'decisions':e.kind==='question'?'questions':'comments';
-           pushTasks.push(()=>e.replyToEntryId&&e.replyToAuthorId?queuePush(clientLabel,'Новый ответ',signedInUser.uid,o.id,'site','replies',e.replyToAuthorId):queuePush(clientLabel,actionLabel,signedInUser.uid,o.id,'site',category));
+           const pushBody=['comment','question','decision'].includes(e.kind)?String(e.text||actionLabel).slice(0,500):actionLabel;
+           const mentionRecipientIds=pendingEntryMentionIds.get(e.id)||[];
+           pushTasks.push(()=>e.replyToEntryId&&e.replyToAuthorId?queuePush(clientLabel,pushBody,signedInUser.uid,o.id,'site','replies',e.replyToAuthorId,{isReply:true}):queuePush(clientLabel,pushBody,signedInUser.uid,o.id,'site',category,'',mentionRecipientIds.length?{mentionRecipientIds}:{}));
          }
        }
        oldEntries.delete(e.id);
@@ -659,12 +661,15 @@ function flushPushBatch(key){
   if(signedInUser?.uid!==batch.authorId)return;
   const orderIds=[...new Set(batch.events.map(item=>item.orderId).filter(Boolean))];
   const eventCount=batch.events.length;
+  const lastEvent=batch.events[batch.events.length-1];
   const categoryTitles={orders:'Новые заказы',assembly:'Сборка заказов',status:'Изменения статусов',editing:'Изменения заказов',defects:'Новые дефекты',questions:'Новые вопросы',decisions:'Новые решения',replies:'Новые ответы',comments:'Новые комментарии',chat:'Общий чат',likes:'Реакции в чате'};
+  const lastMessageText=['comments','replies','questions'].includes(lastEvent.category)?String(lastEvent.body||'').trim().slice(0,260):'';
   const summaryBody=batch.target==='chat'
     ?`За короткое время: ${eventCount} ${plural(eventCount,'новое сообщение','новых сообщения','новых сообщений')}.`
-    :`За короткое время: ${eventCount} ${plural(eventCount,'изменение','изменения','изменений')}${batch.events[0].orderNumber?` в заказе № ${batch.events[0].orderNumber}`:''}.`;
+    :`За короткое время: ${eventCount} ${plural(eventCount,'изменение','изменения','изменений')}${batch.events[0].orderNumber?` в заказе № ${batch.events[0].orderNumber}`:''}.${lastMessageText?' Последний комментарий: '+lastMessageText:''}`;
   const payload=batch.events.length===1?batch.events[0]:{
     ...batch.events[0],
+    mentionRecipientIds:[...new Set(batch.events.flatMap(item=>Array.isArray(item.mentionRecipientIds)?item.mentionRecipientIds:[]))].slice(0,20),
     title:categoryTitles[batch.events[0].category]||'Обновления заказов',
     body:summaryBody,
     orderId:orderIds.length===1?orderIds[0]:'',
@@ -687,6 +692,7 @@ function queuePush(title,body,authorId,orderId='',target='site',category='',reci
     target:normalizedTarget,
     category:normalizedCategory,
     recipientUserId:String(recipientUserId||''),
+    mentionRecipientIds:Array.isArray(attention.mentionRecipientIds)?[...new Set(attention.mentionRecipientIds.map(String).filter(Boolean))].slice(0,20):[],
     isMention:attention.isMention===true,
     isReply:attention.isReply===true,
     forceAll:attention.forceAll===true,
@@ -2276,7 +2282,7 @@ if((o.returns||[]).length){
 }else{
   articlesHtml+='<div class="field-hint">Возвратов ещё не оформляли.</div>';
 }
-let entries=(o.entries||[]).slice().sort((a,b)=>new Date(a.createdAt||0)-new Date(b.createdAt||0)).map(e=>{const replyTarget=(o.entries||[]).find(x=>x.id===e.replyToEntryId);const decisionLabel=e.decision==='Подтверждён'?'Подтверждено':e.decision==='Отменён'?'Отменено':e.decision==='Удалена из заказа'?'Позиция удалена из заказа':'Ожидает решения';const decidedBy=e.decidedByName||e.decidedBy||'';const defectArticleIndex=e.kind==='defect'?(Number.isInteger(e.articleIndex)?e.articleIndex:(o.articles||[]).findIndex(x=>x.article===e.article)):-1;return `<article class="timeline-item ${e.important?'timeline-item-important':''}"><div class="timeline-top"><span><b>${esc(e.author)}</b> · ${fmtDateTime(e.createdAt)}${e.important?' <span class="important-message-mark" title="Важное сообщение">❗ ВАЖНО</span>':''}</span><span style="display:flex;align-items:center;gap:7px"><span class="timeline-type">${esc(({defect:'ДЕФЕКТ',question:'ВОПРОС',decision:'РЕШЕНИЕ',comment:'КОММЕНТАРИЙ',viewed:'ПРОСМОТРЕНО',system:'СИСТЕМА'})[e.kind]||'ЗАПИСЬ')}</span>${isDirector?`<button class="row-menu" title="Удалить запись (директор)" data-action="delete-entry:${e.id}">×</button>`:''}</span></div>${e.replyToEntryId?`<div class="timeline-reply-reference"><b>Ответ для ${esc(e.replyToAuthorName||replyTarget?.author||'Сотрудника')}</b><div>${esc(String(e.replyToText||replyTarget?.text||'').slice(0,220))}${String(e.replyToText||replyTarget?.text||'').length>220?'…':''}</div></div>`:''}${e.article&&e.kind!=='defect'?`<div class="timeline-article">Артикул: ${esc(e.article)}</div>`:''}${e.kind!=='defect'?'<div class="timeline-text">'+esc(e.text)+'</div>':''}${e.kind==='comment'?button('↩ Ответить','reply-entry:'+e.id,'small-button primary-soft timeline-reply-button'):''}${e.kind!=='defect'&&e.photos?.length?`<div class="photo-grid">${e.photos.map(p=>`<div class="order-photo-share"><img src="${esc(p)}" alt="Фото к записи" data-photo="${esc(p)}"><button type="button" class="small-button primary-soft" data-viber-photo="${esc(p)}" data-viber-context="${esc('Комментарий · заказ № '+o.number)}">Отправить в Viber</button></div>`).join('')}</div>`:''}${e.kind==='defect'?`<section class="defect-comment-box ${e.decision?'defect-comment-resolved':'defect-comment-pending'}"><div class="defect-comment-heading"><b>⚠ Дефект детали</b><span class="defect-comment-status">${esc(decisionLabel)}</span></div><div class="defect-comment-article">Артикул: <b>${esc(e.article||'Не указан')}</b></div><div class="defect-comment-description">${esc(e.text||'Описание дефекта не добавлено.')}</div>${e.photos?.length?`<div class="defect-comment-photos">${e.photos.map((p,n)=>`<div class="order-photo-share"><img src="${esc(p)}" alt="Фото дефекта ${n+1}" data-photo="${esc(p)}"><button type="button" class="small-button primary-soft" data-viber-photo="${esc(p)}" data-viber-context="${esc(o.client||'Клиент')}">Отправить в Viber</button></div>`).join('')}</div>`:'<div class="defect-comment-no-photos">Фотографии не приложены</div>'}${!e.decision&&(isManager||canManageUsers)&&defectArticleIndex>=0?button('Рассмотреть','review-defect:'+defectArticleIndex,'small-button danger defect-review-photo-button'):''}${e.decision?`<div class="defect-comment-decision">Решение: <b>${esc(decisionLabel)}</b>${decidedBy?` · ${esc(decidedBy)}`:''}${e.decisionText?`<p>${esc(e.decisionText)}</p>`:''}</div>`:'<div class="defect-comment-hint">Выберите действие по этой детали:</div>'}${!e.decision&&(isManager||canManageUsers)?`<div class="defect-comment-actions">${button('✓ Одобрить дефект','defect-confirm:'+e.id,'small-button good')}${button('Удалить позицию из заказа','defect-remove:'+e.id,'small-button danger')}${button('Отменить весь заказ','defect-cancel:'+e.id,'small-button danger')}</div>`:''}${!e.decision&&isWarehouse&&!isManager&&!canManageUsers?'<div class="defect-comment-hint">Ожидает решения менеджера.</div>':''}</section>`:''}</article>`}).join('');const reviewed=(o.entries||[]).some(e=>e.kind==='viewed');let badge=reviewed?'<span class="status-pill status-neutral">Просмотрен менеджером</span>':'';showModal(`Заказ № ${o.number}`,`<div class="order-detail-head"><div><button type="button" class="detail-number detail-client-link" data-open-client-card="${esc(o.client)}" data-open-client-id="${esc(o.clientId||'')}" title="Открыть карточку клиента">${esc(o.client)}</button><div class="detail-client">Заказ № ${esc(o.number)}</div><div class="detail-meta"><div class="detail-meta-line">Создан: ${fmtDateTime(o.createdAt)}</div>${`<div class="detail-meta-line">Доставка: ${o.deliveryType==='pickup'?'Самовывоз':o.deliveryType==='post'?'Доставка почтой':o.deliveryType==='kamyanske'?'Доставка в Камянское':'Доставка по городу'}</div>`}${o.transferredAt?`<div class="detail-meta-line">Перенесен: ${fmtDateTime(o.transferredAt)}</div>`:""}${o.assembledAt?`<div class="detail-meta-line">Собран: ${fmtDateTime(o.assembledAt)}</div>`:""}${o.shippedAt?`<div class="detail-meta-line">Отгружен: ${fmtDateTime(o.shippedAt)}</div>`:""}<div class="detail-meta-line">${esc(o.author||"Кладовщик")}</div><div class="detail-history-mini">${(o.entries||[]).slice(-3).reverse().map(e=>`<div class="detail-history-line">${esc(e.author||'Сотрудник')} · ${fmtDateTime(e.createdAt)} · ${esc(e.text||'Действие')}</div>`).join('')}</div></div></div><div>${statusPill(o.status)}${assemblyIndicator(o)}<div style="margin-top:6px">${badge}</div></div></div><div class="detail-actions">${actions}</div>${articlesHtml}<div class="detail-section-title">Комментарии и дефекты · ${entriesCount(o)} ${plural(entriesCount(o),'запись','записи','записей')}</div><div class="timeline">${entries||'<div class="danger-note">Записей пока нет. Добавьте комментарий или описание дефекта.</div>'}</div>`,[button('Закрыть','close')],'КАРТОЧКА ЗАКАЗА');modal.dataset.orderDetail=id;loadWarehouseMapAddresses(o.articles)}
+let entries=(o.entries||[]).slice().sort((a,b)=>new Date(a.createdAt||0)-new Date(b.createdAt||0)).map(e=>{const replyTarget=(o.entries||[]).find(x=>x.id===e.replyToEntryId);const decisionLabel=e.decision==='Подтверждён'?'Подтверждено':e.decision==='Отменён'?'Отменено':e.decision==='Удалена из заказа'?'Позиция удалена из заказа':'Ожидает решения';const decidedBy=e.decidedByName||e.decidedBy||'';const defectArticleIndex=e.kind==='defect'?(Number.isInteger(e.articleIndex)?e.articleIndex:(o.articles||[]).findIndex(x=>x.article===e.article)):-1;return `<article class="timeline-item ${e.important?'timeline-item-important':''}"><div class="timeline-top"><span><b>${esc(e.author)}</b> · ${fmtDateTime(e.createdAt)}${e.important?' <span class="important-message-mark" title="Важное сообщение">❗ ВАЖНО</span>':''}</span><span style="display:flex;align-items:center;gap:7px"><span class="timeline-type">${esc(({defect:'ДЕФЕКТ',question:'ВОПРОС',decision:'РЕШЕНИЕ',comment:'КОММЕНТАРИЙ',viewed:'ПРОСМОТРЕНО',system:'СИСТЕМА'})[e.kind]||'ЗАПИСЬ')}</span>${isDirector?`<button class="row-menu" title="Удалить запись (директор)" data-action="delete-entry:${e.id}">×</button>`:''}</span></div>${e.replyToEntryId?`<div class="timeline-reply-reference"><b>Ответ для ${esc(e.replyToAuthorName||replyTarget?.author||'Сотрудника')}</b><div>${esc(String(e.replyToText||replyTarget?.text||'').slice(0,220))}${String(e.replyToText||replyTarget?.text||'').length>220?'…':''}</div></div>`:''}${e.article&&e.kind!=='defect'?`<div class="timeline-article">Артикул: ${esc(e.article)}</div>`:''}${e.kind!=='defect'?'<div class="timeline-text">'+renderChatText(e.text)+'</div>':''}${e.kind==='comment'?button('↩ Ответить','reply-entry:'+e.id,'small-button primary-soft timeline-reply-button'):''}${e.kind!=='defect'&&e.photos?.length?`<div class="photo-grid">${e.photos.map(p=>`<div class="order-photo-share"><img src="${esc(p)}" alt="Фото к записи" data-photo="${esc(p)}"><button type="button" class="small-button primary-soft" data-viber-photo="${esc(p)}" data-viber-context="${esc('Комментарий · заказ № '+o.number)}">Отправить в Viber</button></div>`).join('')}</div>`:''}${e.kind==='defect'?`<section class="defect-comment-box ${e.decision?'defect-comment-resolved':'defect-comment-pending'}"><div class="defect-comment-heading"><b>⚠ Дефект детали</b><span class="defect-comment-status">${esc(decisionLabel)}</span></div><div class="defect-comment-article">Артикул: <b>${esc(e.article||'Не указан')}</b></div><div class="defect-comment-description">${esc(e.text||'Описание дефекта не добавлено.')}</div>${e.photos?.length?`<div class="defect-comment-photos">${e.photos.map((p,n)=>`<div class="order-photo-share"><img src="${esc(p)}" alt="Фото дефекта ${n+1}" data-photo="${esc(p)}"><button type="button" class="small-button primary-soft" data-viber-photo="${esc(p)}" data-viber-context="${esc(o.client||'Клиент')}">Отправить в Viber</button></div>`).join('')}</div>`:'<div class="defect-comment-no-photos">Фотографии не приложены</div>'}${!e.decision&&(isManager||canManageUsers)&&defectArticleIndex>=0?button('Рассмотреть','review-defect:'+defectArticleIndex,'small-button danger defect-review-photo-button'):''}${e.decision?`<div class="defect-comment-decision">Решение: <b>${esc(decisionLabel)}</b>${decidedBy?` · ${esc(decidedBy)}`:''}${e.decisionText?`<p>${esc(e.decisionText)}</p>`:''}</div>`:'<div class="defect-comment-hint">Выберите действие по этой детали:</div>'}${!e.decision&&(isManager||canManageUsers)?`<div class="defect-comment-actions">${button('✓ Одобрить дефект','defect-confirm:'+e.id,'small-button good')}${button('Удалить позицию из заказа','defect-remove:'+e.id,'small-button danger')}${button('Отменить весь заказ','defect-cancel:'+e.id,'small-button danger')}</div>`:''}${!e.decision&&isWarehouse&&!isManager&&!canManageUsers?'<div class="defect-comment-hint">Ожидает решения менеджера.</div>':''}</section>`:''}</article>`}).join('');const reviewed=(o.entries||[]).some(e=>e.kind==='viewed');let badge=reviewed?'<span class="status-pill status-neutral">Просмотрен менеджером</span>':'';showModal(`Заказ № ${o.number}`,`<div class="order-detail-head"><div><button type="button" class="detail-number detail-client-link" data-open-client-card="${esc(o.client)}" data-open-client-id="${esc(o.clientId||'')}" title="Открыть карточку клиента">${esc(o.client)}</button><div class="detail-client">Заказ № ${esc(o.number)}</div><div class="detail-meta"><div class="detail-meta-line">Создан: ${fmtDateTime(o.createdAt)}</div>${`<div class="detail-meta-line">Доставка: ${o.deliveryType==='pickup'?'Самовывоз':o.deliveryType==='post'?'Доставка почтой':o.deliveryType==='kamyanske'?'Доставка в Камянское':'Доставка по городу'}</div>`}${o.transferredAt?`<div class="detail-meta-line">Перенесен: ${fmtDateTime(o.transferredAt)}</div>`:""}${o.assembledAt?`<div class="detail-meta-line">Собран: ${fmtDateTime(o.assembledAt)}</div>`:""}${o.shippedAt?`<div class="detail-meta-line">Отгружен: ${fmtDateTime(o.shippedAt)}</div>`:""}<div class="detail-meta-line">${esc(o.author||"Кладовщик")}</div><div class="detail-history-mini">${(o.entries||[]).slice(-3).reverse().map(e=>`<div class="detail-history-line">${esc(e.author||'Сотрудник')} · ${fmtDateTime(e.createdAt)} · ${esc(e.text||'Действие')}</div>`).join('')}</div></div></div><div>${statusPill(o.status)}${assemblyIndicator(o)}<div style="margin-top:6px">${badge}</div></div></div><div class="detail-actions">${actions}</div>${articlesHtml}<div class="detail-section-title">Комментарии и дефекты · ${entriesCount(o)} ${plural(entriesCount(o),'запись','записи','записей')}</div><div class="timeline">${entries||'<div class="danger-note">Записей пока нет. Добавьте комментарий или описание дефекта.</div>'}</div>`,[button('Закрыть','close')],'КАРТОЧКА ЗАКАЗА');modal.dataset.orderDetail=id;loadWarehouseMapAddresses(o.articles)}
 
 function openOrderActionCategory(category){const o=state.orders.find(x=>x.id===selectedId);if(o&&hasPendingDefect(o)){toast('Пока дефект не рассмотрен, смена статуса недоступна. Сборку и редактирование можно продолжать.');return;}const isManager=isManagerRole()||canManageUsers;const warehouseActions=[...(state.role==='warehouse'||canManageUsers?[button('Отгружен кладовщиком','set-status:Отгружен кладовщиком','small-button shipped')]:[]),button('Камянское','set-status:Камянское','small-button warehouse-status-kamenskoye'),button('Под вопросом','set-status:Под вопросом','small-button warehouse-status-question'),button('Ожидает самовывоза','set-status:Ожидает самовывоза','small-button warehouse-status-pickup-waiting'),button('Клиент забрал самовывозом','set-status:Клиент забрал самовывозом','small-button warehouse-status-pickup-done')];const managerActions=[button('Создан','set-status:Создан','small-button manager-status-created'),button('На согласовании','set-status:На согласовании','small-button manager-status-approval'),button('Одобрен на отгрузку клиенту','set-status:Одобрен на отгрузку клиенту','small-button manager-status-ready'),button('Перенесен','set-status:Перенесен','small-button manager-status-transferred'),button('Отменён','set-status:Отменён','small-button manager-status-cancel'),button('Ожидает оплаты','set-status:Ожидает оплаты','small-button manager-status-payment')];const title=category==='warehouse'?'Действия кладовщика':'Действия менеджера';const list=category==='warehouse'?warehouseActions:managerActions;showModal(title,`<div class="order-action-menu"><div class="order-action-menu-hint">${category==='warehouse'?'Статусы сборки и выдачи заказа.':'Статусы согласования и работы менеджера.'}</div><div class="order-action-menu-list">${list.join('')}</div></div>`,[button('Назад к заказу','back-detail')],category==='warehouse'?'КЛАДОВЩИК':'МЕНЕДЖЕР')}
 function openEditMenu(){showModal('Редактировать заказ','<div class="field-hint">Выберите, что хотите изменить.</div>',[button('Редактировать данные','edit-order-info','small-button neutral-edit-button'),button('Редактировать артикулы','edit-articles','small-button neutral-edit-button'),button('Назад к заказу','back-detail','small-button')],'РЕДАКТИРОВАНИЕ ЗАКАЗА')}
@@ -2415,8 +2421,8 @@ async function saveArticles(){
    toast('Не удалось сохранить артикулы: '+(String(err?.code||'').replace(/^.*?\//,'')||'проверьте доступ и соединение'));
  }
 }
-function addComment(){loadCurrentChatPeople();showModal('Добавить комментарий',`<form id="entryForm"><div class="field entry-mention-wrap"><label for="entryText">Сообщение *</label><textarea id="entryText" required placeholder="Напишите комментарий; используйте @ для упоминания" autocomplete="off"></textarea><div id="entryMentionSuggestions" class="chat-mention-suggestions entry-mention-suggestions" hidden></div></div><div class="field"><label class="important-message-option"><input id="entryImportant" type="checkbox"> <span>⚠ Сделать важным сообщением</span></label></div><div class="field"><label for="entryPhotos">Фото (необязательно)</label><div class="upload-box">Прикрепить фотографии<input id="entryPhotos" type="file" accept="image/*" multiple></div><span class="field-hint">Можно отправить обычный текст без артикула и фотографий.</span></div></form>`,[button('Назад','back-detail'),button('Отправить','save-entry','primary-button')],'КОММЕНТАРИЙ');modal.dataset.replyToEntryId='';modal.dataset.entryDraftId=crypto.randomUUID();$('entryKind')?.remove()}
-function replyToEntry(entryId){loadCurrentChatPeople();const o=state.orders.find(x=>x.id===selectedId),entry=o?.entries.find(x=>x.id===entryId);if(!o||!entry||entry.kind!=='comment'){toast('Не удалось найти комментарий для ответа.');return;}showModal('Ответ на комментарий',`<div class="timeline-reply-reference"><b>${esc(entry.author||'Сотрудник')}</b><div>${esc(String(entry.text||'').slice(0,500))}${String(entry.text||'').length>500?'…':''}</div></div><form id="entryForm"><div class="field entry-mention-wrap"><label for="entryText">Ваш ответ *</label><textarea id="entryText" required placeholder="Напишите ответ…" autocomplete="off"></textarea><div id="entryMentionSuggestions" class="chat-mention-suggestions entry-mention-suggestions" hidden></div></div><div class="field"><label for="entryPhotos">Фото (необязательно)</label><div class="upload-box">Прикрепить фотографии<input id="entryPhotos" type="file" accept="image/*" multiple></div></div></form>`,[button('Назад','back-detail'),button('Отправить ответ','save-entry','primary-button')],'ОТВЕТ НА КОММЕНТАРИЙ');modal.dataset.replyToEntryId=entry.id;modal.dataset.entryDraftId=crypto.randomUUID();}
+function addComment(){loadCurrentChatPeople();showModal('Добавить комментарий',`<form id="entryForm"><div class="field entry-mention-wrap"><label for="entryText">Сообщение *</label><textarea id="entryText" required placeholder="Напишите комментарий; используйте @ для упоминания" autocomplete="off"></textarea><div id="entryMentionSuggestions" class="chat-mention-suggestions entry-mention-suggestions" hidden></div><div id="entryMentionSelected" class="entry-mention-selected" hidden></div><small class="field-hint entry-mention-help">Введите @ и выберите сотрудника из списка, чтобы отправить ему уведомление.</small></div><div class="field"><label class="important-message-option"><input id="entryImportant" type="checkbox"> <span>⚠ Сделать важным сообщением</span></label></div><div class="field"><label for="entryPhotos">Фото (необязательно)</label><div class="upload-box">Прикрепить фотографии<input id="entryPhotos" type="file" accept="image/*" multiple></div><span class="field-hint">Можно отправить обычный текст без артикула и фотографий.</span></div></form>`,[button('Назад','back-detail'),button('Отправить','save-entry','primary-button')],'КОММЕНТАРИЙ');modal.dataset.replyToEntryId='';modal.dataset.entryDraftId=crypto.randomUUID();modal.dataset.entryMentionSelections='[]';$('entryKind')?.remove()}
+function replyToEntry(entryId){loadCurrentChatPeople();const o=state.orders.find(x=>x.id===selectedId),entry=o?.entries.find(x=>x.id===entryId);if(!o||!entry||entry.kind!=='comment'){toast('Не удалось найти комментарий для ответа.');return;}showModal('Ответ на комментарий',`<div class="timeline-reply-reference"><b>${esc(entry.author||'Сотрудник')}</b><div>${esc(String(entry.text||'').slice(0,500))}${String(entry.text||'').length>500?'…':''}</div></div><form id="entryForm"><div class="field entry-mention-wrap"><label for="entryText">Ваш ответ *</label><textarea id="entryText" required placeholder="Напишите ответ…" autocomplete="off"></textarea><div id="entryMentionSuggestions" class="chat-mention-suggestions entry-mention-suggestions" hidden></div><div id="entryMentionSelected" class="entry-mention-selected" hidden></div><small class="field-hint entry-mention-help">Введите @ и выберите сотрудника из списка, чтобы отправить ему уведомление.</small></div><div class="field"><label for="entryPhotos">Фото (необязательно)</label><div class="upload-box">Прикрепить фотографии<input id="entryPhotos" type="file" accept="image/*" multiple></div></div></form>`,[button('Назад','back-detail'),button('Отправить ответ','save-entry','primary-button')],'ОТВЕТ НА КОММЕНТАРИЙ');modal.dataset.replyToEntryId=entry.id;modal.dataset.entryDraftId=crypto.randomUUID();modal.dataset.entryMentionSelections='[]';}
 function addDefect(){const o=state.orders.find(x=>x.id===selectedId);if(!o)return;if(!canEditOrder(o)){toast('После отгрузки заказ заблокирован для этой роли.');return;}const options=(o.articles||[]).map((x,i)=>`<label class="defect-multi-option"><input type="checkbox" name="defectArticleIndex" value="${i}"><span><b>${esc(x.article)}</b> · ${Number(x.quantity)||1} шт. · позиция ${i+1}</span></label>`).join('');if(!options){toast('В заказе нет позиций для выбора дефекта.');return;}showModal('Добавить дефект',`<form id="entryForm"><input id="entryKind" type="hidden" value="defect"><div class="field"><label>Позиции с дефектом * (можно выбрать несколько)</label><div class="defect-multi-list">${options}</div></div><div class="field"><label for="entryText">Описание дефекта *</label><textarea id="entryText" required placeholder="Опишите, что не так с деталью"></textarea></div><div class="field"><label for="entryPhotos">Фото дефекта (необязательно)</label><div class="upload-box">Прикрепить фотографии<input id="entryPhotos" type="file" accept="image/*" multiple></div><span class="field-hint">Прикреплённые фото будут добавлены к первой отмеченной позиции.</span></div></form>`,[button('Назад','back-detail'),button('Добавить дефект','save-entry','primary-button')],'ДЕФЕКТ ДЕТАЛИ');modal.dataset.entryDraftId=crypto.randomUUID();modal.dataset.entryDraftIds='{}'}
 function editDefect(entryId){const o=state.orders.find(x=>x.id===selectedId),e=o?.entries.find(x=>x.id===entryId);if(!o||!e||e.kind!=='defect'||e.decision||!(state.role==='warehouse'||canManageUsers)||!canEditOrder(o)){toast('Редактировать можно только нерассмотренный дефект в доступном для редактирования заказе.');return;}const options=(o.articles||[]).map((x,i)=>`<option value="${i}"${(Number.isInteger(e.articleIndex)?e.articleIndex===i:x.article===e.article)?' selected':''}>${esc(x.article)} · ${Number(x.quantity)||1} шт. · позиция ${i+1}</option>`).join('');showModal('Редактировать дефект',`<form id="editDefectForm"><div class="field"><label for="editDefectArticleIndex">Позиция заказа *</label><select id="editDefectArticleIndex" required>${options}</select></div><div class="field"><label for="editDefectText">Описание дефекта *</label><textarea id="editDefectText" required>${esc(e.text||'')}</textarea></div><div class="field"><label>Текущие фото</label><div class="photo-grid">${(e.photos||[]).map(p=>`<img src="${p}" alt="Фото дефекта" data-photo="${p}">`).join('')||'<span class="field-hint">Фото не прикреплены.</span>'}</div></div><div class="field"><label for="editDefectPhotos">Добавить фото</label><div class="upload-box">Прикрепить фотографии<input id="editDefectPhotos" type="file" accept="image/*" multiple></div><span class="field-hint">Существующие фото сохранятся; всего не более пяти фото.</span></div></form>`,[button('Назад','back-detail'),button('Сохранить дефект','save-defect-edit','primary-button')],'РЕДАКТИРОВАНИЕ ДЕФЕКТА');modal.dataset.editDefectId=entryId;}
 async function saveDefectEdit(){const o=state.orders.find(x=>x.id===selectedId),id=modal.dataset.editDefectId,e=o?.entries.find(x=>x.id===id);if(!o||!e||e.kind!=='defect'||e.decision||!(state.role==='warehouse'||canManageUsers)||!canEditOrder(o)){toast('Редактирование недоступно для этого заказа.');return;}const articleIndex=Number($('editDefectArticleIndex')?.value),article=o.articles?.[articleIndex]?.article,text=$('editDefectText')?.value.trim()||'';if(!article||!Number.isInteger(articleIndex)||articleIndex<0||!text){toast('Выберите позицию и заполните описание.');return;}try{const blobs=await readPhotos($('editDefectPhotos')?.files||[]);if((e.photos||[]).length+blobs.length>5){toast('Всего можно прикрепить не более пяти фото.');return;}const added=await uploadPhotos(o.id,e.id,blobs);e.article=article;e.articleIndex=articleIndex;e.text=text;e.photos=[...(e.photos||[]),...added];await save();await writeAudit('Изменён дефект',`Артикул: ${article}`,o.id,{entryId:id});closeModal();render();openOrder(o.id);toast('Дефект обновлён.');}catch(err){console.error(err);toast(err.message||'Не удалось сохранить дефект.');}}
@@ -2452,7 +2458,7 @@ async function saveOrder(){
   pendingOrderData.delete(o.id);pendingOrderCreateDrafts.delete(fingerprint);saveOrdersCache();
   closeModal();render();toast('Карточка заказа создана.');
   void queuePush(o.client||'Клиент не указан','Новый заказ',signedInUser.uid,o.id,'site','orders');
-  if(o.entries.length)void queuePush(o.client||'Клиент не указан','Новый комментарий',signedInUser.uid,o.id,'site','comments');
+  if(o.entries.length)void queuePush(o.client||'Клиент не указан',String(o.entries.find(entry=>entry.kind==='comment')?.text||'Новый комментарий').slice(0,500),signedInUser.uid,o.id,'site','comments');
   notify(`Создан заказ № ${n}`,o.id);
  }catch(err){
   console.error('Не удалось создать заказ',err);
@@ -2583,6 +2589,7 @@ async function uploadPhotos(orderId,entryId,blobs){
   }));
 }
 let entrySending=false;
+const pendingEntryMentionIds=new Map();
 async function saveEntry(){
   if(entrySending)return;
   const kind=$('entryKind')?.value||'comment',text=$('entryText').value.trim(),o=state.orders.find(x=>x.id===selectedId),replyToEntryId=kind==='comment'?String(modal.dataset.replyToEntryId||''):'',replyTarget=replyToEntryId?(o?.entries||[]).find(e=>e.id===replyToEntryId):null,articleIndexes=kind==='defect'?[...document.querySelectorAll('input[name="defectArticleIndex"]:checked')].map(x=>Number(x.value)):[-1],articleIndex=articleIndexes[0]??-1,article=kind==='defect'?(o?.articles?.[articleIndex]?.article||''):'';if(!text){toast('Напишите сообщение.');return}if(kind==='defect'&&(!o||!articleIndexes.length||articleIndexes.some(i=>!Number.isInteger(i)||i<0||!o.articles?.[i]))){toast('Выберите хотя бы одну позицию заказа.');return}
@@ -2598,7 +2605,14 @@ const previousStatus=o.status;
 let defectCommitted=false;
  const addedEntryIds=[];
 try{
-const photoBlobs=await readPhotos($('entryPhotos').files);const important=kind==='comment'&&$('entryImportant')?.checked===true;
+let mentionRecipients=[];
+if(kind==='comment'){
+ await loadCurrentChatPeople();
+ const mentionResolution=resolveOrderCommentMentions(text);
+ if(mentionResolution.ambiguous.length){toast('Выберите конкретного сотрудника из списка упоминаний для @'+mentionResolution.ambiguous.join(', @')+'.');return;}
+ mentionRecipients=mentionResolution.recipients.filter(person=>person.id!==replyTarget?.authorId);
+ if(mentionRecipients.length>20){toast('В одном комментарии можно упомянуть не более 20 сотрудников.');return;}
+}const photoBlobs=await readPhotos($('entryPhotos').files);const important=kind==='comment'&&$('entryImportant')?.checked===true;
 const photos=await uploadPhotos(o.id,entryId,photoBlobs);
  if(kind==='defect'){
   const createdAt=isoNow(),author=profileName||roles[state.role],entries=articleIndexes.map((idx,n)=>({id:draftEntryIds[String(idx)],kind,article:o.articles[idx].article,articleIndex:idx,text,important:false,authorId:signedInUser.uid,author,createdAt,photos:n===0?photos:[]}));
@@ -2615,10 +2629,10 @@ const photos=await uploadPhotos(o.id,entryId,photoBlobs);
   await queuePush(o.client||'Клиент не указан','Добавлен дефект',signedInUser.uid,o.id,'site','defects');
   closeModal();render();const defectToast=toast(`⚠️ ДЕФЕКТ · Заказ № ${o.number}`,o.id);defectToast.classList.add('defect-toast');notify(`Дефект к заказу № ${o.number}`,o.id);openOrder(o.id);
  }else{
-  const entry={id:entryId,kind,article:'',...(replyTarget?{replyToEntryId:replyTarget.id,replyToAuthorId:replyTarget.authorId||'',replyToAuthorName:replyTarget.author||'Сотрудника',replyToText:String(replyTarget.text||'').slice(0,500)}:{}),text,important,authorId:signedInUser.uid,author:profileName||roles[state.role],createdAt:isoNow(),photos};addedEntryIds.push(entry.id);o.entries=(o.entries||[]).filter(existing=>existing.id!==entry.id);o.entries.push(entry);await save();if(replyTarget?.authorId&&replyTarget.authorId!==signedInUser.uid){await queuePush(profileName||roles[state.role],`Ответ на ваш комментарий: ${text}`,signedInUser.uid,o.id,'site','replies',replyTarget.authorId,{isReply:true});}const tokens=[...text.matchAll(/(^|[\s])@([\p{L}\p{N}_-]{2,})/gu)].map(x=>x[2].toLocaleLowerCase('ru'));const mentioned=[...new Map(knownChatPeople.map(p=>[p.id,p])).values()].filter(p=>p.id&&p.id!==signedInUser.uid&&p.id!==replyTarget?.authorId&&tokens.includes(chatMentionToken(p.name).toLocaleLowerCase('ru')));await Promise.all(mentioned.map(p=>queuePush(profileName||roles[state.role],text,signedInUser.uid,o.id,'site','replies',p.id,{isMention:true})));await writeAudit('Добавлен комментарий',text,o.id,{entryId});closeModal();render();toast('Запись добавлена в историю заказа.');notify(`Комментарий к заказу № ${o.number}`,o.id);openOrder(o.id)
+  const entry={id:entryId,kind,article:'',...(replyTarget?{replyToEntryId:replyTarget.id,replyToAuthorId:replyTarget.authorId||'',replyToAuthorName:replyTarget.author||'Сотрудника',replyToText:String(replyTarget.text||'').slice(0,500)}:{}),text,important,authorId:signedInUser.uid,author:profileName||roles[state.role],createdAt:isoNow(),photos};addedEntryIds.push(entry.id);o.entries=(o.entries||[]).filter(existing=>existing.id!==entry.id);o.entries.push(entry);pendingEntryMentionIds.set(entryId,mentionRecipients.map(person=>person.id));await save();pendingEntryMentionIds.delete(entryId);if(replyTarget)await Promise.all(mentionRecipients.map(person=>queuePush(((profileName||roles[state.role])+' · заказ № '+o.number).slice(0,120),text.slice(0,500),signedInUser.uid,o.id,'site','replies',person.id,{isMention:true})));await writeAudit('Добавлен комментарий',text,o.id,{entryId});closeModal();render();toast('Запись добавлена в историю заказа.');notify(`Комментарий к заказу № ${o.number}`,o.id);openOrder(o.id)
  }
  }catch(e){if(addedEntryIds.length)o.entries=o.entries.filter(entry=>!addedEntryIds.includes(entry.id));if(kind==='defect'&&!defectCommitted)o.status=previousStatus;render();toast(defectCommitted?'Дефект сохранён, но не удалось обновить уведомления.':e.message)}
-finally{entrySending=false;if(sendButton){sendButton.disabled=false;sendButton.textContent=kind==='defect'?'Добавить дефект':'Отправить';}}}
+finally{pendingEntryMentionIds.delete(entryId);entrySending=false;if(sendButton){sendButton.disabled=false;sendButton.textContent=kind==='defect'?'Добавить дефект':'Отправить';}}}
 
 async function setStatus(status,text,kind='system'){
  const o=state.orders.find(x=>x.id===selectedId);
@@ -2781,20 +2795,27 @@ async function toggleExtraPhoneNotifications(){if(!signedInUser)return;const pre
 let chatMessages=[],olderChatMessages=[],chatOldestCursor=null,hasOlderChatMessages=false,loadingOlderChatMessages=false,chatPendingScrollRestore=null;
 let knownChatPeople=[];
 let chatMentionPeopleLoading=false;
+let chatPeopleLoadPromise=null;
 async function loadCurrentChatPeople(){
-  if(chatMentionPeopleLoading||!signedInUser)return;
+  if(!signedInUser)return;
+  if(chatPeopleLoadPromise)return chatPeopleLoadPromise;
   chatMentionPeopleLoading=true;
-  try{
-    // Mentions must resolve against current accounts, never historical message authors.
-    const snap=await getDocs(collection(db,'users'));
-    knownChatPeople=snap.docs
-      .map(d=>({id:d.id,name:chatDisplayName(d.data()?.displayName||d.data()?.name||''),active:d.data()?.active!==false}))
-      .filter(p=>p.id&&p.name&&p.active&&p.id!==signedInUser.uid);
-    chatMentionSuggestions();
-    entryMentionSuggestions();
-  }catch(err){
-    console.warn('Не удалось обновить список сотрудников для упоминаний',err);
-  }finally{chatMentionPeopleLoading=false;}
+  chatPeopleLoadPromise=(async()=>{
+    try{
+      // The staff directory is the safe, role-available source. Regular employees
+      // cannot list private user profiles, so do not query /users from the client.
+      await loadStaffDirectory();
+      knownChatPeople=[...staffDirectory.values()]
+        .map(person=>({id:String(person.uid||person.id||''),name:chatDisplayName(person.displayName||person.name||''),roleLabel:String(person.roleLabel||roles[person.role]||''),active:person.active===true}))
+        .filter(person=>person.id&&person.name&&person.active&&person.id!==signedInUser?.uid)
+        .sort((a,b)=>a.name.localeCompare(b.name,'ru')||a.id.localeCompare(b.id));
+      chatMentionSuggestions();
+      entryMentionSuggestions();
+    }catch(err){
+      console.warn('Не удалось обновить список сотрудников для упоминаний',err);
+    }finally{chatMentionPeopleLoading=false;chatPeopleLoadPromise=null;}
+  })();
+  return chatPeopleLoadPromise;
 }
 
 function startChatReply(messageId){
@@ -2889,10 +2910,22 @@ function entryMentionSuggestions(){
     .filter(p=>chatMentionToken(p.name).toLocaleLowerCase('ru').startsWith(needle))
     .slice(0,6);
   if(!people.length){list.hidden=true;list.innerHTML='';return;}
-  list.innerHTML=people.map(p=>'<button type="button" data-entry-mention="'+esc(chatMentionToken(p.name))+'">@'+esc(chatMentionToken(p.name))+' <small>'+esc(p.name)+'</small></button>').join('');
+  list.innerHTML=people.map(p=>'<button type="button" data-entry-mention="'+esc(chatMentionToken(p.name))+'" data-entry-mention-id="'+esc(p.id)+'">@'+esc(chatMentionToken(p.name))+' <small>'+esc(p.name)+(p.roleLabel?' · '+esc(p.roleLabel):'')+'</small></button>').join('');
   list.hidden=false;
 }
-function insertEntryMention(token){
+function readEntryMentionSelections(){
+  try{const value=JSON.parse(modal?.dataset.entryMentionSelections||'[]');return Array.isArray(value)?value.filter(item=>item&&typeof item.id==='string'&&typeof item.token==='string'):[];}catch{return [];}
+}
+function renderEntryMentionSelections(){
+  const box=$('entryMentionSelected'),input=$('entryText');
+  if(!box||!input)return;
+  const textTokens=new Set([...input.value.matchAll(/(?:^|[\s])@([\p{L}\p{N}_-]{2,})/gu)].map(match=>match[1].toLocaleLowerCase('ru')));
+  const selections=readEntryMentionSelections().filter(item=>textTokens.has(item.token.toLocaleLowerCase('ru'))&&knownChatPeople.some(person=>person.id===item.id&&person.active));
+  if(modal)modal.dataset.entryMentionSelections=JSON.stringify(selections);
+  box.innerHTML=selections.map(item=>{const person=knownChatPeople.find(candidate=>candidate.id===item.id);return person?'<button type="button" class="entry-mention-chip" data-remove-entry-mention="'+esc(person.id)+'" title="Убрать упоминание">@'+esc(item.token)+' <span>'+esc(person.name)+'</span> ×</button>':'';}).join('');
+  box.hidden=!selections.length;
+}
+function insertEntryMention(token,userId=''){
   const input=$('entryText'),list=$('entryMentionSuggestions');
   if(!input)return;
   const start=input.selectionStart??input.value.length;
@@ -2902,8 +2935,30 @@ function insertEntryMention(token){
   input.value=before+separator+after;
   const pos=before.length+separator.length;
   input.setSelectionRange(pos,pos);
+  if(userId){
+    const selections=readEntryMentionSelections().filter(item=>item.id!==userId);
+    selections.push({id:String(userId),token:String(token)});
+    if(modal)modal.dataset.entryMentionSelections=JSON.stringify(selections);
+    renderEntryMentionSelections();
+  }
   if(list){list.hidden=true;list.innerHTML='';}
   input.focus();
+}
+function resolveOrderCommentMentions(text){
+  const tokens=[...new Set([...String(text||'').matchAll(/(?:^|[\s])@([\p{L}\p{N}_-]{2,})/gu)].map(match=>match[1].toLocaleLowerCase('ru')))];
+  const selected=readEntryMentionSelections().filter(item=>tokens.includes(item.token.toLocaleLowerCase('ru')));
+  const recipients=new Map(),ambiguous=[];
+  for(const token of tokens){
+    const selectedForToken=selected.filter(item=>item.token.toLocaleLowerCase('ru')===token);
+    if(selectedForToken.length){
+      selectedForToken.forEach(item=>{const person=knownChatPeople.find(candidate=>candidate.id===item.id&&candidate.active);if(person&&person.id!==signedInUser?.uid)recipients.set(person.id,person);});
+      continue;
+    }
+    const matches=knownChatPeople.filter(person=>person.active&&person.id!==signedInUser?.uid&&chatMentionToken(person.name).toLocaleLowerCase('ru')===token);
+    if(matches.length===1)recipients.set(matches[0].id,matches[0]);
+    else if(matches.length>1)ambiguous.push(token);
+  }
+  return {recipients:[...recipients.values()],ambiguous};
 }
 function insertChatMention(token){
   const input=$('chatInput'),list=$('chatMentionSuggestions');
@@ -4224,7 +4279,7 @@ document.addEventListener('change',e=>{
   }
 });
 document.addEventListener('input',e=>{
-  if(e.target?.id==='entryText')entryMentionSuggestions();
+  if(e.target?.id==='entryText'){entryMentionSuggestions();renderEntryMentionSelections();}
   if(['clientName','editClientName'].includes(e.target?.id)){
     const selected=clients.find(c=>c.id===e.target.dataset.clientId);
     if(selected&&String(selected.name||'').trim()!==e.target.value.trim())delete e.target.dataset.clientId;
@@ -4241,7 +4296,7 @@ document.addEventListener('focusin',e=>{
 });
 
 document.addEventListener('keyup',e=>{
-  if(e.target?.id==='entryText')entryMentionSuggestions();
+  if(e.target?.id==='entryText'){entryMentionSuggestions();renderEntryMentionSelections();}
   if(e.target?.id==='clientName')clientNameSuggestions('clientName','clientNameSuggestions');
   if(e.target?.id==='editClientName')clientNameSuggestions('editClientName','editClientNameSuggestions');
   if(e.target?.classList?.contains('order-article-input'))showArticleSuggestions(e.target);
@@ -4294,7 +4349,8 @@ document.addEventListener('click',e=>{
     return;
   }
   const entryMention=e.target.closest('[data-entry-mention]');
-  if(entryMention){e.preventDefault();insertEntryMention(entryMention.dataset.entryMention||'');return;}
+  if(entryMention){e.preventDefault();insertEntryMention(entryMention.dataset.entryMention||'',entryMention.dataset.entryMentionId||'');return;}
+  const removeEntryMention=e.target.closest('[data-remove-entry-mention]');if(removeEntryMention){e.preventDefault();const id=removeEntryMention.dataset.removeEntryMention;if(modal)modal.dataset.entryMentionSelections=JSON.stringify(readEntryMentionSelections().filter(item=>item.id!==id));renderEntryMentionSelections();$('entryText')?.focus();return;}
   const mention=e.target.closest('[data-chat-mention]');
   if(mention){e.preventDefault();insertChatMention(mention.dataset.chatMention||'');return;}
   const like=e.target.closest('[data-action^="toggle-chat-like:"]');

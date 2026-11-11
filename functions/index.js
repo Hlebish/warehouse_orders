@@ -81,8 +81,9 @@ function notificationCopy(data, count, category) {
   if (count <= 1) return { title: String(data.title || 'Заказы · Склад'), body: String(data.body || 'Новое изменение в заказе.') };
   const forms = counts[category] || ['обновление', 'обновления', 'обновлений'];
   const orderNumber = String(data.orderNumber || '').trim();
-  const lastBody = String(data.body || '').trim();
-  const detail = lastBody && !lastBody.startsWith('За короткое время:')
+  const rawBody = String(data.body || '').trim();
+  const lastBody = rawBody.replace(/^За короткое время:[^.]*\.\s*/u, '').trim();
+  const detail = lastBody
     ? ` Последнее: ${orderNumber ? `заказ № ${orderNumber} · ` : ''}${lastBody}`
     : orderNumber ? ` Последнее изменение — заказ № ${orderNumber}.` : '';
   return {
@@ -146,6 +147,7 @@ async function createNotificationHistory(data, eventId) {
     : (data.target === 'chat' ? 'chat' : 'orders');
   const recipientUserId = String(data.recipientUserId || '');
   const authorId = String(data.authorId || '');
+  const mentionRecipientIds = new Set(Array.isArray(data.mentionRecipientIds)?data.mentionRecipientIds.map(String):[]);
   // For a direct notification, read only the recipient profile instead of querying
   // the full active-user collection. Broadcasts still use the active-user query.
   const users = recipientUserId
@@ -159,21 +161,22 @@ async function createNotificationHistory(data, eventId) {
 
   for (const user of users) {
     const profile = user.data() || {};
+    const isMentionRecipient=mentionRecipientIds.has(user.id);
     if (data.buybackItemId && !canAccessBuybackProfile(profile)) continue;
     if (authorId && user.id === authorId && !(data.forceAll === true && recipientUserId === user.id)) continue;
     const settings = profile.notificationSettings || {};
-    if (!notificationCategoryEnabled(settings, category) && !data.buybackItemId && data.forceAll !== true && !data.directChatThreadId) continue;
+    if (!notificationCategoryEnabled(settings, category) && !data.isMention && !isMentionRecipient && !data.buybackItemId && data.forceAll !== true && !data.directChatThreadId) continue;
 
     const notificationRef = user.ref.collection('notifications').doc(eventId);
     batch.set(notificationRef, {
-      title: String(data.title || 'Заказы · Склад').slice(0, 120),
+      title: (isMentionRecipient&&data.target!=='chat'?`Вас упомянули в заказе № ${String(data.orderNumber||'').trim()}`:String(data.title || 'Заказы · Склад')).slice(0, 120),
       message: String(data.body || 'Новое изменение.').slice(0, 500),
       body: String(data.body || 'Новое изменение.').slice(0, 500),
       orderId: String(data.orderId || ''),
       orderNumber: String(data.orderNumber || ''),
       target: data.target === 'chat' ? 'chat' : 'site',
       category,
-      isMention: data.isMention === true || data.isMention === 'true',
+      isMention: data.isMention === true || data.isMention === 'true' || isMentionRecipient,
       isReply: data.isReply === true || data.isReply === 'true',
       authorId: String(data.authorId || ''),
       directChatThreadId: String(data.directChatThreadId || ''),
@@ -200,18 +203,19 @@ async function createNotificationHistory(data, eventId) {
   return count;
 }
 
-async function collectTokens(category='orders', recipientUserId='', authorId='', forceAll=false, buybackOnly=false, directChat=false) {
+async function collectTokens(category='orders', recipientUserId='', authorId='', forceAll=false, buybackOnly=false, directChat=false, mentionRecipientIds=[]) {
   // Direct notifications should never enumerate every employee's devices.
   const users = recipientUserId
     ? await db.collection('users').doc(recipientUserId).get().then(user =>
         user.exists && user.data()?.active === true ? [user] : [])
     : (await db.collection('users').where('active', '==', true).get()).docs;
 
+  const mentionedUsers=new Set(Array.isArray(mentionRecipientIds)?mentionRecipientIds.map(String):[]);
   const eligibleUsers = users.filter(user => {
     const profile = user.data() || {};
     if (buybackOnly && !canAccessBuybackProfile(profile)) return false;
     if (authorId && user.id === authorId && !(forceAll && recipientUserId === user.id)) return false;
-    return forceAll || buybackOnly || directChat || notificationCategoryEnabled(profile.notificationSettings || {}, category);
+    return forceAll || buybackOnly || directChat || mentionedUsers.has(user.id) || notificationCategoryEnabled(profile.notificationSettings || {}, category);
   });
 
   // Only read push-token subcollections for users who can receive this event.
@@ -515,6 +519,16 @@ exports.enqueueWarehousePush = onCall(async request => {
   const directChatThreadId = String(input.directChatThreadId || '');
   const directMessageId = String(input.directMessageId || '');
   const isUrgent = input.isUrgent === true;
+  if (input.mentionRecipientIds !== undefined && !Array.isArray(input.mentionRecipientIds)) {
+    throw new HttpsError('invalid-argument', 'Получатели упоминания должны быть списком сотрудников.');
+  }
+  const mentionRecipientIds = [...new Set((Array.isArray(input.mentionRecipientIds)?input.mentionRecipientIds:[]).map(value=>String(value||'')).filter(Boolean))];
+  if (mentionRecipientIds.length > 20 || mentionRecipientIds.some(id=>id.length>128)) {
+    throw new HttpsError('invalid-argument', 'В комментарии можно упомянуть не более 20 сотрудников.');
+  }
+  if (mentionRecipientIds.length && (target !== 'site' || category !== 'comments' || !orderId || recipientUserId)) {
+    throw new HttpsError('invalid-argument', 'Упоминания можно отправлять только с комментарием к заказу.');
+  }
   if (directChatThreadId && (!recipientUserId || category !== 'replies' || target !== 'chat' || directChatThreadId.length > 300)) {
     throw new HttpsError('invalid-argument', 'Некорректный адрес личного сообщения.');
   }
@@ -531,6 +545,12 @@ exports.enqueueWarehousePush = onCall(async request => {
     const recipientSnap = await db.collection('users').doc(recipientUserId).get();
     if (!recipientSnap.exists || recipientSnap.data()?.active !== true) {
       throw new HttpsError('failed-precondition', 'Получатель не найден или отключён.');
+    }
+  }
+  if (mentionRecipientIds.length) {
+    const mentionProfiles=await Promise.all(mentionRecipientIds.map(id=>db.collection('users').doc(id).get()));
+    if (mentionProfiles.some((profile,index)=>!profile.exists||profile.data()?.active!==true||mentionRecipientIds[index]===uid)) {
+      throw new HttpsError('failed-precondition', 'Один из сотрудников для упоминания недоступен.');
     }
   }
   if (directMessageId) {
@@ -593,6 +613,7 @@ exports.enqueueWarehousePush = onCall(async request => {
     target,
     category,
     recipientUserId,
+    mentionRecipientIds,
     orderNumber,
     isMention: input.isMention === true,
     isReply: input.isReply === true,
@@ -623,13 +644,15 @@ exports.sendWarehousePush = onDocumentCreated({ document: 'pushQueue/{eventId}',
   const target = data.target === 'chat' ? 'chat' : 'site';
   const category = ['orders', 'assembly', 'defects', 'status', 'editing', 'comments', 'questions', 'decisions', 'chat', 'replies', 'likes'].includes(data.category) ? data.category : (target === 'chat' ? 'chat' : 'orders');
   const recipientUserId = String(data.recipientUserId || '');
+  const mentionRecipientIds=Array.isArray(data.mentionRecipientIds)?[...new Set(data.mentionRecipientIds.map(String))]:[];
+  const mentionRecipients=new Set(mentionRecipientIds);
   const expiresAt = Number(data.expiresAt) || (Date.parse(String(data.createdAt || '')) + 60000);
   if (Number.isFinite(expiresAt) && expiresAt > 0 && Date.now() > expiresAt) {
     await markDone(snapshot.ref, { deliveryStatus: 'expired', acceptedCount: 0, failedCount: 0 });
     logger.info('Push skipped: expired before delivery', { eventId });
     return;
   }
-  const alwaysRelevant = data.forceAll === true || data.isMention === true || data.isReply === true;
+  const alwaysRelevant = data.forceAll === true || data.isMention === true || data.isReply === true || mentionRecipientIds.length>0;
   if (orderId && data.orderVersion && !alwaysRelevant) {
     const currentOrder = await db.collection('orders').doc(orderId).get();
     const currentVersion = currentOrder.exists ? orderVersionKey(currentOrder.data()) : '';
@@ -656,7 +679,7 @@ exports.sendWarehousePush = onDocumentCreated({ document: 'pushQueue/{eventId}',
       : (orderId ? `${siteUrl}?order=${encodeURIComponent(orderId)}` : siteUrl));
 
   try {
-    const tokenDocs = await collectTokens(category, recipientUserId, String(data.authorId || ''), data.forceAll === true, Boolean(data.buybackItemId), Boolean(directChatThreadId));
+    const tokenDocs = await collectTokens(category, recipientUserId, String(data.authorId || ''), data.forceAll === true, Boolean(data.buybackItemId), Boolean(directChatThreadId), mentionRecipientIds);
 
     if (!tokenDocs.length) {
       await historyPromise;
@@ -681,13 +704,14 @@ exports.sendWarehousePush = onDocumentCreated({ document: 'pushQueue/{eventId}',
       const group = tokenDocs.slice(i, i + 500);
 
       for (const platform of ['web', 'android']) {
-        const platformGroup = group.filter(item => item.platform === platform);
+       for (const isMentionRecipient of [false,true]) {
+        const platformGroup = group.filter(item => item.platform === platform && mentionRecipients.has(item.userId)===isMentionRecipient);
         if (!platformGroup.length) continue;
 
         const baseMessage = {
           tokens: platformGroup.map(item => item.token),
           data: {
-            title: pushCopy.title,
+            title: isMentionRecipient?`Вас упомянули в заказе № ${String(data.orderNumber||'').trim()}`.slice(0,120):pushCopy.title,
             body: pushCopy.body,
             eventId,
             link,
@@ -698,7 +722,7 @@ exports.sendWarehousePush = onDocumentCreated({ document: 'pushQueue/{eventId}',
             directMessageId: String(data.directMessageId || ''),
             authorId: senderId,
             notificationTag,
-            isMention: String(data.isMention === true || data.isMention === 'true'),
+            isMention: String(isMentionRecipient || data.isMention === true || data.isMention === 'true'),
             isReply: String(data.isReply === true || data.isReply === 'true'),
             createdAt: String(data.createdAt || ''),
             expiresAt: String(expiresAt || '')
@@ -747,6 +771,7 @@ exports.sendWarehousePush = onDocumentCreated({ document: 'pushQueue/{eventId}',
       });
 
         await Promise.all(removals);
+      }
       }
     }
 

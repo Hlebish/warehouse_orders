@@ -2423,6 +2423,12 @@ body.dark-theme .mention-center-button b{background:#16845b!important;color:#fff
 /* Keep order-comment mention suggestions anchored to the comment field. */
 .entry-mention-wrap{position:relative}
 .entry-mention-wrap .entry-mention-suggestions{top:calc(100% + 5px);bottom:auto;max-height:220px;overflow:auto;z-index:30}
+.entry-mention-selected{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px}
+.entry-mention-selected[hidden]{display:none}
+.entry-mention-chip{border:1px solid #4ba981;background:#e9f8f0;color:#176d46;border-radius:999px;padding:4px 9px;font-size:11px;font-weight:700;cursor:pointer}
+.entry-mention-chip span{font-weight:500}
+.entry-mention-help{display:block;margin-top:6px}
+body.dark-theme .entry-mention-chip{background:#173629;color:#a7e7c2;border-color:#347c59}
 
 
 /* Replies to comments inside order history */

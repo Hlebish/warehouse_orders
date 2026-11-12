@@ -2,6 +2,7 @@ export function searchClients(clients, text, maxResults = 8) {
   const query = String(text || '').trim().toLocaleLowerCase('ru');
   if (!query) return [];
   return (Array.isArray(clients) ? clients : [])
+    .filter(client => !client.hiddenFromDirectory)
     .filter(client => String(client.name || '').toLocaleLowerCase('ru').includes(query)
       || String(client.phone || '').toLocaleLowerCase('ru').includes(query))
     .slice(0, maxResults);

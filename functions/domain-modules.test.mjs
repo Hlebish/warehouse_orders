@@ -96,3 +96,37 @@ test('shipment list aggregation excludes removed defect lines and uses shipment 
     { article: 'APHD4307', quantity: 2, type: 'body', orders: ['A-1'] }
   ]);
 });
+
+test('direct conversations never merge with each other or public replies', () => {
+  const notices = [
+    { id: 'a', target: 'chat', category: 'replies', directChatThreadId: 'alice' },
+    { id: 'b', target: 'chat', category: 'replies', directChatThreadId: 'bob' },
+    { id: 'c', target: 'chat', category: 'replies', isMention: true },
+    { id: 'd', target: 'chat', category: 'replies', directChatThreadId: 'alice' }
+  ];
+  const groups = groupNotifications(notices);
+  assert.equal(groups.length, 3);
+  assert.equal(groups.find(g => g.latest.id === 'a').entries.length, 2);
+  assert.equal(groupNotifications(notices, { category: 'direct' }).length, 2);
+  assert.equal(groupNotifications(notices, { search: 'личные' }).length, 2);
+});
+
+test('newest event is selected even when input arrives out of order', () => {
+  const groups = groupNotifications([
+    { id: 'old', orderId: 'o', createdAt: { seconds: 100 } },
+    { id: 'new', orderId: 'o', createdAt: '2026-11-12T12:00:00Z' }
+  ]);
+  assert.equal(groups[0].latest.id, 'new');
+});
+
+test('urgent requests and mentions stay separate from ordinary messages', () => {
+  const base = { target: 'chat', category: 'chat' };
+  const groups = groupNotifications([
+    { ...base, id: 'normal' },
+    { ...base, id: 'mention', isMention: 'true' },
+    { ...base, id: 'urgent-a', isUrgent: true },
+    { ...base, id: 'urgent-b', isUrgent: true }
+  ]);
+  assert.equal(groups.length, 4);
+  assert.equal(groups.find(g => g.latest.id === 'mention').section, 'attention');
+});

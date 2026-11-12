@@ -6,7 +6,7 @@ import { getMessaging, getToken, deleteToken, onMessage } from 'https://www.gsta
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-functions.js';
 import { firebaseConfig, vapidKey } from './firebase-config.js';
 import { canTransitionOrderStatus } from './order-workflow.mjs';
-import { NOTIFICATION_CATEGORIES, NOTIFICATION_CATEGORY_KEYS, normalizeNotificationSettings, groupNotifications } from './notification-settings.mjs';
+import { NOTIFICATION_CATEGORIES, NOTIFICATION_CATEGORY_KEYS, normalizeNotificationSettings, groupNotifications, NOTIFICATION_SECTIONS } from './notification-settings.mjs';
 import { searchClients, searchProducts } from './client-directory.mjs';
 import { shipmentOrderDateKey as getShipmentOrderDateKey, shipmentItemsForDate as buildShipmentItemsForDate } from './warehouse-operations.mjs';
 document.documentElement.classList.toggle('warehouse-desktop-app',window.warehouseDesktop?.isDesktopApp===true);
@@ -214,7 +214,7 @@ function watchNotifications(){
       }
     }
     initialSnapshot=false;
-    knownNoticeIds=new Set(next.map(n=>n.id));state.notices=next;paintNotices();renderStaffPanel();
+    knownNoticeIds=new Set(next.map(n=>n.id));state.notices=next;paintNotices();refreshNotificationCenter?.();renderStaffPanel();
   },err=>console.error('Не удалось загрузить историю уведомлений',err));
 }
 function flagOn(n,key){return n?.[key]===true||n?.[key]==='true'||n?.[key]===1}
@@ -469,6 +469,7 @@ async function markNotificationItemsRead(items=[],showToast=false){
   }));
   const failed=results.filter(ok=>!ok).length;
   paintNotices();
+  refreshNotificationCenter?.();
   if(showToast){
     if(failed===0)toast('Все уведомления отмечены прочитанными.');
     else toast('Не удалось отметить '+failed+' уведомлен'+(failed===1?'ие':'ия')+'. Проверьте доступ и повторите попытку.');
@@ -4183,16 +4184,24 @@ async function refreshPushRegistrationStatus(){
     status.dataset.state='error';
   }
 }
+let refreshNotificationCenter=null;
 function showNotifications(){
   const render=()=>{
     const q=String($('notificationSearch')?.value||'').toLocaleLowerCase('ru');
     const cat=$('notificationFilter')?.value||'';
     const groups=groupNotifications(state.notices,{search:q,category:cat==='unread'?'':cat,unreadOnly:cat==='unread',toDateKey:localDateKey});
-    const rows=groups.map(group=>{
+    const rows=Object.entries(NOTIFICATION_SECTIONS).map(([section,label])=>{
+      const sectionGroups=groups.filter(group=>group.section===section);
+      if(!sectionGroups.length)return '';
+      const count=sectionGroups.reduce((sum,group)=>sum+group.unreadCount,0);
+      return '<section class="notification-section" data-section="'+section+'"><h3>'+esc(label)+(count?' · '+count+' новых':'')+'</h3>'+sectionGroups.map(group=>{
       const entries=group.entries,n=group.latest,ids=entries.map(item=>item.id),unreadCount=group.unreadCount;
-      const tone=notificationTone(n);
+      const tone=group.section==='direct'?'violet':notificationTone(n);
+      const badge='<span class="notification-kind">'+esc(n.directChatThreadId?'Личное сообщение':NOTIFICATION_CATEGORIES[group.category]||'Уведомление')+'</span>';
+      const history=entries.length>1?'<details class="notification-history"><summary>Показать все события ('+entries.length+')</summary>'+entries.map(item=>'<div><b>'+esc(item.title||'Уведомление')+'</b><p>'+esc(item.message||item.body||'Новое событие')+'</p><small>'+fmtDateTime(item.createdAt||item.at)+'</small></div>').join('')+'</details>':'';
       const openButton=n.directChatThreadId&&n.authorId?'<button type="button" class="small-button primary-soft" data-open-direct-chat-thread="'+esc(n.directChatThreadId)+'" data-open-direct-chat-peer="'+esc(n.authorId)+'">Открыть личный чат</button>':n.orderId?'<button type="button" class="small-button primary-soft" data-open="'+esc(n.orderId)+'">Открыть заказ</button>':n.target==='chat'?'<button type="button" class="small-button primary-soft" data-open-chat="1">Открыть чат</button>':'';
-      return '<article role="button" tabindex="0" aria-label="Отметить уведомления прочитанными" class="notification-entry notification-'+tone+' '+(unreadCount?'unread':'')+'" data-notice-id="'+esc(n.id)+'" data-notice-ids="'+esc(ids.join(','))+'"><span class="notification-dot"></span><div><b>'+esc(n.title||'Уведомление')+'</b><p>'+esc(n.message||n.body||'Новое событие')+'</p><small>'+fmtDateTime(n.createdAt||n.at)+'</small>'+(entries.length>1?'<span class="notification-group-count">'+entries.length+' событий · '+(unreadCount?unreadCount+' новых':'прочитано')+'</span>':'')+'</div><div class="notification-group-actions">'+openButton+'</div></article>';
+      return '<article class="notification-entry notification-'+tone+' '+(unreadCount?'unread':'')+'" data-notice-id="'+esc(n.id)+'" data-notice-ids="'+esc(ids.join(','))+'"><span class="notification-dot"></span><div>'+badge+'<b>'+esc(n.title||'Уведомление')+'</b><p>'+esc(n.message||n.body||'Новое событие')+'</p><small>'+fmtDateTime(n.createdAt||n.at)+'</small>'+(entries.length>1?'<span class="notification-group-count">'+entries.length+' событий · '+(unreadCount?unreadCount+' новых':'прочитано')+'</span>':'')+history+'</div><div class="notification-group-actions">'+openButton+(unreadCount?'<button type="button" class="small-button" data-read-notices>Прочитано</button>':'')+'</div></article>';
+      }).join('')+'</section>';
     }).join('');
     const listEl=$('notificationList');if(listEl)listEl.innerHTML=rows||'<div class="danger-note">Уведомлений по фильтрам нет.</div>';
     const unreadSummary=$('notificationUnreadCount');if(unreadSummary)unreadSummary.textContent=String(state.notices.filter(n=>!n.read).length);
@@ -4201,12 +4210,11 @@ function showNotifications(){
   const unread=state.notices.filter(n=>!n.read).length;
   const pushGranted=typeof Notification!=='undefined'&&Notification.permission==='granted';
   const pushControls='<div class="push-device-controls"><div><b>Системные push-уведомления</b><small>'+((pushGranted)?'Разрешены в браузере':'Можно включить на этом устройстве')+'</small></div><div class="push-device-buttons"><button type="button" class="small-button good" data-action="enable-notifications">🔔 Включить уведомления</button><button type="button" class="small-button danger" data-action="disable-notifications">🔕 Отключить уведомления</button></div></div><div class="push-registration-status" id="pushRegistrationStatus" role="status">Проверяем регистрацию на этом устройстве…</div>'+'<button type="button" class="notification-setting '+(state.extraPhoneNotifications?'enabled':'disabled')+'" style="width:100%;margin:0 0 12px;text-align:left" data-action="toggle-extra-phone-notifications"><b>📱 Дополнительные уведомления на все устройства</b><small>'+(state.extraPhoneNotifications?'Включены — уведомления от других сотрудников приходят на все зарегистрированные устройства. Ваши действия не уведомляют вас.':'Выключены — push приходит только на последнее активное устройство. Включите, чтобы получать уведомления на компьютере и телефоне одновременно.')+'</small></button><p class="field-hint">Доставка на устройства независимая: открытый браузер на ПК не должен мешать уведомлениям на телефоне. На телефоне должны быть разрешены уведомления и зарегистрирован push-токен.</p>';
-  const body=pushControls+'<div class="notification-toolbar"><label class="search-box"><span>⌕</span><input id="notificationSearch" type="search" placeholder="Поиск уведомлений"></label><select id="notificationFilter"><option value="">Все категории</option><option value="unread">Непрочитанные</option>'+NOTIFICATION_CATEGORY_KEYS.map(k=>'<option value="'+k+'">'+esc(NOTIFICATION_CATEGORIES[k])+'</option>').join('')+'</select></div><h3 class="notification-settings-title">Персональные настройки · каждое действие отдельно</h3><div class="notification-settings-grid">'+NOTIFICATION_CATEGORY_KEYS.map(k=>'<button type="button" class="notification-setting '+(state.notificationSettings[k]?'enabled':'disabled')+'" data-action="toggle-notification:'+k+'"><b>'+esc(NOTIFICATION_CATEGORIES[k])+'</b><small>'+(state.notificationSettings[k]?'Включены':'Выключены')+'</small></button>').join('')+'</div><div class="notification-summary"><span><b id="notificationUnreadCount">'+unread+'</b> непрочитанных</span><span><b id="notificationGroupCount">0</b> групп</span></div><div id="notificationList" class="notification-list"></div>';
+  const body='<details class="notification-preferences"><summary>Настройки уведомлений и устройств</summary>'+pushControls+'<h3 class="notification-settings-title">Персональные настройки · каждое действие отдельно</h3><div class="notification-settings-grid">'+NOTIFICATION_CATEGORY_KEYS.map(k=>'<button type="button" class="notification-setting '+(state.notificationSettings[k]?'enabled':'disabled')+'" data-action="toggle-notification:'+k+'"><b>'+esc(NOTIFICATION_CATEGORIES[k])+'</b><small>'+(state.notificationSettings[k]?'Включены':'Выключены')+'</small></button>').join('')+'</div></details><div class="notification-toolbar"><label class="search-box"><span>⌕</span><input id="notificationSearch" type="search" placeholder="Поиск уведомлений"></label><select id="notificationFilter"><option value="">Все категории</option><option value="unread">Непрочитанные</option><option value="direct">Личные сообщения</option>'+NOTIFICATION_CATEGORY_KEYS.map(k=>'<option value="'+k+'">'+esc(NOTIFICATION_CATEGORIES[k])+'</option>').join('')+'</select></div><div class="notification-summary"><span><b id="notificationUnreadCount">'+unread+'</b> непрочитанных</span><span><b id="notificationGroupCount">0</b> групп</span></div><div id="notificationList" class="notification-list"></div>';
   showModal('Уведомления',body,[button('Прочитать всё','mark-notifications-read','small-button good'),button('Закрыть','close')],'ЦЕНТР УВЕДОМЛЕНИЙ');
   $('notificationSearch')?.addEventListener('input',render);$('notificationFilter')?.addEventListener('change',render);render();
   void refreshPushRegistrationStatus();
-  // Opening the notification center counts as viewing the notifications.
-  void markNotificationItemsRead(state.notices.filter(n=>!n.read)).then(()=>render());
+  refreshNotificationCenter=()=>{if($('notificationList')&&$('modalTitle')?.textContent==='Уведомления')render();};
 }
 function profileMenu(){
   const themeAction=button(document.body.classList.contains('dark-theme')?'☀️ Светлая тема':'🌙 Тёмная тема','toggle-theme','small-button primary-soft');
@@ -4320,6 +4328,7 @@ document.addEventListener('click',e=>{
   if(productSuggestion){e.preventDefault();chooseArticleSuggestion(productSuggestion);return;}
   const noticeCard=e.target.closest('[data-notice-id]');
   if(noticeCard){
+    if(!e.target.closest('[data-read-notices], [data-open], [data-open-chat], [data-open-direct-chat-thread]'))return;
     const noticeIds=(noticeCard.dataset.noticeIds||noticeCard.dataset.noticeId||'').split(',').filter(Boolean);
     const notices=state.notices.filter(n=>noticeIds.includes(n.id));
     const openButton=e.target.closest('[data-open]');

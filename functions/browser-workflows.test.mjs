@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
+import {orderEditSnapshot,assertOrderUnchanged} from '../editing-state.mjs';
 import { canTransitionOrderStatus, statusAfterDefectDecision } from '../order-workflow.mjs';
 const source=readFileSync(new URL('../app.js',import.meta.url),'utf8');
 const between=(start,end)=>{const a=source.indexOf(start),b=source.indexOf(end,a);assert.ok(a>=0&&b>a,'Missing source boundary: '+start);return source.slice(a,b);};
@@ -13,11 +14,12 @@ function harness(order,overrides={}){
    profileName:'Сотрудник',roles:{warehouse:'Кладовщик'},db:{},serverCache:new Map(),pendingWrites:new Set(),pendingOrderData:new Map(),
    console:{error(){},warn(){}},crypto:{randomUUID:()=> 'entry-id'},modal:{hidden:false,dataset:{orderDetail:order.id}},
    isoNow:()=> '2026-11-12T12:00:00Z',doc:(_db,...parts)=>parts.join('/'),
-   isShipmentLocked:o=>['Отгружен кладовщиком','Клиент забрал самовывозом'].includes(o.status),
+   isShipmentLocked:o=>['Отгружен кладовщиком','Клиент забрал самовывозом'].includes(o.status),canEditOrder:o=>!['Отгружен кладовщиком','Клиент забрал самовывозом'].includes(o.status),
    render(){},saveOrdersCache(){},openOrder(){},notify:(...args)=>events.push(['notify',...args]),
    toast:message=>events.push(['toast',message]),queuePush:async(...args)=>events.push(['push',...args]),
    writeAudit:async(...args)=>events.push(['audit',...args]),$:()=>null,
-   entryToCloud:entry=>({...entry}),canTransitionOrderStatus,statusAfterDefectDecision,
+   entryToCloud:entry=>({...entry}),canTransitionOrderStatus,statusAfterDefectDecision,orderEditSnapshot,assertOrderUnchanged,
+   filesForInput:input=>[...(input?.files||[])],activeEntryDraft:null,persistOpenEntryDraft(){},clearSubmittedDraft:async()=>{},startModalSave:()=>({success(){},fail(){},finish(){},isCurrent:()=>false}),
    ...overrides
  };
  context.runTransaction=async(_db,callback)=>{
@@ -104,7 +106,7 @@ test('manager confirmation and removal use readiness rather than blindly resetti
 test('failed defect decisions restore the old status and remain undecided',async()=>{
  const order=base();order.status='Дефект';order.entries=[{id:'defect',kind:'defect',article:'B',articleIndex:1}];
  const {context}=harness(order);context.state.role='manager';context.isManagerRole=()=>true;
- context.writeBatch=()=>({update(){},commit:async()=>{throw Error('offline');}});
+ context.runTransaction=async()=>{throw Error('offline');};
  vm.runInContext(between('const defectDecisionFields=', 'function deleteOrder(){'),context);
  await context.decideDefect('defect','Подтверждён');
  assert.equal(context.state.orders[0].status,'Дефект');
@@ -139,4 +141,19 @@ test('manager gets a clear explanation instead of attempting to decide a shipped
  await context.decideDefect('defect','Подтверждён');
  assert.equal(attempted,false);assert.equal(context.state.orders[0].entries[0].decision,undefined);
  assert.ok(events.some(event=>event[0]==='toast'&&event[1].includes('уже отгружен')));
+});
+
+test('atomic order edits reject a changed server version and keep local input untouched',async()=>{
+ const order=base(),{context,data}=harness(order);
+ vm.runInContext(between('function applyCommittedOrder(', 'let modalHistoryEntry='),context);
+ const expected=orderEditSnapshot(order);data.number='other-worker';
+ await assert.rejects(context.commitOrderEdit(order,expected,{number:'mine'},null),{code:'order-conflict'});
+ assert.equal(data.number,'other-worker');assert.equal(context.state.orders[0].number,order.number);
+});
+test('a transaction retry cannot overwrite a status changed by another employee',async()=>{
+ const order=base(),{context,data}=harness(order);
+ vm.runInContext(between('function applyCommittedOrder(', 'let modalHistoryEntry='),context);
+ context.retryWith={status:'Отгружен кладовщиком'};
+ await assert.rejects(context.commitOrderEdit(order,orderEditSnapshot(order),{status:'Собран'},null));
+ assert.equal(data.status,'Отгружен кладовщиком');
 });

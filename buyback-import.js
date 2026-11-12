@@ -2,6 +2,7 @@ import { initializeApp, getApps } from 'https://www.gstatic.com/firebasejs/12.19
 import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js';
 import { getFirestore, collection, doc, onSnapshot, serverTimestamp, writeBatch } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
 import { firebaseConfig } from './firebase-config.js';
+import { localDateKey, validReceivedDate } from './buyback-dates.mjs?v=2026.11.12.05';
 
 const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
 const auth = getAuth(app);
@@ -168,6 +169,8 @@ function install() {
     </summary>
     <div class="invoice-content">
       <textarea id="buybackInvoiceText" rows="7" placeholder="Вставь сюда текст приходной накладной из 1С…"></textarea>
+      <label class="buyback-field" style="margin-top:12px;max-width:300px">Дата приёма на склад<input id="buybackInvoiceDate" type="date" required value="${localDateKey()}"></label>
+      <p class="buyback-edit-note">Можно указать фактическую дату приёма отдельно от даты накладной. Срок хранения считается от выбранной даты.</p>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
         <button type="button" id="buybackInvoiceParse">Разобрать накладную</button>
         <button type="button" id="buybackInvoiceSave" disabled style="opacity:.5">Добавить все позиции</button>
@@ -180,20 +183,34 @@ function install() {
   const status = panel.querySelector('#buybackInvoiceStatus');
   const save = panel.querySelector('#buybackInvoiceSave');
   const preview = panel.querySelector('#buybackInvoicePreview');
-  panel.querySelector('#buybackInvoiceParse').addEventListener('click', () => {
-    parsed = parseInvoice(panel.querySelector('#buybackInvoiceText').value);
-    save.disabled = !parsed.rows.length || !parsed.receivedAt;
+  const receivedDate = panel.querySelector('#buybackInvoiceDate');
+  let dateChosen = false, importing = false, importFailed = false;
+  const refreshPreviewStatus = () => {
+    save.disabled = importing || importFailed || !parsed?.rows.length || !validReceivedDate(receivedDate.value);
     save.style.opacity = save.disabled ? '.5' : '1';
-    status.style.color = parsed.rows.length && parsed.receivedAt ? '#b7c8dd' : '#e5bd78';
-    status.textContent = !parsed.rows.length ? 'Не удалось найти позиции. Проверьте, что скопирована вся таблица и артикулы находятся отдельной колонкой. Если ошибка повторится, сохраните текст накладной для диагностики.' : !parsed.receivedAt ? 'Позиции найдены, но не распознана дата. Поддерживаются даты вида «23 жовтня 2026» и «23.10.2026». Проверьте заголовок документа.' : `Найдено позиций: ${parsed.rows.length}. Поставщик: ${parsed.supplier || 'не распознан'} · Дата: ${parsed.receivedAt}. Проверьте список ниже перед добавлением.`;
+    if (!parsed || importing || importFailed) return;
+    status.style.color = parsed.rows.length && validReceivedDate(receivedDate.value) ? '#b7c8dd' : '#e5bd78';
+    status.textContent = !parsed.rows.length ? 'Не удалось найти позиции. Проверьте, что скопирована вся таблица и артикулы находятся отдельной колонкой. Если ошибка повторится, сохраните текст накладной для диагностики.' : !validReceivedDate(receivedDate.value) ? 'Выберите дату фактического приёма товара на склад.' : `Найдено позиций: ${parsed.rows.length}. Поставщик: ${parsed.supplier || 'не распознан'} · Приём на склад: ${receivedDate.value}${parsed.receivedAt ? ' · Дата накладной: ' + parsed.receivedAt : ' · Дата накладной не распознана'}. Проверьте список ниже перед добавлением.`;
+  };
+  receivedDate.addEventListener('input', () => { dateChosen = true; refreshPreviewStatus(); });
+  panel.querySelector('#buybackInvoiceParse').addEventListener('click', () => {
+    importFailed = false;
+    parsed = parseInvoice(panel.querySelector('#buybackInvoiceText').value);
+    if (!dateChosen) receivedDate.value = validReceivedDate(parsed.receivedAt) ? parsed.receivedAt : localDateKey();
+    refreshPreviewStatus();
     preview.innerHTML = parsed.rows.length ? `<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr><th style="text-align:left;padding:7px;border-bottom:1px solid #3b4350">Артикул</th><th style="text-align:left;padding:7px;border-bottom:1px solid #3b4350">Наименование</th><th style="text-align:right;padding:7px;border-bottom:1px solid #3b4350">Кол-во</th></tr></thead><tbody>${parsed.rows.map(r => `<tr><td style="padding:7px;border-bottom:1px solid #303640;white-space:nowrap">${esc(r.article)}</td><td style="padding:7px;border-bottom:1px solid #303640">${esc(r.name)}</td><td style="padding:7px;text-align:right;border-bottom:1px solid #303640">${r.quantity}</td></tr>`).join('')}</tbody></table>` : '';
   });
   save.addEventListener('click', async () => {
-    if (!parsed?.rows.length || !parsed.receivedAt || !currentUser || !canAccessBuyback) {
+    if (importing) return;
+    if (!parsed?.rows.length || !validReceivedDate(receivedDate.value) || !currentUser || !canAccessBuyback) {
       status.textContent = !currentUser ? 'Нет активной авторизации. Обнови страницу и войди заново.' : 'Сначала разбери накладную и проверь позиции.';
       return;
     }
     save.disabled = true;
+    importing = true;
+    const receivedAt = receivedDate.value;
+    receivedDate.disabled = true;
+    panel.querySelector('#buybackInvoiceText').disabled = true;
     panel.querySelector('#buybackInvoiceParse').disabled = true;
     let added = 0;
     try {
@@ -203,7 +220,7 @@ function install() {
           const ref = doc(collection(db, 'buybackItems'));
           batch.set(ref, {
           article: row.article, name: row.name, quantity: row.quantity,
-          receivedAt: parsed.receivedAt, supplier: parsed.supplier, comment: '',
+          receivedAt, supplier: parsed.supplier, comment: '',
           createdAt: serverTimestamp(), createdBy: currentUser.uid,
           createdByName: currentUser.displayName || currentUser.email || 'Сотрудник',
           status: 'active', soldAt: null, cancelledAt: null, returnedAt: null,
@@ -214,14 +231,20 @@ function install() {
         added += Math.min(450, parsed.rows.length - offset);
       }
       status.style.color = '#b7c8dd';
-      status.textContent = `Готово: добавлено ${added} позиций. Таймер хранения рассчитывается от даты приёма ${parsed.receivedAt}.`;
+      status.textContent = `Готово: добавлено ${added} позиций. Таймер хранения рассчитывается от даты приёма ${receivedAt}.`;
       preview.innerHTML = '';
       panel.querySelector('#buybackInvoiceText').value = '';
       parsed = null;
+      dateChosen = false;
+      receivedDate.value = localDateKey();
     } catch (error) {
+      importFailed = true;
       status.style.color = '#e5bd78';
       status.textContent = `ОШИБКА ИМПОРТА: добавлено ${added} из ${parsed.rows.length}. ${error?.code ? `Код: ${error.code}. ` : ''}${error?.message || error}. Проверьте список перекупного товара перед повторным запуском — уже добавленные позиции не удалены.`;
     } finally {
+      importing = false;
+      receivedDate.disabled = false;
+      panel.querySelector('#buybackInvoiceText').disabled = false;
       panel.querySelector('#buybackInvoiceParse').disabled = false;
       save.disabled = true;
       save.style.opacity = '.5';

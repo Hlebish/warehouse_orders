@@ -175,6 +175,7 @@ async function createNotificationHistory(data, eventId) {
       body: String(data.body || 'Новое изменение.').slice(0, 500),
       orderId: String(data.orderId || ''),
       orderNumber: String(data.orderNumber || ''),
+      entryId: String(data.entryId || ''),
       target: data.target === 'chat' ? 'chat' : 'site',
       category,
       isMention: data.isMention === true || data.isMention === 'true' || isMentionRecipient,
@@ -519,6 +520,8 @@ exports.enqueueWarehousePush = onCall(async request => {
   const forceAll = input.forceAll === true;
   const directChatThreadId = String(input.directChatThreadId || '');
   const directMessageId = String(input.directMessageId || '');
+  const entryId = String(input.entryId || '');
+  if (entryId && (!orderId || target !== 'site' || entryId.length > 128 || entryId.includes('/'))) throw new HttpsError('invalid-argument', 'Некорректная ссылка на запись заказа.');
   const isUrgent = input.isUrgent === true;
   if (input.mentionRecipientIds !== undefined && !Array.isArray(input.mentionRecipientIds)) {
     throw new HttpsError('invalid-argument', 'Получатели упоминания должны быть списком сотрудников.');
@@ -604,6 +607,11 @@ exports.enqueueWarehousePush = onCall(async request => {
     }
   }
 
+  if (entryId) {
+    const entry = await db.collection('orders').doc(orderId).collection('entries').doc(entryId).get();
+    if (!entry.exists || entry.data().authorId !== uid) throw new HttpsError('permission-denied', 'Запись заказа не найдена или принадлежит другому сотруднику.');
+  }
+
   const ref = db.collection('pushQueue').doc();
   const now = Date.now();
   await ref.create({
@@ -620,6 +628,7 @@ exports.enqueueWarehousePush = onCall(async request => {
     isReply: input.isReply === true,
     directChatThreadId,
     directMessageId,
+    entryId,
     isUrgent,
     isDeleted: isDeletedOrder,
     forceAll,
@@ -653,7 +662,7 @@ exports.sendWarehousePush = onDocumentCreated({ document: 'pushQueue/{eventId}',
     logger.info('Push skipped: expired before delivery', { eventId });
     return;
   }
-  const alwaysRelevant = data.forceAll === true || data.isMention === true || data.isReply === true || mentionRecipientIds.length>0;
+  const alwaysRelevant = Boolean(data.entryId) || data.forceAll === true || data.isMention === true || data.isReply === true || mentionRecipientIds.length>0;
   if (orderId && data.orderVersion && !alwaysRelevant) {
     const currentOrder = await db.collection('orders').doc(orderId).get();
     const currentVersion = currentOrder.exists ? orderVersionKey(currentOrder.data()) : '';
@@ -677,7 +686,7 @@ exports.sendWarehousePush = onDocumentCreated({ document: 'pushQueue/{eventId}',
     ? `${siteUrl}?directChat=${encodeURIComponent(directChatThreadId)}&peer=${encodeURIComponent(senderId)}`
     : (target === 'chat'
       ? `${siteUrl}?chat=1`
-      : (orderId ? `${siteUrl}?order=${encodeURIComponent(orderId)}` : siteUrl));
+      : (orderId ? `${siteUrl}?order=${encodeURIComponent(orderId)}${data.entryId ? '&entry=' + encodeURIComponent(String(data.entryId)) : ''}` : siteUrl));
 
   try {
     const tokenDocs = await collectTokens(category, recipientUserId, String(data.authorId || ''), data.forceAll === true, Boolean(data.buybackItemId), Boolean(directChatThreadId), mentionRecipientIds);

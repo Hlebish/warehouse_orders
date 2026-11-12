@@ -249,8 +249,16 @@ public class MainActivity extends AppCompatActivity {
             public void handleOnBackPressed() {
                 if (webView != null) {
                     webView.evaluateJavascript(
-                        "window.handleNativeBack ? window.handleNativeBack() : false",
-                        null
+                        "(function(){try{return typeof window.handleNativeBack === 'function' && window.handleNativeBack() === true;}catch(error){return false;}})()",
+                        handled -> {
+                            if ("true".equals(handled) || webView == null || isFinishing() || isDestroyed()) return;
+                            // Other pages, including maps opened by older site code,
+                            // may not install the order app's JavaScript back handler.
+                            String currentUrl = webView.getUrl();
+                            if (currentUrl != null && currentUrl.startsWith("https://hlebish.github.io/warehouse-map/")) webView.loadUrl(SITE_URL);
+                            else if (webView.canGoBack()) webView.goBack();
+                            else if (webView.getUrl() == null || !webView.getUrl().startsWith(SITE_URL)) webView.loadUrl(SITE_URL);
+                        }
                     );
                 }
             }

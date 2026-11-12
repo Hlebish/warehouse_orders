@@ -17,6 +17,8 @@ let updateInstallScheduled = false;
 let showingOfflinePage = false;
 let offlineRetryTimer = null;
 let offlineRetryInProgress = false;
+let offlinePageLoading = false;
+let mainPageLoadFailed = false;
 const activeNotifications = new Map();
 const hasSingleInstanceLock = app.requestSingleInstanceLock();
 
@@ -237,7 +239,7 @@ async function readPublishedAssetVersion() {
 }
 
 async function checkForSiteUpdates() {
-  if (!mainWindow || mainWindow.isDestroyed() || mainWindow.webContents.isLoading() || checkingForSiteUpdates) return;
+  if (!mainWindow || mainWindow.isDestroyed() || showingOfflinePage || mainWindow.webContents.isLoading() || checkingForSiteUpdates) return;
   checkingForSiteUpdates = true;
   try {
     const publishedVersion = await readPublishedAssetVersion();
@@ -293,17 +295,18 @@ function createWindow() {
   });
 
   mainWindow.maximize();
-  mainWindow.loadURL(APP_URL);
   mainWindow.webContents.on('console-message', (_event, details) => {
     if (details.level >= 2) console.warn('[Warehouse Orders renderer]', details.message);
   });
+  mainWindow.webContents.on('did-start-loading', () => { mainPageLoadFailed = false; });
   mainWindow.webContents.on('did-fail-load', (_event, code, description, validatedURL, isMainFrame) => {
     console.error('[Warehouse Orders] Page load failed:', code, description, validatedURL);
     if (!isMainFrame || code === -3 || !String(validatedURL || '').startsWith(APP_URL)) return;
+    mainPageLoadFailed = true;
     showOfflineStartupPage();
   });
   mainWindow.webContents.on('did-finish-load', () => {
-    if (mainWindow?.webContents.getURL().startsWith(APP_URL)) {
+    if (!mainPageLoadFailed && mainWindow?.webContents.getURL().startsWith(APP_URL)) {
       showingOfflinePage = false;
       if (offlineRetryTimer) clearInterval(offlineRetryTimer);
       offlineRetryTimer = null;
@@ -348,37 +351,50 @@ function createWindow() {
     event.preventDefault();
     if (url.startsWith('https://')) shell.openExternal(url);
   });
+
+  mainWindow.loadURL(APP_URL).catch(error => {
+    console.info('[Warehouse Orders] Initial page unavailable:', String(error?.message || error));
+    showOfflineStartupPage();
+  });
 }
 
 function showOfflineStartupPage() {
-  if (!mainWindow || mainWindow.isDestroyed() || showingOfflinePage) return;
+  if (!mainWindow || mainWindow.isDestroyed()) return;
   showingOfflinePage = true;
+  if (!offlineRetryTimer) offlineRetryTimer = setInterval(retryAppConnection, 5000);
+  const currentUrl = mainWindow.webContents.getURL();
+  if (offlinePageLoading || (currentUrl.startsWith('file:') && currentUrl.endsWith('/offline.html'))) return;
+  offlinePageLoading = true;
   mainWindow.loadFile(path.join(__dirname, 'offline.html')).catch(error => {
     console.error('[Warehouse Orders] Could not show offline page:', String(error?.message || error));
-  });
-  if (!offlineRetryTimer) offlineRetryTimer = setInterval(retryAppConnection, 15000);
+  }).finally(() => { offlinePageLoading = false; });
 }
 
 async function retryAppConnection() {
   if (!showingOfflinePage || offlineRetryInProgress || !mainWindow || mainWindow.isDestroyed()) return;
+  const target = mainWindow;
   offlineRetryInProgress = true;
-  mainWindow.webContents.send('warehouse:offline-status', 'Проверяем сервер. Если связь восстановилась, приложение загрузится автоматически.');
+  let navigationTimeout;
+  target.webContents.send('warehouse:offline-status', 'Переподключаемся… Приложение откроется в этом окне.');
   try {
     const response = await net.fetch(APP_URL, { cache: 'no-store', signal: AbortSignal.timeout(10000) });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    // Keep the offline page and retry loop active until the real page finishes
-    // loading. A successful connectivity probe alone does not guarantee that
-    // Chromium can complete the navigation; clearing the flag early stranded
-    // users on a failed/blank load with no further retries.
-    // Keep the offline retry loop armed until did-finish-load confirms that
-    // Chromium rendered the app. loadURL may resolve before navigation ends.
-    showingOfflinePage = false;
-    await mainWindow.loadURL(APP_URL);
+    if (target.isDestroyed() || target !== mainWindow) return;
+    // Keep retrying until did-finish-load confirms successful site navigation.
+    // Both a failed navigation and a hung WebView must return to the retry screen.
+    await Promise.race([
+      target.loadURL(APP_URL),
+      new Promise((_, reject) => {
+        navigationTimeout = setTimeout(() => reject(new Error('Превышено время загрузки приложения')), 20000);
+      })
+    ]);
   } catch (error) {
-    showingOfflinePage = true;
+    if (target.isDestroyed() || target !== mainWindow) return;
+    showOfflineStartupPage();
     console.info('[Warehouse Orders] Still waiting for network:', String(error?.message || error));
-    mainWindow?.webContents.send('warehouse:offline-status', 'Соединения пока нет. Повторим проверку автоматически.');
+    target.webContents.send('warehouse:offline-status', 'Соединение пока не восстановлено. Повторяем попытки каждые 5 секунд.');
   } finally {
+    if (navigationTimeout) clearTimeout(navigationTimeout);
     offlineRetryInProgress = false;
   }
 }

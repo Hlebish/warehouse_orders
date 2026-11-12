@@ -61,7 +61,7 @@ import com.google.firebase.messaging.FirebaseMessaging;
 
 public class MainActivity extends AppCompatActivity {
     private static final String SITE_URL = "https://hlebish.github.io/warehouse_orders/";
-    private static final String ANDROID_RELEASES_URL = "https://api.github.com/repos/Hlebish/warehouse_orders/releases/latest";
+    private static final String ANDROID_RELEASES_URL = "https://api.github.com/repos/Hlebish/warehouse_orders/releases?per_page=50";
     private static final String CHANNEL_ID = "warehouse_orders_v8_custom_sound";
     private static final int NOTIFICATION_PERMISSION_REQUEST = 1001;
     private static final String PREFS = "warehouse_push";
@@ -80,6 +80,20 @@ public class MainActivity extends AppCompatActivity {
     private WebView webView;
     private View networkErrorView;
     private String lastPageUrl = SITE_URL;
+    private final OfflineRecovery offlineRecovery = new OfflineRecovery();
+    private TextView networkErrorDetail;
+    private Button networkRetryButton;
+    private static final long OFFLINE_RETRY_MS = 5000L;
+    private static final long PAGE_LOAD_TIMEOUT_MS = 20000L;
+    private final Runnable offlineRetry = () -> {
+        if (this.activityResumed && offlineRecovery.isOffline()) retryMainPage();
+    };
+    private final Runnable offlineLoadTimeout = () -> {
+        if (webView == null || isFinishing() || isDestroyed()) return;
+        offlineRecovery.pageFailed();
+        webView.stopLoading();
+        showNetworkError();
+    };
     private String pendingNotificationLink = "";
     private GoogleSignInClient googleSignInClient;
     private ValueCallback<Uri[]> filePathCallback;
@@ -158,14 +172,23 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
                 super.onPageStarted(view, url, favicon);
-                lastPageUrl = url == null || url.isEmpty() ? SITE_URL : url;
-                if (networkErrorView != null) networkErrorView.setVisibility(View.GONE);
+                if (url == null || !url.startsWith(SITE_URL)) return;
+                lastPageUrl = withoutRetryParameter(url);
+                offlineRecovery.pageStarted();
+                mainHandler.removeCallbacks(offlineLoadTimeout);
+                mainHandler.postDelayed(offlineLoadTimeout, PAGE_LOAD_TIMEOUT_MS);
+                // Keep the recovery screen visible until a real page succeeds.
             }
 
             @Override
             public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
-                if (url == null || !url.startsWith(SITE_URL)) return;
+                if (url == null || !url.startsWith(SITE_URL) || !url.equals(view.getUrl())) return;
+                if (!offlineRecovery.pageFinished()) return;
+                mainHandler.removeCallbacks(offlineLoadTimeout);
+                mainHandler.removeCallbacks(offlineRetry);
+                if (networkErrorView != null) networkErrorView.setVisibility(View.GONE);
+                if (networkRetryButton != null) networkRetryButton.setEnabled(true);
                 // The app removes its startup overlay after Firebase auth resolves.
                 // Repaint again after that transition; the first WebView frame alone
                 // can be blank on some Android GPU/WebView combinations until touch.
@@ -179,14 +202,14 @@ public class MainActivity extends AppCompatActivity {
             public void onReceivedError(WebView view, android.webkit.WebResourceRequest request,
                     android.webkit.WebResourceError error) {
                 super.onReceivedError(view, request, error);
-                if (request.isForMainFrame()) showNetworkError();
+                if (isCurrentMainFrame(view, request)) showNetworkError();
             }
 
             @Override
             public void onReceivedHttpError(WebView view, android.webkit.WebResourceRequest request,
                     android.webkit.WebResourceResponse errorResponse) {
                 super.onReceivedHttpError(view, request, errorResponse);
-                if (request.isForMainFrame() && errorResponse.getStatusCode() >= 400) showNetworkError();
+                if (isCurrentMainFrame(view, request) && errorResponse.getStatusCode() >= 400) showNetworkError();
             }
         });
         webView.setWebChromeClient(new WebChromeClient() {
@@ -253,6 +276,7 @@ public class MainActivity extends AppCompatActivity {
         ));
 
         TextView detail = new TextView(this);
+        networkErrorDetail = detail;
         detail.setText("Проверьте интернет. Заказы и уведомления обновятся после подключения.");
         detail.setTextColor(Color.rgb(174, 188, 188));
         detail.setTextSize(14);
@@ -264,7 +288,8 @@ public class MainActivity extends AppCompatActivity {
         panel.addView(detail, detailParams);
 
         Button retry = new Button(this);
-        retry.setText("Повторить");
+        networkRetryButton = retry;
+        retry.setText("Переподключиться");
         retry.setAllCaps(false);
         retry.setOnClickListener(view -> retryMainPage());
         LinearLayout.LayoutParams buttonParams = new LinearLayout.LayoutParams(
@@ -275,20 +300,46 @@ public class MainActivity extends AppCompatActivity {
         return panel;
     }
 
+    private boolean isCurrentMainFrame(WebView view, android.webkit.WebResourceRequest request) {
+        return request.isForMainFrame() && (view.getUrl() == null || request.getUrl().toString().equals(view.getUrl()));
+    }
+
+    private void scheduleOfflineRetry() {
+        mainHandler.removeCallbacks(offlineRetry);
+        if (activityResumed && offlineRecovery.isOffline()) mainHandler.postDelayed(offlineRetry, OFFLINE_RETRY_MS);
+    }
+
     private void showNetworkError() {
         runOnUiThread(() -> {
+            offlineRecovery.pageFailed();
+            mainHandler.removeCallbacks(offlineLoadTimeout);
             if (networkErrorView != null) networkErrorView.setVisibility(View.VISIBLE);
+            if (networkRetryButton != null) networkRetryButton.setEnabled(true);
+            if (networkErrorDetail != null) networkErrorDetail.setText("Проверьте интернет. Переподключаемся автоматически каждые 5 секунд. Сохранённый вход останется.");
+            scheduleOfflineRetry();
         });
     }
 
+    private String withoutRetryParameter(String target) {
+        Uri uri = Uri.parse(target);
+        Uri.Builder builder = uri.buildUpon().clearQuery();
+        for (String key : uri.getQueryParameterNames()) {
+            if (!"_native_retry".equals(key)) for (String value : uri.getQueryParameters(key)) builder.appendQueryParameter(key, value);
+        }
+        return builder.build().toString();
+    }
+
     private void retryMainPage() {
-        if (webView == null) return;
-        if (networkErrorView != null) networkErrorView.setVisibility(View.GONE);
-        String target = lastPageUrl == null || lastPageUrl.isEmpty() ? SITE_URL : lastPageUrl;
+        if (webView == null || isFinishing() || isDestroyed() || !offlineRecovery.beginRetry()) return;
+        mainHandler.removeCallbacks(offlineRetry);
+        mainHandler.removeCallbacks(offlineLoadTimeout);
+        if (networkRetryButton != null) networkRetryButton.setEnabled(false);
+        if (networkErrorDetail != null) networkErrorDetail.setText("Переподключаемся… Приложение откроется здесь, когда связь восстановится.");
+        String target = lastPageUrl != null && lastPageUrl.startsWith(SITE_URL) ? withoutRetryParameter(lastPageUrl) : SITE_URL;
         String retryUrl = Uri.parse(target).buildUpon()
             .appendQueryParameter("_native_retry", String.valueOf(System.currentTimeMillis()))
-            .build()
-            .toString();
+            .build().toString();
+        mainHandler.postDelayed(offlineLoadTimeout, PAGE_LOAD_TIMEOUT_MS);
         webView.loadUrl(retryUrl);
     }
 
@@ -429,6 +480,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onPause() {
         activityResumed = false;
+        mainHandler.removeCallbacks(offlineRetry);
         mainHandler.removeCallbacks(periodicAppUpdateCheck);
         super.onPause();
     }
@@ -554,25 +606,32 @@ public class MainActivity extends AppCompatActivity {
                 int count;
                 while ((count = input.read(buffer)) != -1) body.append(new String(buffer, 0, count, "UTF-8"));
             }
-            JSONObject release = new JSONObject(body.toString());
-            if (release.optBoolean("draft") || release.optBoolean("prerelease")) return null;
-            String tag = release.optString("tag_name", "");
-            String prefix = "android-v1.0.";
-            if (!tag.startsWith(prefix)) return null;
-            int versionCode;
-            try { versionCode = Integer.parseInt(tag.substring(prefix.length())); }
-            catch (NumberFormatException ignored) { return null; }
-            org.json.JSONArray assets = release.optJSONArray("assets");
-            if (assets == null) return null;
-            String downloadUrl = "";
-            for (int assetIndex = 0; assetIndex < assets.length(); assetIndex++) {
-                JSONObject asset = assets.optJSONObject(assetIndex);
-                if (asset != null && "app-release.apk".equals(asset.optString("name"))) {
-                    downloadUrl = asset.optString("browser_download_url", ""); break;
+            // Android and Windows publish into the same repository. The latest
+            // GitHub release can be a Windows installer, so select the newest APK.
+            JSONArray releases = new JSONArray(body.toString());
+            AndroidRelease latest = null;
+            for (int releaseIndex = 0; releaseIndex < releases.length(); releaseIndex++) {
+                JSONObject release = releases.optJSONObject(releaseIndex);
+                if (release == null || release.optBoolean("draft") || release.optBoolean("prerelease")) continue;
+                String tag = release.optString("tag_name", "");
+                String prefix = "android-v1.0.";
+                if (!tag.startsWith(prefix)) continue;
+                int versionCode;
+                try { versionCode = Integer.parseInt(tag.substring(prefix.length())); }
+                catch (NumberFormatException ignored) { continue; }
+                JSONArray assets = release.optJSONArray("assets");
+                if (assets == null) continue;
+                String downloadUrl = "";
+                for (int assetIndex = 0; assetIndex < assets.length(); assetIndex++) {
+                    JSONObject asset = assets.optJSONObject(assetIndex);
+                    if (asset != null && "app-release.apk".equals(asset.optString("name"))) {
+                        downloadUrl = asset.optString("browser_download_url", ""); break;
+                    }
                 }
+                if (!downloadUrl.startsWith("https://github.com/Hlebish/warehouse_orders/releases/download/")) continue;
+                if (latest == null || versionCode > latest.versionCode) latest = new AndroidRelease(versionCode, "1.0." + versionCode, downloadUrl);
             }
-            if (!downloadUrl.startsWith("https://github.com/Hlebish/warehouse_orders/releases/download/")) return null;
-            return new AndroidRelease(versionCode, "1.0." + versionCode, downloadUrl);
+            return latest;
         } finally {
             connection.disconnect();
         }
@@ -1003,6 +1062,8 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onDestroy() {
+        mainHandler.removeCallbacks(offlineRetry);
+        mainHandler.removeCallbacks(offlineLoadTimeout);
         if (filePathCallback != null) {
             filePathCallback.onReceiveValue(null);
             filePathCallback = null;

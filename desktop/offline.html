@@ -21,7 +21,7 @@
     const button=document.getElementById('retry');
     button.addEventListener('click',()=>{button.disabled=true;document.getElementById('status').textContent='Проверяем соединение…';window.warehouseDesktop?.retryAppConnection();setTimeout(()=>{button.disabled=false},3000)});
     window.warehouseDesktop?.onOfflineStatus?.(message=>{document.getElementById('status').textContent=message;button.disabled=false});
-    setInterval(()=>window.warehouseDesktop?.retryAppConnection(),15000);
+    window.addEventListener('online',()=>window.warehouseDesktop?.retryAppConnection());
   </script>
 </body>
 </html>

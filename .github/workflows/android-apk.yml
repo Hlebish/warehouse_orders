@@ -24,6 +24,12 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      - name: Verify offline recovery state transitions
+        run: |
+          mkdir -p "$RUNNER_TEMP/offline-tests"
+          javac -d "$RUNNER_TEMP/offline-tests" android/app/src/main/java/com/amp/warehouseorders/OfflineRecovery.java android/tests/OfflineRecoveryTest.java
+          java -ea -cp "$RUNNER_TEMP/offline-tests" com.amp.warehouseorders.OfflineRecoveryTest
+
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:

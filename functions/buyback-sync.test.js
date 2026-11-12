@@ -31,3 +31,11 @@ test('linked lot wins over older stock; other orders reserved stock is untouched
  {article:'APHD4307',quantity:1,status:'active',orderId:'order',receivedAt:'2026'}]);
  await sell('APHD4307');assert.equal(records.get('item2').status,'sold');assert.equal(records.get('item0').status,'active');assert.equal(records.get('item1').status,'active');
 });
+
+test('order 3109 screenshot: shipped OPT BP-12485 leaves active deadline stock',async()=>{
+ const {records,sell}=setup([{article:'OPT BP-12485',quantity:1,status:'active'}]);
+ await sell('OPT BP-12485 Гальмівні колодки дискові');
+ assert.equal(records.get('item0').status,'sold');
+ assert.equal(records.get('item0').quantity,1);
+ assert.equal([...records.values()].filter(item=>item.status==='active').length,0);
+});

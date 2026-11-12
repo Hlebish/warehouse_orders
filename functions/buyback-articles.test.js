@@ -18,3 +18,12 @@ test('quantities aggregate plain and imported order lines for the same SKU',()=>
 test('descriptions without a real inventory prefix never match',()=>{
   assert.notEqual(resolveBuybackArticle('Капот Honda APHD4307',stock),'APHD4307');
 });
+
+test('order 3109 screenshot: spaced OPT SKU matches without its Ukrainian description',()=>{
+  const {normalizeBuybackArticle}=require('./buyback-articles');
+  const inventoryCode=normalizeBuybackArticle('OPT BP-12485');
+  const orderLine='OPT BP-12485 Гальмівні колодки дискові';
+  assert.notEqual(normalizeBuybackArticle(orderLine),inventoryCode,'the previous whole-line comparison misses this item');
+  assert.equal(resolveBuybackArticle(orderLine,new Set([inventoryCode])),inventoryCode);
+  assert.notEqual(resolveBuybackArticle('OPT BP-124850 Гальмівні колодки дискові',new Set([inventoryCode])),inventoryCode);
+});

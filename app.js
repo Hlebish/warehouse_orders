@@ -9,6 +9,7 @@ import { orderEditSnapshot, assertOrderUnchanged } from './editing-state.mjs?v=2
 import { drafts, draftKey } from './draft-store.mjs?v=2026.11.12.05';
 import { createWarehouseMapPanel, warehouseMapUrl, mapArticleQuery } from './warehouse-map-panel.mjs?v=2026.11.12.06';
 import { composerHtml, bindChatComposer, chatTime, chatDay } from './chat-ui.mjs?v=2026.11.12.07';
+import { createPhotoSharing, decoratePhotoSharing } from './photo-sharing.mjs?v=2026.11.12.09';
 import { canTransitionOrderStatus, statusAfterDefectDecision } from './order-workflow.mjs?v=2026.11.12.03';
 import { NOTIFICATION_CATEGORIES, NOTIFICATION_CATEGORY_KEYS, normalizeNotificationSettings, groupNotifications, NOTIFICATION_SECTIONS } from './notification-settings.mjs?v=2026.11.12.02';
 import { searchClients, searchProducts, findClientCandidates, clientPhone, clientAddress, clientComment } from './client-directory.mjs?v=2026.11.12.07';
@@ -65,6 +66,7 @@ let uiStateRestored=false,lastUiSave=0;
 const isAndroidWarehouse=()=>/WarehouseOrdersAndroid/.test(navigator.userAgent);
 const isPhoneDevice=()=>/Android|iPhone|iPod|Mobile/i.test(navigator.userAgent);
 const warehouseMapPanel=createWarehouseMapPanel();
+const photoSharing=createPhotoSharing({prepare:source=>Array.isArray(source)?createDefectPhotoCollage(source):fetchPhotoAsPng(source),notify:message=>toast(message)});
 function showArticleOnMap(article){
  if(!mapArticleQuery(article)){toast('В позиции не указан артикул.');return;}
  if(isPhoneDevice()||window.Capacitor?.isNativePlatform?.()){
@@ -1663,6 +1665,7 @@ async function commitOrderEdit(order,expected,patch,entry){
 let modalHistoryEntry=false;
 let orderReturnModalSnapshot=null;
 function showModal(title,body,buttons=[],eyebrow='КАРТОЧКА ЗАКАЗА'){
+  if(photoSharing.isOpen())photoSharing.close();
   persistOpenEntryDraft();activeEntryDraft=null;
   const editingOrder=state.orders.find(order=>order.id===selectedId);
   if(editingOrder)modal.dataset.orderBaseline=JSON.stringify(orderEditSnapshot(editingOrder));else delete modal.dataset.orderBaseline;
@@ -1679,12 +1682,12 @@ function showModal(title,body,buttons=[],eyebrow='КАРТОЧКА ЗАКАЗА'
     copyButton.dataset.copyContext=viberButton.dataset.viberContext||'Фото из заказа';
     copyButton.textContent='📋 Скопировать фото';
     viberButton.insertAdjacentElement('afterend',copyButton);
-    if(!isPhoneDevice())viberButton.remove();
+    viberButton.dataset.sharePhoto=viberButton.dataset.viberPhoto;viberButton.removeAttribute('data-viber-photo');viberButton.className='photo-share-button';viberButton.textContent='↗ Поделиться';
   });
   $('modalBody').querySelectorAll('.defect-comment-photos,.defect-modal-photos').forEach(photoGroup=>{
     const photoUrls=[...new Set(Array.from(photoGroup.querySelectorAll('img[data-photo]')).map(item=>item.dataset.photo).filter(Boolean))];
     const photoButton=photoGroup.querySelector('[data-viber-context],[data-copy-context]');
-    if(photoUrls.length<2||(isPhoneDevice()&&!isAndroidWarehouse()))return;
+    if(photoUrls.length<2)return;
     const groupButton=document.createElement('button');
     groupButton.type='button';
     groupButton.className='small-button primary-soft defect-photo-group-button';
@@ -1692,7 +1695,9 @@ function showModal(title,body,buttons=[],eyebrow='КАРТОЧКА ЗАКАЗА'
     groupButton.dataset.photoGroup=JSON.stringify(photoUrls);
     groupButton.dataset.photoGroupContext=photoButton?.dataset.viberContext||photoButton?.dataset.copyContext||'Фото дефекта';
     photoGroup.insertAdjacentElement('beforebegin',groupButton);
+    const shareButton=document.createElement('button');shareButton.type='button';shareButton.className='small-button primary-soft defect-photo-group-button';shareButton.textContent='↗ Поделиться коллажем';shareButton.dataset.sharePhotoGroup=JSON.stringify(photoUrls);photoGroup.insertAdjacentElement('beforebegin',shareButton);
   });
+  decoratePhotoSharing($('modalBody'));
   $('modalFoot').innerHTML=buttons.join('');
   modal.hidden=false;
   document.body.classList.add('overlay-window-open');
@@ -3175,6 +3180,7 @@ async function shareChatMessage(id){
   const m=findChatMessage(id);if(!m)return;
   const text=[m.authorName||'Сотрудник',m.text||'📷 Фото'].filter(Boolean).join(': ');
   const urls=Array.isArray(m.photos)?m.photos:[];
+  if(urls.length){photoSharing.open(urls.length===1?urls[0]:urls);return;}
   try{if(navigator.share){await navigator.share({title:'Сообщение из Warehouse Orders',text,...(urls.length===1?{url:urls[0]}:{})});return;}}
   catch(err){if(err?.name==='AbortError')return;console.warn('Системная отправка недоступна',err);}
   const value=[text,...urls].join('\n');
@@ -3325,6 +3331,7 @@ async function copyPhotoToClipboard(url,context='Фото из заказа'){
 async function shareChatMessageViaViber(id){
   const m=findChatMessage(id);if(!m)return;
   const urls=Array.isArray(m.photos)?m.photos:[];
+  if(urls.length){photoSharing.open(urls.length===1?urls[0]:urls);return;}
   const message=[m.authorName||'Сотрудник',m.text||'📷 Фото',...urls].filter(Boolean).join('\n');
   const shareUrl='viber://forward?text='+encodeURIComponent(message.slice(0,200));
   // Launch the Viber protocol from the direct click gesture. If Windows has no handler,
@@ -3455,6 +3462,7 @@ function renderChatMessages(options={}){
       const roleBadge='<span class="chat-role-badge chat-role-'+roleMeta.tone+'" title="'+esc(roleMeta.label)+'"><span aria-hidden="true">'+roleMeta.icon+'</span>'+esc(roleMeta.label)+'</span>';
       return chatDayDivider+'<article class="chat-message chat-author-role-'+roleMeta.tone+' '+(mine?'mine':'')+'"><div class="chat-bubble-head"><div class="chat-bubble-author"><b>'+esc(chatDisplayName(m.authorName))+'</b><span class="chat-bubble-role">'+esc(roleMeta.label)+'</span></div><time title="'+esc(fmtDateTime(m.createdAt))+'">'+esc(chatTime(m.createdAt))+'</time></div>'+replyHtml+'<div class="chat-message-text">'+renderChatText(m.text)+'</div>'+(m.editedAt?'<small class="chat-edited-label">изменено</small>':'')+photoHtml+(m.isUrgent?'<div class="chat-urgent-banner">🚨 СРОЧНОЕ ОБРАЩЕНИЕ</div>':'')+'<div class="chat-message-actions">'+likeHtml+menuHtml+receipt+urgentAckButton+'</div></article>';
     }).join('');
+    decoratePhotoSharing(box);
     if(chatPendingScrollRestore){box.scrollTop=chatPendingScrollRestore.top+(box.scrollHeight-chatPendingScrollRestore.height);chatPendingScrollRestore=null;}
     else if(options.preserveScroll){
       if(options.scrollToNew){box.scrollTop=box.scrollHeight;requestAnimationFrame(()=>{box.scrollTop=box.scrollHeight;});}
@@ -3485,7 +3493,7 @@ async function loadDirectPhoto(path,button){
   if(!url){if(!directPhotoRequests.has(path))directPhotoRequests.set(path,getDownloadURL(storageRef(storage,path)).then(url=>{if(signedInUser?.uid===owner)directPhotoCache.set(path,url);return url;}).finally(()=>directPhotoRequests.delete(path)));url=await directPhotoRequests.get(path);}
   if(!button.isConnected||signedInUser?.uid!==owner)return;
   button.dataset.photo=url;button.disabled=false;button.onclick=null;button.replaceChildren();
-  const image=document.createElement('img'),box=button.closest('.direct-chat-messages'),nearBottom=box&&box.scrollHeight-box.clientHeight-box.scrollTop<90;image.src=url;image.alt='Фото из личного чата';image.loading='lazy';image.addEventListener('load',()=>{if(nearBottom&&box.scrollHeight-box.clientHeight-box.scrollTop<300)box.scrollTop=box.scrollHeight;},{once:true});button.append(image);
+  const image=document.createElement('img'),box=button.closest('.direct-chat-messages'),nearBottom=box&&box.scrollHeight-box.clientHeight-box.scrollTop<90;image.src=url;image.alt='Фото из личного чата';image.loading='lazy';image.addEventListener('load',()=>{if(nearBottom&&box.scrollHeight-box.clientHeight-box.scrollTop<300)box.scrollTop=box.scrollHeight;},{once:true});button.append(image);decoratePhotoSharing(button.parentElement);
  }catch(error){if(button.isConnected){button.disabled=false;button.textContent='Повторить загрузку фото';button.onclick=()=>{button.disabled=true;void loadDirectPhoto(path,button);};}}
 }
 function renderDirectChatMessages(messages){
@@ -4570,6 +4578,8 @@ document.addEventListener('click',e=>{
   if(share){e.preventDefault();shareChatMessage(share.dataset.action.split(':').slice(1).join(':'));return;}
   const copyPhoto=e.target.closest('[data-copy-photo]');
   if(copyPhoto){e.preventDefault();e.stopPropagation();copyPhotoToClipboard(copyPhoto.dataset.copyPhoto,copyPhoto.dataset.copyContext||'Фото из заказа');return;}
+  const sharePhoto=e.target.closest('[data-share-photo]'),shareGroup=e.target.closest('[data-share-photo-group]');
+  if(sharePhoto||shareGroup){e.preventDefault();e.stopPropagation();try{photoSharing.open(shareGroup?JSON.parse(shareGroup.dataset.sharePhotoGroup):sharePhoto.dataset.sharePhoto);}catch(error){toast('Не удалось подготовить фотографии.');}return;}
   const photoGroup=e.target.closest('[data-photo-group]');
   if(photoGroup){e.preventDefault();e.stopPropagation();try{copyPhotoGroup(JSON.parse(photoGroup.dataset.photoGroup||'[]'),photoGroup.dataset.photoGroupContext||'Фото дефекта')}catch(err){console.error('Некорректный список фотографий дефекта',err);toast('Не удалось прочитать список фотографий.')}return;}
   const viberPhoto=e.target.closest('[data-viber-photo]');
@@ -4584,6 +4594,7 @@ const clientCardLink=e.target.closest('[data-open-client-card]');if(clientCardLi
 let imageViewerHistoryEntry=false,imageViewerBackPending=false;
 function openImageViewer(){
   $('imageViewer').hidden=false;
+  $('shareImageViewer').dataset.sharePhoto=$('imageViewerImage').src;
   if(!imageViewerHistoryEntry){
     try{history.pushState({imageViewer:true},'',location.href);imageViewerHistoryEntry=true}catch{imageViewerHistoryEntry=false}
   }
@@ -4592,6 +4603,7 @@ function closeImageViewer(fromPop=false){
   if($('imageViewer').hidden)return;
   $('imageViewer').hidden=true;
   $('imageViewerImage').removeAttribute('src');
+  delete $('shareImageViewer').dataset.sharePhoto;
   if(imageViewerHistoryEntry){
     imageViewerHistoryEntry=false;
     if(!fromPop){imageViewerBackPending=true;history.back();}
@@ -4605,6 +4617,7 @@ document.addEventListener('touchstart',e=>{if(!e.touches||e.touches.length!==1)r
 document.addEventListener('touchend',e=>{if(!tracking||!e.changedTouches||e.changedTouches.length!==1)return;const t=e.changedTouches[0];const dx=t.clientX-startX,dy=t.clientY-startY;tracking=false;if(dx>=threshold&&Math.abs(dy)<80)openSidebar();},{passive:true});
 })();
 window.handleNativeBack=function(){
+  if(photoSharing.close())return true;
   if(imageViewerBackPending)return true;
   if(warehouseMapPanel.close())return true;
   if(!$('imageViewer').hidden){if(imageViewerHistoryEntry){history.back();return true;}closeImageViewer(true);return true;}
@@ -4618,6 +4631,7 @@ window.handleNativeBack=function(){
   return true;
 };
 window.addEventListener('popstate',()=>{
+  if(photoSharing.handlePopState())return;
   if(imageViewerBackPending){imageViewerBackPending=false;return;}
   if(warehouseMapPanel.handlePopState())return;
   if(imageViewerHistoryEntry){
@@ -4634,7 +4648,7 @@ window.addEventListener('popstate',()=>{
     return;
   }
   if(handlingSidebarPop)handlingSidebarPop=false;
-});document.addEventListener('keydown',e=>{if(e.key==='Escape'){if(warehouseMapPanel.close()){e.preventDefault();return;}if(!$('imageViewer').hidden){e.preventDefault();closeImageViewer();return}if(!modal.hidden){e.preventDefault();closeModal();return}if($('staffPresencePanel').classList.contains('open')){e.preventDefault();openStaffPanel(false);return}if($('sidebar').classList.contains('open')){e.preventDefault();closeSidebar();return}closeSidebar()}});$('closeImageViewer').addEventListener('click',()=>closeImageViewer());
+});document.addEventListener('keydown',e=>{if(e.key==='Escape'){if(photoSharing.close()){e.preventDefault();return;}if(warehouseMapPanel.close()){e.preventDefault();return;}if(!$('imageViewer').hidden){e.preventDefault();closeImageViewer();return}if(!modal.hidden){e.preventDefault();closeModal();return}if($('staffPresencePanel').classList.contains('open')){e.preventDefault();openStaffPanel(false);return}if($('sidebar').classList.contains('open')){e.preventDefault();closeSidebar();return}closeSidebar()}});$('closeImageViewer').addEventListener('click',()=>closeImageViewer());
 $('newOrderButton').addEventListener('click',openNewOrder);$('newOrderHintButton').addEventListener('click',openNewOrder);$('emptyAddButton').addEventListener('click',openNewOrder);$('closeModal').addEventListener('click',closeModal);$('searchInput').addEventListener('input',()=>{currentOrdersPage=1;render()});$('dateFromFilter').addEventListener('change',()=>{currentOrdersPage=1;render()});$('dateToFilter').addEventListener('change',()=>{currentOrdersPage=1;render()});$('clearDateButton').addEventListener('click',()=>{$('dateFromFilter').value='';$('dateToFilter').value='';currentOrdersPage=1;render()});$('ordersPagination').addEventListener('click',e=>{const button=e.target.closest('[data-orders-page]');if(!button||button.disabled)return;currentOrdersPage=Math.max(1,currentOrdersPage+(button.dataset.ordersPage==='next'?1:-1));render();});$('notificationButton').addEventListener('click',showNotifications);$('profileButton').addEventListener('click',profileMenu);$('chatSidebarButton').addEventListener('click',openChat);$('mobileMenu').addEventListener('click',openSidebar);function positionFilterMenu(){const button=$('filterButton'),menu=$('filterMenu');if(!button||!menu||menu.hidden)return;const r=button.getBoundingClientRect();const gap=6;const menuWidth=Math.max(205,r.width);let left=Math.min(r.right-menuWidth,window.innerWidth-8);left=Math.max(8,left);let top=r.bottom+gap;const menuHeight=menu.offsetHeight;if(top+menuHeight>window.innerHeight-8&&r.top-menuHeight-gap>=8)top=r.top-menuHeight-gap;menu.style.left=Math.round(left)+'px';menu.style.top=Math.round(top)+'px';menu.style.minWidth=Math.round(menuWidth)+'px'}$('filterButton').addEventListener('click',e=>{e.stopPropagation();const menu=$('filterMenu');const isOpen=!menu.hidden;menu.hidden=isOpen;$('filterButton').setAttribute('aria-expanded',String(!isOpen));if(!isOpen){updateFilterMenu();requestAnimationFrame(positionFilterMenu)}});document.querySelectorAll('[data-menu-filter]').forEach(btn=>btn.addEventListener('click',()=>{activeFilter=btn.dataset.menuFilter;currentOrdersPage=1;render();updateFilterMenu();$('filterMenu').hidden=true;$('filterButton').setAttribute('aria-expanded','false')}));document.addEventListener('click',e=>{if(!e.target.closest('.filter-menu-wrap')){$('filterMenu').hidden=true;$('filterButton').setAttribute('aria-expanded','false')}});window.addEventListener('resize',positionFilterMenu);window.addEventListener('scroll',positionFilterMenu,true);function updateFilterMenu(){document.querySelectorAll('[data-menu-filter]').forEach(btn=>btn.classList.toggle('active',btn.dataset.menuFilter===activeFilter));}document.addEventListener('keydown',e=>{
   if((e.key==='Enter'||e.key===' ')&&e.target.closest('.stat-card-clickable')){
     e.preventDefault();

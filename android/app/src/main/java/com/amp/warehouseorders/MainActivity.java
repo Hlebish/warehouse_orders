@@ -858,6 +858,10 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void downloadAndSharePhotos(List<String> imageUrls, String caption) {
+        downloadAndSharePhotos(imageUrls, caption, true);
+    }
+
+    private void downloadAndSharePhotos(List<String> imageUrls, String caption, boolean preferViber) {
         try {
             if (imageUrls == null || imageUrls.isEmpty() || imageUrls.size() > 20)
                 throw new IllegalArgumentException("Choose between 1 and 20 photos");
@@ -876,22 +880,22 @@ public class MainActivity extends AppCompatActivity {
             } else {
                 send.putParcelableArrayListExtra(Intent.EXTRA_STREAM, contentUris);
             }
-            if (contentUris.size() == 1) send.putExtra(Intent.EXTRA_TEXT, caption == null ? "Фото дефекта" : caption);
+            if (contentUris.size() == 1 && caption != null && !caption.trim().isEmpty()) send.putExtra(Intent.EXTRA_TEXT, caption);
             ClipData clipData = ClipData.newUri(getContentResolver(), "Фото дефекта", contentUris.get(0));
             for (int i = 1; i < contentUris.size(); i++) clipData.addItem(new ClipData.Item(contentUris.get(i)));
             send.setClipData(clipData);
             send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-            send.setPackage("com.viber.voip");
-            Intent launch = send;
-            if (send.resolveActivity(getPackageManager()) == null) launch = Intent.createChooser(send.setPackage(null), "Отправить фотографии");
+            if (preferViber) send.setPackage("com.viber.voip");
+            Intent launch = preferViber ? send : Intent.createChooser(send, "Поделиться фотографией");
+            if (preferViber && send.resolveActivity(getPackageManager()) == null) launch = Intent.createChooser(send.setPackage(null), "Отправить фотографии");
             final Intent finalLaunch = launch;
             runOnUiThread(() -> {
                 try {
                     startActivity(finalLaunch);
-                    if (contentUris.size() > 1) android.widget.Toast.makeText(this,
+                    if (preferViber && contentUris.size() > 1) android.widget.Toast.makeText(this,
                         "Выбери чат в Viber и нажми «Отправить»", android.widget.Toast.LENGTH_LONG).show();
                 }
-                catch (Exception error) { android.widget.Toast.makeText(this, "Не удалось открыть отправку фото в Viber", android.widget.Toast.LENGTH_LONG).show(); }
+                catch (Exception error) { android.widget.Toast.makeText(this, "Не удалось открыть отправку фотографии", android.widget.Toast.LENGTH_LONG).show(); }
             });
         } catch (Exception error) {
             android.util.Log.e("WarehouseOrders", "Unable to share photos to Viber", error);
@@ -1007,6 +1011,12 @@ public class MainActivity extends AppCompatActivity {
         public void sharePhotoToViber(String imageUrl, String caption) {
             if (imageUrl == null || imageUrl.isEmpty()) return;
             shareExecutor.execute(() -> downloadAndSharePhoto(imageUrl, caption));
+        }
+
+        @JavascriptInterface
+        public void sharePhoto(String imageUrl) {
+            if (imageUrl == null || imageUrl.isEmpty()) return;
+            shareExecutor.execute(() -> downloadAndSharePhotos(Collections.singletonList(imageUrl), "", false));
         }
 
         @JavascriptInterface

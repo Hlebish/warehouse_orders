@@ -10,7 +10,7 @@
     "firebase-functions": "^7.4.0"
   },
   "scripts": {
-    "test": "node --test warehouse-map-lookup.test.js domain-modules.test.mjs browser-workflows.test.mjs buyback-articles.test.js buyback-sync.test.js desktop-recovery.test.cjs editing-state.test.mjs warehouse-map-panel.test.mjs chat-ui.test.mjs client-matching.test.mjs buyback-state.test.mjs buyback-lifecycle.test.js collage.test.mjs",
+    "test": "node --test warehouse-map-lookup.test.js domain-modules.test.mjs browser-workflows.test.mjs buyback-articles.test.js buyback-sync.test.js desktop-recovery.test.cjs editing-state.test.mjs warehouse-map-panel.test.mjs chat-ui.test.mjs client-matching.test.mjs buyback-state.test.mjs buyback-lifecycle.test.js collage.test.mjs photo-sharing.test.mjs",
     "test:warehouse-map-rules": "npx --yes firebase-tools emulators:exec --config ../firebase.warehouse-map-test.json --project demo-warehouse-map-rules \"node --test warehouse-map-rtdb-emulator.test.js\"",
     "test:chat-rules": "npx --yes firebase-tools@latest emulators:exec --config ../firebase.chat-test.json --project demo-warehouse-chat --only firestore,storage \"node direct-chat-rules.test.mjs\"",
     "test:buyback-stock-rules": "npx --yes firebase-tools@latest emulators:exec --config ../firebase.chat-test.json --project demo-warehouse-stock --only firestore \"node buyback-stock-rules.test.mjs\""

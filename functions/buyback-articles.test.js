@@ -35,3 +35,10 @@ test('order 3106 screenshot: multipart SKUs keep all numeric and letter segments
   for(const [code,name] of pairs)assert.equal(resolveBuybackArticle(code+' '+name,known),normalizeBuybackArticle(code));
   assert.notEqual(resolveBuybackArticle('FP 4819 311 Крило',new Set(['FP4819210'])),'FP4819210');
 });
+
+test('removed defects exclude only their own position when SKUs repeat',()=>{
+ const {buybackShippableArticles}=require('./buyback-articles');
+ const lines=[{article:'A',quantity:1},{article:'A',quantity:2}];
+ assert.deepEqual(buybackShippableArticles(lines,[{kind:'defect',decision:'Удалена из заказа',articleIndex:0}]),[lines[1]]);
+ assert.deepEqual(buybackShippableArticles(lines,[{kind:'defect',decision:'Подтверждён',articleIndex:0}]),lines);
+});

@@ -8,7 +8,7 @@ const { initializeApp } = require('firebase-admin/app');
 const { getFirestore, FieldValue, Timestamp, FieldPath } = require('firebase-admin/firestore');
 const { getMessaging } = require('firebase-admin/messaging');
 const { createHash } = require('crypto');
-const { normalizeBuybackArticle, resolveBuybackArticle, buybackArticleQuantities } = require('./buyback-articles');
+const { normalizeBuybackArticle, resolveBuybackArticle, buybackArticleQuantities, buybackShippableArticles } = require('./buyback-articles');
 
 initializeApp();
 const db = getFirestore();
@@ -877,7 +877,9 @@ async function markBuybackItemsSold(order, eventId) {
     if ((await transaction.get(markerRef)).exists) return { skipped: true, sold: 0, unmatched: 0 };
     const soldSnap = await transaction.get(db.collection('buybackItems').where('soldByOrderId', '==', order.id));
     const snap = await transaction.get(db.collection('buybackItems').where('status', 'in', ['active', 'expired']));
-    const needed = buybackArticleQuantities(order.articles, new Set([...soldSnap.docs, ...snap.docs].map(item => normalizeBuybackArticle(item.data().article))));
+    const entriesSnap = await transaction.get(db.collection('orders').doc(order.id).collection('entries'));
+    const shippedArticles = buybackShippableArticles(order.articles, entriesSnap.docs.map(entry => entry.data()));
+    const needed = buybackArticleQuantities(shippedArticles, new Set([...soldSnap.docs, ...snap.docs].map(item => normalizeBuybackArticle(item.data().article))));
     const alreadySold = new Map();
     for (const itemDoc of soldSnap.docs) {
       const item = itemDoc.data();

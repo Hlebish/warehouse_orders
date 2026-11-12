@@ -30,4 +30,13 @@ function buybackArticleQuantities(articles, knownArticles) {
   return result;
 }
 
-module.exports = { normalizeBuybackArticle, resolveBuybackArticle, buybackArticleQuantities };
+// Defect decisions retain the original order line for history, but a removed
+// line must never consume inventory when the rest of the order is shipped.
+function buybackShippableArticles(articles, entries) {
+  const removed = (Array.isArray(entries) ? entries : []).filter(entry => entry.kind === 'defect' && entry.decision === 'Удалена из заказа');
+  return (Array.isArray(articles) ? articles : []).filter((line, index) => !removed.some(entry =>
+    Number.isInteger(entry.articleIndex) ? entry.articleIndex === index : entry.article === line.article
+  ));
+}
+
+module.exports = { normalizeBuybackArticle, resolveBuybackArticle, buybackArticleQuantities, buybackShippableArticles };

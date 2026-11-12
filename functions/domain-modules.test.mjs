@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { canTransitionOrderStatus } from '../order-workflow.mjs';
+import { canTransitionOrderStatus, statusAfterDefectDecision } from '../order-workflow.mjs';
 import { normalizeNotificationSettings, groupNotifications } from '../notification-settings.mjs';
 import { searchClients, searchProducts } from '../client-directory.mjs';
 import { shipmentItemsForDate, shipmentOrderDateKey } from '../warehouse-operations.mjs';
@@ -129,4 +129,36 @@ test('urgent requests and mentions stay separate from ordinary messages', () => 
   ]);
   assert.equal(groups.length, 4);
   assert.equal(groups.find(g => g.latest.id === 'mention').section, 'attention');
+});
+
+test('confirmed defect approves shipment when other positions are collected', () => {
+  const order={articles:[{article:'A',collected:true},{article:'B',collected:false}],entries:[{kind:'defect',articleIndex:1,decision:'Подтверждён'}]};
+  assert.equal(statusAfterDefectDecision(order),'Одобрен на отгрузку клиенту');
+  order.entries[0].decision='Удалена из заказа';
+  assert.equal(statusAfterDefectDecision(order),'Одобрен на отгрузку клиенту');
+  order.articles[0].collected=false;
+  assert.equal(statusAfterDefectDecision(order),'Создан');
+});
+
+test('each defect needs its own decision before shipment approval', () => {
+  const order={articles:[{article:'A',collected:false},{article:'B',collected:false}],entries:[
+    {kind:'defect',articleIndex:0,decision:'Подтверждён'},
+    {kind:'defect',articleIndex:1}
+  ]};
+  assert.equal(statusAfterDefectDecision(order),'Дефект');
+  order.entries[1].decision='Подтверждён';
+  assert.equal(statusAfterDefectDecision(order),'Одобрен на отгрузку клиенту');
+  order.entries.forEach(entry=>entry.decision='Удалена из заказа');
+  assert.equal(statusAfterDefectDecision(order),'Создан');
+});
+
+test('defect decisions apply to one position even if article codes repeat', () => {
+  const order={articles:[{article:'A',collected:false},{article:'A',collected:false}],entries:[{kind:'defect',articleIndex:0,decision:'Подтверждён'}]};
+  assert.equal(statusAfterDefectDecision(order),'Создан');
+  order.articles[1].collected=true;
+  assert.equal(statusAfterDefectDecision(order),'Одобрен на отгрузку клиенту');
+});
+
+test('hidden clients do not reappear in autocomplete', () => {
+  assert.deepEqual(searchClients([{name:'АМП',hiddenFromDirectory:true},{name:'АМП Киев'}],'АМП'),[{name:'АМП Киев'}]);
 });

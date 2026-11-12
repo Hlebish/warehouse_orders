@@ -1,5 +1,5 @@
 const { app, BrowserWindow, Tray, Menu, nativeImage, shell, session, Notification, ipcMain, clipboard, net, powerMonitor } = require('electron');
-const { spawn } = require('node:child_process');
+const { execFile } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
 const { autoUpdater } = require('electron-updater');
@@ -54,34 +54,22 @@ function isGoogleAuthUrl(rawUrl) {
   }
 }
 
-function openViberApp(context = '') {
-  // Viber rejects the bare `viber://` URI. Its documented forward action
-  // accepts text and opens the contact picker, so keep the clipboard photo
-  // ready for the user to paste into the selected chat.
-  const caption = `Фото из Заказы · Склад${context ? ` · ${context}` : ''}. Фото скопировано — вставьте его в чате через Ctrl+V.`.slice(0, 190);
-  const shareUrl = `viber://forward?text=${encodeURIComponent(caption)}`;
-  if (process.platform !== 'win32') return shell.openExternal(shareUrl);
-
-  const viberPaths = [
-    path.join(process.env.LOCALAPPDATA || '', 'Viber', 'Viber.exe'),
-    path.join(process.env.ProgramFiles || 'C:\\Program Files', 'Rakuten Viber', 'Viber.exe'),
-    path.join(process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)', 'Rakuten Viber', 'Viber.exe')
-  ];
-  const executable = viberPaths.find(candidate => candidate && fs.existsSync(candidate));
-  if (!executable) throw new Error('Не удалось найти установленный Viber. Фото уже скопировано — открой Viber вручную и нажми Ctrl+V.');
-
-  // Launch the registered share action so an existing Viber window comes to
-  // the foreground with its recipient picker, instead of opening a blank URI.
-  return shell.openExternal(shareUrl).then(() => true).catch(() => new Promise((resolve, reject) => {
-    // Keep a reliable fallback for installations where the URI handler is not
-    // registered; this at least raises Viber and leaves the image on clipboard.
-    const child = spawn(executable, [], { detached: true, stdio: 'ignore', windowsHide: true });
-    child.once('error', reject);
-    child.once('spawn', () => {
-      child.unref();
-      resolve(true);
-    });
-  }));
+function openViberApp() {
+  // Opening Viber must never create an outgoing text message. The photo is
+  // already on the clipboard; the Windows helper restores and focuses Viber.
+  if (process.platform !== 'win32') return shell.openExternal('viber://chats').then(() => ({ opened: true, focused: false }));
+  const script = path.join(app.isPackaged ? process.resourcesPath : __dirname, 'focus-viber.ps1');
+  const powershell = path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe');
+  return new Promise((resolve, reject) => {
+    execFile(powershell, ['-NoLogo', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', script],
+      { windowsHide: true, timeout: 12000, maxBuffer: 16384 }, (error, stdout) => {
+        if (error) { reject(new Error('Не удалось вывести Viber на экран. Фото уже скопировано.')); return; }
+        try {
+          const result = JSON.parse(stdout.replace(/^\uFEFF/, '').trim());
+          resolve({ opened: result.opened === true, focused: result.focused === true });
+        } catch { reject(new Error('Не удалось подтвердить открытие Viber. Фото уже скопировано.')); }
+      });
+  });
 }
 
 function notifyDesktopUpdateStatus(body) {
@@ -216,14 +204,17 @@ ipcMain.handle('warehouse:share-photo-to-viber', async (event, payload = {}) => 
 
   clipboard.writeImage(image);
   let viberOpened = false;
+  let viberFocused = false;
   if (payload.openViber !== false) {
     try {
-      viberOpened = await openViberApp(String(payload.context || '').slice(0, 100));
+      const result = await openViberApp();
+      viberOpened = result.opened;
+      viberFocused = result.focused;
     } catch (error) {
       console.warn('[Warehouse Orders] Could not open Viber:', String(error?.message || error));
     }
   }
-  return { copied: true, viberOpened, context: String(payload.context || '').slice(0, 200) };
+  return { copied: true, viberOpened, viberFocused };
 });
 
 let loadedAssetVersion = '';

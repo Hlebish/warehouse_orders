@@ -9010,7 +9010,7 @@ body #modalBackdrop .modal.chat-dialog #modalBody :is(#chatForm,#directChatForm)
 .photo-share-dialog>header{display:flex;align-items:center;justify-content:space-between;gap:12px}.photo-share-dialog>header>b{font-size:17px}
 .photo-share-dialog>header>button{width:32px;height:32px;padding:0;border:0;border-radius:7px;background:#2a3540;color:#c7d4de;font-size:24px}
 .photo-share-status{margin:10px 0 14px;color:#a4b5c3;font-size:12px;line-height:1.5}
-.photo-share-options{display:grid;gap:8px}.photo-share-options>button{display:grid;gap:4px;min-height:58px;padding:11px 13px;border:1px solid #394956;border-radius:10px;background:#222e39;color:#e5edf4;text-align:left;cursor:pointer}
-.photo-share-options>button>b{font-size:14px}.photo-share-options>button>span{font-size:11px;color:#a4b5c3}.photo-share-options>button:disabled{opacity:.5}
-body:not(.dark-theme) .photo-share-dialog{background:#fff;color:#243444;border-color:#d5dfe8}body:not(.dark-theme) .photo-share-options>button{background:#f4f7fa;color:#243444;border-color:#d5dfe8}body:not(.dark-theme) .photo-share-status,body:not(.dark-theme) .photo-share-options>button>span{color:#657a8a}
+.photo-share-options{display:grid;gap:8px}.photo-share-options>:is(button,a){display:grid;gap:4px;min-height:58px;padding:11px 13px;border:1px solid #394956;border-radius:10px;background:#222e39;color:#e5edf4;text-align:left;text-decoration:none;cursor:pointer}
+.photo-share-options>:is(button,a)>b{font-size:14px}.photo-share-options>:is(button,a)>span{font-size:11px;color:#a4b5c3}.photo-share-options>button:disabled{opacity:.5}
+body:not(.dark-theme) .photo-share-dialog{background:#fff;color:#243444;border-color:#d5dfe8}body:not(.dark-theme) .photo-share-options>:is(button,a){background:#f4f7fa;color:#243444;border-color:#d5dfe8}body:not(.dark-theme) .photo-share-status,body:not(.dark-theme) .photo-share-options>:is(button,a)>span{color:#657a8a}
 @media(max-width:600px){.photo-share-overlay{place-items:end center;padding:12px}.photo-share-dialog{width:100%;padding:16px}.photo-share-button{min-height:34px}}

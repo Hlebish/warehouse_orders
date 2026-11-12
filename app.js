@@ -9,7 +9,7 @@ import { orderEditSnapshot, assertOrderUnchanged } from './editing-state.mjs?v=2
 import { drafts, draftKey } from './draft-store.mjs?v=2026.11.12.05';
 import { createWarehouseMapPanel, warehouseMapUrl, mapArticleQuery } from './warehouse-map-panel.mjs?v=2026.11.12.06';
 import { composerHtml, bindChatComposer, chatTime, chatDay } from './chat-ui.mjs?v=2026.11.12.07';
-import { createPhotoSharing, decoratePhotoSharing } from './photo-sharing.mjs?v=2026.11.12.09';
+import { createPhotoSharing, decoratePhotoSharing } from './photo-sharing.mjs?v=2026.11.12.10';
 import { canTransitionOrderStatus, statusAfterDefectDecision } from './order-workflow.mjs?v=2026.11.12.03';
 import { NOTIFICATION_CATEGORIES, NOTIFICATION_CATEGORY_KEYS, normalizeNotificationSettings, groupNotifications, NOTIFICATION_SECTIONS } from './notification-settings.mjs?v=2026.11.12.02';
 import { searchClients, searchProducts, findClientCandidates, clientPhone, clientAddress, clientComment } from './client-directory.mjs?v=2026.11.12.07';
@@ -3241,47 +3241,7 @@ function startBrowserPhotoCopy(url){
   const writePromise=navigator.clipboard.write([new ClipboardItem({'image/png':pngPromise})]);
   return {pngPromise,writePromise};
 }
-async function sharePhotoViaViber(url,context='Фото из заказа'){
-  if(!url)return;
-  if(window.warehouseDesktop?.sharePhotoToViber){
-    try{
-      const result=await window.warehouseDesktop.sharePhotoToViber(url,context,true);
-      if(result?.copied){toast(result.viberOpened?'Фото скопировано. Viber открыт — выбери чат и нажми Ctrl+V.':'Фото скопировано. Открой Viber, выбери чат и нажми Ctrl+V.');return;}
-      throw new Error('Windows-приложение не подтвердило копирование фото.');
-    }catch(err){
-      console.error('Windows не смогло подготовить фото для Viber',err);
-      toast('Не удалось скопировать фото для Viber: '+(err?.message||'проверь интернет и попробуй ещё раз'));
-      return;
-    }
-  }
-  // Android app: pass the Firebase Storage URL to the native bridge. The app
-  // downloads the image and shares a real image/* content URI with Viber.
-  if(window.AndroidWarehouse?.sharePhotoToViber){
-    try{window.AndroidWarehouse.sharePhotoToViber(url,context);return;}
-    catch(err){console.warn('Native Viber photo share failed',err);}
-  }
-  // In a desktop browser, copy a PNG during the click gesture and open Viber's
-  // supported share URI with a short caption. The user picks a chat and pastes.
-  try{
-    const copy=startBrowserPhotoCopy(url);
-    const launch=document.createElement('a');
-    launch.href='viber://forward?text='+encodeURIComponent(context+' · фото скопировано, нажми Ctrl+V');
-    launch.rel='noreferrer';document.body.appendChild(launch);launch.click();launch.remove();
-    await copy.writePromise;
-    toast('Фото скопировано. Выбери чат в Viber и нажми Ctrl+V.');
-  }catch(err){
-    if(err?.name==='AbortError')return;
-    console.error('Не удалось передать фото в Viber',err);
-    try{
-      const original=new URL(url,location.href);
-      if(original.protocol==='https:'&&['firebasestorage.googleapis.com','storage.googleapis.com'].includes(original.hostname)){
-        const fallback=toast('Браузер не смог подготовить файл автоматически. Сохрани оригинал и прикрепи к Viber:','',{persistent:true});const link=document.createElement('a');link.href=original.href;link.target='_blank';link.rel='noopener noreferrer';link.textContent=' Открыть фото';link.style.color='white';link.style.textDecoration='underline';fallback.append(link);const close=document.createElement('button');close.type='button';close.textContent=' ×';close.setAttribute('aria-label','Закрыть уведомление');close.addEventListener('click',()=>fallback.remove());fallback.append(close);
-        return;
-      }
-    }catch{}
-    toast('Не удалось подготовить фото для Viber. Проверь интернет и попробуй ещё раз.');
-  }
-}
+function sharePhotoViaViber(url){if(url)photoSharing.open(url);}
 async function copyPhotoGroup(urls,context='Фото дефекта'){
   if(!Array.isArray(urls)||urls.length<2)return;
   if(window.AndroidWarehouse?.sharePhotosToViber){

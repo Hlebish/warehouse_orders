@@ -3,6 +3,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('warehouseDesktop', {
   isDesktopApp: true,
   platform: process.platform,
+  opensViberWithoutMessage: true,
   getAppVersion() {
     return ipcRenderer.invoke('warehouse:get-app-version');
   },

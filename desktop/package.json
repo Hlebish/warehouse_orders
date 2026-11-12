@@ -27,6 +27,9 @@
       "package.json",
       "icon.ico"
     ],
+    "extraResources": [
+      { "from": "focus-viber.ps1", "to": "focus-viber.ps1" }
+    ],
     "win": {
       "target": [
         {

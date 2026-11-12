@@ -8,6 +8,7 @@ const { initializeApp } = require('firebase-admin/app');
 const { getFirestore, FieldValue, Timestamp, FieldPath } = require('firebase-admin/firestore');
 const { getMessaging } = require('firebase-admin/messaging');
 const { createHash } = require('crypto');
+const { directPushEventId } = require('./direct-push-id');
 const { normalizeBuybackArticle, resolveBuybackArticle, buybackArticleQuantities, buybackShippableArticles } = require('./buyback-articles');
 
 initializeApp();
@@ -612,9 +613,11 @@ exports.enqueueWarehousePush = onCall(async request => {
     if (!entry.exists || entry.data().authorId !== uid) throw new HttpsError('permission-denied', 'Запись заказа не найдена или принадлежит другому сотруднику.');
   }
 
-  const ref = db.collection('pushQueue').doc();
+  const ref = directMessageId
+    ? db.collection('pushQueue').doc(directPushEventId(directChatThreadId,directMessageId,uid,recipientUserId))
+    : db.collection('pushQueue').doc();
   const now = Date.now();
-  await ref.create({
+  try { await ref.create({
     title,
     body,
     authorId: uid,
@@ -637,6 +640,9 @@ exports.enqueueWarehousePush = onCall(async request => {
     expiresAt: now + 60000,
     sentAt: null
   });
+  } catch (error) {
+    if (!directMessageId || ![6,'already-exists','ALREADY_EXISTS'].includes(error.code)) throw error;
+  }
   return { ok: true, eventId: ref.id };
 });
 

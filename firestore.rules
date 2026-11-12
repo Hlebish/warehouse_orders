@@ -165,25 +165,36 @@ service cloud.firestore {
       allow delete: if false;
 
       match /messages/{messageId} {
+        // Optional photos contain 0..5 Storage paths scoped to this thread,
+        // the immutable message author and this message ID. Older text-only
+        // messages remain valid when a recipient adds a read/urgent receipt.
+        function validDirectPhoto(data, index) {
+          return data.photos.size() <= index
+            || data.photos[index] == 'directChats/' + threadId + '/' + data.authorId + '/' + messageId + '/' + string(index) + '.jpg';
+        }
+        function validDirectMessage(data) {
+          return data.text is string && data.text.size() <= 1000
+            && (!('photos' in data) || (data.photos is list && data.photos.size() <= 5
+              && validDirectPhoto(data,0) && validDirectPhoto(data,1) && validDirectPhoto(data,2) && validDirectPhoto(data,3) && validDirectPhoto(data,4)))
+            && (data.text.size() > 0 || ('photos' in data && data.photos.size() > 0))
+            && (!('authorName' in data) || (data.authorName is string && data.authorName.size() <= 200));
+        }
         function directChatParticipant() {
           return activeUser()
             && get(/databases/$(database)/documents/directChats/$(threadId)).data.participants is list
             && request.auth.uid in get(/databases/$(database)/documents/directChats/$(threadId)).data.participants;
         }
         allow read: if directChatParticipant();
-        // Only authenticated active participants may write messages to their own thread.
-        // Keep validation intentionally minimal to avoid rejecting valid serverTimestamp writes.
         allow create: if directChatParticipant()
+          && validDirectMessage(request.resource.data)
           && request.resource.data.authorId == request.auth.uid
-          && request.resource.data.text is string
-          && request.resource.data.text.size() > 0
-          && request.resource.data.text.size() <= 1000
-          && request.resource.data.keys().hasOnly(['text','authorId','authorName','createdAt','mentionUserIds','notificationRecipientIds','isUrgent','urgentAckBy','readBy'])
+          && request.resource.data.keys().hasOnly(['text','photos','authorId','authorName','createdAt','mentionUserIds','notificationRecipientIds','isUrgent','urgentAckBy','readBy'])
           && (!request.resource.data.keys().hasAny(['readBy'])
             || (request.resource.data.readBy is list
               && request.resource.data.readBy.size() == 1
               && request.resource.data.readBy.hasAll([request.auth.uid])));
         allow update: if directChatParticipant()
+          && validDirectMessage(request.resource.data)
           && (
             (resource.data.authorId != request.auth.uid
               && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['readBy'])

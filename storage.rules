@@ -19,6 +19,22 @@ service firebase.storage {
       allow delete: if activeUser() && request.auth.uid == userId;
     }
 
+    // Personal chat attachments are separate from the shared staff chat.
+    match /directChats/{threadId}/{userId}/{messageId}/{fileName} {
+      function participant() {
+        return activeUser()
+          && request.auth.uid in firestore.get(/databases/(default)/documents/directChats/$(threadId)).data.participants;
+      }
+      allow read: if participant();
+      allow create: if participant()
+        && resource == null
+        && request.auth.uid == userId
+        && fileName.matches('[0-4]\\.jpg')
+        && request.resource.size <= 8 * 1024 * 1024
+        && request.resource.contentType == 'image/jpeg';
+      allow delete: if participant() && request.auth.uid == userId;
+    }
+
     match /avatars/{userId}/{fileName} {
       allow read: if activeUser();
       allow create, update: if activeUser()

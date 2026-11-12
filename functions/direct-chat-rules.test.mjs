@@ -1,0 +1,47 @@
+import {initializeTestEnvironment,assertSucceeds,assertFails} from '@firebase/rules-unit-testing';
+import {doc,setDoc,getDoc,updateDoc,serverTimestamp,arrayUnion} from 'firebase/firestore';
+import {ref,uploadBytes,getBytes,getMetadata,deleteObject} from 'firebase/storage';
+import {readFileSync} from 'node:fs';
+const env=await initializeTestEnvironment({projectId:'demo-warehouse-chat',firestore:{host:'127.0.0.1',port:8086,rules:readFileSync(new URL('../firestore.rules',import.meta.url),'utf8')},storage:{host:'127.0.0.1',port:9196,rules:readFileSync(new URL('../storage.rules',import.meta.url),'utf8')}});
+let checks=0;
+const check=async(name,operation,allowed)=>{await(allowed?assertSucceeds(operation):assertFails(operation));checks++;console.log('PASS',name);};
+const context=uid=>uid?env.authenticatedContext(uid):env.unauthenticatedContext();
+const alice=context('alice'),bob=context('bob');
+const path=(id,index=0,author='alice',thread='alice__bob')=>`directChats/${thread}/${author}/${id}/${index}.jpg`;
+const message=(id,patch={})=>({text:'Сообщение',authorId:'alice',authorName:'Алиса',createdAt:serverTimestamp(),mentionUserIds:['bob'],notificationRecipientIds:['bob'],isUrgent:false,urgentAckBy:[],readBy:['alice'],...patch});
+const create=(id,patch={},who=alice)=>setDoc(doc(who.firestore(),'directChats','alice__bob','messages',id),message(id,patch));
+try{
+ await env.withSecurityRulesDisabled(async c=>{
+  for(const uid of ['alice','bob','outsider','disabled','admin'])await setDoc(doc(c.firestore(),'users',uid),{active:uid!=='disabled',role:uid==='admin'?'director':'warehouse'});
+  await setDoc(doc(c.firestore(),'directChats','alice__bob'),{participants:['alice','bob'],lastSenderId:'alice',lastMessage:'',createdAt:serverTimestamp()});
+  await setDoc(doc(c.firestore(),'directChats','bob__outsider'),{participants:['bob','outsider'],lastSenderId:'bob',lastMessage:'',createdAt:serverTimestamp()});
+ });
+ await check('legacy text-only message',create('legacy'),true);
+ await check('photo without caption',create('photo',{text:'',photos:[path('photo')]}),true);
+ await check('caption and five private photos',create('five',{photos:Array.from({length:5},(_,i)=>path('five',i))}),true);
+ await check('reject sixth photo',create('six',{photos:Array.from({length:6},(_,i)=>path('six',i))}),false);
+ await check('reject empty message',create('empty',{text:'',photos:[]}),false);
+ for(const [name,photos]of [['wrong thread',[path('foreign',0,'alice','bob__outsider')]],['wrong author',[path('foreign',0,'bob')]],['wrong message',[path('another')]],['external URL',['https://example.invalid/photo.jpg']],['invalid element',[42]],['wrong slot',[path('foreign',1)]]])await check(name,create('foreign',{photos}),false);
+ await check('outsider cannot read message',getDoc(doc(context('outsider').firestore(),'directChats','alice__bob','messages','photo')),false);
+ await check('admin outside the thread cannot read message',getDoc(doc(context('admin').firestore(),'directChats','alice__bob','messages','photo')),false);
+ await check('recipient reads a photo message',getDoc(doc(bob.firestore(),'directChats','alice__bob','messages','photo')),true);
+ for(const id of ['legacy','photo'])await check('recipient receipt '+id,updateDoc(doc(bob.firestore(),'directChats','alice__bob','messages',id),{readBy:arrayUnion('bob')}),true);
+ await check('recipient cannot replace photos while acknowledging',updateDoc(doc(bob.firestore(),'directChats','alice__bob','messages','photo'),{readBy:['alice','bob'],photos:[]}),false);
+ await check('urgent photo create',create('urgent',{text:'',photos:[path('urgent')],isUrgent:true}),true);
+ await check('recipient confirms urgent photo',updateDoc(doc(bob.firestore(),'directChats','alice__bob','messages','urgent'),{urgentAckBy:arrayUnion('bob')}),true);
+ await check('author cannot rewrite a sent photo message',updateDoc(doc(alice.firestore(),'directChats','alice__bob','messages','photo'),{photos:[]}),false);
+ const bytes=new Uint8Array([255,216,255,217]),metadata={contentType:'image/jpeg'},photoPath=path('upload');
+ await check('participant uploads own photo',uploadBytes(ref(alice.storage(),photoPath),bytes,metadata),true);
+ await check('recipient downloads photo',getBytes(ref(bob.storage(),photoPath)),true);
+ for(const uid of ['outsider','admin','disabled',null])await check('deny private photo access '+uid,getMetadata(ref(context(uid).storage(),photoPath)),false);
+ await check('reject overwrite',uploadBytes(ref(alice.storage(),photoPath),bytes,metadata),false);
+ await check('reject impersonated uploader',uploadBytes(ref(alice.storage(),path('upload',0,'bob')),bytes,metadata),false);
+ await check('reject foreign thread upload',uploadBytes(ref(alice.storage(),path('upload',0,'alice','bob__outsider')),bytes,metadata),false);
+ await check('reject orphan thread upload',uploadBytes(ref(alice.storage(),path('upload',0,'alice','missing')),bytes,metadata),false);
+ await check('reject non-image upload',uploadBytes(ref(alice.storage(),path('pdf')),bytes,{contentType:'application/pdf'}),false);
+ await check('reject sixth upload slot',uploadBytes(ref(alice.storage(),path('upload',5)),bytes,metadata),false);
+ await check('reject photo over 8 MiB',uploadBytes(ref(alice.storage(),path('large')),new Uint8Array(8*1024*1024+1),metadata),false);
+ await check('recipient cannot delete another author photo',deleteObject(ref(bob.storage(),photoPath)),false);
+ await check('author can remove own attachment',deleteObject(ref(alice.storage(),photoPath)),true);
+ console.log('Private chat rules:',checks,'checks passed');
+}finally{await env.cleanup();}

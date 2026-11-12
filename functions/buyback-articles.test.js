@@ -1,0 +1,20 @@
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const {resolveBuybackArticle, buybackArticleQuantities} = require('./buyback-articles');
+const stock = new Set(['APHD4307','APHD43070','APHD4307A']);
+test('imported descriptions do not prevent sale matching',()=>{
+  assert.equal(resolveBuybackArticle('APHD4307 Капот Honda',stock),'APHD4307');
+  assert.equal(resolveBuybackArticle('АР-HD 4307 Капот Honda',stock),'APHD4307');
+});
+test('different SKU lengths and suffixes stay distinct',()=>{
+  assert.equal(resolveBuybackArticle('APHD43070 Капот',stock),'APHD43070');
+  assert.equal(resolveBuybackArticle('APHD4307A Капот',stock),'APHD4307A');
+  assert.notEqual(resolveBuybackArticle('APHD4307-A Капот',new Set(['APHD4307'])),'APHD4307');
+  assert.notEqual(resolveBuybackArticle('APHD43070 Капот',new Set(['APHD4307'])),'APHD4307');
+});
+test('quantities aggregate plain and imported order lines for the same SKU',()=>{
+  assert.equal(buybackArticleQuantities([{article:'APHD4307 Капот Honda',quantity:2},{article:'APHD4307',quantity:1}],stock).get('APHD4307'),3);
+});
+test('descriptions without a real inventory prefix never match',()=>{
+  assert.notEqual(resolveBuybackArticle('Капот Honda APHD4307',stock),'APHD4307');
+});

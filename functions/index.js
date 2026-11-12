@@ -8,6 +8,7 @@ const { initializeApp } = require('firebase-admin/app');
 const { getFirestore, FieldValue, Timestamp, FieldPath } = require('firebase-admin/firestore');
 const { getMessaging } = require('firebase-admin/messaging');
 const { createHash } = require('crypto');
+const { normalizeBuybackArticle, resolveBuybackArticle, buybackArticleQuantities } = require('./buyback-articles');
 
 initializeApp();
 const db = getFirestore();
@@ -829,32 +830,13 @@ exports.sendWarehousePush = onDocumentCreated({ document: 'pushQueue/{eventId}',
 });
 
 
-function normalizeBuybackArticle(value) {
-  // Normalize harmless separators but keep the whole code: truncating APxx
-  // codes at their first digits can merge distinct product variants.
-  const lookalikes = { А: 'A', В: 'B', Е: 'E', К: 'K', М: 'M', Н: 'H', О: 'O', Р: 'P', С: 'C', Т: 'T', У: 'Y', Х: 'X', І: 'I', Ј: 'J', Ѕ: 'S' };
-  return String(value || '').normalize('NFKC').trim().toUpperCase()
-    .replace(/[АВЕКМНОРСТУХІЈЅ]/g, character => lookalikes[character] || character)
-    .replace(/[^A-Z0-9]/g, '');
-}
-
-function buybackArticleQuantities(articles) {
-  const result = new Map();
-  for (const line of Array.isArray(articles) ? articles : []) {
-    const article = normalizeBuybackArticle(line?.article);
-    const quantity = Math.max(1, Math.floor(Number(line?.quantity) || 1));
-    if (article) result.set(article, (result.get(article) || 0) + quantity);
-  }
-  return result;
-}
-
 function buybackEventDocId(prefix, eventId) {
   return `${prefix}_${createHash('sha256').update(String(eventId)).digest('hex').slice(0, 40)}`;
 }
 
 async function syncBuybackOrderReferences(order) {
-  const quantities = buybackArticleQuantities(order.articles);
   const snap = await db.collection('buybackItems').where('status', 'in', ['active', 'expired']).get();
+  const quantities = buybackArticleQuantities(order.articles, new Set(snap.docs.map(item => normalizeBuybackArticle(item.data().article))));
   const today = new Date().toISOString().slice(0, 10);
   let batch = db.batch();
   let writes = 0;
@@ -889,13 +871,13 @@ async function syncBuybackOrderReferences(order) {
 }
 
 async function markBuybackItemsSold(order, eventId) {
-  const needed = buybackArticleQuantities(order.articles);
-  if (!needed.size) return;
+  if (!Array.isArray(order.articles) || !order.articles.length) return;
   const markerRef = db.collection('orders').doc(order.id).collection('buybackSync').doc(buybackEventDocId('shipment', eventId));
   const result = await db.runTransaction(async transaction => {
     if ((await transaction.get(markerRef)).exists) return { skipped: true, sold: 0, unmatched: 0 };
     const soldSnap = await transaction.get(db.collection('buybackItems').where('soldByOrderId', '==', order.id));
     const snap = await transaction.get(db.collection('buybackItems').where('status', 'in', ['active', 'expired']));
+    const needed = buybackArticleQuantities(order.articles, new Set([...soldSnap.docs, ...snap.docs].map(item => normalizeBuybackArticle(item.data().article))));
     const alreadySold = new Map();
     for (const itemDoc of soldSnap.docs) {
       const item = itemDoc.data();
@@ -908,7 +890,8 @@ async function markBuybackItemsSold(order, eventId) {
     // remaining unsynced quantity; never consume stock twice for one order.
     const remaining = new Map([...needed].map(([article, quantity]) => [article, Math.max(0, quantity - (alreadySold.get(article) || 0))]));
     const today = new Date().toISOString().slice(0, 10);
-    const candidates = snap.docs.slice().sort((a, b) =>
+    const candidates = snap.docs.filter(item => !item.get('orderId') || item.get('orderId') === order.id).sort((a, b) =>
+      Number(b.get('orderId') === order.id) - Number(a.get('orderId') === order.id) ||
       String(a.get('receivedAt') || '').localeCompare(String(b.get('receivedAt') || '')) || a.id.localeCompare(b.id)
     );
     let writes = 0;
@@ -950,11 +933,11 @@ async function markBuybackItemsSold(order, eventId) {
     }
     if (writes > 450) throw new Error('Buyback shipment exceeds the safe transaction write limit');
     transaction.set(markerRef, { processedAt: FieldValue.serverTimestamp(), kind: 'shipment' });
-    return { skipped: false, sold: soldTotal, unmatched: [...remaining.values()].reduce((sum, quantity) => sum + quantity, 0) };
+    return { skipped: false, articles: [...needed.keys()], sold: soldTotal, unmatched: [...remaining.values()].reduce((sum, quantity) => sum + quantity, 0) };
   });
   if (!result.skipped) logger.info('Buyback inventory reconciled for shipped order', {
     orderId: order.id, orderNumber: String(order.number || ''), soldQuantity: result.sold,
-    unmatchedQuantity: result.unmatched, articles: [...needed.keys()]
+    unmatchedQuantity: result.unmatched, articles: result.articles
   });
 }
 
@@ -964,9 +947,10 @@ async function restoreBuybackItemsForReturn(order, returnEntry, eventId) {
     if ((await transaction.get(markerRef)).exists) return;
     const soldQuery = db.collection('buybackItems').where('soldByOrderId', '==', order.id);
     const soldSnap = await transaction.get(soldQuery);
+    const knownArticles = new Set(soldSnap.docs.map(item => normalizeBuybackArticle(item.data().article)));
     const remaining = new Map();
     for (const entry of Array.isArray(returnEntry.items) ? returnEntry.items : []) {
-      const article = normalizeBuybackArticle(entry?.article);
+      const article = resolveBuybackArticle(entry?.article, knownArticles);
       const quantity = Math.max(0, Math.floor(Number(entry?.quantity) || 0));
       if (article && quantity) remaining.set(article, (remaining.get(article) || 0) + quantity);
     }

@@ -130,3 +130,13 @@ test('multiple defects persist independent position IDs, descriptions and photos
  assert.deepEqual(clone(saved.map(entry=>entry.articleIndex)),[0,1]);
  assert.equal(context.state.orders[0].entries.length,3);
 });
+
+test('manager gets a clear explanation instead of attempting to decide a shipped defect',async()=>{
+ const order=base();order.status='Отгружен кладовщиком';order.entries=[{id:'defect',kind:'defect',article:'B',articleIndex:1}];
+ const {context,events}=harness(order);context.state.role='manager';context.isManagerRole=()=>true;
+ vm.runInContext(between('const defectDecisionFields=', 'function deleteOrder(){'),context);
+ let attempted=false;context.persistDefectDecision=async()=>{attempted=true;return true;};
+ await context.decideDefect('defect','Подтверждён');
+ assert.equal(attempted,false);assert.equal(context.state.orders[0].entries[0].decision,undefined);
+ assert.ok(events.some(event=>event[0]==='toast'&&event[1].includes('уже отгружен')));
+});

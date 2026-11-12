@@ -27,3 +27,11 @@ test('order 3109 screenshot: spaced OPT SKU matches without its Ukrainian descri
   assert.equal(resolveBuybackArticle(orderLine,new Set([inventoryCode])),inventoryCode);
   assert.notEqual(resolveBuybackArticle('OPT BP-124850 Гальмівні колодки дискові',new Set([inventoryCode])),inventoryCode);
 });
+
+test('order 3106 screenshot: multipart SKUs keep all numeric and letter segments',()=>{
+  const {normalizeBuybackArticle}=require('./buyback-articles');
+  const pairs=[['KH3755 280','Капот'],['FP 4819 311','Крило'],['FP 4819 R1-E','Фара передня'],['FP 4823 900-P','Бампер'],['FP 4819 203','Панель'],['FP 4819 210','Полоска пластикова']];
+  const known=new Set(pairs.map(([code])=>normalizeBuybackArticle(code)));
+  for(const [code,name] of pairs)assert.equal(resolveBuybackArticle(code+' '+name,known),normalizeBuybackArticle(code));
+  assert.notEqual(resolveBuybackArticle('FP 4819 311 Крило',new Set(['FP4819210'])),'FP4819210');
+});

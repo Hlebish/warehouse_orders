@@ -15,6 +15,7 @@
         android:theme="@style/Theme.WarehouseOrders"
         android:icon="@drawable/amp_launcher"
         android:roundIcon="@drawable/amp_launcher">
+        <meta-data android:name="com.google.firebase.messaging.default_notification_icon" android:resource="@drawable/ic_notification_amp" />
 
         <provider
             android:name="androidx.core.content.FileProvider"

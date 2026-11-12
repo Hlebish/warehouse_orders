@@ -850,7 +850,7 @@ function buybackEventDocId(prefix, eventId) {
 }
 
 async function syncBuybackOrderReferences(order) {
-  const snap = await db.collection('buybackItems').where('status', 'in', ['active', 'expired']).get();
+  const snap = await db.collection('buybackItems').where('status', 'in', ['active', 'expired', 'stocked']).get();
   const quantities = buybackArticleQuantities(order.articles, new Set(snap.docs.map(item => normalizeBuybackArticle(item.data().article))));
   const today = new Date().toISOString().slice(0, 10);
   let batch = db.batch();
@@ -891,7 +891,7 @@ async function markBuybackItemsSold(order, eventId) {
   const result = await db.runTransaction(async transaction => {
     if ((await transaction.get(markerRef)).exists) return { skipped: true, sold: 0, unmatched: 0 };
     const soldSnap = await transaction.get(db.collection('buybackItems').where('soldByOrderId', '==', order.id));
-    const snap = await transaction.get(db.collection('buybackItems').where('status', 'in', ['active', 'expired']));
+    const snap = await transaction.get(db.collection('buybackItems').where('status', 'in', ['active', 'expired', 'stocked']));
     const entriesSnap = await transaction.get(db.collection('orders').doc(order.id).collection('entries'));
     const shippedArticles = buybackShippableArticles(order.articles, entriesSnap.docs.map(entry => entry.data()));
     const needed = buybackArticleQuantities(shippedArticles, new Set([...soldSnap.docs, ...snap.docs].map(item => normalizeBuybackArticle(item.data().article))));
@@ -983,7 +983,7 @@ async function restoreBuybackItemsForReturn(order, returnEntry, eventId) {
       if (!needed || !available) continue;
       const quantity = Math.min(needed, available);
       const returnedFields = {
-        status: 'active', returnedAt: today, returnedFromOrderId: order.id,
+        status: item.stockedAt ? 'stocked' : 'active', returnedAt: today, returnedFromOrderId: order.id,
         returnedFromOrderNumber: String(order.number || ''), returnedFromReturnId: returnEntry.id,
         returnedFromClient: String(order.client || ''), updatedAt: FieldValue.serverTimestamp()
       };
@@ -994,7 +994,7 @@ async function restoreBuybackItemsForReturn(order, returnEntry, eventId) {
       else {
         const splitRef = db.collection('buybackItems').doc(buybackEventDocId(`returned_${itemDoc.id}`, eventId));
         transaction.set(splitRef, {
-          ...item, quantity, status: 'active', ...returnedFields, returnedFromBuybackId: itemDoc.id,
+          ...item, quantity, ...returnedFields, returnedFromBuybackId: itemDoc.id,
           orderId: null, orderNumber: null, clientName: null, reservedAt: null,
           createdAt: FieldValue.serverTimestamp()
         });
@@ -1016,14 +1016,14 @@ async function reverseBuybackReturn(orderId, returnId, eventId) {
     const sourceRefs = new Map();
     for (const itemDoc of returnedSnap.docs) {
       const item = itemDoc.data();
-      if (item.status === 'active' && item.returnedFromBuybackId) sourceRefs.set(item.returnedFromBuybackId, db.collection('buybackItems').doc(item.returnedFromBuybackId));
+      if (['active','stocked'].includes(item.status) && item.returnedFromBuybackId) sourceRefs.set(item.returnedFromBuybackId, db.collection('buybackItems').doc(item.returnedFromBuybackId));
     }
     const sources = new Map();
     for (const [id, ref] of sourceRefs) { const snap = await transaction.get(ref); if (snap.exists) sources.set(id, snap); }
     let writes = 0;
     for (const itemDoc of returnedSnap.docs) {
       const item = itemDoc.data();
-      if (item.status !== 'active') continue;
+      if (!['active','stocked'].includes(item.status)) continue;
       if (item.returnedFromBuybackId) {
         const source = sources.get(item.returnedFromBuybackId);
         if (!source) continue;
@@ -1262,6 +1262,31 @@ exports.repeatUnreadChatNotifications = onSchedule({
   }
 });
 
+async function checkOneBuybackDeadline(itemRef,todayUtc){
+  const milestones = {
+    3: { title: 'Перекупной товар залежался', body: article => `Артикул ${article}: товар находится на складе уже 3 дня. Проверьте дальнейшие действия.` },
+    6: { title: 'Внимание: подходит срок возврата', body: article => `Артикул ${article}: прошло 6 из 14 дней. Срок возврата приближается — пора принять решение.` },
+    10: { title: 'КРИТИЧЕСКИЙ СРОК ВОЗВРАТА', body: article => `Артикул ${article}: прошло 10 из 14 дней. До окончания срока осталось 4 дня — срочно проверьте возврат!` }
+  };
+  await db.runTransaction(async transaction=>{
+    const snap=await transaction.get(itemRef);if(!snap.exists)return;
+    const data=snap.data()||{};if(data.status!=='active')return;
+    const receivedAt=String(data.receivedAt||'');if(!/^\d{4}-\d{2}-\d{2}$/.test(receivedAt))return;
+    const receivedUtc=Date.parse(receivedAt+'T00:00:00Z');if(!Number.isFinite(receivedUtc))return;
+    const elapsed=Math.floor((todayUtc-receivedUtc)/86400000);
+    if(elapsed>=14){transaction.update(itemRef,{status:'expired',updatedAt:FieldValue.serverTimestamp()});return;}
+    const sent=Array.isArray(data.sentMilestones)?data.sentMilestones:[];
+    const due=Object.keys(milestones).map(Number).filter(day=>elapsed>=day&&!sent.includes(day));
+    for(const day of due){const milestone=milestones[day],eventId='buyback_'+itemRef.id+'_'+day;
+      transaction.set(db.collection('pushQueue').doc(eventId),{
+        title:milestone.title,body:milestone.body(String(data.article||'без артикула'))+' Количество: '+String(data.quantity||1)+'.',
+        authorId:'system',orderId:'',target:'site',category:'orders',recipientUserId:'',createdAt:new Date().toISOString(),sentAt:null,buybackItemId:itemRef.id
+      });
+    }
+    if(due.length)transaction.update(itemRef,{sentMilestones:FieldValue.arrayUnion(...due),updatedAt:FieldValue.serverTimestamp()});
+  });
+}
+
 exports.checkBuybackDeadlines = onSchedule({
   schedule: 'every day 09:00',
   timeZone: 'Europe/Kyiv',
@@ -1272,39 +1297,7 @@ exports.checkBuybackDeadlines = onSchedule({
   const kyivParts = Object.fromEntries(new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Kyiv', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(now).map(part => [part.type, part.value]));
   const kyivDateKey = `${kyivParts.year}-${kyivParts.month}-${kyivParts.day}`;
   const todayUtc = Date.parse(`${kyivDateKey}T00:00:00Z`);
-  const milestones = {
-    3: { title: 'Перекупной товар залежался', body: article => `Артикул ${article}: товар находится на складе уже 3 дня. Проверьте дальнейшие действия.` },
-    6: { title: 'Внимание: подходит срок возврата', body: article => `Артикул ${article}: прошло 6 из 14 дней. Срок возврата приближается — пора принять решение.` },
-    10: { title: 'КРИТИЧЕСКИЙ СРОК ВОЗВРАТА', body: article => `Артикул ${article}: прошло 10 из 14 дней. До окончания срока осталось 4 дня — срочно проверьте возврат!` }
-  };
-  for (const itemDoc of snap.docs) {
-    const data = itemDoc.data() || {};
-    const receivedAt = String(data.receivedAt || '');
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(receivedAt)) continue;
-    const receivedUtc = Date.parse(`${receivedAt}T00:00:00Z`);
-    if (!Number.isFinite(receivedUtc)) continue;
-    const elapsed = Math.floor((todayUtc - receivedUtc) / 86400000);
-    if (elapsed >= 14) await itemDoc.ref.update({ status: 'expired', updatedAt: FieldValue.serverTimestamp() });
-    const sent = Array.isArray(data.sentMilestones) ? data.sentMilestones : [];
-    const due = Object.keys(milestones).map(Number).filter(day => elapsed >= day && !sent.includes(day));
-    for (const day of due) {
-      const milestone = milestones[day];
-      const eventId = 'buyback_' + itemDoc.id + '_' + day;
-      await db.collection('pushQueue').doc(eventId).set({
-        title: milestone.title,
-        body: milestone.body(String(data.article || 'без артикула')) + ' Количество: ' + String(data.quantity || 1) + '.',
-        authorId: 'system',
-        orderId: '',
-        target: 'site',
-        category: 'orders',
-        recipientUserId: '',
-        createdAt: new Date().toISOString(),
-        sentAt: null,
-        buybackItemId: itemDoc.id
-      }, { merge: true });
-      await itemDoc.ref.update({ sentMilestones: FieldValue.arrayUnion(day), updatedAt: FieldValue.serverTimestamp() });
-    }
-  }
+  for (const itemDoc of snap.docs) await checkOneBuybackDeadline(itemDoc.ref,todayUtc);
 });
 
 

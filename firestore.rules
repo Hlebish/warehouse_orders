@@ -652,9 +652,20 @@ service cloud.firestore {
     }
 
     match /buybackItems/{itemId} {
+      function validReceiptField(data, key, maxSize) {
+        return !(key in data) || data[key] == null || (data[key] is string && data[key].size() <= maxSize);
+      }
+      function validStockReceipt(data) {
+        return validReceiptField(data,'stockedAt',10) && validReceiptField(data,'stockedBy',128) && validReceiptField(data,'stockedByName',200)
+          && (!('stockedAt' in data) || data.stockedAt == null || data.stockedAt.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$'))
+          && (data.status != 'stocked' || (data.keys().hasAll(['stockedAt','stockedBy','stockedByName'])
+            && data.stockedAt is string && data.stockedAt.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+            && data.stockedBy is string && data.stockedBy.size() > 0 && data.stockedBy.size() <= 128
+            && data.stockedByName is string && data.stockedByName.size() <= 200));
+      }
       allow read: if canAccessBuyback();
       allow create: if canAccessBuyback()
-        && request.resource.data.keys().hasOnly(['article','name','quantity','receivedAt','supplier','comment','createdAt','createdOn','createdBy','createdByName','status','soldAt','cancelledAt','returnedAt','shippedAt','sentMilestones','updatedAt','orderId','orderNumber','clientName','reservedAt','soldByOrderId','soldByOrderNumber','soldToClient','shippedLate','overdueDaysAtShipment'])
+        && request.resource.data.keys().hasOnly(['article','name','quantity','receivedAt','supplier','comment','createdAt','createdOn','createdBy','createdByName','status','soldAt','cancelledAt','returnedAt','shippedAt','sentMilestones','updatedAt','orderId','orderNumber','clientName','reservedAt','soldByOrderId','soldByOrderNumber','soldToClient','shippedLate','overdueDaysAtShipment','returnedFromOrderId','returnedFromOrderNumber','returnedFromReturnId','returnedFromClient','returnedFromBuybackId','stockedAt','stockedBy','stockedByName'])
         && request.resource.data.article is string
         && request.resource.data.article.size() > 0
         && request.resource.data.quantity is number
@@ -666,19 +677,24 @@ service cloud.firestore {
         && (!request.resource.data.keys().hasAny(['comment']) || request.resource.data.comment is string && request.resource.data.comment.size() <= 1000)
         && request.resource.data.createdBy == request.auth.uid
         && request.resource.data.createdByName is string
-        && request.resource.data.status in ['active','returned','sold','cancelled','expired','shipped']
+        && request.resource.data.status in ['active','returned','sold','cancelled','expired','shipped','stocked']
+        && validStockReceipt(request.resource.data)
+        && (request.resource.data.status != 'stocked' || request.resource.data.stockedBy == request.auth.uid)
         && request.resource.data.sentMilestones is list;
       // For updates, validate fields when they are changed. This lets older
       // records with legacy/missing optional fields have their status restored.
       allow update: if canAccessBuyback()
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['article','name','quantity','receivedAt','supplier','comment','status','soldAt','cancelledAt','returnedAt','shippedAt','sentMilestones','updatedAt','orderId','orderNumber','clientName','reservedAt','soldByOrderId','soldByOrderNumber','soldToClient','shippedLate','overdueDaysAtShipment','returnedFromOrderId','returnedFromOrderNumber','returnedFromReturnId','returnedFromClient','returnedFromBuybackId'])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['article','name','quantity','receivedAt','supplier','comment','status','soldAt','cancelledAt','returnedAt','shippedAt','sentMilestones','updatedAt','orderId','orderNumber','clientName','reservedAt','soldByOrderId','soldByOrderNumber','soldToClient','shippedLate','overdueDaysAtShipment','returnedFromOrderId','returnedFromOrderNumber','returnedFromReturnId','returnedFromClient','returnedFromBuybackId','stockedAt','stockedBy','stockedByName'])
         && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['article']) || request.resource.data.article is string && request.resource.data.article.size() > 0)
         && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['quantity']) || request.resource.data.quantity is number && request.resource.data.quantity >= 1 && request.resource.data.quantity <= 100000)
         && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['receivedAt']) || request.resource.data.receivedAt is string)
         && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['supplier']) || !request.resource.data.keys().hasAny(['supplier']) || request.resource.data.supplier is string && request.resource.data.supplier.size() <= 160)
         && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['name']) || !request.resource.data.keys().hasAny(['name']) || request.resource.data.name is string && request.resource.data.name.size() <= 300)
         && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['comment']) || !request.resource.data.keys().hasAny(['comment']) || request.resource.data.comment is string && request.resource.data.comment.size() <= 1000)
-        && request.resource.data.status in ['active','returned','sold','cancelled','expired','shipped']
+        && request.resource.data.status in ['active','returned','sold','cancelled','expired','shipped','stocked']
+        && validStockReceipt(request.resource.data)
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['stockedBy'])
+          || request.resource.data.stockedBy == null || request.resource.data.stockedBy == request.auth.uid)
         && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['sentMilestones']) || request.resource.data.sentMilestones is list);
       allow delete: if canManageUsers();
     }

@@ -9,9 +9,12 @@ export function explainBuybackItem(item, inventory = [], order) {
   if (item.status === 'sold') {
     title = 'Продажа записана';
     detail = item.soldByOrderId ? 'Продано по заказу № ' + (orderNumber || '—') + (item.soldAt ? ' · ' + item.soldAt : '') : 'Отмечено проданным вручную' + (item.soldAt ? ' · ' + item.soldAt : '');
-  } else if (active && order && ['Отгружен кладовщиком', 'Клиент забрал самовывозом'].includes(order.status)) {
+  } else if ((active || item.status === 'stocked') && order && ['Отгружен кладовщиком', 'Клиент забрал самовывозом'].includes(order.status)) {
     title = 'Ожидает синхронизации продажи'; warning = true;
     detail = 'Заказ № ' + orderNumber + ' уже выдан. В этой карточке пока остаётся ' + item.quantity + ' шт. в работе.';
+  } else if (item.status === 'stocked') {
+    title = 'Принят на собственный склад';
+    detail = 'Срок возврата закрыт'+(item.stockedAt?' '+item.stockedAt:'')+'. '+item.quantity+' шт. остаётся на складе и будет списано при продаже.';
   } else if (active) {
     title = item.returnedFromOrderId ? 'Возвращено в работу' : 'Продажа не записана — товар в сроках';
     detail = orderId ? (order ? 'Заказ № ' + orderNumber + ': ' + order.status : order === null ? 'Связанный заказ удалён или недоступен.' : 'Загружаем состояние связанного заказа…') : 'К заказу не привязан. Таймер учитывает только количество этой карточки: ' + item.quantity + ' шт.';
@@ -19,5 +22,5 @@ export function explainBuybackItem(item, inventory = [], order) {
     title = ({returned: 'Возвращено поставщику', cancelled: 'Карточка отменена', shipped: 'Отгружено просроченным'})[item.status] || 'Срок остановлен';
     detail = 'Эта карточка не входит в количество товара в работе.';
   }
-  return {title, detail, warning, orderId, orderNumber, sold: sum(['sold']), available: sum(['active', 'expired'])};
+  return {title, detail, warning, orderId, orderNumber, sold: sum(['sold']), available: sum(['active', 'expired']), stocked: sum(['stocked'])};
 }

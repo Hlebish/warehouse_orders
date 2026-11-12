@@ -3196,8 +3196,9 @@ function fetchPhotoAsPng(url){
     return png;
   });
 }
-async function createDefectPhotoCollage(urls,context='Фото дефекта'){
-  const columns=2,outer=18,gap=12,tileWidth=900,imageHeight=630,headerHeight=48;
+async function createDefectPhotoCollage(urls,context=''){
+  const label=String(context||'').trim();
+  const columns=2,outer=18,gap=12,tileWidth=900,imageHeight=630,headerHeight=label?48:0;
   const rows=Math.ceil(urls.length/columns),tileHeight=imageHeight;
   const canvas=document.createElement('canvas');
   canvas.width=outer*2+columns*tileWidth+gap*(columns-1);
@@ -3207,7 +3208,7 @@ async function createDefectPhotoCollage(urls,context='Фото дефекта'){
   ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';
   ctx.fillStyle='#111820';ctx.fillRect(0,0,canvas.width,canvas.height);
   ctx.fillStyle='#f4f7fb';ctx.font='600 24px system-ui, sans-serif';
-  ctx.fillText(String(context||'Клиент').slice(0,100),outer,outer+30);
+  if(label)ctx.fillText(label.slice(0,100),outer,outer+30);
   for(let index=0;index<urls.length;index++){
     const blob=await fetchPhotoAsPng(urls[index]);
     const bitmap=await createImageBitmap(blob);
@@ -3278,7 +3279,7 @@ async function sharePhotoViaViber(url,context='Фото из заказа'){
 async function copyPhotoGroup(urls,context='Фото дефекта'){
   if(!Array.isArray(urls)||urls.length<2)return;
   if(window.AndroidWarehouse?.sharePhotosToViber){
-    try{window.AndroidWarehouse.sharePhotosToViber(JSON.stringify(urls),context);toast(`Готовлю ${urls.length} фото для Viber…`);return;}
+    try{window.AndroidWarehouse.sharePhotosToViber(JSON.stringify(urls),'');toast(`Готовлю ${urls.length} фото для Viber…`);return;}
     catch(err){console.warn('Не удалось отправить группу фото в Android Viber',err);}
   }
   const isDesktopRuntime=window.warehouseDesktop?.isDesktopApp===true||/Electron/i.test(navigator.userAgent);
@@ -3288,14 +3289,14 @@ async function copyPhotoGroup(urls,context='Фото дефекта'){
   }
   try{
     if(window.warehouseDesktop?.sharePhotoToViber){
-      const collage=await createDefectPhotoCollage(urls,context);
+      const collage=await createDefectPhotoCollage(urls);
       const reader=new FileReader();
       const dataUrl=await new Promise((resolve,reject)=>{reader.onload=()=>resolve(String(reader.result||''));reader.onerror=()=>reject(new Error('Не удалось прочитать коллаж.'));reader.readAsDataURL(collage);});
-      const result=await window.warehouseDesktop.sharePhotoToViber(dataUrl,context,false);
+      const result=await window.warehouseDesktop.sharePhotoToViber(dataUrl,'',false);
       if(!result?.copied)throw new Error('Windows-приложение не подтвердило копирование коллажа.');
     }else{
       if(!navigator.clipboard?.write||typeof ClipboardItem==='undefined')throw new Error('Браузер не поддерживает копирование изображений.');
-      const collagePromise=createDefectPhotoCollage(urls,context);
+      const collagePromise=createDefectPhotoCollage(urls);
       await navigator.clipboard.write([new ClipboardItem({'image/png':collagePromise})]);
     }
     toast(`${urls.length} фото объединены в одно изображение и скопированы. Вставь в Viber через Ctrl+V.`);
@@ -3918,9 +3919,9 @@ async function generateDailyReport(dateKey,endDateKey=dateKey){
     }catch(error){
       if(canViewBuybackReport)console.warn('Не удалось загрузить перекупной товар для отчёта',error);
     }
-    const buybackStatusLabel=item=>{const status=String(item.status||'').trim();if(!status||status.toLowerCase()==='active')return 'На складе';if(/sold|продан|отгружен|забрал/i.test(status))return 'Продан / отгружен';if(/cancel|отмен/i.test(status))return 'Отменён';if(/return|возврат|вернул|returned/i.test(status))return 'Возвращён';return status;};
+    const buybackStatusLabel=item=>{const status=String(item.status||'').trim();if(status.toLowerCase()==='stocked')return 'Принят на склад';if(!status||status.toLowerCase()==='active')return 'На складе';if(/sold|продан|отгружен|забрал/i.test(status))return 'Продан / отгружен';if(/cancel|отмен/i.test(status))return 'Отменён';if(/return|возврат|вернул|returned/i.test(status))return 'Возвращён';return status;};
     const buybackStatus=item=>String(item.status||'active').trim().toLowerCase();
-    const buybackOnStock=buybackItems.filter(item=>['','active'].includes(buybackStatus(item)));
+    const buybackOnStock=buybackItems.filter(item=>['','active','stocked'].includes(buybackStatus(item)));
     const buybackDate=(...values)=>values.some(value=>value&&reportDateMatches(value,dateKey,endDateKey));
     const buybackRelevant=buybackItems.filter(item=>{
       const status=buybackStatus(item);
@@ -3933,11 +3934,11 @@ async function generateDailyReport(dateKey,endDateKey=dateKey){
       const soldToday=item.soldAt?buybackDate(item.soldAt):(!item.soldAt&&sold&&buybackDate(item.updatedAt));
       const cancelledToday=item.cancelledAt?buybackDate(item.cancelledAt):(!item.cancelledAt&&cancelled&&buybackDate(item.updatedAt));
       const returnedToday=item.returnedAt?buybackDate(item.returnedAt):(!item.returnedAt&&returned&&buybackDate(item.updatedAt));
-      const onStock=['','active'].includes(status);
+      const onStock=['','active','stocked'].includes(status);
       return onStock||createdToday||soldToday||cancelledToday||returnedToday;
     });
     const buybackDaysOnStock=(item,status)=>{const received=String(item.receivedAt||'').slice(0,10);if(!/^\d{4}-\d{2}-\d{2}$/.test(received))return '—';const sold=/sold|продан|отгружен|забрал/i.test(status);const cancelled=/cancel|отмен/i.test(status);const returned=/return|возврат|вернул/i.test(status);const closed=sold||cancelled||returned;const endValue=closed?(sold?(item.soldAt||item.updatedAt):cancelled?(item.cancelledAt||item.updatedAt):(item.returnedAt||item.updatedAt)):localDateKey(new Date());const end=String(endValue||'').slice(0,10);if(!/^\d{4}-\d{2}-\d{2}$/.test(end))return '—';const elapsed=Math.floor((Date.parse(end+'T00:00:00Z')-Date.parse(received+'T00:00:00Z'))/86400000);return Number.isFinite(elapsed)?Math.max(0,elapsed):'—';};
-    const buybackRows=buybackRelevant.slice().sort((a,b)=>String(a.status||'active').localeCompare(String(b.status||'active'))||String(a.article||'').localeCompare(String(b.article||''))).map(item=>{const status=buybackStatus(item);const eventDate=/sold|продан|отгружен/i.test(status)?(item.soldAt||item.updatedAt):/cancel|отмен/i.test(status)?(item.cancelledAt||item.updatedAt):/return|возврат|вернул/i.test(status)?(item.returnedAt||item.updatedAt):(item.createdOn||item.createdAt||item.receivedAt);return [esc(item.article||'—'),esc(item.quantity??'—'),esc(item.supplier||'—'),esc(buybackStatusLabel(item)),esc(item.receivedAt||'—'),esc(buybackDaysOnStock(item,status)),esc(eventDate?fmtDateTime(eventDate):'—'),esc(item.createdByName||'—')];});
+    const buybackRows=buybackRelevant.slice().sort((a,b)=>String(a.status||'active').localeCompare(String(b.status||'active'))||String(a.article||'').localeCompare(String(b.article||''))).map(item=>{const status=buybackStatus(item);const eventDate=status==='stocked'?item.stockedAt:/sold|продан|отгружен/i.test(status)?(item.soldAt||item.updatedAt):/cancel|отмен/i.test(status)?(item.cancelledAt||item.updatedAt):/return|возврат|вернул/i.test(status)?(item.returnedAt||item.updatedAt):(item.createdOn||item.createdAt||item.receivedAt);return [esc(item.article||'—'),esc(item.quantity??'—'),esc(item.supplier||'—'),esc(buybackStatusLabel(item)),esc(item.receivedAt||'—'),esc(buybackDaysOnStock(item,status)),esc(eventDate?fmtDateTime(eventDate):'—'),esc(item.createdByName||'—')];});
     const buybackMonthlyEvents=buybackItems.map(item=>{
       const status=buybackStatus(item);
       const receivedDate=item.receivedAt||item.createdOn||item.createdAt;
@@ -3946,21 +3947,23 @@ async function generateDailyReport(dateKey,endDateKey=dateKey){
       const returned=/return|возврат|вернул|returned/i.test(status);
       const createdInPeriod=buybackDate(item.createdOn,item.createdAt);
       const receivedInPeriod=!!receivedDate&&buybackDate(receivedDate);
+      const stockedInPeriod=!!item.stockedAt&&buybackDate(item.stockedAt);
       const soldInPeriod=item.soldAt?buybackDate(item.soldAt):(!item.soldAt&&sold&&buybackDate(item.updatedAt));
       const cancelledInPeriod=item.cancelledAt?buybackDate(item.cancelledAt):(!item.cancelledAt&&cancelled&&buybackDate(item.updatedAt));
       const returnedInPeriod=item.returnedAt?buybackDate(item.returnedAt):(!item.returnedAt&&returned&&buybackDate(item.updatedAt));
-      return {item,status,createdInPeriod,receivedInPeriod,soldInPeriod,cancelledInPeriod,returnedInPeriod};
+      return {item,status,createdInPeriod,receivedInPeriod,stockedInPeriod,soldInPeriod,cancelledInPeriod,returnedInPeriod};
     });
     const buybackMonthlyCount=key=>buybackMonthlyEvents.filter(x=>x[key]).length;
     const buybackMonthlyUnits=key=>buybackMonthlyEvents.filter(x=>x[key]).reduce((sum,x)=>sum+(Number(x.item.quantity)||0),0);
-    const buybackMonthlyRows=buybackMonthlyEvents.filter(x=>x.createdInPeriod||x.receivedInPeriod||x.soldInPeriod||x.cancelledInPeriod||x.returnedInPeriod).map(x=>{
+    const buybackMonthlyRows=buybackMonthlyEvents.filter(x=>x.createdInPeriod||x.receivedInPeriod||x.stockedInPeriod||x.soldInPeriod||x.cancelledInPeriod||x.returnedInPeriod).map(x=>{
       const events=[];
       if(x.createdInPeriod)events.push('Добавлен');
       if(x.receivedInPeriod)events.push('Поступил');
+      if(x.stockedInPeriod)events.push('Принят на склад');
       if(x.soldInPeriod)events.push('Продан / отгружен');
       if(x.cancelledInPeriod)events.push('Отменён');
       if(x.returnedInPeriod)events.push('Возвращён');
-      const date=x.item.soldAt&&x.soldInPeriod?x.item.soldAt:x.item.cancelledAt&&x.cancelledInPeriod?x.item.cancelledAt:x.item.returnedAt&&x.returnedInPeriod?x.item.returnedAt:x.item.receivedAt||x.item.createdOn||x.item.createdAt||x.item.updatedAt;
+      const date=x.item.soldAt&&x.soldInPeriod?x.item.soldAt:x.item.cancelledAt&&x.cancelledInPeriod?x.item.cancelledAt:x.item.returnedAt&&x.returnedInPeriod?x.item.returnedAt:x.stockedInPeriod?x.item.stockedAt:x.item.receivedAt||x.item.createdOn||x.item.createdAt||x.item.updatedAt;
       return [esc(x.item.article||'—'),esc(x.item.quantity??'—'),esc(x.item.supplier||'—'),esc(events.join(', ')),esc(date?fmtDateTime(date):'—')];
     });
     const eventEntries=state.orders.flatMap(o=>(Array.isArray(o.entries)?o.entries:[]).filter(e=>reportDateMatches(e.createdAt,dateKey,endDateKey)).map(e=>({order:o,entry:e})));
@@ -4106,7 +4109,7 @@ async function generateDailyReport(dateKey,endDateKey=dateKey){
       sections.push('<h2>Отгрузки по клиентам</h2><p class="section-note">Количество уникальных заказов, отгруженных каждому клиенту за выбранный месяц.</p>'+reportTable(['Клиент','Отгружено заказов','Деталей отгружено'],shippedByClientRows));
 
       sections.push('<h2>Динамика по неделям</h2><p class="section-note">Количество событий по неделям месяца. Данные показаны в сравнительном виде; шкала общая для всех серий.</p><div class="chart-legend"><span><i class="legend-created"></i>Создано</span><span><i class="legend-shipped"></i>Отгружено</span><span><i class="legend-pickup"></i>Самовывоз</span><span><i class="legend-cancelled"></i>Отменено</span></div>'+chartRows);
-      if(canViewBuybackReport)sections.push('<h2>Перекупной товар — статистика за период</h2><div class="summary"><div class="kpi"><b>'+buybackMonthlyCount('receivedInPeriod')+'</b>позиций поступило</div><div class="kpi"><b>'+buybackMonthlyUnits('receivedInPeriod')+'</b>единиц поступило</div><div class="kpi"><b>'+buybackMonthlyCount('soldInPeriod')+'</b>позиций продано / отгружено</div><div class="kpi"><b>'+buybackMonthlyUnits('soldInPeriod')+'</b>единиц продано / отгружено</div><div class="kpi"><b>'+buybackMonthlyCount('cancelledInPeriod')+'</b>позиций отменено</div><div class="kpi"><b>'+buybackMonthlyCount('returnedInPeriod')+'</b>позиций возвращено</div><div class="kpi"><b>'+buybackOnStock.length+'</b>позиций на складе сейчас</div><div class="kpi"><b>'+buybackUnits+'</b>единиц на складе сейчас</div></div><p class="section-note">Статистика за выбранный период рассчитывается по датам поступления и закрытия, если они сохранены в записи. Остаток на складе — текущее состояние на момент формирования отчёта.</p>'+reportTable(['Артикул','Количество','Поставщик','События за период','Дата события'],buybackMonthlyRows));
+      if(canViewBuybackReport)sections.push('<h2>Перекупной товар — статистика за период</h2><div class="summary"><div class="kpi"><b>'+buybackMonthlyCount('receivedInPeriod')+'</b>позиций поступило</div><div class="kpi"><b>'+buybackMonthlyUnits('receivedInPeriod')+'</b>единиц поступило</div><div class="kpi"><b>'+buybackMonthlyCount('soldInPeriod')+'</b>позиций продано / отгружено</div><div class="kpi"><b>'+buybackMonthlyUnits('soldInPeriod')+'</b>единиц продано / отгружено</div><div class="kpi"><b>'+buybackMonthlyUnits('stockedInPeriod')+'</b>единиц принято на склад</div><div class="kpi"><b>'+buybackMonthlyCount('cancelledInPeriod')+'</b>позиций отменено</div><div class="kpi"><b>'+buybackMonthlyCount('returnedInPeriod')+'</b>позиций возвращено</div><div class="kpi"><b>'+buybackOnStock.length+'</b>позиций на складе сейчас</div><div class="kpi"><b>'+buybackUnits+'</b>единиц на складе сейчас</div></div><p class="section-note">Статистика за выбранный период рассчитывается по датам поступления и закрытия, если они сохранены в записи. Остаток на складе — текущее состояние на момент формирования отчёта.</p>'+reportTable(['Артикул','Количество','Поставщик','События за период','Дата события'],buybackMonthlyRows));
       sections.push('<h2>Сравнение с предыдущим периодом</h2><p class="section-note">Сравнение '+esc(fmtDate(previousStart)+' — '+fmtDate(previousEnd))+' '+esc(comparisonLabel)+'.</p><div class="summary"><div class="kpi"><b>'+currentMetrics.created+'</b>создано заказов<br>'+countComparison(currentMetrics.created,previousMetrics.created)+'</div><div class="kpi"><b>'+currentMetrics.shipped+'</b>отгружено заказов<br>'+countComparison(currentMetrics.shipped,previousMetrics.shipped)+'</div><div class="kpi"><b>'+currentMetrics.pickup+'</b>самовывозов<br>'+countComparison(currentMetrics.pickup,previousMetrics.pickup)+'</div><div class="kpi"><b>'+currentMetrics.cancelled+'</b>отменено заказов<br>'+countComparison(currentMetrics.cancelled,previousMetrics.cancelled)+'</div></div>');
 
 

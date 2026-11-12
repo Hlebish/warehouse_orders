@@ -1,5 +1,6 @@
-import { explainBuybackItem } from './buyback-explanation.mjs?v=2026.11.12.05';
+import { explainBuybackItem } from './buyback-explanation.mjs?v=2026.11.12.08';
 import { localDateKey, validReceivedDate } from './buyback-dates.mjs?v=2026.11.12.05';
+import { buybackAgeDays, buybackPhase, buybackIsCritical, buybackIsTimed, buybackStockPatch } from './buyback-state.mjs?v=2026.11.12.08';
 import { initializeApp, getApps } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js';
 import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js';
 import { getFirestore, collection, doc, onSnapshot, getDocFromServer, setDoc, updateDoc, runTransaction, serverTimestamp, query, orderBy } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
@@ -17,7 +18,7 @@ const pendingBuybackCreates=new Map();
 const style = document.createElement('style');
 style.textContent = `
 .buyback-explanation{margin-top:12px;padding:10px 12px;border:1px solid #4a5644;border-radius:9px;font-size:12px;line-height:1.6}.buyback-explanation p{margin:4px 0}.buyback-explanation small{display:block;color:#abb8a5}.buyback-explanation button{margin-top:8px}.buyback-sync-warning{border-color:#bb893e;background:#493a1b}.save-error{color:#eb9b94!important}
-.buyback-nav-alert[hidden]{display:none}.buyback-nav-alert{margin-left:auto;display:inline-grid;place-items:center;width:23px;height:23px;border-radius:50%;background:#c83e3e;color:white;font-weight:900;font-size:17px;box-shadow:0 0 0 4px #c83e3e18;animation:buybackPulse 1.5s infinite}
+#buybackNavAlert[hidden]{display:none!important}.buyback-nav-alert{margin-left:auto;display:inline-grid;place-items:center;width:23px;height:23px;border-radius:50%;background:#c83e3e;color:white;font-weight:900;font-size:17px;box-shadow:0 0 0 4px #c83e3e18;animation:buybackPulse 1.5s infinite}
 @keyframes buybackPulse{50%{box-shadow:0 0 0 7px #c83e3e08}}
 .buyback-overlay{position:fixed;inset:0;background:#141c2a70;z-index:50;display:grid;place-items:center;padding:16px}
 .buyback-overlay[hidden]{display:none}
@@ -486,7 +487,7 @@ overlay.className='buyback-overlay';overlay.hidden=true;overlay.innerHTML=`
 </details>
 <div class="buyback-summary" id="buybackSummary"></div>
 <div class="buyback-supplier-filter"><label for="buybackSearch">Поиск</label><input id="buybackSearch" type="search" autocomplete="off" placeholder="Артикул или клиент" aria-label="Поиск по артикулу или клиенту"><label for="buybackSupplierFilter">Поставщик</label><select id="buybackSupplierFilter"><option value="">Все поставщики</option></select></div>
-<div class="buyback-summary"><button class="buyback-chip" data-status="active" type="button">В работе</button><button class="buyback-chip" data-status="returned" type="button">Возвращён</button><button class="buyback-chip" data-status="sold" type="button">Продан</button><button class="buyback-chip" data-status="cancelled" type="button">Отменён</button><button class="buyback-chip" data-status="expired" type="button">Просрочен</button><button class="buyback-chip" data-status="shipped" type="button">Отгружен просроченным</button></div>
+<div class="buyback-summary"><button class="buyback-chip" data-status="active" type="button">В работе</button><button class="buyback-chip" data-status="stocked" type="button">На складе</button><button class="buyback-chip" data-status="returned" type="button">Возвращён</button><button class="buyback-chip" data-status="sold" type="button">Продан</button><button class="buyback-chip" data-status="cancelled" type="button">Отменён</button><button class="buyback-chip" data-status="expired" type="button">Просрочен</button><button class="buyback-chip" data-status="shipped" type="button">Отгружен просроченным</button></div>
 <div class="buyback-list" id="buybackList"><div class="buyback-empty">Загружаю перекупной товар…</div></div>
 </div></section>`;
 document.body.append(overlay);
@@ -521,7 +522,7 @@ nav.hidden=true;
 const dateInput=$('buybackDate');
 dateInput.value=localDateKey();
 function showToast(message){const stack=$('toastStack');if(stack){const el=document.createElement('div');el.className='toast';el.textContent=message;stack.append(el);setTimeout(()=>el.remove(),3500)}}
-function elapsedDays(date){const d=new Date(date+'T00:00:00');const n=new Date();return Math.floor((Date.UTC(n.getFullYear(),n.getMonth(),n.getDate())-Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()))/86400000)}
+function elapsedDays(date){return buybackAgeDays(date);}
 function deadline(item){const [year,month,day]=item.receivedAt.split('-').map(Number);return new Date(Date.UTC(year,month-1,day+13))}
 function refreshSupplierSuggestions(){
  const names=buybackSupplierNames;
@@ -539,7 +540,7 @@ function scheduleBuybackRender(){if(buybackRenderScheduled)return;buybackRenderS
 const buybackOrderInfo=new Map(),buybackOrderStops=new Map(),buybackCommentDrafts=new Map(),buybackCommentBases=new Map();
 function buybackExplanationHtml(item){
  const info=explainBuybackItem(item,items,buybackOrderInfo.get(item.orderId||item.soldByOrderId||item.returnedFromOrderId||''));
- return '<div class="buyback-explanation '+(info.warning?'buyback-sync-warning':'')+'"><b>'+escapeHtml(info.title)+'</b><p>'+escapeHtml(info.detail)+'</p><small>Всего по этому артикулу: продано '+info.sold+' шт. · в работе '+info.available+' шт.</small>'+(info.orderId?'<button type="button" class="buyback-action-edit" data-buyback-open-order="'+escapeHtml(info.orderId)+'">Открыть заказ'+(info.orderNumber?' № '+escapeHtml(info.orderNumber):'')+'</button>':'')+'</div>';
+ return '<div class="buyback-explanation '+(info.warning?'buyback-sync-warning':'')+'"><b>'+escapeHtml(info.title)+'</b><p>'+escapeHtml(info.detail)+'</p><small>Всего по этому артикулу: продано '+info.sold+' шт. · в работе '+info.available+' шт.'+(info.stocked?' · принято на склад '+info.stocked+' шт.':'')+'</small>'+(info.orderId?'<button type="button" class="buyback-action-edit" data-buyback-open-order="'+escapeHtml(info.orderId)+'">Открыть заказ'+(info.orderNumber?' № '+escapeHtml(info.orderNumber):'')+'</button>':'')+'</div>';
 }
 function paintBuybackExplanations(){
  overlay.querySelectorAll('[data-buyback-explanation]').forEach(node=>{const item=items.find(item=>item.id===node.dataset.buybackExplanation);if(item)node.innerHTML=buybackExplanationHtml(item);});
@@ -561,14 +562,42 @@ function rememberBuybackCommentDrafts(){
  });
 }
 
+function buybackActions(item){
+ const id=escapeHtml(item.id),edit='<button class="buyback-action-edit" data-edit-buyback="'+id+'">Редактировать</button>';
+ if(buybackIsTimed(item))return edit+'<button class="buyback-action-green" data-set-status="returned" data-id="'+id+'">Возвращён</button><button class="buyback-action-green" data-set-status="sold" data-id="'+id+'">Продан</button>'+(buybackPhase(item)==='expired'?'<button class="buyback-action-green" data-accept-buyback-stock="'+id+'">Принять на склад</button><button class="buyback-action-green" data-set-status="shipped" data-id="'+id+'">Отгрузить</button>':'')+'<button class="buyback-action-red" data-set-status="cancelled" data-id="'+id+'">Отменить</button>';
+ if(item.status==='stocked')return edit+'<button class="buyback-action-green" data-set-status="sold" data-id="'+id+'">Продан</button><button class="buyback-action-edit" data-set-status="active" data-id="'+id+'">Вернуть в контроль сроков</button>';
+ return edit+'<button class="buyback-action-edit" data-set-status="'+(item.stockedAt?'stocked':'active')+'" data-id="'+id+'">'+(item.stockedAt?'Вернуть на склад':'Вернуть в работу')+'</button>';
+}
+const stockAcceptsInFlight=new Set();
+async function acceptExpiredBuyback(itemId){
+ const item=items.find(row=>row.id===itemId);if(!item||!currentUser||!hasBuybackAccess||stockAcceptsInFlight.has(itemId))return;
+ if(buybackPhase(item)!=='expired'){showToast('Принять на склад можно только просроченный товар.');return;}
+ stockAcceptsInFlight.add(itemId);
+ try{
+  const quantity=Number(item.quantity)>1?await askBuybackQuantity(item,'stocked'):1;if(quantity===null)return;
+  const actor={uid:currentUser.uid,name:currentUser.displayName||currentUser.email||'Сотрудник'},receipt=buybackStockPatch(actor,localDateKey());
+  const source=doc(db,'buybackItems',item.id),split=quantity===Number(item.quantity)?null:doc(collection(db,'buybackItems'));
+  await runTransaction(db,async transaction=>{
+   const snap=await transaction.get(source);if(!snap.exists())throw new Error('Товар уже удалён.');const current=snap.data();
+   if(current.status!==item.status||Number(current.quantity)!==Number(item.quantity)||current.receivedAt!==item.receivedAt||current.article!==item.article||buybackPhase(current)!=='expired')throw new Error('Товар уже изменил другой сотрудник. Обновите список и повторите действие.');
+   const patch={...receipt,updatedAt:serverTimestamp()};
+   if(!split){transaction.update(source,patch);return;}
+   transaction.set(split,{...current,...patch,quantity,createdAt:serverTimestamp(),createdBy:actor.uid,createdByName:actor.name});
+   transaction.update(source,{quantity:Number(current.quantity)-quantity,updatedAt:serverTimestamp()});
+  });
+  showToast('Принято на склад: '+quantity+' шт. Срок возврата закрыт.');
+ }catch(error){console.error('Не удалось принять товар на склад',error);showToast(error.message||'Не удалось сохранить приём на склад.');}
+ finally{stockAcceptsInFlight.delete(itemId);}
+}
+
 function render(){
  rememberBuybackCommentDrafts();
  refreshSupplierSuggestions();
- const active=items.filter(x=>x.status==='active'&&elapsedDays(x.receivedAt)<14);
- const expiredItems=items.filter(x=>x.status==='expired'||(x.status==='active'&&elapsedDays(x.receivedAt)>=14));
- const criticalItems=active.filter(x=>elapsedDays(x.receivedAt)>=10&&elapsedDays(x.receivedAt)<14);
- const warnItems=active.filter(x=>elapsedDays(x.receivedAt)>=6&&elapsedDays(x.receivedAt)<10);
- $('buybackNavAlert').hidden=!active.some(x=>elapsedDays(x.receivedAt)>=10);
+ const active=items.filter(x=>['active','approaching','critical'].includes(buybackPhase(x)));
+ const expiredItems=items.filter(x=>buybackPhase(x)==='expired');
+ const criticalItems=items.filter(x=>buybackIsCritical(x));
+ const warnItems=items.filter(x=>buybackPhase(x)==='approaching');
+ $('buybackNavAlert').hidden=!hasBuybackAccess||criticalItems.length===0;
  $('buybackSummary').innerHTML=`<button type="button" class="buyback-chip buyback-stat-card" data-buyback-stat="active"><span class="buyback-stat-icon blue">⬡</span><span class="buyback-stat-label">В работе</span><b>${active.length}</b></button><button type="button" class="buyback-chip buyback-stat-card" data-buyback-stat="approaching"><span class="buyback-stat-icon amber">◷</span><span class="buyback-stat-label">Срок подходит</span><b>${warnItems.length}</b></button><button type="button" class="buyback-chip buyback-stat-card" data-buyback-stat="critical"><span class="buyback-stat-icon red">!</span><span class="buyback-stat-label">Критично</span><b>${criticalItems.length}</b></button><button type="button" class="buyback-chip buyback-stat-card" data-buyback-stat="expired"><span class="buyback-stat-icon neutral">⌛</span><span class="buyback-stat-label">Просрочено</span><b>${expiredItems.length}</b></button>`;
  const normalizedSearch=String(selectedSearch||'').trim().toLocaleLowerCase('ru');
  const searchableText=item=>{
@@ -586,7 +615,7 @@ function render(){
  // Поиск работает по всей истории и не зависит от выбранного статуса/поставщика.
  const visible=sortedBuybackItems.filter(x=>{
    if(normalizedSearch)return searchableText(x).includes(normalizedSearch);
-   const isExpired=x.status==='expired'||(x.status==='active'&&elapsedDays(x.receivedAt)>=14);
+   const isExpired=buybackPhase(x)==='expired';
    const matchesStatus=selectedStatus==='shipped'?x.status==='shipped':selectedStatus==='expired'?isExpired:selectedStatus==='approaching'?!isExpired&&x.status==='active'&&elapsedDays(x.receivedAt)>=6&&elapsedDays(x.receivedAt)<10:selectedStatus==='critical'?!isExpired&&x.status==='active'&&elapsedDays(x.receivedAt)>=10&&elapsedDays(x.receivedAt)<14:(selectedStatus==='active'?!isExpired&&x.status==='active':x.status===selectedStatus);
    return matchesStatus&&(!selectedSupplier||String(x.supplier||'')===selectedSupplier);
  });
@@ -595,12 +624,12 @@ function render(){
  const displayed=searched.slice(0,visibleBuybackCount);
  const renderItem=item=>{
   const days=elapsedDays(item.receivedAt),left=14-days;
-  const isExpired=item.status==='expired'||(item.status==='active'&&days>=14);
-  const cls=isExpired?'expired':days>=10?'critical':days>=6?'warn':'';
-  const status=item.status==='shipped'?'ОТГРУЖЕН':isExpired?'ПРОСРОЧЕН':item.status==='active'?(item.returnedFromReturnId||item.returnedAt?'ВОЗВРАЩЁН В РАБОТУ':days>=10?'Срок подходит к концу':days>=6?'Срок возврата приближается':days>=3?'Товар залежался на складе':'Срок идёт'):(item.status==='returned'?'Возвращён':item.status==='sold'?'Продан':item.status==='cancelled'?'Отменён':'');
+  const isExpired=buybackPhase(item)==='expired';
+  const phase=buybackPhase(item),cls=isExpired?'expired':phase==='critical'?'critical':phase==='approaching'?'warn':'';
+  const status=item.status==='stocked'?'ПРИНЯТ НА СКЛАД':item.status==='shipped'?'ОТГРУЖЕН':isExpired?'ПРОСРОЧЕН':item.status==='active'?(item.returnedFromReturnId||item.returnedAt?'ВОЗВРАЩЁН В РАБОТУ':days>=10?'Срок подходит к концу':days>=6?'Срок возврата приближается':days>=3?'Товар залежался на складе':'Срок идёт'):(item.status==='returned'?'Возвращён':item.status==='sold'?'Продан':item.status==='cancelled'?'Отменён':'');
   const bar=Math.max(0,Math.min(100,days/14*100));
-  const actions='<button class="buyback-action-edit" data-edit-buyback="'+item.id+'">Редактировать</button>'+((item.status==='active'||isExpired)?'<button class="buyback-action-green" data-set-status="returned" data-id="'+item.id+'">Возвращён</button><button class="buyback-action-green" data-set-status="sold" data-id="'+item.id+'">Продан</button>'+(isExpired?'<button class="buyback-action-green" data-set-status="shipped" data-id="'+item.id+'">Отгрузить</button>':'')+'<button class="buyback-action-red" data-set-status="cancelled" data-id="'+item.id+'">Отменить</button>':'<button class="buyback-action-edit" data-set-status="active" data-id="'+item.id+'">Вернуть в работу</button>');
-  return `<article class="buyback-card ${cls}" data-buyback-item-id="${escapeHtml(item.id)}"><div><div class="buyback-article">${escapeHtml(item.article)} <span style="font-weight:500;color:#8a94a1">× ${item.quantity}</span></div>${item.name?'<div style="margin-top:4px;font-size:12px;color:#aab4c0">' + escapeHtml(item.name) + '</div>':''}<div class="buyback-meta">${item.supplier?'<b>Поставщик:</b> '+escapeHtml(item.supplier)+' · ':''}Принят: ${escapeHtml(item.receivedAt)} · Последний день срока: <b>${escapeHtml(deadline(item).toLocaleDateString('ru-RU',{timeZone:'UTC'}))}</b> · Прошло дней: <b>${Math.max(0,days)}</b>${item.shippedAt?' · Дата отгрузки: <b>'+escapeHtml(item.shippedAt)+'</b>':''}${item.shippedLate?' · <b style="color:#e6a0a0">Отгружен после просрочки на '+Math.max(0,Number(item.overdueDaysAtShipment)||0)+' дн.</b>':''}${item.orderNumber?' · Заказ: <b>№ '+escapeHtml(item.orderNumber)+'</b>':''}${item.clientName?' · Клиент: <b>'+escapeHtml(item.clientName)+'</b>':''}${item.soldByOrderNumber?' · Продано по заказу: <b>№ '+escapeHtml(item.soldByOrderNumber)+'</b>':''}${item.soldToClient?' · Покупатель: <b>'+escapeHtml(item.soldToClient)+'</b>':''}${item.soldAt?' · Продан: <b>'+escapeHtml(item.soldAt)+'</b>':''}${item.returnedAt?' · Возвращён: <b>'+escapeHtml(item.returnedAt)+'</b>':''}${item.cancelledAt?' · Отменён: <b>'+escapeHtml(item.cancelledAt)+'</b>':''}${item.returnedFromOrderNumber?' · Возврат из заказа: <b>№ '+escapeHtml(item.returnedFromOrderNumber)+'</b>':''} · ${isExpired?'Просрочено на '+Math.max(0,days-14)+' дн.':item.status==='active'?'Осталось дней: '+Math.max(0,left):'14-дневный срок остановлен'}</div><div class="buyback-progress"><span style="width:${bar}%"></span></div><div class="buyback-status">${status}</div><div data-buyback-explanation="${escapeHtml(item.id)}">${buybackExplanationHtml(item)}</div><div class="buyback-comment"><label for="buybackComment-${escapeHtml(item.id)}">Комментарий к товару</label><textarea id="buybackComment-${escapeHtml(item.id)}" data-buyback-comment="${escapeHtml(item.id)}" data-base-comment="${escapeHtml(buybackCommentBases.get(item.id)??item.comment??'')}" maxlength="1000" placeholder="Напишите примечание по этому товару…">${escapeHtml(buybackCommentDrafts.get(item.id)??item.comment??'')}</textarea><div class="buyback-comment-footer"><button type="button" class="buyback-comment-save" data-save-buyback-comment="${escapeHtml(item.id)}">Сохранить комментарий</button><span class="buyback-comment-saved">${buybackCommentDrafts.has(item.id)?'Черновик — не сохранено':item.comment?'Комментарий сохранён':'Можно оставить пустым'}</span></div></div></div><div class="buyback-actions">${'<button class="buyback-action-edit" data-edit-buyback="'+item.id+'">Редактировать</button>' + ((item.status==='active'||isExpired) ? '<button class="buyback-action-green" data-set-status="returned" data-id="'+item.id+'">Возвращён</button><button class="buyback-action-green" data-set-status="sold" data-id="'+item.id+'">Продан</button>' + (isExpired ? '<button class="buyback-action-green" data-set-status="shipped" data-id="'+item.id+'">Отгрузить</button>' : '') + '<button class="buyback-action-red" data-set-status="cancelled" data-id="'+item.id+'">Отменить</button>' : '<button class="buyback-action-edit" data-set-status="active" data-id="'+item.id+'">Вернуть в работу</button>')}</div></article>`;
+  const actions=buybackActions(item);
+  return `<article class="buyback-card ${cls}" data-buyback-item-id="${escapeHtml(item.id)}"><div><div class="buyback-article">${escapeHtml(item.article)} <span style="font-weight:500;color:#8a94a1">× ${item.quantity}</span></div>${item.name?'<div style="margin-top:4px;font-size:12px;color:#aab4c0">' + escapeHtml(item.name) + '</div>':''}<div class="buyback-meta">${item.supplier?'<b>Поставщик:</b> '+escapeHtml(item.supplier)+' · ':''}Принят: ${escapeHtml(item.receivedAt)} · Последний день срока: <b>${escapeHtml(deadline(item).toLocaleDateString('ru-RU',{timeZone:'UTC'}))}</b> · Прошло дней: <b>${Math.max(0,days)}</b>${item.stockedAt?' · Принят на собственный склад: <b>'+escapeHtml(item.stockedAt)+'</b>':''}${item.shippedAt?' · Дата отгрузки: <b>'+escapeHtml(item.shippedAt)+'</b>':''}${item.shippedLate?' · <b style="color:#e6a0a0">Отгружен после просрочки на '+Math.max(0,Number(item.overdueDaysAtShipment)||0)+' дн.</b>':''}${item.orderNumber?' · Заказ: <b>№ '+escapeHtml(item.orderNumber)+'</b>':''}${item.clientName?' · Клиент: <b>'+escapeHtml(item.clientName)+'</b>':''}${item.soldByOrderNumber?' · Продано по заказу: <b>№ '+escapeHtml(item.soldByOrderNumber)+'</b>':''}${item.soldToClient?' · Покупатель: <b>'+escapeHtml(item.soldToClient)+'</b>':''}${item.soldAt?' · Продан: <b>'+escapeHtml(item.soldAt)+'</b>':''}${item.returnedAt?' · Возвращён: <b>'+escapeHtml(item.returnedAt)+'</b>':''}${item.cancelledAt?' · Отменён: <b>'+escapeHtml(item.cancelledAt)+'</b>':''}${item.returnedFromOrderNumber?' · Возврат из заказа: <b>№ '+escapeHtml(item.returnedFromOrderNumber)+'</b>':''} · ${isExpired?'Просрочено на '+Math.max(0,days-14)+' дн.':item.status==='active'?'Осталось дней: '+Math.max(0,left):'14-дневный срок остановлен'}</div>${buybackIsTimed(item)?'<div class="buyback-progress"><span style="width:'+bar+'%"></span></div>':''}<div class="buyback-status">${status}</div><div data-buyback-explanation="${escapeHtml(item.id)}">${buybackExplanationHtml(item)}</div><div class="buyback-comment"><label for="buybackComment-${escapeHtml(item.id)}">Комментарий к товару</label><textarea id="buybackComment-${escapeHtml(item.id)}" data-buyback-comment="${escapeHtml(item.id)}" data-base-comment="${escapeHtml(buybackCommentBases.get(item.id)??item.comment??'')}" maxlength="1000" placeholder="Напишите примечание по этому товару…">${escapeHtml(buybackCommentDrafts.get(item.id)??item.comment??'')}</textarea><div class="buyback-comment-footer"><button type="button" class="buyback-comment-save" data-save-buyback-comment="${escapeHtml(item.id)}">Сохранить комментарий</button><span class="buyback-comment-saved">${buybackCommentDrafts.has(item.id)?'Черновик — не сохранено':item.comment?'Комментарий сохранён':'Можно оставить пустым'}</span></div></div></div><div class="buyback-actions">${actions}</div></article>`;
  };
  const groups=new Map();
  const supplierKey=value=>{
@@ -620,7 +649,7 @@ function render(){
  }
  const groupRows=[...groups.entries()].map(([key,groupItems])=>{
   const label=key==='unknown'?'Не указан поставщик':key==='formaparts'?'Форма Партс':supplierLabels.get(key);
-  const urgent=groupItems.filter(item=>{const d=elapsedDays(item.receivedAt);return item.status==='active'&&(d>=10||d>=14)||item.status==='expired'}).length;
+  const urgent=groupItems.filter(item=>buybackIsCritical(item)).length;
   return {key,label,groupItems,urgent,oldest:Math.max(...groupItems.map(item=>elapsedDays(item.receivedAt)))};
  }).sort((a,b)=>b.urgent-a.urgent||b.oldest-a.oldest||a.label.localeCompare(b.label,'ru'));
  const openSupplierGroups=new Set([...$('buybackList').querySelectorAll('.buyback-supplier-group[open]')].map(group=>group.dataset.supplierKey));
@@ -778,7 +807,7 @@ function finishBuybackQuantity(value){
 function askBuybackQuantity(item,status){
  if(quantitySelectionResolver)finishBuybackQuantity(null);
  const quantity=Number(item.quantity)||1;
- const label=status==='returned'?'возвращёнными':status==='sold'?'проданными':status==='shipped'?'отгруженными':'отменёнными';
+ const label=status==='stocked'?'принятыми на склад':status==='returned'?'возвращёнными':status==='sold'?'проданными':status==='shipped'?'отгруженными':'отменёнными';
  $('buybackQuantityTitle').textContent='Изменить статус';
  $('buybackQuantityPrompt').textContent='Сколько из '+quantity+' единиц артикула '+String(item.article||'')+' отметить как '+label+'?';
  const input=$('buybackQuantityValue');input.max=String(quantity);input.value=String(quantity);
@@ -835,12 +864,14 @@ overlay.addEventListener('click',async e=>{
   $('buybackEditArticle').focus();
   return;
  }
+ const accept=e.target.closest('[data-accept-buyback-stock]');
+ if(accept){await acceptExpiredBuyback(accept.dataset.acceptBuybackStock);return;}
  const btn=e.target.closest('[data-set-status]');if(!btn)return;
  try{
   const nextStatus=btn.dataset.setStatus,item=items.find(x=>x.id===btn.dataset.id);
   if(!item)throw new Error('Запись не найдена');
-  const eventDate=new Date().toISOString().slice(0,10),isExpired=item.status==='expired'||(item.status==='active'&&elapsedDays(item.receivedAt)>=14);
-  if((item.status==='active'||isExpired)&&['returned','sold','cancelled','shipped'].includes(nextStatus)){
+  const eventDate=localDateKey(),isExpired=buybackPhase(item)==='expired';
+  if((buybackIsTimed(item)||item.status==='stocked')&&['returned','sold','cancelled','shipped'].includes(nextStatus)){
     let qty=Number(item.quantity)||1;
     if(btn.dataset.partial==='true'||qty>1){
       const entered=await askBuybackQuantity(item,nextStatus);
@@ -855,15 +886,18 @@ overlay.addEventListener('click',async e=>{
       const current=currentSnap.data();
       if(Number(current.quantity)!==Number(item.quantity)||String(current.status||'active')!==String(item.status||'active'))throw new Error('Эту запись уже изменили. Обновите список и повторите действие.');
       if(!splitRef){transaction.update(itemRef,patch);return}
-      transaction.set(splitRef,{article:item.article,quantity:qty,receivedAt:item.receivedAt,supplier:item.supplier||'',comment:item.comment||'',createdAt:serverTimestamp(),createdOn:item.createdOn||eventDate,createdBy:currentUser.uid,createdByName:currentUser.displayName||currentUser.email||'Сотрудник',status:nextStatus,soldAt:nextStatus==='sold'?eventDate:null,cancelledAt:nextStatus==='cancelled'?eventDate:null,returnedAt:nextStatus==='returned'?eventDate:null,shippedAt:nextStatus==='shipped'?eventDate:null,shippedLate:nextStatus==='shipped'?isExpired:false,overdueDaysAtShipment:nextStatus==='shipped'?Math.max(0,elapsedDays(item.receivedAt)-14):0,sentMilestones:Array.isArray(item.sentMilestones)?item.sentMilestones:[],updatedAt:serverTimestamp()});
+      transaction.set(splitRef,{article:item.article,name:item.name||'',quantity:qty,...(item.stockedAt?{stockedAt:item.stockedAt,stockedBy:item.stockedBy,stockedByName:item.stockedByName}:{}),receivedAt:item.receivedAt,supplier:item.supplier||'',comment:item.comment||'',createdAt:serverTimestamp(),createdOn:item.createdOn||eventDate,createdBy:currentUser.uid,createdByName:currentUser.displayName||currentUser.email||'Сотрудник',status:nextStatus,soldAt:nextStatus==='sold'?eventDate:null,cancelledAt:nextStatus==='cancelled'?eventDate:null,returnedAt:nextStatus==='returned'?eventDate:null,shippedAt:nextStatus==='shipped'?eventDate:null,shippedLate:nextStatus==='shipped'?isExpired:false,overdueDaysAtShipment:nextStatus==='shipped'?Math.max(0,elapsedDays(item.receivedAt)-14):0,sentMilestones:Array.isArray(item.sentMilestones)?item.sentMilestones:[],updatedAt:serverTimestamp()});
       transaction.update(itemRef,{quantity:Number(current.quantity)-qty,updatedAt:serverTimestamp()});
     });
     showToast(qty===Number(item.quantity)?'Статус перекупного товара обновлён.':'Часть товара перенесена в категорию «'+(nextStatus==='returned'?'Возвращён':nextStatus==='sold'?'Продан':nextStatus==='shipped'?'Отгружен':'Отменён')+'».');
   }else{
     const patch={status:nextStatus,updatedAt:serverTimestamp()};
-    if(nextStatus==='active'){
+    if(nextStatus==='stocked'&&!item.stockedAt)throw new Error('Принять на склад можно только просроченный товар.');
+    if(nextStatus==='active'&&item.status==='stocked'){Object.assign(patch,{stockedAt:null,stockedBy:null,stockedByName:null});}
+    else if(nextStatus==='active'||nextStatus==='stocked'){
       // Do not leave a prior shipment's order link on reopened inventory.
       // The reconciliation trigger uses soldByOrderId to avoid double counting.
+      if(nextStatus==='active')Object.assign(patch,{stockedAt:null,stockedBy:null,stockedByName:null});
       Object.assign(patch,{
         soldAt:null,cancelledAt:null,returnedAt:null,shippedAt:null,shippedLate:false,overdueDaysAtShipment:0,
         soldByOrderId:'',soldByOrderNumber:'',soldToClient:'',
@@ -879,7 +913,7 @@ onAuthStateChanged(auth,user=>{
  for(const stop of buybackOrderStops.values())stop();buybackOrderStops.clear();buybackOrderInfo.clear();buybackCommentDrafts.clear();buybackCommentBases.clear();$('buybackList').innerHTML='';
  currentUser=user;
  unsubscribe?.();unsubscribe=null;profileUnsubscribe?.();profileUnsubscribe=null;items=[];sortedBuybackItems=[];buybackSupplierNames=[];hasBuybackAccess=false;
- nav.hidden=true;overlay.hidden=true;
+ nav.hidden=true;$('buybackNavAlert').hidden=true;overlay.hidden=true;
  if(!user)return;
  profileUnsubscribe=onSnapshot(doc(db,'users',user.uid),profileSnap=>{
   const profile=profileSnap.data()||{};
@@ -892,3 +926,8 @@ onAuthStateChanged(auth,user=>{
   },err=>{unsubscribe=null;console.error('buybackItems snapshot failed',err);$('buybackList').innerHTML='<div class="buyback-empty">Нет доступа к перекупному товару. Обновите страницу или обратитесь к администратору.</div>';});
  },err=>{console.error('Не удалось проверить доступ к перекупному товару',err);nav.hidden=true;close()});
 });
+
+let lastBuybackDay=localDateKey();
+function refreshBuybackDay(){const today=localDateKey();if(today!==lastBuybackDay){lastBuybackDay=today;scheduleBuybackRender();}}
+setInterval(refreshBuybackDay,60000);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshBuybackDay();});

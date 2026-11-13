@@ -13,7 +13,8 @@ async function seedEmulator() {
   unaddressed:{testItem:{article:'APBM1203'}},
   history:{privateTestEvent:{description:'private'}},
   special:{resale:'private'},itemMeta:{privateItem:{note:'private'}},
-  unaddressedTrash:{privateTrash:{article:'APXX0000'}},undo:{lastImport:{description:'private'}}
+  unaddressedTrash:{privateTrash:{article:'APXX0000'}},
+  undo:{lastImport:{description:'private'}}
  }); } finally { await deleteApp(seedApp); }
 }
 test('synthetic Warehouse Map reader can only read cells and unaddressed items, and cannot write',async t=>{
@@ -30,7 +31,24 @@ test('synthetic Warehouse Map reader can only read cells and unaddressed items, 
  const db=getDatabase(app);
  assert.equal((await db.ref('warehouse/cells/S1/A/1').get()).val(),'APHD4307 — капот Honda');
  assert.equal((await db.ref('warehouse/unaddressed/testItem/article').get()).val(),'APBM1203');
- await assert.rejects(db.ref('warehouse/cells/S1/A/1').set('MUST NOT WRITE'),e=>/permission_denied|Permission denied/i.test(String(e?.message||e)));
+
+ const writePaths = [
+  'warehouse',
+  'warehouse/cells/S1/A/1',
+  'warehouse/unaddressed/testItem/article',
+  'warehouse/history/privateTestEvent/description',
+  'warehouse/special/resale',
+  'warehouse/itemMeta/privateItem/note',
+  'warehouse/unaddressedTrash/privateTrash/article',
+  'warehouse/undo/lastImport/description'
+ ];
+ for (const path of writePaths) {
+  await assert.rejects(
+   db.ref(path).set('MUST NOT WRITE'),
+   e=>/permission_denied|Permission denied/i.test(String(e?.message||e)),
+   `Unexpected write: ${path}`
+  );
+ }
  for(const path of ['warehouse','warehouse/history/privateTestEvent/description','warehouse/special/resale','warehouse/itemMeta/privateItem/note','warehouse/unaddressedTrash/privateTrash/article','warehouse/undo/lastImport/description']){
   await assert.rejects(db.ref(path).get(),e=>/permission_denied|Permission denied/i.test(String(e?.message||e)),`Unexpected read: ${path}`);
  }

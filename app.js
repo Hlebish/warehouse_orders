@@ -3551,7 +3551,7 @@ async function openDirectChat(person,requestedThreadId=''){
  openStaffPanel(false);
  directChatTarget=person;
  const canonicalThreadId=directChatThreadId(signedInUser.uid,person.uid),threadId=String(requestedThreadId||canonicalThreadId);
-  void markNotificationItemsRead((Array.isArray(state.notices)?state.notices:[]).filter(n=>!n.read&&n.directChatThreadId===threadId&&!n.directMessageId&&!flagOn(n,'isUrgent')));
+  void markNotificationItemsRead((Array.isArray(state.notices)?state.notices:[]).filter(n=>!n.read&&n.directChatThreadId===threadId&&!flagOn(n,'isUrgent')));
  const threadRef=doc(db,'directChats',threadId);
  const participants=[signedInUser.uid,person.uid].sort();
  try{

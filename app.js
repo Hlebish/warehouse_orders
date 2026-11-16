@@ -9,6 +9,7 @@ import { orderEditSnapshot, assertOrderUnchanged } from './editing-state.mjs?v=2
 import { drafts, draftKey } from './draft-store.mjs?v=2026.11.12.05';
 import { createWarehouseMapPanel, warehouseMapUrl, mapArticleQuery } from './warehouse-map-panel.mjs?v=2026.11.12.06';
 import { composerHtml, bindChatComposer, chatTime, chatDay } from './chat-ui.mjs?v=2026.11.12.07';
+import { createDirectChatReceipts } from './direct-chat-receipts.mjs?v=2026.11.16.01';
 import { createPhotoSharing, decoratePhotoSharing } from './photo-sharing.mjs?v=2026.11.12.10';
 import { canTransitionOrderStatus, statusAfterDefectDecision } from './order-workflow.mjs?v=2026.11.12.03';
 import { NOTIFICATION_CATEGORIES, NOTIFICATION_CATEGORY_KEYS, normalizeNotificationSettings, groupNotifications, NOTIFICATION_SECTIONS } from './notification-settings.mjs?v=2026.11.12.02';
@@ -3463,7 +3464,8 @@ function renderDirectChatMessages(messages){
  let previousDay='';
  box.innerHTML=messages.map(message=>{
   const day=chatDay(message.createdAt),divider=day!==previousDay?'<div class="chat-day-divider"><span>'+esc(day)+'</span></div>':'';previousDay=day;
-  const mine=message.authorId===signedInUser?.uid,peerRead=mine&&!!directChatTarget?.uid&&Array.isArray(message.readBy)&&message.readBy.includes(directChatTarget.uid);
+  const mine=message.authorId===signedInUser?.uid,peerId=directChatTarget?.uid;
+  const peerRead=mine&&!!peerId&&((Array.isArray(message.readBy)&&message.readBy.includes(peerId))||(message.isUrgent===true&&Array.isArray(message.urgentAckBy)&&message.urgentAckBy.includes(peerId)));
   const urgentPending=message.isUrgent===true&&!mine&&!(Array.isArray(message.urgentAckBy)&&message.urgentAckBy.includes(signedInUser?.uid));
   const photos=Array.isArray(message.photos)?message.photos:[];
   const photoHtml=photos.length?'<div class="chat-photo-grid">'+photos.map(path=>'<button type="button" class="chat-photo-open" data-direct-photo="'+esc(path)+'" aria-label="Открыть фотографию" disabled>Загрузка фото…</button>').join('')+'</div>':'';
@@ -3533,20 +3535,36 @@ async function openDirectChat(person,requestedThreadId=''){
   const directInitials=String(person.displayName||'С').trim().split(/\s+/).slice(0,2).map(x=>x[0]||'').join('').toLocaleUpperCase('ru')||'?';
   const directAvatar=person.avatarUrl?'<img src="'+esc(person.avatarUrl)+'" alt="">':'<span>'+esc(directInitials)+'</span>';
   directChatActiveThreadId=threadId;
-  showModal('Личный чат','<div class="direct-chat-shell"><div class="direct-chat-person"><span class="staff-avatar">'+directAvatar+'</span><div><b>'+esc(person.displayName||'Сотрудник')+'</b><small>'+esc(person.roleLabel||'Сотрудник')+'</small></div><span class="direct-chat-private">Личная переписка</span></div><div class="direct-chat-messages" id="directChatMessages"><div class="chat-empty">Загрузка переписки…</div></div>'+composerHtml(true)+'</div>',[],'СООБЩЕНИЯ');
+  showModal('Личный чат','<div class="direct-chat-shell"><div class="direct-chat-person"><span class="staff-avatar">'+directAvatar+'</span><div><b>'+esc(person.displayName||'Сотрудник')+'</b><small>'+esc(person.roleLabel||'Сотрудник')+'</small></div><span class="direct-chat-private">Личная переписка</span></div><div class="direct-chat-messages" id="directChatMessages"><div class="chat-empty">Загрузка переписки…</div></div><button type="button" id="directChatReceiptRetry" class="small-button" hidden>Не удалось передать отметку о прочтении. Повторить</button>'+composerHtml(true)+'</div>',[],'СООБЩЕНИЯ');
   const composer=bindChatComposer($('directChatForm'),true);
 
+  const viewerId=signedInUser.uid,messagesBox=$('directChatMessages'),receiptRetry=$('directChatReceiptRetry');
+  const receipts=createDirectChatReceipts({viewerId,
+   isActive:()=>signedInUser?.uid===viewerId&&document.visibilityState==='visible'&&!modal.hidden&&$('directChatMessages')===messagesBox,
+   markRead:message=>updateDoc(doc(db,'directChats',threadId,'messages',message.id),{readBy:arrayUnion(message.authorId,viewerId)}),
+   onError:error=>{console.warn('Не удалось отметить личное сообщение прочитанным',error);receiptRetry.hidden=false;}
+  });
+  const retryReceipts=()=>{receiptRetry.hidden=true;receipts.retry();};
+  const resumeReceipts=()=>{if(document.visibilityState==='visible')retryReceipts();};
+  document.addEventListener('visibilitychange',resumeReceipts);
+  window.addEventListener('online',retryReceipts);
+  window.addEventListener('warehouse-app-resumed',resumeReceipts);
+  receiptRetry.addEventListener('click',retryReceipts);
   const messagesQuery=query(collection(db,'directChats',threadId,'messages'),orderBy('createdAt','desc'),limit(100));
-  directChatUnsubscribe=onSnapshot(messagesQuery,snap=>{
+  const unsubscribeMessages=onSnapshot(messagesQuery,snap=>{
    const messages=snap.docs.map(d=>({id:d.id,...d.data()})).reverse();
-   const unreadIncoming=messages.filter(message=>message.authorId!==signedInUser.uid&&!(Array.isArray(message.readBy)&&message.readBy.includes(signedInUser.uid)));
-   if(unreadIncoming.length){const receiptBatch=writeBatch(db);unreadIncoming.forEach(message=>receiptBatch.update(doc(db,'directChats',threadId,'messages',message.id),{readBy:arrayUnion(message.authorId,signedInUser.uid)}));void receiptBatch.commit().catch(error=>console.warn('Не удалось отметить личные сообщения прочитанными',error));}
    renderDirectChatMessages(messages);
+   receipts.update(messages);
   },err=>{
    console.error('Не удалось загрузить личную переписку',err);
    const box=$('directChatMessages');if(box)box.innerHTML='<div class="danger-note">Не удалось загрузить переписку. Проверьте правила Firestore.</div>';
   });
-  const messagesBox=$('directChatMessages');
+  directChatUnsubscribe=()=>{
+   receipts.dispose();unsubscribeMessages();
+   document.removeEventListener('visibilitychange',resumeReceipts);
+   window.removeEventListener('online',retryReceipts);
+   window.removeEventListener('warehouse-app-resumed',resumeReceipts);
+  };
   messagesBox?.addEventListener('click',event=>{
    const ack=event.target.closest('[data-direct-urgent-ack]');
    if(ack){event.preventDefault();void acknowledgeDirectUrgentMessage(ack.dataset.directUrgentAck);}

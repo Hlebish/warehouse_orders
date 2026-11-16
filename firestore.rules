@@ -184,6 +184,22 @@ service cloud.firestore {
             && get(/databases/$(database)/documents/directChats/$(threadId)).data.participants is list
             && request.auth.uid in get(/databases/$(database)/documents/directChats/$(threadId)).data.participants;
         }
+        // A read receipt changes only readBy. Validate that field independently
+        // of immutable legacy message content, just as in the general chat.
+        // The recipient may add their UID and backfill the author's missing UID,
+        // but cannot erase an existing receipt or acknowledge for a third party.
+        function validDirectReadReceipt(data) {
+          return resource.data.authorId is string
+            && resource.data.authorId != request.auth.uid
+            && resource.data.authorId in get(/databases/$(database)/documents/directChats/$(threadId)).data.participants
+            && data.diff(resource.data).affectedKeys().hasOnly(['readBy'])
+            && data.readBy is list
+            && data.readBy.size() <= 2
+            && data.readBy.hasAll([request.auth.uid])
+            && data.readBy.hasOnly([resource.data.authorId,request.auth.uid])
+            && (!(resource.data.keys().hasAny(['readBy']) && resource.data.readBy is list)
+              || data.readBy.hasAll(resource.data.readBy));
+        }
         allow read: if directChatParticipant();
         allow create: if directChatParticipant()
           && validDirectMessage(request.resource.data)
@@ -194,18 +210,11 @@ service cloud.firestore {
               && request.resource.data.readBy.size() == 1
               && request.resource.data.readBy.hasAll([request.auth.uid])));
         allow update: if directChatParticipant()
-          && validDirectMessage(request.resource.data)
           && (
-            (resource.data.authorId != request.auth.uid
-              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['readBy'])
-              && request.resource.data.readBy is list
-              && request.resource.data.readBy.size() <= 2
-              && request.resource.data.readBy.hasAll([resource.data.authorId,request.auth.uid])
-              && (!(resource.data.keys().hasAny(['readBy']) && resource.data.readBy is list)
-                || (request.resource.data.readBy.hasAll(resource.data.readBy)
-                  && request.resource.data.readBy.size() <= resource.data.readBy.size() + 1)))
+            validDirectReadReceipt(request.resource.data)
             ||
-            (resource.data.authorId != request.auth.uid
+            (validDirectMessage(request.resource.data)
+              && resource.data.authorId != request.auth.uid
               && resource.data.isUrgent == true
               && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['urgentAckBy'])
               && request.resource.data.urgentAckBy is list

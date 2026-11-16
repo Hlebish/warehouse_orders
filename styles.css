@@ -8509,6 +8509,11 @@ body.dark-theme .order-summary-done{border-color:#39494b;background:#202a2c}
 @media(max-width:620px){.order-summary{padding:12px}.order-summary-grid{grid-template-columns:1fr;gap:11px}.order-summary-cell+.order-summary-cell{padding-top:9px;border-top:1px solid #637b6e24}.order-summary-cell>p{font-size:12px}}
 
 /* One overlay drawer for employees and their personal conversations. */
+/* Reserve the collapsed desktop rail once; opening the drawer never changes it. */
+@media(min-width:721px){.app-shell>.main-area{box-sizing:border-box;padding-right:76px}}
+.orders-panel .panel-heading{flex-wrap:wrap;min-width:0}
+.orders-panel .list-controls{flex-wrap:wrap;max-width:100%;min-width:0}
+.orders-panel .filter-menu-wrap{flex:0 0 auto;height:auto}
 .staff-presence-panel{
  --drawer-bg:#fff;--drawer-line:#e1e8ed;--drawer-text:#263742;--drawer-muted:#75848f;
  --drawer-hover:#f4f8f6;--drawer-accent:#267c57;--drawer-soft:#e8f5ed;--drawer-danger:#d7485b;
@@ -8600,8 +8605,21 @@ body.dark-theme .staff-conversation-urgent{background:#c74b4826;color:#f7aaa6}
 .staff-presence-toggle.has-direct-unread i{color:#ec596d}
 .staff-presence-panel .staff-urgent-section{margin:0 0 10px;padding:10px}
 @media(max-width:720px){
- .staff-presence-panel{top:70px;right:6px;bottom:12px;width:48px;max-width:calc(100vw - 12px);padding:5px;border-radius:15px}
+ body{min-width:0}
+ .app-shell{min-width:0;width:100%}
+ .staff-presence-panel{right:6px;max-width:calc(100vw - 12px)}
+ .staff-presence-panel:not(.open){display:none}
  .staff-presence-panel.open{top:8px;bottom:8px;width:min(380px,calc(100vw - 12px));border-radius:16px}
+ body .app-shell>.main-area>.topbar{position:relative!important;display:grid!important;grid-template-columns:42px minmax(0,1fr) 86px!important;grid-template-rows:auto auto!important;align-items:center!important;height:auto!important;gap:8px!important;padding:8px 12px!important;overflow:visible!important;isolation:isolate}
+ body .app-shell>.main-area>.topbar::before,body .app-shell>.main-area>.topbar::after{display:none!important;content:none!important}
+ body .app-shell>.main-area>.topbar .mobile-menu{grid-column:1!important;grid-row:1!important}
+ body .app-shell>.main-area>.topbar .breadcrumbs{grid-column:2!important;grid-row:1!important;min-width:0!important;margin:0!important;overflow-wrap:anywhere}
+ body .app-shell>.main-area>.topbar .top-actions{position:static!important;display:grid!important;grid-column:1/-1!important;grid-row:2!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;width:100%!important;max-width:100%!important;min-width:0!important;gap:6px!important;margin:0!important;padding:0!important;overflow:visible!important;white-space:normal!important}
+ body .app-shell>.main-area>.topbar .top-actions :is(#shipmentManifestButton,#dailyReportButton,#siteHistoryButton,#analyticsButton){position:static!important;display:inline-flex!important;width:100%!important;min-width:0!important;min-height:38px!important;height:auto!important;padding:7px 8px!important;white-space:normal!important;line-height:1.2!important}
+ body .app-shell>.main-area>.topbar :is(#staffPresenceToggle,#notificationButton){position:absolute!important;top:8px!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;width:38px!important;min-width:38px!important;height:38px!important;margin:0!important;padding:0!important}
+ body .app-shell>.main-area>.topbar #staffPresenceToggle{right:54px!important}
+ body .app-shell>.main-area>.topbar #notificationButton{right:10px!important}
+ body .app-shell>.main-area>.topbar .top-divider,body .app-shell>.main-area>.topbar .today{display:none!important}
  .staff-rail-expand{width:36px;height:36px;flex-basis:36px;padding:7px;border-radius:11px}
  .staff-rail-avatars{gap:8px}
  .staff-rail-avatar{width:34px;height:34px;flex-basis:34px}

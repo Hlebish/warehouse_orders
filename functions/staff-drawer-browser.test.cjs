@@ -13,11 +13,16 @@ const drawerStart=index.indexOf('    <div class="staff-presence-backdrop"');
 const drawerEnd=index.indexOf('</aside>',drawerStart)+8;
 assert.ok(drawerStart>=0&&drawerEnd>drawerStart,'Drawer markup must be present');
 const drawer=index.slice(drawerStart,drawerEnd);
+const mainStart=index.indexOf('    <main class="main-area">'),mainEnd=index.indexOf('</main>',mainStart)+7;
+assert.ok(mainStart>=0&&mainEnd>mainStart,'Actual orders workspace markup must be present');
+const workspace=index.slice(mainStart,mainEnd).replace('<section class="content">','<section class="content"><button id="workAction" type="button">Действие в заказе</button>');
 const application=[between('function presenceLastSeenLabel(', 'async function loadStaffDirectory('),between('function isStaffPanelDesktopLayout(',"document.addEventListener('focusin',")].join('\n');
 const fixture=`
 import * as model from '/staff-conversations.mjs';
 Object.assign(window,model);
 const $=id=>document.getElementById(id),modal=$('modalBackdrop');
+if(/WarehouseOrdersAndroid/.test(navigator.userAgent))document.documentElement.classList.add('android-warehouse');
+if($('today'))$('today').textContent=new Intl.DateTimeFormat('ru-RU',{weekday:'short',day:'numeric',month:'long'}).format(new Date());
 const signedInUser={uid:'me'},state={notices:[],orders:[],role:'warehouse'};
 const directChatTarget=null,staffPresence=new Map(),staffDirectory=new Map(),directThreads=new Map();
 let staffDirectoryLoadError=false,directThreadsLoadError=false,directThreadsErrorCode='';
@@ -71,7 +76,7 @@ async function main(){
   if(pathname==='/qa.js'){res.setHeader('Content-Type','text/javascript; charset=utf-8');res.end(fixture);return;}
   if(pathname==='/'){
    res.setHeader('Content-Type','text/html; charset=utf-8');
-   res.end('<!doctype html><html class="app-booted"><head><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/styles.css"><style>*{animation:none!important;transition:none!important;scroll-behavior:auto!important}</style></head><body class="dark-theme"><div class="app-shell"><aside class="sidebar">Склад</aside>'+drawer+'<main class="main-area"><header class="topbar"><button id="staffPresenceToggle" type="button" aria-expanded="false">Сообщения <i id="staffPresenceBadge">0</i></button></header><div class="content"><button id="workAction">Действие в заказе</button><div class="table-wrap"><table><thead><tr><th>Заказ</th><th>Клиент</th><th>Статус</th></tr></thead><tbody><tr><td>12345</td><td>Клиент</td><td>Создан</td></tr></tbody></table></div></div></main><div id="modalBackdrop" class="modal-backdrop" hidden><section class="modal"><span id="modalEyebrow">НОВЫЙ ЗАКАЗ</span><textarea id="orderDraft">Сохранённый текст заказа</textarea></section></div><div id="toastStack"></div></div><script type="module" src="/qa.js"></script></body></html>');return;
+   res.end('<!doctype html><html class="app-booted"><head><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/styles.css"><style>[hidden]{display:none!important}*{animation:none!important;transition:none!important;scroll-behavior:auto!important}</style></head><body class="dark-theme"><div class="app-shell"><aside class="sidebar">Склад</aside>'+drawer+workspace+'<div id="modalBackdrop" class="modal-backdrop" hidden><section class="modal"><span id="modalEyebrow">НОВЫЙ ЗАКАЗ</span><textarea id="orderDraft">Сохранённый текст заказа</textarea></section></div><div id="toastStack"></div></div><script type="module" src="/qa.js"></script></body></html>');return;
   }
   const file=path.join(root,path.basename(pathname));
   if(!fs.existsSync(file)){res.writeHead(404);res.end();return;}
@@ -93,6 +98,7 @@ async function main(){
   function sameBox(a,b,label){for(const key of ['x','y','width','height'])assert.ok(Math.abs(a[key]-b[key])<1,label+' '+key+' changed from '+a[key]+' to '+b[key]);}
   const checkOpen=()=>page.waitForFunction(()=>document.getElementById('staffPresencePanel').classList.contains('open'));
   const checkClosed=()=>page.waitForFunction(()=>!document.getElementById('staffPresencePanel').classList.contains('open'));
+  const checkNoneditableFocus=async()=>assert.equal(await page.evaluate(()=>document.activeElement?.matches('input,textarea,[contenteditable="true"]')),false,'opening the drawer focused an editable field');
 
   // Parent supplies the final row identity; Write controls are retained from
   // the existing app and provide a stable way to locate each employee.
@@ -101,22 +107,39 @@ async function main(){
   for(const width of [1280,900,720,390,320])for(const dark of [true,false])for(const native of [false,true]){
    await page.evaluate(({dark,native})=>{document.body.classList.toggle('dark-theme',dark);document.documentElement.classList.toggle('warehouse-desktop-app',native);window.qa.close();},{dark,native});
    await page.setViewportSize({width,height:900});
+   const mobile=width<=720,opener=mobile?'staffPresenceToggle':'staffPresenceExpand';
+   assert.equal(await page.locator('#staffPresencePanel').isHidden(),mobile,'collapsed mobile rail must be absent');
+   const collision=await page.evaluate(()=>{
+    const panel=document.getElementById('staffPresencePanel'),rail=panel.getBoundingClientRect(),shown=panel.getClientRects().length>0;
+    const targets=[...document.querySelectorAll('.topbar button,.stat-card,.orders-panel .list-controls button,.orders-panel .list-controls input')].filter(node=>node.getClientRects().length&&getComputedStyle(node).visibility!=='hidden');
+    const outside=[],overlap=[];
+    for(const node of targets){const a=node.getBoundingClientRect(),name=node.id||node.getAttribute('data-stat-key')||node.className;if(a.left<-.5||a.right>innerWidth+.5)outside.push({name,left:a.left,right:a.right});if(shown&&a.left<rail.right&&a.right>rail.left&&(node.closest('.content')||(a.top<rail.bottom&&a.bottom>rail.top)))overlap.push({name,control:a.toJSON(),rail:rail.toJSON()});}
+    const content=document.querySelector('.content').getBoundingClientRect();
+    return {outside,overlap,main:document.querySelector('.main-area').getBoundingClientRect().toJSON(),content:content.toJSON()};
+   });
+   if(collision.overlap.length||collision.outside.length){console.log('COLLISION',JSON.stringify({width,dark,native,collision}));await page.screenshot({path:'/tmp/staff-drawer-collision.png'});}
+   assert.deepEqual(collision.overlap,[],'collapsed rail covers workspace controls at '+width+'/'+native);
+   assert.deepEqual(collision.outside,[],'workspace controls outside viewport at '+width+'/'+native);
+   if(mobile){assert.ok(Math.abs(collision.main.width-width)<1,'mobile workspace lost width to a rail gutter');assert.ok(collision.content.right<=width+1,'mobile content exceeds viewport');}
    const before=await mainBox(),beforeTable=await tableBox();
-   await page.locator('#staffPresenceExpand').click();await checkOpen();
+   await page.locator('#'+opener).click();await checkOpen();await page.waitForFunction(()=>document.activeElement?.id==='staffPresenceClose');await checkNoneditableFocus();
    sameBox(before,await mainBox(),'main '+width+'/'+dark+'/'+native);sameBox(beforeTable,await tableBox(),'table '+width+'/'+dark+'/'+native);
    const bounds=await page.locator('#staffPresencePanel').boundingBox();assert.ok(bounds.x>=-1&&bounds.x+bounds.width<=width+1,'drawer outside viewport at '+width);
    const overflow=await page.locator('#staffPresencePanel').evaluate(e=>e.scrollWidth>e.clientWidth);assert.equal(overflow,false,'drawer horizontal overflow');
    await page.locator('#staffPresenceClose').click();await checkClosed();sameBox(before,await mainBox(),'main after close');
    report.push({width,dark,native});
   }
-  console.log('PASS fixed overlay preserves workspace and table at all 20 viewport/theme/native combinations');
+  console.log('PASS real workspace controls and stats are uncovered; overlay preserves layout with no autofocus keyboard at all 20 viewport/theme/native combinations');
 
   await page.setViewportSize({width:1280,height:900});
   await page.evaluate(()=>{document.documentElement.classList.remove('warehouse-desktop-app');window.qa.reset();window.qa.close();});
   await page.locator('[data-staff-rail-id="alice"]').click();await checkOpen();assert.equal(await page.evaluate(()=>window.qa.opened.length),0,'collapsed avatar opened a chat');
+  await page.waitForFunction(()=>document.activeElement?.id==='staffPresenceClose');await checkNoneditableFocus();
   await page.locator('#staffPresenceClose').click();await checkClosed();
   const rail=await page.locator('#staffPresencePanel').boundingBox();await page.mouse.click(rail.x+rail.width/2,rail.y+rail.height-24);await checkOpen();assert.equal(await page.evaluate(()=>window.qa.opened.length),0,'empty rail opened a chat');
+  await page.waitForFunction(()=>document.activeElement?.id==='staffPresenceClose');await checkNoneditableFocus();
   await page.locator('#staffPresenceClose').click();await checkClosed();await page.locator('#staffPresencePanel').focus();await page.keyboard.press('Space');await checkOpen();
+  await page.waitForFunction(()=>document.activeElement?.id==='staffPresenceClose');await checkNoneditableFocus();
   console.log('PASS avatar and empty collapsed rail both expand without opening chat');
 
   assert.equal(await page.locator('[data-staff-message-id="me"]').count(),0,'own profile duplicated as contact');
@@ -126,6 +149,7 @@ async function main(){
   await page.locator('[data-staff-open-id="alice"]').click();await checkClosed();
   assert.deepEqual(await page.evaluate(()=>window.qa.opened.at(-1)),{kind:'chat',uid:'alice',threadId:'alice__me',messageId:'message-43'});
   await page.evaluate(()=>window.qa.reset());await page.locator('#staffPresenceExpand').click();await checkOpen();
+  await page.locator('#staffDirectorySearch').click();assert.equal(await page.evaluate(()=>document.activeElement?.id),'staffDirectorySearch','explicit search tap must focus the search input');
   await page.locator('#staffDirectorySearch').fill('ALICE-42');assert.equal(await page.locator('[data-staff-message-id]').count(),1);
   await page.locator('#staffDirectorySearch').fill('');await page.locator('#staffFilterUnread').click();assert.equal(await page.locator('[data-staff-message-id]').count(),1);
   await page.evaluate(()=>window.qa.clearUnread());assert.equal(await page.locator('[data-staff-message-id]').count(),0);assert.equal(await page.locator('#staffPresenceRailCount').isHidden(),true);assert.equal(await page.locator('#staffUrgentSection').isHidden(),true);await page.locator('#staffFilterAll').click();assert.equal(await page.locator('[data-staff-message-id]').count(),3);
@@ -138,18 +162,31 @@ async function main(){
   assert.equal(await page.evaluate(()=>document.activeElement?.id),'staffPresenceExpand','Escape did not restore the opening control');
   await page.locator('#staffPresenceExpand').click();await checkOpen();const work=await page.locator('#workAction').boundingBox();const clicks=await page.evaluate(()=>window.qa.workspaceClicks);await page.mouse.click(work.x+5,work.y+5);await checkClosed();assert.equal(await page.evaluate(()=>window.qa.workspaceClicks),clicks,'backdrop click reached workspace action');
   await page.waitForFunction(()=>document.getElementById('staffPresenceBackdrop').hidden);await page.locator('#workAction').click();assert.equal(await page.evaluate(()=>window.qa.workspaceClicks),clicks+1);
-  await page.evaluate(()=>window.qa.openBeforeAnimationFrame());await checkOpen();await page.mouse.click(work.x+5,work.y+5);await checkClosed();assert.equal(await page.evaluate(()=>window.qa.workspaceClicks),clicks+1,'first-frame outside click reached workspace action');await page.evaluate(()=>window.qa.finishFrames());
+  await page.evaluate(()=>window.qa.openBeforeAnimationFrame());await checkOpen();await checkNoneditableFocus();await page.mouse.click(work.x+5,work.y+5);await checkClosed();assert.equal(await page.evaluate(()=>window.qa.workspaceClicks),clicks+1,'first-frame outside click reached workspace action');await page.evaluate(()=>window.qa.finishFrames());
   await page.evaluate(()=>{document.getElementById('modalBackdrop').hidden=false;window.qa.open();});await checkOpen();await page.keyboard.press('Escape');await checkClosed();
   assert.equal(await page.evaluate(()=>window.qa.underlyingModalCloses),0,'drawer Escape closed the underlying modal');assert.equal(await page.locator('#orderDraft').inputValue(),'Сохранённый текст заказа');await page.evaluate(()=>document.getElementById('modalBackdrop').hidden=true);
   console.log('PASS keyboard expansion, Escape and outside close without workspace click-through');
   await page.evaluate(()=>{window.qa.addMany();window.qa.open();});await checkOpen();
-  await page.waitForFunction(()=>document.activeElement?.id==='staffDirectorySearch');
+  await page.waitForFunction(()=>document.activeElement?.id==='staffPresenceClose');await checkNoneditableFocus();
   const anchor=await page.locator('.staff-panel-scroll').evaluate(scroll=>{scroll.scrollTop=700;const bounds=scroll.getBoundingClientRect();const target=[...scroll.querySelectorAll('[data-staff-open-id]')].find(node=>{const box=node.getBoundingClientRect();return box.top>=bounds.top&&box.bottom<=bounds.bottom;});target.focus({preventScroll:true});return {uid:target.dataset.staffOpenId,top:scroll.scrollTop,header:document.querySelector('.staff-panel-header').getBoundingClientRect().top};});
   await page.evaluate(()=>window.qa.updatePresence('alice',Date.now()));
   const refreshed=await page.locator('.staff-panel-scroll').evaluate(scroll=>({uid:document.activeElement.dataset.staffOpenId,top:scroll.scrollTop,header:document.querySelector('.staff-panel-header').getBoundingClientRect().top}));
   assert.equal(refreshed.uid,anchor.uid,'presence refresh lost focused employee');assert.ok(Math.abs(refreshed.top-anchor.top)<2,'presence refresh moved list scroll');assert.ok(Math.abs(refreshed.header-anchor.header)<1,'list scrolling moved drawer header');
   console.log('PASS live presence refresh preserves focused contact, scroll and sticky header');
-  await page.evaluate(()=>{window.qa.reset();document.querySelector('.staff-panel-scroll').scrollTop=0;});await page.setViewportSize({width:390,height:844});await checkOpen();await page.screenshot({path:'/tmp/staff-drawer-mobile.png'});
+  await page.evaluate(()=>{window.qa.reset();document.querySelector('.staff-panel-scroll').scrollTop=0;window.qa.close();document.getElementById('workAction').hidden=true;});await page.setViewportSize({width:390,height:844});await checkClosed();assert.equal(await page.locator('#staffPresencePanel').isHidden(),true);await page.locator('#staffPresenceToggle').click();await checkOpen();await page.waitForFunction(()=>document.activeElement?.id==='staffPresenceClose');await checkNoneditableFocus();await page.keyboard.press('Escape');await checkClosed();await page.waitForFunction(()=>document.activeElement?.id==='staffPresenceToggle');await page.screenshot({path:'/tmp/staff-drawer-mobile-collapsed.png'});await page.locator('#staffPresenceToggle').click();await checkOpen();await page.waitForFunction(()=>document.activeElement?.id==='staffPresenceClose');await checkNoneditableFocus();await page.screenshot({path:'/tmp/staff-drawer-mobile.png'});
+  const androidContext=await browser.newContext({viewport:{width:390,height:844},deviceScaleFactor:3,isMobile:true,hasTouch:true,userAgent:'Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 Chrome/125.0.0.0 Mobile Safari/537.36 WarehouseOrdersAndroid'});
+  const android=await androidContext.newPage();android.on('pageerror',error=>errors.push(error.message));await android.route('**/*',route=>route.request().url().startsWith(url)?route.continue():route.abort());await android.goto(url);await android.waitForFunction(()=>window.qa?.ready);
+  await android.evaluate(()=>document.getElementById('workAction').hidden=true);
+  for(const dark of [true,false]){
+   await android.evaluate(dark=>{document.body.classList.toggle('dark-theme',dark);window.qa.close();},dark);
+   assert.equal(await android.locator('#staffPresencePanel').isHidden(),true,'Android collapsed rail remains visible');
+   const outside=await android.evaluate(()=>[...document.querySelectorAll('.topbar button,.stat-card')].filter(node=>node.getClientRects().length).map(node=>({id:node.id||node.getAttribute('data-stat-key'),box:node.getBoundingClientRect()})).filter(({box})=>box.left<-.5||box.right>innerWidth+.5).map(({id})=>id));assert.deepEqual(outside,[],'Android controls or stats outside viewport');
+   if(dark)await android.screenshot({path:'/tmp/staff-drawer-android-collapsed.png'});
+   await android.locator('#staffPresenceToggle').tap();await android.waitForFunction(()=>document.activeElement?.id==='staffPresenceClose');assert.equal(await android.evaluate(()=>document.activeElement?.matches('input,textarea,[contenteditable="true"]')),false,'Android opening would summon the keyboard');
+   if(dark)await android.screenshot({path:'/tmp/staff-drawer-android-open.png'});
+   await android.locator('#staffDirectorySearch').tap();assert.equal(await android.evaluate(()=>document.activeElement?.id),'staffDirectorySearch','Android explicit search tap did not focus input');await android.locator('#staffPresenceClose').tap();await android.waitForFunction(()=>document.activeElement?.id==='staffPresenceToggle');
+  }
+  await androidContext.close();console.log('PASS Android touch/DPR3 has clear stats and messages control, no automatic editable focus, and explicit search tap works');
   assert.deepEqual(errors,[],'browser exceptions');console.log('PASS no browser errors');
  }finally{if(browser)await browser.close();await new Promise(resolve=>server.close(resolve));}
 }

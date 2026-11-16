@@ -1272,7 +1272,7 @@ function startPresence(user){
 }
 function isStaffPanelDesktopLayout(){return window.matchMedia('(min-width: 721px)').matches}
 let staffBackdropHideTimer=null,staffDrawerReturnFocus=null,staffDrawerOpenRequest=0;
-function openStaffPanel(open=true,{restoreFocus=false,focusSearch=true}={}){
+function openStaffPanel(open=true,{restoreFocus=false}={}){
  const panel=$('staffPresencePanel'),backdrop=$('staffPresenceBackdrop'),button=$('staffPresenceToggle');
  if(!panel)return;
  const wasOpen=panel.classList.contains('open');
@@ -1296,12 +1296,18 @@ function openStaffPanel(open=true,{restoreFocus=false,focusSearch=true}={}){
  }
  button?.setAttribute('aria-expanded',String(open));
  $('staffPresenceExpand')?.setAttribute('aria-expanded',String(open));
- if(open&&focusSearch&&!wasOpen)requestAnimationFrame(()=>{if(panel.classList.contains('open'))$('staffDirectorySearch')?.focus({preventScroll:true});});
+ if(open&&!wasOpen)requestAnimationFrame(()=>{
+  // Keep text inputs unfocused until the user explicitly taps one. Focusing
+  // search here opens the Android/iOS keyboard before the drawer can be read.
+  if(panel.classList.contains('open')&&(!panel.contains(document.activeElement)||rail?.contains(document.activeElement)||document.activeElement===panel))$('staffPresenceClose')?.focus({preventScroll:true});
+ });
  if(!open&&wasOpen){
   const previous=staffDrawerReturnFocus;staffDrawerReturnFocus=null;
   if(restoreFocus)requestAnimationFrame(()=>{
    if(panel.classList.contains('open'))return;
-   const target=previous?.isConnected&&!previous.closest?.('.staff-presence-content')?previous:$('staffPresenceExpand');
+   const canRestore=node=>node?.isConnected&&node.getClientRects().length&&!node.closest?.('[inert]')&&!node.closest?.('.staff-presence-content')&&!node.matches?.('input,textarea,[contenteditable]');
+   const expand=$('staffPresenceExpand');
+   const target=canRestore(previous)?previous:canRestore(expand)?expand:button;
    target?.focus?.({preventScroll:true});
   });
  }

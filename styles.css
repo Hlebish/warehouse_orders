@@ -8923,6 +8923,11 @@ body.dark-theme .chat-dialog{--chat-bg:#141b22;--chat-panel:#1b232c;--chat-bubbl
 #modalBackdrop .modal.chat-dialog #modalBody .direct-chat-person .staff-avatar{width:32px;height:32px;flex:0 0 32px;font-size:12px}
 #modalBackdrop .modal.chat-dialog #modalBody .direct-chat-person b{font-size:13px;color:var(--chat-text)}
 #modalBackdrop .modal.chat-dialog #modalBody .direct-chat-person small{font-size:10px;color:var(--chat-muted)}
+#modalBackdrop .modal.chat-dialog #modalBody .direct-chat-person-copy{flex:1;min-width:0}
+#modalBackdrop .modal.chat-dialog #modalBody .direct-chat-person-copy b{overflow-wrap:anywhere}
+#modalBackdrop .modal.chat-dialog #modalBody .direct-chat-presence{white-space:normal;line-height:1.4;overflow-wrap:anywhere}
+#modalBackdrop .modal.chat-dialog #modalBody .direct-chat-presence.is-online{color:var(--chat-accent)}
+#modalBackdrop .modal.chat-dialog #modalBody .direct-chat-person .staff-avatar i{border-color:var(--chat-panel)}
 .direct-chat-private{margin-left:auto;color:var(--chat-muted);font-size:10px}
 body #modalBackdrop .modal.chat-dialog #modalBody #chatMessages,body #modalBackdrop .modal.chat-dialog #modalBody #directChatMessages{display:flex!important;flex:1!important;flex-direction:column;gap:8px!important;min-height:0!important;max-height:none!important;padding:14px!important;overflow-y:auto;overscroll-behavior:contain;background:var(--chat-bg)!important;border:0!important;border-radius:0!important;scrollbar-width:thin}
 body #modalBackdrop .modal.chat-dialog #modalBody #chatMessages .chat-message,body #modalBackdrop .modal.chat-dialog #modalBody #directChatMessages .chat-message{max-width:86%!important;min-width:0!important;align-self:flex-start;padding:9px 11px!important;border:1px solid var(--chat-line)!important;border-radius:12px 12px 12px 3px!important;background:var(--chat-bubble)!important;color:var(--chat-text)!important;box-shadow:none!important}

@@ -9,7 +9,8 @@ import { orderEditSnapshot, assertOrderUnchanged } from './editing-state.mjs?v=2
 import { drafts, draftKey } from './draft-store.mjs?v=2026.11.12.05';
 import { createWarehouseMapPanel, warehouseMapUrl, mapArticleQuery } from './warehouse-map-panel.mjs?v=2026.11.12.06';
 import { composerHtml, bindChatComposer, chatTime, chatDay } from './chat-ui.mjs?v=2026.11.12.07';
-import { createDirectChatReceipts } from './direct-chat-receipts.mjs?v=2026.11.16.01';
+import { createDirectChatReceipts } from './direct-chat-receipts.mjs?v=2026.11.16.02';
+import { createDirectChatNoticeSync } from './direct-chat-notices.mjs?v=2026.11.16.02';
 import { createPhotoSharing, decoratePhotoSharing } from './photo-sharing.mjs?v=2026.11.12.10';
 import { canTransitionOrderStatus, statusAfterDefectDecision } from './order-workflow.mjs?v=2026.11.12.03';
 import { NOTIFICATION_CATEGORIES, NOTIFICATION_CATEGORY_KEYS, normalizeNotificationSettings, groupNotifications, NOTIFICATION_SECTIONS } from './notification-settings.mjs?v=2026.11.12.02';
@@ -19,6 +20,7 @@ document.documentElement.classList.toggle('warehouse-desktop-app',window.warehou
 const firebaseApp=initializeApp(firebaseConfig),auth=getAuth(firebaseApp),db=getFirestore(firebaseApp),messaging=getMessaging(firebaseApp),storage=getStorage(firebaseApp),staffAuth=getAuth(initializeApp(firebaseConfig,'amp-staff-provisioner'));
 const warehouseFunctions=getFunctions(firebaseApp,'europe-west1'),enqueueWarehousePush=httpsCallable(warehouseFunctions,'enqueueWarehousePush'),getStaffDirectoryCallable=httpsCallable(warehouseFunctions,'getStaffDirectory'),getDirectChatThreadsCallable=httpsCallable(warehouseFunctions,'getDirectChatThreads');
 let signedInUser=null,profileName='',canManageUsers=false,profileUnsubscribe=null,ordersUnsubscribe=null,chatUnsubscribe=null,directChatUnsubscribe=null,chatBadgeUnsubscribe=null,chatUnreadReceiptUnsubscribe=null,notificationsUnsubscribe=null,serverCache=new Map(),entryUnsubscribes=new Map(),defectEntryUnsubscribes=new Map(),pendingWrites=new Set(),pendingOrderData=new Map(),initialCloudLoad=true;
+let directChatNoticeSync=null;
 let chatLegacyHistoryLoaded=false,chatLegacyHistoryLoading=false,chatLegacyHistoryCursor=null;
 let ordersRetryTimer=null,ordersRetryDelay=3000,ordersConnectionNoticeShown=false,ordersListenerBlocked=false;
 const roles={warehouse:'Кладовщик',manager:'Менеджер',chief_accountant:'Главный бухгалтер',accountant:'Бухгалтер',director:'Директор'};
@@ -187,6 +189,17 @@ applyTheme(savedTheme);
 function watchNotifications(){
   notificationsUnsubscribe?.();
   if(!signedInUser)return;
+  const viewerId=signedInUser.uid;
+  const noticeSync=createDirectChatNoticeSync({viewerId,
+    isCurrentAccount:()=>signedInUser?.uid===viewerId,
+    markRead:notice=>markNotificationItemsRead([notice]),
+    onError:error=>console.warn('Не удалось синхронизировать прочтение личного уведомления',error)
+  });
+  directChatNoticeSync=noticeSync;
+  const retryReadNotices=()=>noticeSync.retry();
+  const resumeReadNotices=()=>{if(document.visibilityState==='visible')noticeSync.retry();};
+  window.addEventListener('online',retryReadNotices);
+  document.addEventListener('visibilitychange',resumeReadNotices);
   let knownNoticeIds=new Set(state.notices.map(n=>n.id));
   let initialSnapshot=true;
   // Only surface notifications created while this live listener is active.
@@ -199,7 +212,7 @@ function watchNotifications(){
     return Number.isFinite(created)&&created>=listenerStartedAt-5000&&Date.now()-created<=60000;
   };
   const q=query(collection(db,'users',signedInUser.uid,'notifications'),orderBy('createdAt','desc'),limit(100));
-  notificationsUnsubscribe=onSnapshot(q,snap=>{
+  const unsubscribeNotices=onSnapshot(q,snap=>{
     const next=snap.docs.map(d=>({id:d.id,...d.data(),at:d.data().createdAt||d.data().at||isoNow()}))
       .filter(n=>!n.authorId||String(n.authorId)!==String(signedInUser.uid));
     if(!initialSnapshot){
@@ -230,7 +243,14 @@ function watchNotifications(){
     }
     initialSnapshot=false;
     knownNoticeIds=new Set(next.map(n=>n.id));state.notices=next;paintNotices();refreshNotificationCenter?.();renderStaffPanel();
+    noticeSync.updateNotices(next);
   },err=>console.error('Не удалось загрузить историю уведомлений',err));
+  notificationsUnsubscribe=()=>{
+    unsubscribeNotices();noticeSync.dispose();
+    if(directChatNoticeSync===noticeSync)directChatNoticeSync=null;
+    window.removeEventListener('online',retryReadNotices);
+    document.removeEventListener('visibilitychange',resumeReadNotices);
+  };
 }
 function flagOn(n,key){return n?.[key]===true||n?.[key]==='true'||n?.[key]===1}
 function isMentionNotice(n){if(n?.directChatThreadId)return false;const t=String(n?.title||'').toLocaleLowerCase('ru');return flagOn(n,'isMention')||t.includes('упомянули вас')||t.includes('вас упомянули')||n?.category==='mention'}
@@ -485,6 +505,7 @@ async function markNotificationItemsRead(items=[],showToast=false){
   const failed=results.filter(ok=>!ok).length;
   paintNotices();
   refreshNotificationCenter?.();
+  renderStaffPanel();
   if(showToast){
     if(failed===0)toast('Все уведомления отмечены прочитанными.');
     else toast('Не удалось отметить '+failed+' уведомлен'+(failed===1?'ие':'ия')+'. Проверьте доступ и повторите попытку.');
@@ -1109,7 +1130,18 @@ function presenceLastSeenLabel(value){
  if(visitDay===dayStart-86400000)return 'Был(а) в сети вчера в '+clock;
  return 'Был(а) в сети '+date.toLocaleDateString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric'})+' в '+clock;
 }
+function renderDirectChatPresence(){
+ const label=$('directChatPresence'),dot=$('directChatPresenceDot');
+ if(!label||!directChatTarget?.uid)return;
+ const presence=staffPresence.get(directChatTarget.uid),lastSeen=Number(presence?.updatedAt||0);
+ const online=presence?.active===true&&lastSeen>0&&Date.now()-lastSeen<45000;
+ label.textContent=online?'В сети':presenceLastSeenLabel(lastSeen);
+ label.title=online?'Сейчас в сети':'Не в сети';
+ label.classList.toggle('is-online',online);
+ dot?.classList.toggle('is-online',online);
+}
 function renderStaffPanel(){
+ renderDirectChatPresence();
  const list=$('staffPresenceList'),rail=$('staffPresenceRailAvatars');if(!list||!rail)return;
  const now=Date.now(),items=[...staffDirectory.values()].filter(x=>x.active===true).map(person=>{
   const p=staffPresence.get(person.uid),lastSeen=Number(p?.updatedAt||0),online=!!p&&p.active===true&&lastSeen>0&&now-lastSeen<45000;
@@ -3496,8 +3528,10 @@ async function acknowledgeDirectUrgentMessage(messageId,threadId='',noticeId='')
  const resolvedThreadId=threadId||directChatActiveThreadId||(directChatTarget?.uid?directChatThreadId(signedInUser.uid,directChatTarget.uid):'');
  if(!resolvedThreadId)return;
  const closeDirectChat=!!activeUrgentDirectOverlay;
+ const readerId=signedInUser.uid;
  try{
-  await updateDoc(doc(db,'directChats',resolvedThreadId,'messages',messageId),{urgentAckBy:arrayUnion(signedInUser.uid)});
+  await updateDoc(doc(db,'directChats',resolvedThreadId,'messages',messageId),{urgentAckBy:arrayUnion(readerId)});
+  if(signedInUser?.uid===readerId)directChatNoticeSync?.confirmUrgentRead(resolvedThreadId,messageId);
   const relatedNotices=(Array.isArray(state.notices)?state.notices:[]).filter(n=>!n.read&&(noticeId?n.id===noticeId:n.directMessageId===messageId));
   if(relatedNotices.length)await markNotificationItemsRead(relatedNotices);
   const alertKey=noticeId||`${resolvedThreadId}:${messageId}`;
@@ -3517,7 +3551,7 @@ async function openDirectChat(person,requestedThreadId=''){
  openStaffPanel(false);
  directChatTarget=person;
  const canonicalThreadId=directChatThreadId(signedInUser.uid,person.uid),threadId=String(requestedThreadId||canonicalThreadId);
-  void markNotificationItemsRead((Array.isArray(state.notices)?state.notices:[]).filter(n=>!n.read&&n.directChatThreadId===threadId&&!flagOn(n,'isUrgent')));
+  void markNotificationItemsRead((Array.isArray(state.notices)?state.notices:[]).filter(n=>!n.read&&n.directChatThreadId===threadId&&!n.directMessageId&&!flagOn(n,'isUrgent')));
  const threadRef=doc(db,'directChats',threadId);
  const participants=[signedInUser.uid,person.uid].sort();
  try{
@@ -3535,26 +3569,29 @@ async function openDirectChat(person,requestedThreadId=''){
   const directInitials=String(person.displayName||'С').trim().split(/\s+/).slice(0,2).map(x=>x[0]||'').join('').toLocaleUpperCase('ru')||'?';
   const directAvatar=person.avatarUrl?'<img src="'+esc(person.avatarUrl)+'" alt="">':'<span>'+esc(directInitials)+'</span>';
   directChatActiveThreadId=threadId;
-  showModal('Личный чат','<div class="direct-chat-shell"><div class="direct-chat-person"><span class="staff-avatar">'+directAvatar+'</span><div><b>'+esc(person.displayName||'Сотрудник')+'</b><small>'+esc(person.roleLabel||'Сотрудник')+'</small></div><span class="direct-chat-private">Личная переписка</span></div><div class="direct-chat-messages" id="directChatMessages"><div class="chat-empty">Загрузка переписки…</div></div><button type="button" id="directChatReceiptRetry" class="small-button" hidden>Не удалось передать отметку о прочтении. Повторить</button>'+composerHtml(true)+'</div>',[],'СООБЩЕНИЯ');
+  showModal('Личный чат','<div class="direct-chat-shell"><div class="direct-chat-person"><span class="staff-avatar">'+directAvatar+'<i id="directChatPresenceDot" aria-hidden="true"></i></span><div class="direct-chat-person-copy"><b>'+esc(person.displayName||'Сотрудник')+'</b><small>'+esc(person.roleLabel||'Сотрудник')+'</small><small id="directChatPresence" class="direct-chat-presence" role="status" aria-live="polite"></small></div><span class="direct-chat-private">Личная переписка</span></div><div class="direct-chat-messages" id="directChatMessages"><div class="chat-empty">Загрузка переписки…</div></div><button type="button" id="directChatReceiptRetry" class="small-button" hidden>Не удалось передать отметку о прочтении. Повторить</button>'+composerHtml(true)+'</div>',[],'СООБЩЕНИЯ');
+  renderDirectChatPresence();
   const composer=bindChatComposer($('directChatForm'),true);
 
   const viewerId=signedInUser.uid,messagesBox=$('directChatMessages'),receiptRetry=$('directChatReceiptRetry');
   const receipts=createDirectChatReceipts({viewerId,
    isActive:()=>signedInUser?.uid===viewerId&&document.visibilityState==='visible'&&!modal.hidden&&$('directChatMessages')===messagesBox,
    markRead:message=>updateDoc(doc(db,'directChats',threadId,'messages',message.id),{readBy:arrayUnion(message.authorId,viewerId)}),
+   onRead:message=>{if(signedInUser?.uid===viewerId)directChatNoticeSync?.confirmRead(threadId,message);},
    onError:error=>{console.warn('Не удалось отметить личное сообщение прочитанным',error);receiptRetry.hidden=false;}
   });
-  const retryReceipts=()=>{receiptRetry.hidden=true;receipts.retry();};
+  const retryReceipts=()=>{receiptRetry.hidden=true;receipts.retry();directChatNoticeSync?.retry();};
   const resumeReceipts=()=>{if(document.visibilityState==='visible')retryReceipts();};
   document.addEventListener('visibilitychange',resumeReceipts);
   window.addEventListener('online',retryReceipts);
   window.addEventListener('warehouse-app-resumed',resumeReceipts);
   receiptRetry.addEventListener('click',retryReceipts);
   const messagesQuery=query(collection(db,'directChats',threadId,'messages'),orderBy('createdAt','desc'),limit(100));
-  const unsubscribeMessages=onSnapshot(messagesQuery,snap=>{
-   const messages=snap.docs.map(d=>({id:d.id,...d.data()})).reverse();
+  const unsubscribeMessages=onSnapshot(messagesQuery,{includeMetadataChanges:true},snap=>{
+   const messages=snap.docs.map(d=>({id:d.id,...d.data(),hasPendingWrites:d.metadata.hasPendingWrites})).reverse();
    renderDirectChatMessages(messages);
    receipts.update(messages);
+   if(signedInUser?.uid===viewerId)directChatNoticeSync?.observeMessages(threadId,messages);
   },err=>{
    console.error('Не удалось загрузить личную переписку',err);
    const box=$('directChatMessages');if(box)box.innerHTML='<div class="danger-note">Не удалось загрузить переписку. Проверьте правила Firestore.</div>';

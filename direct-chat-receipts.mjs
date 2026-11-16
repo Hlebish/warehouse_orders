@@ -1,7 +1,7 @@
 // Each message has its own write: a rejected legacy receipt must not block
 // the rest of the conversation. Do not trust optimistic snapshots as a
 // successful write, and do not loop on their rollback after a rejection.
-export function createDirectChatReceipts({viewerId,isActive,markRead,onError=()=>{}}){
+export function createDirectChatReceipts({viewerId,isActive,markRead,onRead=()=>{},onError=()=>{}}){
  let messages=[],disposed=false;
  const pending=new Set(),confirmed=new Set(),failed=new Set();
  function flush(){
@@ -15,7 +15,7 @@ export function createDirectChatReceipts({viewerId,isActive,markRead,onError=()=
     if(disposed||!isActive())return false;
     return Promise.resolve(markRead(message)).then(()=>true);
    }).then(saved=>{
-    if(saved)confirmed.add(message.id);
+    if(saved){confirmed.add(message.id);onRead(message);}
    }).catch(error=>{
     failed.add(message.id);
     if(!disposed)onError(error);

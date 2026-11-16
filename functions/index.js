@@ -689,7 +689,7 @@ exports.sendWarehousePush = onDocumentCreated({ document: 'pushQueue/{eventId}',
   const directChatThreadId = String(data.directChatThreadId || '');
   const senderId = String(data.authorId || '');
   const link = directChatThreadId && senderId
-    ? `${siteUrl}?directChat=${encodeURIComponent(directChatThreadId)}&peer=${encodeURIComponent(senderId)}`
+    ? `${siteUrl}?directChat=${encodeURIComponent(directChatThreadId)}&peer=${encodeURIComponent(senderId)}${data.directMessageId ? '&directMessage=' + encodeURIComponent(String(data.directMessageId)) : ''}`
     : (target === 'chat'
       ? `${siteUrl}?chat=1`
       : (orderId ? `${siteUrl}?order=${encodeURIComponent(orderId)}${data.entryId ? '&entry=' + encodeURIComponent(String(data.entryId)) : ''}` : siteUrl));

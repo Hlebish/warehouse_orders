@@ -8929,6 +8929,15 @@ body.dark-theme .chat-dialog{--chat-bg:#141b22;--chat-panel:#1b232c;--chat-bubbl
 #modalBackdrop .modal.chat-dialog #modalBody .direct-chat-presence.is-online{color:var(--chat-accent)}
 #modalBackdrop .modal.chat-dialog #modalBody .direct-chat-person .staff-avatar i{border-color:var(--chat-panel)}
 .direct-chat-private{margin-left:auto;color:var(--chat-muted);font-size:10px}
+#modalBackdrop .modal.chat-dialog #modalBody .direct-chat-history-tools{display:flex;flex:none;flex-direction:column;gap:6px;padding:8px 14px;border-bottom:1px solid var(--chat-line);background:var(--chat-panel)}
+#modalBackdrop .modal.chat-dialog #modalBody .direct-chat-search{display:flex;align-items:center;gap:7px;min-width:0;padding:0 9px;border:1px solid var(--chat-line);border-radius:9px;background:var(--chat-bg);color:var(--chat-muted)}
+#modalBackdrop .modal.chat-dialog #modalBody .direct-chat-search input{flex:1;min-width:0;width:100%;min-height:34px;padding:6px 0;border:0;outline:0;background:transparent;color:var(--chat-text);font-size:12px}
+#modalBackdrop .modal.chat-dialog #modalBody .direct-chat-search:focus-within{border-color:var(--chat-accent)}
+#modalBackdrop .modal.chat-dialog #modalBody .direct-chat-search button{flex:none;min-width:30px;min-height:30px;padding:0;border:0;background:transparent;color:var(--chat-muted);font-size:21px}
+#modalBackdrop .modal.chat-dialog #modalBody .direct-chat-history-row{display:flex;align-items:center;gap:8px;min-height:18px;color:var(--chat-muted);font-size:10px;line-height:1.4}
+#modalBackdrop .modal.chat-dialog #modalBody .direct-chat-history-row button{flex:none;min-height:30px;padding:5px 8px;background:var(--chat-bg);border-color:var(--chat-line);color:var(--chat-text)}
+#modalBackdrop .modal.chat-dialog #modalBody .direct-chat-history-row span{flex:1;min-width:0;overflow-wrap:anywhere}
+#modalBackdrop .modal.chat-dialog #modalBody #directChatMessages .direct-message-focus{outline:2px solid #d2b56e!important;outline-offset:2px}
 body #modalBackdrop .modal.chat-dialog #modalBody #chatMessages,body #modalBackdrop .modal.chat-dialog #modalBody #directChatMessages{display:flex!important;flex:1!important;flex-direction:column;gap:8px!important;min-height:0!important;max-height:none!important;padding:14px!important;overflow-y:auto;overscroll-behavior:contain;background:var(--chat-bg)!important;border:0!important;border-radius:0!important;scrollbar-width:thin}
 body #modalBackdrop .modal.chat-dialog #modalBody #chatMessages .chat-message,body #modalBackdrop .modal.chat-dialog #modalBody #directChatMessages .chat-message{max-width:86%!important;min-width:0!important;align-self:flex-start;padding:9px 11px!important;border:1px solid var(--chat-line)!important;border-radius:12px 12px 12px 3px!important;background:var(--chat-bubble)!important;color:var(--chat-text)!important;box-shadow:none!important}
 body #modalBackdrop .modal.chat-dialog #modalBody #chatMessages .chat-message.mine,body #modalBackdrop .modal.chat-dialog #modalBody #directChatMessages .chat-message.mine{align-self:flex-end;background:var(--chat-mine)!important;border-radius:12px 12px 3px 12px!important}
@@ -9019,3 +9028,20 @@ body #modalBackdrop .modal.chat-dialog #modalBody :is(#chatForm,#directChatForm)
 .photo-share-options>:is(button,a)>b{font-size:14px}.photo-share-options>:is(button,a)>span{font-size:11px;color:#a4b5c3}.photo-share-options>button:disabled{opacity:.5}
 body:not(.dark-theme) .photo-share-dialog{background:#fff;color:#243444;border-color:#d5dfe8}body:not(.dark-theme) .photo-share-options>:is(button,a){background:#f4f7fa;color:#243444;border-color:#d5dfe8}body:not(.dark-theme) .photo-share-status,body:not(.dark-theme) .photo-share-options>:is(button,a)>span{color:#657a8a}
 @media(max-width:600px){.photo-share-overlay{place-items:end center;padding:12px}.photo-share-dialog{width:100%;padding:16px}.photo-share-button{min-height:34px}}
+
+/* Compact operational summary in the order card. */
+.order-summary{margin:0 0 16px;padding:13px 14px;border:1px solid #d5e2dc;border-radius:11px;background:#f5faf7;color:#263e34}
+.order-summary-heading{display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.order-summary-heading>b{font-size:13px}.order-summary-heading>small{font-size:10px;color:#637b6e}
+.order-summary-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:13px}
+.order-summary-cell{min-width:0;overflow-wrap:anywhere}.order-summary-cell>span{display:block;font-size:10px;color:#637b6e;margin-bottom:5px}
+.order-summary-cell>p{margin:0;font-size:11px;line-height:1.6}.order-summary-cell>small{display:block;margin-top:5px;font-size:10px;line-height:1.4;color:#637b6e}
+.order-summary-next>b{display:block;margin-bottom:3px;font-size:11px;color:#247854}
+.order-summary-warning{border-color:#e1bd8e;background:#fff9ef}.order-summary-warning .order-summary-next>b{color:#9c651d}
+.order-summary-done{border-color:#d6dfdf;background:#f5f8f8}.order-summary-loading{border-style:dashed}
+body.dark-theme .order-summary{border-color:#365345;background:#1b2a24;color:#d8e9df}
+body.dark-theme .order-summary :is(.order-summary-heading>small,.order-summary-cell>span,.order-summary-cell>small){color:#a0b6a9}
+body.dark-theme .order-summary-next>b{color:#8ed4ad}
+body.dark-theme .order-summary-warning{border-color:#705537;background:#2c261d}body.dark-theme .order-summary-warning .order-summary-next>b{color:#e7bf8d}
+body.dark-theme .order-summary-done{border-color:#39494b;background:#202a2c}
+@media(max-width:620px){.order-summary{padding:12px}.order-summary-grid{grid-template-columns:1fr;gap:11px}.order-summary-cell+.order-summary-cell{padding-top:9px;border-top:1px solid #637b6e24}.order-summary-cell>p{font-size:12px}}

@@ -23,6 +23,7 @@ export function chatDay(value){const date=value?.toDate?.()||new Date(value||0);
 export function bindChatComposer(form,direct=false){
  const id=ids(direct),input=form.querySelector('textarea'),picker=form.querySelector('input[type="file"]'),preview=form.querySelector('#'+id.preview),status=form.querySelector('#'+id.status);
  let files=[],urls=[],busy=false;
+ const changeListeners=new Set(),changed=()=>{for(const listener of changeListeners)listener();};
  const release=()=>{urls.forEach(url=>URL.revokeObjectURL(url));urls=[];};
  const resize=()=>{input.style.height='auto';input.style.height=Math.min(112,Math.max(40,input.scrollHeight))+'px';};
  const setStatus=(message,error=false)=>{status.hidden=!message;status.textContent=message;status.classList.toggle('is-error',error);};
@@ -32,14 +33,16 @@ export function bindChatComposer(form,direct=false){
    const item=document.createElement('span'),img=document.createElement('img'),remove=document.createElement('button');
    const url=URL.createObjectURL(file);urls.push(url);img.src=url;img.alt=file.name||'Фото '+(index+1);
    remove.type='button';remove.textContent='×';remove.setAttribute('aria-label','Убрать фото '+(index+1));remove.disabled=busy;
-   remove.addEventListener('click',()=>{files.splice(index,1);paint();setStatus('');});item.append(img,remove);preview.append(item);
+   remove.addEventListener('click',()=>{files.splice(index,1);paint();setStatus('');changed();});item.append(img,remove);preview.append(item);
   });
  };
- const add=next=>{const combined=[...files,...next],error=validChatPhotos(combined);if(error){setStatus(error,true);return;}files=combined;paint();setStatus('');};
+ const setFiles=next=>{const error=validChatPhotos(next);if(error){setStatus(error,true);return false;}files=[...next];paint();setStatus('');changed();return true;};
+ const add=next=>setFiles([...files,...next]);
  picker.addEventListener('change',()=>{if(!busy)add([...picker.files]);picker.value='';});
  form.querySelector('[data-composer-photo]').addEventListener('click',()=>picker.click());
  input.addEventListener('paste',event=>{const images=[...(event.clipboardData?.items||[])].filter(item=>item.kind==='file'&&item.type.startsWith('image/')).map(item=>item.getAsFile()).filter(Boolean);if(images.length){event.preventDefault();if(!busy)add(images);}});
- input.addEventListener('input',resize);resize();
- const observer=new MutationObserver(()=>{if(!form.isConnected){release();observer.disconnect();}});observer.observe(document.body,{childList:true,subtree:true});
- return {getFiles:()=>[...files],setStatus,setBusy(value){busy=value;form.querySelectorAll('button,input,textarea').forEach(node=>node.disabled=value);form.setAttribute('aria-busy',String(value));},clear(){files=[];input.value='';paint();resize();},isBusy:()=>busy};
+ input.addEventListener('input',()=>{resize();changed();});
+ form.querySelector('#'+id.urgent)?.addEventListener('change',changed);resize();
+ const observer=new MutationObserver(()=>{if(!form.isConnected){release();changeListeners.clear();observer.disconnect();}});observer.observe(document.body,{childList:true,subtree:true});
+ return {getFiles:()=>[...files],setFiles,resize,onChange(listener){changeListeners.add(listener);return ()=>changeListeners.delete(listener);},setStatus,setBusy(value){busy=value;form.querySelectorAll('button,input,textarea').forEach(node=>node.disabled=value);form.setAttribute('aria-busy',String(value));},clear(){files=[];input.value='';paint();resize();changed();},isBusy:()=>busy};
 }

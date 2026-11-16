@@ -27,12 +27,32 @@ async function change(key, value, remove = false) {
     transaction.onabort = () => reject(transaction.error || new Error('Не удалось сохранить черновик'));
   });
 }
+async function removeIfRevision(key, revision) {
+  const db = await open();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction('drafts', 'readwrite');
+    const store = transaction.objectStore('drafts');
+    const request = store.get(key);
+    let removed = false;
+    request.onsuccess = () => {
+      const stored = request.result;
+      if (!stored || stored.value?.revision === revision) {
+        if (stored) store.delete(key);
+        removed = true;
+      }
+    };
+    transaction.oncomplete = () => resolve(removed);
+    transaction.onerror = () => reject(transaction.error);
+    transaction.onabort = () => reject(transaction.error || new Error('Не удалось удалить отправленный черновик'));
+  });
+}
 export function draftKey(userId, orderId, kind, replyId = '') {
   return JSON.stringify([String(userId), String(orderId), kind, String(replyId)]);
 }
 export const drafts = {
   put: (key, value) => serial(() => change(key, value)),
   remove: key => serial(() => change(key, null, true)),
+  removeIfRevision: (key, revision) => serial(() => removeIfRevision(key, revision)),
   get: key => serial(async () => {
     const db = await open();
     const stored = await new Promise((resolve, reject) => {

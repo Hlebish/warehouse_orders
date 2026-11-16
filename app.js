@@ -12,6 +12,7 @@ import { composerHtml, bindChatComposer, chatTime, chatDay } from './chat-ui.mjs
 import { createDirectChatHistory } from './direct-chat-history.mjs?v=2026.11.16.04';
 import { bindDirectChatDraft } from './direct-chat-draft.mjs?v=2026.11.16.04';
 import { renderOrderSummary } from './order-summary.mjs?v=2026.11.16.04';
+import { buildStaffConversations } from './staff-conversations.mjs?v=2026.11.16.05';
 import { createDirectChatReceipts } from './direct-chat-receipts.mjs?v=2026.11.16.02';
 import { createDirectChatNoticeSync } from './direct-chat-notices.mjs?v=2026.11.16.02';
 import { createPhotoSharing, decoratePhotoSharing } from './photo-sharing.mjs?v=2026.11.12.10';
@@ -1099,7 +1100,9 @@ document.addEventListener('visibilitychange',()=>{if(document.visibilityState===
 
 let presenceUnsubscribe=null,presenceHeartbeat=null,presenceExpiryTimer=null,staffDirectoryRetryTimer=null,directThreadsUnsubscribe=null,directThreadsFallbackTimer=null,directThreadsFallbackLoading=false,currentActivity='В приложении',activityResetTimer=null,staffDirectoryLoadError=false,directThreadsLoadError=false,directThreadsErrorCode='';
 const staffPresence=new Map(),staffDirectory=new Map(),directThreads=new Map();
+let staffDrawerSearch='',staffDrawerUnreadOnly=false,staffDrawerItems=[];
 function stopPresence(){
+ staffDrawerSearch='';staffDrawerUnreadOnly=false;staffDrawerItems=[];
  directChatUnsubscribe?.();directChatUnsubscribe=null;directChatTarget=null;
  directThreadsUnsubscribe?.();directThreadsUnsubscribe=null;directThreads.clear();directThreadsLoadError=false;directThreadsErrorCode='';
  if(directThreadsFallbackTimer!==null){clearInterval(directThreadsFallbackTimer);directThreadsFallbackTimer=null}
@@ -1148,54 +1151,45 @@ function renderDirectChatPresence(){
 function renderStaffPanel(){
  renderDirectChatPresence();
  const list=$('staffPresenceList'),rail=$('staffPresenceRailAvatars');if(!list||!rail)return;
- const now=Date.now(),items=[...staffDirectory.values()].filter(x=>x.active===true).map(person=>{
-  const p=staffPresence.get(person.uid),lastSeen=Number(p?.updatedAt||0),online=!!p&&p.active===true&&lastSeen>0&&now-lastSeen<45000;
-  return {...person,online,lastSeen,activity:online?(p.activity||'В приложении'):'Не в сети'};
- }).sort((x,y)=>{
-  const rolePriority={director:0,chief_accountant:1,accountant:1,manager:2,warehouse:3};
-  const roleOrder=(rolePriority[x.role]??4)-(rolePriority[y.role]??4);
-  return roleOrder||String(x.displayName||'').localeCompare(String(y.displayName||''),'ru')||String(x.uid).localeCompare(String(y.uid));
- });
- const onlineCount=items.filter(x=>x.online).length;
- const unreadCountsBySender=new Map();
- (Array.isArray(state.notices)?state.notices:[]).filter(n=>!n.read&&n.directChatThreadId&&n.authorId&&String(n.authorId)!==String(signedInUser?.uid||'')).forEach(n=>{
-  const sender=String(n.authorId);unreadCountsBySender.set(sender,(unreadCountsBySender.get(sender)||0)+1);
- });
- const totalUnreadDirectMessages=[...unreadCountsBySender.values()].reduce((sum,count)=>sum+count,0);
+ const model=buildStaffConversations({viewerId:signedInUser?.uid,directory:staffDirectory,presence:staffPresence,threads:directThreads,notices:state.notices,search:staffDrawerSearch,unreadOnly:staffDrawerUnreadOnly});
+ staffDrawerItems=model.allItems;
+ const {items,unreadTotal:totalUnreadDirectMessages,onlineCount,totalPeople}=model;
  const hasUnreadDirectMessages=totalUnreadDirectMessages>0;
+ const attentionNotices=(Array.isArray(state.notices)?state.notices:[]).filter(n=>!n.read&&!n.directChatThreadId&&(isMentionNotice(n)||flagOn(n,'isReply')));
+ const inboxUnread=totalUnreadDirectMessages+attentionNotices.length;
  $('staffPresencePanel')?.classList.toggle('has-direct-unread',hasUnreadDirectMessages);
  const staffExpandButton=$('staffPresenceExpand');
  staffExpandButton?.classList.toggle('has-direct-unread',hasUnreadDirectMessages);
- staffExpandButton?.setAttribute('aria-label',hasUnreadDirectMessages?`Личные сообщения: ${totalUnreadDirectMessages} непрочитанных. Открыть сотрудников`:'Развернуть список сотрудников');
- staffExpandButton?.setAttribute('title',hasUnreadDirectMessages?`Непрочитанные личные сообщения: ${totalUnreadDirectMessages}`:'Сотрудники');
+ const expandLabel=inboxUnread?`Сообщения: ${inboxUnread} новых. Открыть панель`:'Открыть сообщения и сотрудников';
+ staffExpandButton?.setAttribute('aria-label',expandLabel);staffExpandButton?.setAttribute('title',expandLabel);
+ $('staffPresencePanel')?.setAttribute('aria-label',expandLabel);
  $('staffPresenceToggle')?.classList.toggle('has-direct-unread',hasUnreadDirectMessages);
- const attentionNotices=(Array.isArray(state.notices)?state.notices:[]).filter(n=>!n.read&&!n.directChatThreadId&&(isMentionNotice(n)||flagOn(n,'isReply')));
- const inbox=$('staffInboxList'),inboxCount=$('staffInboxCount');
- const recentThreads=[...directThreads.values()].filter(thread=>Array.isArray(thread.participants)&&thread.participants.includes(signedInUser?.uid)).sort((a,b)=>(asDate(b.lastMessageAt||b.updatedAt)?.getTime()||0)-(asDate(a.lastMessageAt||a.updatedAt)?.getTime()||0)).slice(0,12);
- const inboxEntries=[...recentThreads.map(thread=>({kind:'thread',thread,at:asDate(thread.lastMessageAt||thread.updatedAt)?.getTime()||0})),...attentionNotices.map(notice=>({kind:'notice',notice,at:asDate(notice.createdAt||notice.at)?.getTime()||0}))].sort((a,b)=>b.at-a.at).slice(0,20);
- const inboxUnread=totalUnreadDirectMessages+attentionNotices.length;
- if(inboxCount)inboxCount.textContent=String(inboxUnread);
- if(inbox){
-  inbox.innerHTML=inboxEntries.length?inboxEntries.map(entry=>{
-   if(entry.kind==='notice'){
-    const notice=entry.notice,authorId=String(notice.authorId||''),person=staffDirectory.get(authorId),name=person?.displayName||notice.title||'Сотрудник';
-    const isMention=isMentionNotice(notice),order=notice.orderNumber||notice.orderId;
-    const label=isMention?(order?'Упоминание в заказе № '+order:'Упоминание в общем чате'):'Ответ в '+(notice.target==='chat'?'общем чате':'заказе');
-    const preview=String(notice.message||notice.body||'Новое сообщение').replace(/\s+/g,' ').slice(0,90);
-    const avatar=person?.avatarUrl?'<img src="'+esc(person.avatarUrl)+'" alt="">':'<span>'+esc(String(name).trim().split(/\s+/).slice(0,2).map(x=>x[0]||'').join('').toLocaleUpperCase('ru')||'?')+'</span>';
-    return '<button type="button" class="staff-inbox-item staff-inbox-notice" data-staff-notice-id="'+esc(notice.id)+'"><span class="staff-avatar">'+avatar+'</span><span class="staff-inbox-copy"><span class="staff-inbox-title"><b>'+esc(name)+'</b><time>'+esc(fmtDateTime(notice.createdAt||notice.at))+'</time></span><small><i>'+esc(label)+'</i> · '+esc(preview)+'</small></span><b class="staff-inbox-unread">•</b></button>';
-   }
-   const thread=entry.thread;
-   const peerId=thread.participants.find(uid=>uid!==signedInUser?.uid),peer=staffDirectory.get(peerId),peerName=peer?.displayName||'Сотрудник';
-   const unreadCount=unreadCountsBySender.get(String(peerId))||0,when=thread.lastMessageAt||thread.updatedAt;
-   const preview=String(thread.lastMessage||'Переписка начата').replace(/\s+/g,' ').slice(0,90);
-   const avatar=peer?.avatarUrl?'<img src="'+esc(peer.avatarUrl)+'" alt="">':'<span>'+esc(String(peerName).trim().split(/\s+/).slice(0,2).map(x=>x[0]||'').join('').toLocaleUpperCase('ru')||'?')+'</span>';
-   const sender=thread.lastSenderId===signedInUser?.uid?'Вы: ':'';
-   return '<button type="button" class="staff-inbox-item" data-staff-inbox-id="'+esc(peerId||'')+'"><span class="staff-avatar">'+avatar+'<i class="'+(staffPresence.get(peerId)?.active&&Date.now()-Number(staffPresence.get(peerId)?.updatedAt||0)<45000?'is-online':'')+'"></i></span><span class="staff-inbox-copy"><span class="staff-inbox-title"><b>'+esc(peerName)+'</b><time>'+esc(when?fmtDateTime(when):'')+'</time></span><small><i>Личный чат</i> · '+esc(sender+preview)+'</small></span>'+(unreadCount?'<b class="staff-inbox-unread">'+(unreadCount>99?'99+':unreadCount)+'</b>':'')+'</button>';
-  }).join(''):(directThreadsLoadError?'<div class="staff-empty">Не удалось загрузить переписки ('+esc(directThreadsErrorCode||'ошибка')+'). Проверьте доступ Firestore.</div>':'<div class="staff-empty">Входящих пока нет. Начните личный чат ниже.</div>');
-  inbox.querySelectorAll('[data-staff-inbox-id]').forEach(button=>button.addEventListener('click',()=>{const person=staffDirectory.get(button.dataset.staffInboxId);if(person)void openDirectChat(person)}));
-  inbox.querySelectorAll('[data-staff-notice-id]').forEach(button=>button.addEventListener('click',()=>{const notice=attentionNotices.find(item=>item.id===button.dataset.staffNoticeId);if(notice){void markNotificationItemsRead([notice]);void openMentionNotice(notice)}}));
- }
+ $('staffPresenceToggle')?.setAttribute('aria-label',expandLabel);
+ const railCount=$('staffPresenceRailCount');if(railCount){railCount.textContent=inboxUnread>99?'99+':String(inboxUnread);railCount.hidden=!inboxUnread;}
+ const topCount=$('staffPresenceBadge');if(topCount){topCount.textContent=String(inboxUnread);topCount.hidden=!inboxUnread;}
+ const noticeCount=$('staffDrawerNoticeCount');if(noticeCount){noticeCount.textContent=String(attentionNotices.length);noticeCount.hidden=!attentionNotices.length;}
+ if($('staffPresenceSummary'))$('staffPresenceSummary').textContent=(totalUnreadDirectMessages?totalUnreadDirectMessages+' непрочитанных · ':'')+onlineCount+' в сети · '+totalPeople+' сотрудников';
+ const search=$('staffDirectorySearch');if(search&&search.value!==staffDrawerSearch)search.value=staffDrawerSearch;
+ $('staffFilterAll')?.setAttribute('aria-pressed',String(!staffDrawerUnreadOnly));
+ $('staffFilterUnread')?.setAttribute('aria-pressed',String(staffDrawerUnreadOnly));
+ const avatar=person=>person.avatarUrl?'<img src="'+esc(person.avatarUrl)+'" alt="">':'<span>'+esc(String(person.displayName||'?').trim().split(/\s+/).slice(0,2).map(part=>part[0]||'').join('').toLocaleUpperCase('ru')||'?')+'</span>';
+ const active=document.activeElement,focusedRow=active?.closest?.('[data-staff-conversation-id]'),focusedRail=active?.closest?.('[data-staff-rail-id]');
+ const focusedPeer=focusedRow?.dataset.staffConversationId,focusedWrite=active?.hasAttribute?.('data-staff-message-id');
+ const scroller=list.closest('.staff-panel-scroll'),scrollTop=scroller?.scrollTop||0,railScroll=rail.scrollTop;
+ rail.innerHTML=model.allItems.length?model.allItems.map(person=>'<button type="button" class="staff-rail-avatar'+(person.unreadCount?' has-direct-unread':'')+'" data-staff-rail-id="'+esc(person.uid)+'" title="'+esc(person.displayName||'Сотрудник')+(person.unreadCount?' · новых: '+person.unreadCount:'')+'" aria-label="Открыть сообщения · '+esc(person.displayName||'Сотрудник')+'"><span class="staff-avatar">'+avatar(person)+'<i class="'+(person.online?'is-online':'')+'"></i></span>'+(person.unreadCount?'<b class="staff-rail-unread staff-rail-unread-count">'+(person.unreadCount>99?'99+':person.unreadCount)+'</b>':'')+'</button>').join(''):'<span class="staff-rail-loading">—</span>';
+ const timeLabel=when=>{
+  if(!when)return '';
+  const date=new Date(when),today=new Date();
+  return date.toDateString()===today.toDateString()?date.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'}):date.toLocaleDateString('ru-RU',{day:'2-digit',month:'2-digit'});
+ };
+ list.innerHTML=items.length?items.map(person=>{
+  const status=person.online?'В сети':presenceLastSeenLabel(person.lastSeen);
+  const role=person.roleLabel||roles[person.role]||'';
+  return '<div class="staff-conversation-row'+(person.unreadCount?' has-unread':'')+'" data-staff-conversation-id="'+esc(person.uid)+'"><button type="button" class="staff-conversation-open" data-staff-open-id="'+esc(person.uid)+'" aria-label="Открыть переписку с '+esc(person.displayName||'сотрудником')+(person.unreadCount?', непрочитанных: '+person.unreadCount:'')+'"><span class="staff-avatar">'+avatar(person)+'<i class="'+(person.online?'is-online':'')+'"></i></span><span class="staff-conversation-copy"><span class="staff-conversation-title"><b>'+esc(person.displayName||'Сотрудник')+'</b>'+(person.lastActivity?'<time title="'+esc(fmtDateTime(person.lastActivity))+'">'+esc(timeLabel(person.lastActivity))+'</time>':'')+'</span><span class="staff-conversation-meta"><span class="staff-conversation-presence'+(person.online?' is-online':'')+'" title="'+esc(person.online?person.activity:'Не в сети')+'">'+esc(status)+'</span>'+(role?'<span class="staff-conversation-role">'+esc(role)+'</span>':'')+'</span>'+(person.urgentCount?'<span class="staff-conversation-urgent">Срочное обращение</span>':'')+'<span class="staff-conversation-preview">'+esc(person.preview)+'</span></span></button><span class="staff-conversation-actions">'+(person.unreadCount?'<span class="staff-conversation-unread" aria-label="Непрочитанных сообщений: '+person.unreadCount+'">'+(person.unreadCount>99?'99+':person.unreadCount)+'</span>':'')+'<button type="button" class="staff-presence-message" data-staff-message-id="'+esc(person.uid)+'" aria-label="Написать '+esc(person.displayName||'сотруднику')+'" title="Написать личное сообщение"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.75 5.75h14.5a1.75 1.75 0 0 1 1.75 1.75v9a1.75 1.75 0 0 1-1.75 1.75H9l-4.25 2v-3.75A1.75 1.75 0 0 1 3 14.75v-7a2 2 0 0 1 1.75-2Z"/><path d="m7.5 9 4.5 3.5L16.5 9"/></svg><span>Написать</span></button></span></div>';
+ }).join(''):'<div class="staff-empty">'+(staffDrawerSearch?'Сотрудники или сообщения не найдены.':staffDrawerUnreadOnly?'Непрочитанных личных сообщений нет.':staffDirectoryLoadError?'Не удалось загрузить сотрудников. Повторяем попытку…':'Здесь появятся сотрудники и личные переписки.')+'</div>';
+ if(scroller)scroller.scrollTop=scrollTop;rail.scrollTop=railScroll;
+ if(focusedPeer){const selector=focusedWrite?'[data-staff-message-id]':'[data-staff-open-id]';const target=[...list.querySelectorAll(selector)].find(node=>(node.dataset.staffMessageId||node.dataset.staffOpenId)===focusedPeer);target?.focus({preventScroll:true});}
+ else if(focusedRail){[...rail.querySelectorAll('[data-staff-rail-id]')].find(node=>node.dataset.staffRailId===focusedRail.dataset.staffRailId)?.focus({preventScroll:true});}
  const urgentNotices=(Array.isArray(state.notices)?state.notices:[])
   .filter(n=>!n.read&&flagOn(n,'isUrgent')&&n.directChatThreadId&&n.authorId&&String(n.authorId)!==String(signedInUser?.uid||''))
   .sort((a,b)=>(asDate(b.createdAt||b.at)?.getTime()||0)-(asDate(a.createdAt||a.at)?.getTime()||0));
@@ -1226,35 +1220,6 @@ function renderStaffPanel(){
    if(notice)void openMentionNotice(notice);
   }));
  }
- $('staffPresenceCount').textContent=String(onlineCount);
- $('staffPresenceRailCount').textContent=totalUnreadDirectMessages>99?'99+':String(totalUnreadDirectMessages);
- if($('staffPresenceBadge'))$('staffPresenceBadge').textContent=String(inboxUnread);
- $('staffPresenceSummary').textContent=onlineCount+' в сети · '+items.length+' сотрудников';
- rail.innerHTML=items.length?items.map(person=>{
-  const initials=String(person.displayName||'?').trim().split(/\\s+/).slice(0,2).map(x=>x[0]||'').join('').toLocaleUpperCase('ru');
-  const avatar=person.avatarUrl?'<img src="'+esc(person.avatarUrl)+'" alt="">':'<span>'+esc(initials||'?')+'</span>';
-  const unreadCount=unreadCountsBySender.get(String(person.uid))||0;
-  return '<button type="button" class="staff-rail-avatar'+(unreadCount?' has-direct-unread':'')+'" data-staff-rail-id="'+esc(person.uid)+'" title="'+esc(person.displayName||'Сотрудник')+(unreadCount?' · непрочитанных: '+unreadCount:'')+'" aria-label="'+esc(person.displayName||'Сотрудник')+(person.online?', онлайн':'')+(unreadCount?', непрочитанных сообщений: '+unreadCount:'')+'"><span class="staff-avatar">'+avatar+'<i class="'+(person.online?'is-online':'')+'"></i></span>'+(unreadCount?'<b class="staff-rail-unread staff-rail-unread-count">'+(unreadCount>99?'99+':unreadCount)+'</b>':'')+'</button>';
- }).join(''):'<span class="staff-rail-loading">—</span>';
- list.innerHTML=items.length?items.map(person=>{
-  const initials=String(person.displayName||'?').trim().split(/\\s+/).slice(0,2).map(x=>x[0]||'').join('').toLocaleUpperCase('ru');
-  const avatar=person.avatarUrl?'<img src="'+esc(person.avatarUrl)+'" alt="">':'<span>'+esc(initials||'?')+'</span>';
-  const sub=person.online?person.activity:person.roleLabel;
-  const lastSeen=!person.online?'<small class="staff-last-seen">'+esc(presenceLastSeenLabel(person.lastSeen))+'</small>':'';
-  const unreadCount=unreadCountsBySender.get(String(person.uid))||0;
-  const profileButton='<div class="staff-presence-item'+(unreadCount?' has-direct-unread':'')+'"><span class="staff-avatar">'+avatar+'<i class="'+(person.online?'is-online':'')+'"></i>'+(unreadCount?'<b class="staff-unread-dot staff-unread-count" aria-label="'+unreadCount+' непрочитанных сообщений">'+(unreadCount>99?'99+':unreadCount)+'</b>':'')+'</span><span class="staff-presence-copy"><b>'+esc(person.displayName||'Сотрудник')+'</b><small>'+esc(sub||'Сотрудник')+'</small>'+lastSeen+'</span><span class="staff-presence-state '+(person.online?'online':'')+'">'+(person.online?'●':'○')+'</span></div>';
-  const messageButton=person.uid!==signedInUser?.uid?'<button type="button" class="staff-presence-message" data-staff-message-id="'+esc(person.uid)+'" aria-label="Написать '+esc(person.displayName||'сотруднику')+'" title="Написать личное сообщение"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.75 5.75h14.5a1.75 1.75 0 0 1 1.75 1.75v9a1.75 1.75 0 0 1-1.75 1.75H9l-4.25 2v-3.75A1.75 1.75 0 0 1 3 14.75v-7a2 2 0 0 1 1.75-2Z"/><path d="m7.5 9 4.5 3.5L16.5 9"/></svg><span>Написать</span></button>':'';
-  return '<div class="staff-presence-row">'+profileButton+messageButton+'</div>';
- }).join(''):'<div class="staff-empty">'+(staffDirectoryLoadError?'Не удалось загрузить сотрудников. Повторяем попытку…':'Список сотрудников пока пуст')+'</div>';
- rail.querySelectorAll('[data-staff-rail-id]').forEach(button=>button.addEventListener('click',()=>{
-  const person=items.find(x=>x.uid===button.dataset.staffRailId);
-  if(person&&person.uid!==signedInUser?.uid)void openDirectChat(person);
-  else openStaffPanel(true);
- }));
- list.querySelectorAll('[data-staff-message-id]').forEach(button=>button.addEventListener('click',event=>{
-  event.preventDefault();event.stopPropagation();
-  const person=items.find(x=>x.uid===button.dataset.staffMessageId);if(person)void openDirectChat(person);
- }));
 }
 async function loadStaffDirectory(){
  if(!signedInUser)return;
@@ -1306,60 +1271,87 @@ function startPresence(user){
  presenceExpiryTimer=setInterval(renderStaffPanel,10000);
 }
 function isStaffPanelDesktopLayout(){return window.matchMedia('(min-width: 721px)').matches}
-let staffBackdropHideTimer=null;
-function openStaffPanel(open=true){
+let staffBackdropHideTimer=null,staffDrawerReturnFocus=null,staffDrawerOpenRequest=0;
+function openStaffPanel(open=true,{restoreFocus=false,focusSearch=true}={}){
  const panel=$('staffPresencePanel'),backdrop=$('staffPresenceBackdrop'),button=$('staffPresenceToggle');
  if(!panel)return;
+ const wasOpen=panel.classList.contains('open');
  if(staffBackdropHideTimer!==null){clearTimeout(staffBackdropHideTimer);staffBackdropHideTimer=null;}
+ if(open&&!wasOpen)staffDrawerReturnFocus=document.activeElement;
  panel.classList.toggle('open',open);
+ panel.tabIndex=open?-1:0;
+ panel.setAttribute('role',open?'dialog':'complementary');
+ panel.setAttribute('aria-label',open?'Сообщения и сотрудники':'Открыть сообщения и сотрудников');
+ if(open)panel.setAttribute('aria-modal','true');else panel.removeAttribute('aria-modal');
  document.documentElement.classList.toggle('warehouse-staff-drawer-open',open);
- // Fade the scrim in/out without allowing taps to reach the workspace underneath.
+ const content=$('staffPresenceContent'),rail=$('staffPresenceRail');
+ if(content)content.inert=!open;if(rail)rail.inert=open;
  if(backdrop){
-  if(open){
-   backdrop.hidden=false;
-   requestAnimationFrame(()=>backdrop.classList.add('is-visible'));
-  }else{
+  if(open){backdrop.hidden=false;requestAnimationFrame(()=>{if(panel.classList.contains('open'))backdrop.classList.add('is-visible');});}
+  else{
    backdrop.classList.remove('is-visible');
-   staffBackdropHideTimer=setTimeout(()=>{
-    if(!panel.classList.contains('open'))backdrop.hidden=true;
-    staffBackdropHideTimer=null;
-   },240);
+   if(wasOpen)staffBackdropHideTimer=setTimeout(()=>{if(!panel.classList.contains('open'))backdrop.hidden=true;staffBackdropHideTimer=null;},180);
+   else backdrop.hidden=true;
   }
  }
  button?.setAttribute('aria-expanded',String(open));
  $('staffPresenceExpand')?.setAttribute('aria-expanded',String(open));
+ if(open&&focusSearch&&!wasOpen)requestAnimationFrame(()=>{if(panel.classList.contains('open'))$('staffDirectorySearch')?.focus({preventScroll:true});});
+ if(!open&&wasOpen){
+  const previous=staffDrawerReturnFocus;staffDrawerReturnFocus=null;
+  if(restoreFocus)requestAnimationFrame(()=>{
+   if(panel.classList.contains('open'))return;
+   const target=previous?.isConnected&&!previous.closest?.('.staff-presence-content')?previous:$('staffPresenceExpand');
+   target?.focus?.({preventScroll:true});
+  });
+ }
 }
-$('staffPresenceToggle')?.addEventListener('click',()=>openStaffPanel(!$('staffPresencePanel').classList.contains('open')));
-$('staffPresenceExpand')?.addEventListener('click',()=>openStaffPanel(true));
-$('staffPresencePanel')?.addEventListener('click',event=>{if(!$('staffPresencePanel').classList.contains('open')&&event.target===$('staffPresencePanel'))openStaffPanel(true);});
-$('staffPresenceClose')?.addEventListener('click',()=>openStaffPanel(false));
-$('staffPresenceBackdrop')?.addEventListener('click',()=>{
- const orderCreateOpen=!modal.hidden&&$('modalEyebrow')?.textContent?.trim()==='НОВЫЙ ЗАКАЗ';
- if(orderCreateOpen)return;
+async function openStaffConversation(uid,compose=false){
+ const row=staffDrawerItems.find(person=>person.uid===uid),viewerId=signedInUser?.uid;
+ if(!row||!viewerId)return;
+ const request=++staffDrawerOpenRequest,uiRequest=directChatOpenRequest;
  openStaffPanel(false);
+ const peer=staffDirectory.get(uid)||await resolveDirectChatPeer(uid)||row;
+ if(request!==staffDrawerOpenRequest||signedInUser?.uid!==viewerId||uiRequest!==directChatOpenRequest)return;
+ await openDirectChat(peer,row.threadId,compose?'':row.focusMessageId);
+ if(compose&&directChatTarget?.uid===uid)$('directChatInput')?.focus({preventScroll:true});
+}
+$('staffPresenceToggle')?.addEventListener('click',()=>openStaffPanel(!$('staffPresencePanel').classList.contains('open'),{restoreFocus:true}));
+$('staffPresenceExpand')?.addEventListener('click',()=>openStaffPanel(true));
+// Capture before child handlers: every pixel of the collapsed rail only expands it.
+$('staffPresencePanel')?.addEventListener('click',event=>{
+ if(!$('staffPresencePanel').classList.contains('open')){event.preventDefault();event.stopImmediatePropagation();openStaffPanel(true);}
+},true);
+$('staffPresenceClose')?.addEventListener('click',()=>openStaffPanel(false,{restoreFocus:true}));
+$('staffPresenceBackdrop')?.addEventListener('click',()=>openStaffPanel(false));
+$('staffPresenceList')?.addEventListener('click',event=>{
+ const button=event.target.closest('[data-staff-open-id],[data-staff-message-id]');if(!button)return;
+ event.preventDefault();void openStaffConversation(button.dataset.staffOpenId||button.dataset.staffMessageId,button.hasAttribute('data-staff-message-id'));
 });
-// Use the actual pointer target as the source of truth; this also works if the scrim
-// is visually suppressed by an older desktop CSS rule.
+const resetStaffScroll=()=>{const scroller=$('staffPresenceList')?.closest('.staff-panel-scroll');if(scroller)scroller.scrollTop=0;};
+$('staffDirectorySearch')?.addEventListener('input',event=>{staffDrawerSearch=event.target.value;renderStaffPanel();resetStaffScroll();});
+$('staffFilterAll')?.addEventListener('click',()=>{staffDrawerUnreadOnly=false;renderStaffPanel();resetStaffScroll();});
+$('staffFilterUnread')?.addEventListener('click',()=>{staffDrawerUnreadOnly=true;renderStaffPanel();resetStaffScroll();});
+$('staffDrawerNotifications')?.addEventListener('click',()=>{openStaffPanel(false);showNotifications();});
 document.addEventListener('click',event=>{
  const panel=$('staffPresencePanel'),toggle=$('staffPresenceToggle');
- if(!panel?.classList.contains('open'))return;
- const target=event.target;
- if(!(target instanceof Node))return;
- if(panel.contains(target)||toggle?.contains(target))return;
- const orderCreateOpen=!modal.hidden&&$('modalEyebrow')?.textContent?.trim()==='НОВЫЙ ЗАКАЗ';
- if(orderCreateOpen)return;
- openStaffPanel(false);
-},true);
-document.addEventListener('pointerdown',event=>{
- if(!isStaffPanelDesktopLayout())return;
- const panel=$('staffPresencePanel'),toggle=$('staffPresenceToggle');
  if(!panel?.classList.contains('open')||!(event.target instanceof Node))return;
- if(panel.contains(event.target)||toggle?.contains(event.target))return;
- const orderCreateOpen=!modal.hidden&&$('modalEyebrow')?.textContent?.trim()==='НОВЫЙ ЗАКАЗ';
- if(!orderCreateOpen)openStaffPanel(false);
+ if(!panel.contains(event.target)&&!toggle?.contains(event.target))openStaffPanel(false);
 },true);
-document.addEventListener('keydown',e=>{if(e.key==='Escape')openStaffPanel(false)});
-// Keep the staff dock collapsed by default on desktop and mobile; it never changes workspace width.
+document.addEventListener('keydown',event=>{
+ const panel=$('staffPresencePanel');if(!panel)return;
+ if(!panel.classList.contains('open')){
+  if(event.target===panel&&(event.key==='Enter'||event.key===' ')){event.preventDefault();event.stopImmediatePropagation();openStaffPanel(true);}
+  return;
+ }
+ if(event.key==='Escape'){event.preventDefault();event.stopImmediatePropagation();openStaffPanel(false,{restoreFocus:true});return;}
+ if(event.key==='Tab'){
+  const nodes=[...$('staffPresenceContent').querySelectorAll('button,input,[tabindex="0"]')].filter(node=>!node.disabled&&!node.hidden&&node.getClientRects().length);
+  const first=nodes[0],last=nodes.at(-1);if(!first)return;
+  if(event.shiftKey&&(document.activeElement===first||!panel.contains(document.activeElement))){event.preventDefault();last.focus();}
+  else if(!event.shiftKey&&(document.activeElement===last||!panel.contains(document.activeElement))){event.preventDefault();first.focus();}
+ }
+});
 openStaffPanel(false);
 document.addEventListener('focusin',e=>{
  const el=e.target;if(!(el instanceof HTMLElement)||!el.matches('input,textarea,[contenteditable="true"]'))return;
@@ -1718,6 +1710,7 @@ async function commitOrderEdit(order,expected,patch,entry){
 let modalHistoryEntry=false;
 let orderReturnModalSnapshot=null;
 function showModal(title,body,buttons=[],eyebrow='КАРТОЧКА ЗАКАЗА'){
+  openStaffPanel(false);
   directChatOpenRequest++;
   directChatUnsubscribe?.();directChatUnsubscribe=null;
   if(photoSharing.isOpen())photoSharing.close();

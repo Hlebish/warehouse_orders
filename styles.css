@@ -1615,6 +1615,7 @@ body.dark-theme .order-action-menu-list .manager-status-viewed{color:#fff!import
 body.dark-theme .order-action-menu-list .manager-status-payment{color:#fff!important}
 
 /* Warehouse action buttons use the same centered typography and table status colors */
+.order-action-menu-list .warehouse-status-assembled,
 .order-action-menu-list .warehouse-status-question,
 .order-action-menu-list .warehouse-status-pickup-waiting,
 .order-action-menu-list .warehouse-status-pickup-done,
@@ -8018,6 +8019,21 @@ body.dark-theme .order-action-menu-list .warehouse-status-kamenskoye{
   color:#c3c8ce!important;
   border-color:#3d444d!important;
 }
+
+/* Assembly is a status choice, with the same sizing and alignment as its peers. */
+body:not(.dark-theme) #modalBody .order-action-menu-list button.warehouse-status-assembled{
+  background:#eef6f1!important;color:#245c42!important;border-color:#c9dfd1!important;box-shadow:none!important;
+}
+body.dark-theme #modalBody .order-action-menu-list button.warehouse-status-assembled{
+  background:#24342c!important;color:#d2eadc!important;border-color:#405b4b!important;box-shadow:none!important;
+}
+body:not(.dark-theme) #modalBody .order-action-menu-list button.warehouse-status-assembled:hover{
+  background:#e1eee6!important;border-color:#95b8a2!important;
+}
+body.dark-theme #modalBody .order-action-menu-list button.warehouse-status-assembled:hover{
+  background:#2c4035!important;border-color:#648570!important;
+}
+.order-action-menu-list button.small-button.warehouse-status-assembled:focus-visible{outline:2px solid #5c9b77;outline-offset:3px}
 
 /* Calm, consistent touch feedback in Android WebView, mobile browsers and desktop. */
 html,

@@ -8491,22 +8491,34 @@ body #modalBackdrop .modal.chat-dialog #modalBody :is(#chatForm,#directChatForm)
 body:not(.dark-theme) .photo-share-dialog{background:#fff;color:#243444;border-color:#d5dfe8}body:not(.dark-theme) .photo-share-options>:is(button,a){background:#f4f7fa;color:#243444;border-color:#d5dfe8}body:not(.dark-theme) .photo-share-status,body:not(.dark-theme) .photo-share-options>:is(button,a)>span{color:#657a8a}
 @media(max-width:600px){.photo-share-overlay{place-items:end center;padding:12px}.photo-share-dialog{width:100%;padding:16px}.photo-share-button{min-height:34px}}
 
-/* Compact operational summary in the order card. */
-.order-summary{margin:0 0 16px;padding:13px 14px;border:1px solid #d5e2dc;border-radius:11px;background:#f5faf7;color:#263e34}
-.order-summary-heading{display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:6px;margin-bottom:10px}
-.order-summary-heading>b{font-size:13px}.order-summary-heading>small{font-size:10px;color:#637b6e}
-.order-summary-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:13px}
-.order-summary-cell{min-width:0;overflow-wrap:anywhere}.order-summary-cell>span{display:block;font-size:10px;color:#637b6e;margin-bottom:5px}
-.order-summary-cell>p{margin:0;font-size:11px;line-height:1.6}.order-summary-cell>small{display:block;margin-top:5px;font-size:10px;line-height:1.4;color:#637b6e}
-.order-summary-next>b{display:block;margin-bottom:3px;font-size:11px;color:#247854}
-.order-summary-warning{border-color:#e1bd8e;background:#fff9ef}.order-summary-warning .order-summary-next>b{color:#9c651d}
-.order-summary-done{border-color:#d6dfdf;background:#f5f8f8}.order-summary-loading{border-style:dashed}
-body.dark-theme .order-summary{border-color:#365345;background:#1b2a24;color:#d8e9df}
-body.dark-theme .order-summary :is(.order-summary-heading>small,.order-summary-cell>span,.order-summary-cell>small){color:#a0b6a9}
-body.dark-theme .order-summary-next>b{color:#8ed4ad}
-body.dark-theme .order-summary-warning{border-color:#705537;background:#2c261d}body.dark-theme .order-summary-warning .order-summary-next>b{color:#e7bf8d}
-body.dark-theme .order-summary-done{border-color:#39494b;background:#202a2c}
-@media(max-width:620px){.order-summary{padding:12px}.order-summary-grid{grid-template-columns:1fr;gap:11px}.order-summary-cell+.order-summary-cell{padding-top:9px;border-top:1px solid #637b6e24}.order-summary-cell>p{font-size:12px}}
+/* Factual order chronology. */
+.order-detail-head .detail-client-link{display:block;max-width:100%;padding:0;border:0;background:transparent;text-align:left;overflow-wrap:anywhere}
+.modal .order-detail-head .detail-meta .order-created-by{font-size:12px!important;line-height:1.6;color:#536273!important;overflow-wrap:anywhere}
+body.dark-theme .modal .order-detail-head .detail-meta .order-created-by{color:#bac7d1!important}
+body:not(.dark-theme) .order-history .timeline-top b{color:#435267!important}
+.order-article-view{min-width:0;flex-wrap:wrap}
+.order-article-view>.article-main{flex:1 1 160px;overflow-wrap:anywhere}
+.order-article-view>span:last-child{min-width:0;max-width:100%;flex-wrap:wrap}
+.order-latest-event{display:grid;gap:5px;margin:0 0 18px;padding:0 0 14px;border-bottom:1px solid var(--line);overflow-wrap:anywhere}
+.order-latest-event>span{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.65px}
+.order-latest-event>b{font-size:13px;line-height:1.45;color:inherit}
+.order-latest-event>small,.order-history-loading{font-size:11px;line-height:1.5;color:var(--muted)}
+.order-latest-event>p{margin:0;font-size:12px;line-height:1.55;white-space:pre-wrap}
+.order-history{margin-top:24px;min-width:0}
+.order-history-heading{display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:15px}
+.order-history-heading .detail-section-title{margin:0;font-size:14px}
+.order-history-heading>span{font-size:10px;color:var(--muted)}
+.order-history>.timeline{position:relative;display:grid;gap:12px;padding-left:18px;margin:0}
+.order-history>.timeline:before{content:'';position:absolute;left:4px;top:16px;bottom:18px;width:1px;background:var(--line)}
+.order-history>.timeline>.timeline-item{position:relative;min-width:0;margin:0;padding:13px 14px;border-radius:10px;overflow-wrap:anywhere}
+.order-history>.timeline>.timeline-item:before{content:'';position:absolute;left:-19px;top:18px;width:9px;height:9px;border:2px solid var(--muted);border-radius:50%;background:#fff}
+.order-history-event-title{font-size:13px;font-weight:700;line-height:1.5;margin-bottom:6px}
+.order-history .timeline-top{gap:7px;font-size:10px;line-height:1.6}
+.order-history .timeline-top>span{min-width:0;overflow-wrap:anywhere}
+.order-history .timeline-text{font-size:12px;line-height:1.6;white-space:pre-wrap;margin-top:8px}
+.order-history .timeline-item>.small-button{margin-top:10px}
+body.dark-theme .order-history>.timeline>.timeline-item:before{background:#192129}
+@media(max-width:620px){.order-history>.timeline{padding-left:15px}.order-history>.timeline:before{left:3px}.order-history>.timeline>.timeline-item{padding:12px}.order-history>.timeline>.timeline-item:before{left:-16px;width:7px;height:7px}.order-created-by{line-height:1.7}}
 
 /* One overlay drawer for employees and their personal conversations. */
 /* Reserve the collapsed desktop rail once; opening the drawer never changes it. */

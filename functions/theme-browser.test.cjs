@@ -43,8 +43,9 @@ async function run(){
   });
   for(const width of [1440,390,320])for(const dark of [false,true]){
    await page.setViewportSize({width,height:1000});await page.evaluate(dark=>document.body.classList.toggle('dark-theme',dark),dark);await page.waitForTimeout(320);
-   const metrics=await page.locator('.stat-card').evaluateAll(nodes=>nodes.map(node=>{const icon=node.querySelector('svg'),box=node.getBoundingClientRect();return {width:box.width,left:box.left,right:box.right,overflow:node.scrollWidth>node.clientWidth+1,fill:getComputedStyle(icon.querySelector('path')).fill,stroke:getComputedStyle(icon).stroke,font:parseFloat(getComputedStyle(node.querySelector('strong')).fontSize)};}));
-   assert.equal(metrics.length,9);for(const m of metrics){assert.equal(m.fill,'none');assert.notEqual(m.stroke,'rgb(0, 0, 0)');assert.ok(m.font>=26);assert.equal(m.overflow,false);assert.ok(m.left>=0&&m.right<=width+1);}
+   const metrics=await page.locator('.stat-card').evaluateAll(nodes=>nodes.map(node=>{const icon=node.querySelector('svg'),box=node.getBoundingClientRect();return {width:box.width,left:box.left,right:box.right,backgroundImage:getComputedStyle(node).backgroundImage,overflow:node.scrollWidth>node.clientWidth+1,fill:getComputedStyle(icon.querySelector('path')).fill,stroke:getComputedStyle(icon).stroke,font:parseFloat(getComputedStyle(node.querySelector('strong')).fontSize)};}));
+   assert.equal(metrics.length,9);for(const m of metrics){assert.equal(m.backgroundImage,'none');assert.equal(m.fill,'none');assert.notEqual(m.stroke,'rgb(0, 0, 0)');assert.ok(m.font>=26);assert.equal(m.overflow,false);assert.ok(m.left>=0&&m.right<=width+1);}
+   assert.deepEqual(await page.locator('.app-shell button').evaluateAll(nodes=>nodes.filter(node=>getComputedStyle(node).backgroundImage.includes('gradient')).map(node=>node.id||node.className)),[],'buttons must have flat fills in both themes');
    if(!dark){const bad=await inspect();assert.deepEqual(bad,[],'dark surfaces on light dashboard');assert.deepEqual(await readable(),[],'light dashboard text contrast');const bg=await page.locator('body').evaluate(node=>getComputedStyle(node).backgroundColor);assert.notEqual(bg,'rgb(255, 255, 255)');}
    if(width!==320)await page.screenshot({path:path.join(os.tmpdir(),'warehouse-theme-'+(dark?'dark':'light')+'-'+width+'.png'),fullPage:true});
   }

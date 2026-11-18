@@ -18,7 +18,8 @@
     "test:warehouse-map-rules": "npx --yes firebase-tools emulators:exec --config ../firebase.warehouse-map-test.json --project demo-warehouse-map-rules \"node --test warehouse-map-rtdb-emulator.test.js\"",
     "test:chat-rules": "npx --yes firebase-tools@latest emulators:exec --config ../firebase.chat-test.json --project demo-warehouse-chat --only firestore,storage \"node direct-chat-rules.test.mjs\"",
     "test:buyback-stock-rules": "npx --yes firebase-tools@latest emulators:exec --config ../firebase.chat-test.json --project demo-warehouse-stock --only firestore \"node buyback-stock-rules.test.mjs\"",
-    "test:foreground-sync-browser": "node foreground-sync-browser.test.cjs"
+    "test:foreground-sync-browser": "node foreground-sync-browser.test.cjs",
+    "test:theme-browser": "node theme-browser.test.cjs"
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^5.0.2",

@@ -4,7 +4,7 @@ importScripts(
 );
 
 const SITE_URL = 'https://hlebish.github.io/warehouse_orders/';
-const CACHE = 'order-desk-fcm-v125-drawer-slide';
+const CACHE = 'order-desk-fcm-v126-theme-system';
 // Version bump triggers install/activate; activate notifies open tabs to reload.
 const ASSETS = [
   './',

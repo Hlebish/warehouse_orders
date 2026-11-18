@@ -3,6 +3,7 @@
 const fs=require('node:fs');
 const path=require('node:path');
 const http=require('node:http');
+const os=require('node:os');
 const assert=require('node:assert/strict');
 const {chromium}=require('playwright');
 
@@ -87,7 +88,7 @@ async function run(){
  const url='http://127.0.0.1:'+server.address().port;
  let browser;
  try{
-  browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_PATH||'/usr/bin/chromium',args:['--no-sandbox']});
+  browser=await chromium.launch({headless:true,...(process.env.CHROMIUM_PATH?{executablePath:process.env.CHROMIUM_PATH}:process.platform==='win32'?{channel:'chrome'}:{executablePath:'/usr/bin/chromium'}),args:['--no-sandbox']});
   const page=await browser.newPage({viewport:{width:1280,height:900}}),errors=[];
   page.on('pageerror',error=>errors.push(error.message));
   await page.route('**/*',route=>route.request().url().startsWith(url)?route.continue():route.abort());
@@ -160,19 +161,19 @@ async function run(){
     historyActorColor:getComputedStyle(dialog.querySelector('.order-history .timeline-top b')).color,
     overflowing:[...dialog.querySelectorAll('*')].filter(node=>node.getBoundingClientRect().right>dialog.getBoundingClientRect().right+1).slice(0,8).map(node=>({tag:node.tagName,className:node.className,width:node.clientWidth,scroll:node.scrollWidth,text:node.textContent.slice(0,100)}))
    }));
-   if(layout.dialogOverflow||layout.bodyOverflow||layout.outsideViewport){await page.screenshot({path:'/tmp/order-history-overflow-'+width+'.png'});console.log('LAYOUT',JSON.stringify(layout));}
+   if(layout.dialogOverflow||layout.bodyOverflow||layout.outsideViewport){await page.screenshot({path:path.join(os.tmpdir(),'order-history-overflow-'+width+'.png')});console.log('LAYOUT',JSON.stringify(layout));}
    assert.equal(layout.dialogOverflow,false,'dialog overflow '+width+' '+dark);
    assert.equal(layout.bodyOverflow,false,'body overflow '+width+' '+dark);
    assert.equal(layout.outsideViewport,false,'dialog outside viewport '+width+' '+dark);
    assert.equal(layout.rows,6);
    assert.equal(layout.creatorFont,'12px');
-   assert.equal(layout.creatorColor,dark?'rgb(186, 199, 209)':'rgb(83, 98, 115)');
-   if(!dark)assert.equal(layout.historyActorColor,'rgb(67, 82, 103)');
+   assert.equal(layout.creatorColor,dark?'rgb(186, 199, 209)':'rgb(83, 105, 92)');
+   if(!dark)assert.equal(layout.historyActorColor,'rgb(38, 62, 54)');
    if(width===390){
     console.log('COLORS',dark?'dark':'light',JSON.stringify({creator:layout.creatorColor,creatorFont:layout.creatorFont,historyActor:layout.historyActorColor}));
-    await page.screenshot({path:'/tmp/order-history-'+(dark?'dark':'light')+'-390.png'});
+    await page.screenshot({path:path.join(os.tmpdir(),'order-history-'+(dark?'dark':'light')+'-390.png')});
     await page.locator('.order-history').evaluate(node=>node.scrollIntoView({block:'start',behavior:'instant'}));
-    await page.screenshot({path:'/tmp/order-history-'+(dark?'dark':'light')+'-timeline-390.png'});
+    await page.screenshot({path:path.join(os.tmpdir(),'order-history-'+(dark?'dark':'light')+'-timeline-390.png')});
    }
   }
   assert.deepEqual(errors,[],'browser exceptions');

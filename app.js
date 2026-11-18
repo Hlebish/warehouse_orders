@@ -1,6 +1,6 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js';
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signInWithCredential, signOut, sendPasswordResetEmail, createUserWithEmailAndPassword, updatePassword, EmailAuthProvider, reauthenticateWithCredential, GoogleAuthProvider, signInWithPopup, linkWithCredential, setPersistence, browserLocalPersistence } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js';
-import { getFirestore, collection, doc, documentId, onSnapshot, setDoc, deleteDoc, getDocs, getDocsFromServer, getDoc, getDocFromServer, updateDoc, writeBatch, runTransaction, serverTimestamp, query, where, orderBy, limit, startAfter, arrayUnion, arrayRemove } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
+import { getFirestore, disableNetwork, enableNetwork, collection, doc, documentId, onSnapshot, setDoc, deleteDoc, getDocs, getDocsFromServer, getDoc, getDocFromServer, updateDoc, writeBatch, runTransaction, serverTimestamp, query, where, orderBy, limit, startAfter, arrayUnion, arrayRemove } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
 import { getStorage, ref as storageRef, uploadBytes, uploadBytesResumable, getDownloadURL, deleteObject } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-storage.js';
 import { getMessaging, getToken, deleteToken, onMessage } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-messaging.js';
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-functions.js';
@@ -13,6 +13,7 @@ import { createDirectChatHistory } from './direct-chat-history.mjs?v=2026.11.16.
 import { bindDirectChatDraft } from './direct-chat-draft.mjs?v=2026.11.16.04';
 import { buildOrderHistory, getOrderCreator, getLatestOrderEvent } from './order-history.mjs?v=2026.11.17.01';
 import { buildStaffConversations } from './staff-conversations.mjs?v=2026.11.16.05';
+import { createForegroundSync } from './foreground-sync.mjs?v=2026.11.18.01';
 import { createDirectChatReceipts } from './direct-chat-receipts.mjs?v=2026.11.16.02';
 import { createDirectChatNoticeSync } from './direct-chat-notices.mjs?v=2026.11.16.02';
 import { createPhotoSharing, decoratePhotoSharing } from './photo-sharing.mjs?v=2026.11.12.10';
@@ -73,6 +74,27 @@ const $=id=>document.getElementById(id), modal=$('modalBackdrop');
 let uiStateRestored=false,lastUiSave=0;
 const isAndroidWarehouse=()=>/WarehouseOrdersAndroid/.test(navigator.userAgent);
 const isPhoneDevice=()=>/Android|iPhone|iPod|Mobile/i.test(navigator.userAgent);
+const isAndroidClient=()=>/Android|WarehouseOrdersAndroid/i.test(navigator.userAgent);
+function renderDataSyncStatus(status){
+ const indicator=$('dataSyncIndicator');if(!indicator)return;
+ indicator.hidden=!isAndroidClient()||status==='idle'||!signedInUser;
+ indicator.dataset.state=status;
+ const labels={syncing:'Обновляем данные…',waiting:'Ожидаем соединения…',offline:'Нет сети · показаны сохранённые данные',blocked:'Не удалось получить доступ к данным'};
+ $('dataSyncLabel').textContent=labels[status]||'';
+ $('modeLabel').textContent=status==='idle'?'Вы онлайн':status==='offline'?'Нет сети':'Обновление данных';
+ $('modeSub').textContent=status==='idle'?'Подключено к облаку':labels[status]||'';
+}
+const foregroundDataSync=createForegroundSync({
+ reconnect:async()=>{
+  resumeOrdersListener();
+  // A fresh transport clears Firestore's backoff after Android suspends its
+  // connection. Existing listeners, cached data and queued writes stay intact.
+  await disableNetwork(db);
+  await enableNetwork(db);
+ },
+ onStateChange:renderDataSyncStatus
+});
+foregroundDataSync.network(navigator.onLine!==false);
 const warehouseMapPanel=createWarehouseMapPanel();
 const photoSharing=createPhotoSharing({prepare:source=>Array.isArray(source)?createDefectPhotoCollage(source):fetchPhotoAsPng(source),notify:message=>toast(message)});
 function showArticleOnMap(article){
@@ -978,7 +1000,7 @@ onMessage(messaging,payload=>{
     notify(message,orderId,target,target==='chat'?'chat':'orders');
   }
 });
-function stopCloud(){serverEntriesLoaded.clear();directPhotoCache.clear();directPhotoRequests.clear();flushOrdersCache();if(ordersRetryTimer!==null){clearTimeout(ordersRetryTimer);ordersRetryTimer=null}ordersRetryDelay=3000;ordersConnectionNoticeShown=false;ordersListenerBlocked=false;profileUnsubscribe?.();ordersUnsubscribe?.();chatUnsubscribe?.();chatBadgeUnsubscribe?.();chatUnreadReceiptUnsubscribe?.();notificationsUnsubscribe?.();profileUnsubscribe=ordersUnsubscribe=chatUnsubscribe=chatBadgeUnsubscribe=chatUnreadReceiptUnsubscribe=notificationsUnsubscribe=null;chatUnreadReceiptCount=0;chatLegacyUnread=false;chatUnread=false;for(const stop of entryUnsubscribes.values())stop();entryUnsubscribes.clear();for(const stop of defectEntryUnsubscribes.values())stop();defectEntryUnsubscribes.clear();serverCache.clear();state.orders=[];state.notices=[]}
+function stopCloud(){foregroundDataSync.reset();serverEntriesLoaded.clear();directPhotoCache.clear();directPhotoRequests.clear();flushOrdersCache();if(ordersRetryTimer!==null){clearTimeout(ordersRetryTimer);ordersRetryTimer=null}ordersRetryDelay=3000;ordersConnectionNoticeShown=false;ordersListenerBlocked=false;profileUnsubscribe?.();ordersUnsubscribe?.();chatUnsubscribe?.();chatBadgeUnsubscribe?.();chatUnreadReceiptUnsubscribe?.();notificationsUnsubscribe?.();profileUnsubscribe=ordersUnsubscribe=chatUnsubscribe=chatBadgeUnsubscribe=chatUnreadReceiptUnsubscribe=notificationsUnsubscribe=null;chatUnreadReceiptCount=0;chatLegacyUnread=false;chatUnread=false;for(const stop of entryUnsubscribes.values())stop();entryUnsubscribes.clear();for(const stop of defectEntryUnsubscribes.values())stop();defectEntryUnsubscribes.clear();serverCache.clear();state.orders=[];state.notices=[]}
 let pendingOrderEntryFocus=(()=>{const params=new URLSearchParams(location.search);return params.get('order')&&params.get('entry')?{orderId:params.get('order'),entryId:params.get('entry')}:null;})();
 const serverEntriesLoaded=new Set();
 function openOrderAtEntry(orderId,entryId='',fromForm=false){
@@ -1054,14 +1076,22 @@ function watchPendingDefectOrders(){
 function watchOrders(){
  if(ordersRetryTimer!==null){clearTimeout(ordersRetryTimer);ordersRetryTimer=null}
  ordersUnsubscribe?.();
- ordersUnsubscribe=onSnapshot(collection(db,'orders'),snap=>{
+ foregroundDataSync.start();
+ let firstServerSnapshot=true;
+ ordersUnsubscribe=onSnapshot(collection(db,'orders'),{includeMetadataChanges:true},snap=>{
    ordersRetryDelay=3000;ordersConnectionNoticeShown=false;
+   foregroundDataSync.snapshot(snap.metadata);
    // Firestore provides only the documents that changed after the initial snapshot.
    // Keep a local index so each change can be applied without rescanning every order.
-   if(initialCloudLoad){const localIds=new Set(snap.docs.map(d=>d.id));state.orders=state.orders.filter(o=>localIds.has(o.id));}
+   const firstServer=!snap.metadata.fromCache&&firstServerSnapshot;
+   // The in-memory SDK cache can be empty on a cold launch. Keep the persisted
+   // Android snapshot until the server confirms the complete collection.
+   if(firstServer){const localIds=new Set(snap.docs.map(d=>d.id));state.orders=state.orders.filter(o=>localIds.has(o.id)||pendingWrites.has(o.id));firstServerSnapshot=false;}
+   const changes=snap.docChanges();
+   if(!firstServer&&!changes.length)return;
    const orderIndexById=new Map(state.orders.map((order,index)=>[order.id,index]));
    let openedOrderStatusChanged=false;
-   for(const change of snap.docChanges()){
+   for(const change of changes){
      const d=change.doc;
      if(change.type==='removed'){
        if(!pendingWrites.has(d.id)){
@@ -1077,7 +1107,7 @@ function watchOrders(){
      if(existingOrder&&existingOrder.status!==data.status&&selectedId===d.id&&!modal.hidden&&modal.dataset.orderDetail===d.id)openedOrderStatusChanged=true;
      const order={id:d.id,number:pending?.number??data.number,client:pending?.client??(data.client||''),clientId:pending?.clientId??(data.clientId||''),deliveryType:['city','pickup','post','kamyanske'].includes(data.deliveryType)?data.deliveryType:'city',status:pending?.status??data.status,returnCancelled:data.returnCancelled===true||(Array.isArray(data.returns)&&data.returns.some(r=>r?.status==='cancelled')),articles:pending?.articles??(Array.isArray(data.articles)?data.articles:[]),createdAt:data.createdAt,updatedAt:data.updatedAt,transferredAt:data.transferredAt,resumedAt:data.resumedAt,assembledAt:data.assembledAt,shippedAt:data.shippedAt,assemblyInProgress:data.assemblyInProgress===true,assemblyStartedAt:data.assemblyStartedAt,assemblyStartedBy:data.assemblyStartedBy,assemblyStartedByName:data.assemblyStartedByName,returns:Array.isArray(data.returns)?data.returns:[],author:data.createdByName||'Сотрудник',createdByName:data.createdByName||'',createdBy:data.createdBy,updatedBy:data.updatedBy,updatedByName:data.updatedByName,entries:prior?.entries||[],returns:Array.isArray(data.returns)?data.returns:[]};
      let at=orderIndexById.get(d.id);if(at===undefined){at=state.orders.length;state.orders.push(order);orderIndexById.set(d.id,at);}else state.orders[at]={...order,entries:state.orders[at].entries||[]};serverCache.set(d.id,{...order,articles:(order.articles||[]).map(x=>({...x})),entries:(prior?.entries||[]).map(x=>({...x}))});
-     if(!initialCloudLoad&&change.type==='added'){const message=`Поступил заказ № ${order.number}`;toast(message);notify(message,d.id)}
+     if(!initialCloudLoad&&!snap.metadata.fromCache&&!firstServer&&change.type==='added'){const message=`Поступил заказ № ${order.number}`;toast(message);notify(message,d.id)}
      if(pending && data.number===pending.number && data.client===pending.client && data.status===pending.status){pendingOrderData.delete(d.id);}
    }
    if(!snap.metadata.fromCache)initialCloudLoad=false;saveOrdersCache();watchPendingDefectOrders();scheduleRender();restoreUiState();
@@ -1089,6 +1119,7 @@ function watchOrders(){
    ordersUnsubscribe?.();ordersUnsubscribe=null;
    if(!ordersConnectionNoticeShown){toast('Связь с заказами прервалась. Приложение попробует подключиться снова.');ordersConnectionNoticeShown=true}
    const retryable=['unavailable','deadline-exceeded','resource-exhausted','internal','unknown'].some(code=>err?.code===code||String(err?.code||'').endsWith('/'+code));
+   foregroundDataSync.fail(!retryable);
    if(!retryable){ordersListenerBlocked=true;return}
    const delay=ordersRetryDelay;ordersRetryDelay=Math.min(ordersRetryDelay*2,60000);
    ordersRetryTimer=setTimeout(()=>{ordersRetryTimer=null;if(signedInUser&&document.visibilityState!=='hidden')watchOrders()},delay);
@@ -1097,6 +1128,14 @@ function watchOrders(){
 function resumeOrdersListener(){if(signedInUser&&!ordersUnsubscribe&&!ordersListenerBlocked){if(ordersRetryTimer!==null){clearTimeout(ordersRetryTimer);ordersRetryTimer=null}watchOrders()}}
 window.addEventListener('online',resumeOrdersListener);
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')resumeOrdersListener()});
+document.addEventListener('visibilitychange',()=>{
+ if(!isAndroidClient())return;
+ if(document.visibilityState==='hidden'){foregroundDataSync.hide();flushOrdersCache();}
+ else foregroundDataSync.resume();
+});
+window.addEventListener('online',()=>{if(isAndroidClient())foregroundDataSync.network(true);});
+window.addEventListener('offline',()=>{if(isAndroidClient())foregroundDataSync.network(false);});
+window.addEventListener('pageshow',()=>{if(isAndroidClient())foregroundDataSync.resume();});
 
 let presenceUnsubscribe=null,presenceHeartbeat=null,presenceExpiryTimer=null,staffDirectoryRetryTimer=null,directThreadsUnsubscribe=null,directThreadsFallbackTimer=null,directThreadsFallbackLoading=false,currentActivity='В приложении',activityResetTimer=null,staffDirectoryLoadError=false,directThreadsLoadError=false,directThreadsErrorCode='';
 const staffPresence=new Map(),staffDirectory=new Map(),directThreads=new Map();
@@ -1590,7 +1629,7 @@ function scheduleRender(){
     render();
   });
 }
-function renderOrdersUI(){const search=$('searchInput').value.toLocaleLowerCase('ru');const dateFrom=$('dateFromFilter')?.value||'';const dateTo=$('dateToFilter')?.value||'';const statusPriority={'Создан':0,'Собран':1,'На согласовании':2,'Под вопросом':3,'Дефект':4,'Ожидает оплаты':5,'Одобрен на отгрузку клиенту':6,'Ожидает самовывоза':7,'Самовывоз':7,'Перенесен':8,'Отгружен кладовщиком':9,'Клиент забрал самовывозом':10,'Отменён':11};const dateValue=o=>o?.status==='Перенесен'?(o.createdAt||o.transferredAt||o.updatedAt):orderDisplayDate(o);const compareOrders=(a,b)=>{const dayA=localDateKey(dateValue(a)),dayB=localDateKey(dateValue(b));if(dayA!==dayB)return dayB.localeCompare(dayA);const pA=statusPriority[a.status]??8,pB=statusPriority[b.status]??8;if(pA!==pB)return pA-pB;return new Date(orderDisplayDate(b)||0)-new Date(orderDisplayDate(a)||0)};let orders=[...state.orders].filter(o=>activeFilter==='Камянское'||o.status!=='Камянское').sort((a,b)=>{const aTransferred=a.status==='Перенесен',bTransferred=b.status==='Перенесен';if(aTransferred!==bTransferred)return aTransferred?-1:1;if(aTransferred&&bTransferred){const d=localDateKey(a.createdAt||a.transferredAt||a.updatedAt).localeCompare(localDateKey(b.createdAt||b.transferredAt||b.updatedAt));return d||new Date(a.createdAt||a.transferredAt||0)-new Date(b.createdAt||b.transferredAt||0)}return compareOrders(a,b)});if(activeFilter!=='all')orders=orders.filter(o=>o.status===activeFilter);if(search)orders=orders.filter(o=>orderSearchText(o).includes(search));if(dateFrom||dateTo)orders=orders.filter(o=>isDateInRange(o,dateFrom,dateTo));const hasDateFilter=!!(dateFrom||dateTo);$('clearDateButton').hidden=!hasDateFilter;const filteredOrderCount=orders.length;const pageCount=Math.max(1,Math.ceil(filteredOrderCount/ordersPageSize));currentOrdersPage=Math.max(1,Math.min(currentOrdersPage,pageCount));const pageOrders=orders.slice((currentOrdersPage-1)*ordersPageSize,currentOrdersPage*ordersPageSize);const rows=[];let previousDate='',previousSection='';for(const o of pageOrders){const transferred=o.status==='Перенесен';const displayDate=transferred?(o.createdAt||o.transferredAt||o.updatedAt||o.createdAt):orderDisplayDate(o);const day=localDateKey(displayDate);const section=transferred?'transferred':'current';if(section!==previousSection){rows.push(`<tr class="date-separator ${transferred?'transferred-date-separator':'current-date-separator'}"><td colspan="7"><span>${transferred?'Перенесённые заказы · дата создания':'Текущие заказы · по дням'}</span></td></tr>`);previousSection=section;previousDate=''}if(day!==previousDate){rows.push(`<tr class="date-separator"><td colspan="7"><span>${esc(fmtDate(displayDate))}</span></td></tr>`);previousDate=day}rows.push(`<tr data-order="${esc(o.id)}" tabindex="0" role="button" aria-label="Открыть заказ № ${esc(o.number)}" class="order-card-row ${transferred?'transferred-order-row':''}"><td><a class="order-number" href="#" data-open="${esc(o.id)}">№ ${esc(o.number)}</a><span class="client-sub">создал ${esc(o.author||'Кладовщик')}</span></td><td><a class="client-name client-open" href="#" data-open="${esc(o.id)}">${esc(o.client)}</a><span class="client-sub">${fmtDateTime(displayDate)}</span></td><td><button type="button" class="row-open-status" data-open="${esc(o.id)}" title="Открыть заказ">${statusPill(o.status)}</button>${assemblyIndicator(o)}</td><td><button type="button" class="delivery-type-pill" data-open="${esc(o.id)}" title="Открыть карточку заказа"><span class="delivery-type-icon" aria-hidden="true">${o.deliveryType==='pickup'?'♧':o.deliveryType==='post'?'✉':o.deliveryType==='kamyanske'?'⌖':'↗'}</span><span>${o.deliveryType==='pickup'?'Самовывоз':o.deliveryType==='post'?'Доставка почтой':o.deliveryType==='kamyanske'?'Доставка в Камянское':'Доставка по городу'}</span></button></td><td><button type="button" class="row-open-comments" data-open="${esc(o.id)}" title="Открыть заказ"><span class="comment-icon">💬</span><span class="entry-count">${entriesCount(o)}</span></button></td><td class="time-cell">${fmtDate(displayDate)}</td><td><button class="row-menu" title="Открыть карточку" data-open="${esc(o.id)}">···</button></td></tr>`)}$('ordersBody').innerHTML=rows.join('');const empty=orders.length===0;$('emptyState').classList.toggle('visible',empty);$('ordersBody').style.display=empty?'none':'';const statusCounts=Object.create(null);for(const order of state.orders)statusCounts[order.status]=(statusCounts[order.status]||0)+1;$('statTotal').textContent=statusCounts['Собран']||0;$('statCreated').textContent=statusCounts['Создан']||0;$('statQuestions').textContent=statusCounts['Под вопросом']||0;$('statApproval').textContent=statusCounts['На согласовании']||0;$('statReady').textContent=statusCounts['Одобрен на отгрузку клиенту']||0;$('statPayment').textContent=statusCounts['Ожидает оплаты']||0;$('statPickup').textContent=statusCounts['Ожидает самовывоза']||0;$('statTransferred').textContent=statusCounts['Перенесен']||0;if($('statKamenskoye'))$('statKamenskoye').textContent=statusCounts['Камянское']||0;$('listSummary').textContent=`${filteredOrderCount} ${plural(filteredOrderCount,'заказ','заказа','заказов')}`;const pagination=$('ordersPagination');if(pagination){const first=filteredOrderCount?(currentOrdersPage-1)*ordersPageSize+1:0;const last=Math.min(currentOrdersPage*ordersPageSize,filteredOrderCount);pagination.innerHTML=`<button type="button" class="secondary-button" data-orders-page="prev" ${currentOrdersPage<=1?'disabled':''}>← Назад</button><span>Страница ${currentOrdersPage} из ${pageCount} · ${first}–${last} из ${filteredOrderCount}</span><button type="button" class="secondary-button" data-orders-page="next" ${currentOrdersPage>=pageCount?'disabled':''}>Вперёд →</button>`;pagination.hidden=filteredOrderCount<=ordersPageSize;}$('userName').textContent=profileName||roles[state.role];$('userRole').textContent=canManageUsers?`Администратор · ${roles[state.role]}`:roles[state.role];$('modeLabel').textContent='Вы онлайн';$('modeSub').textContent='Подключено к облаку';$('today').textContent=todayFormatter.format(new Date());document.querySelectorAll('.nav-item').forEach(b=>b.classList.toggle('active',b.dataset.filter===activeFilter));paintNotices();syncPendingDefectToasts()}
+function renderOrdersUI(){const search=$('searchInput').value.toLocaleLowerCase('ru');const dateFrom=$('dateFromFilter')?.value||'';const dateTo=$('dateToFilter')?.value||'';const statusPriority={'Создан':0,'Собран':1,'На согласовании':2,'Под вопросом':3,'Дефект':4,'Ожидает оплаты':5,'Одобрен на отгрузку клиенту':6,'Ожидает самовывоза':7,'Самовывоз':7,'Перенесен':8,'Отгружен кладовщиком':9,'Клиент забрал самовывозом':10,'Отменён':11};const dateValue=o=>o?.status==='Перенесен'?(o.createdAt||o.transferredAt||o.updatedAt):orderDisplayDate(o);const compareOrders=(a,b)=>{const dayA=localDateKey(dateValue(a)),dayB=localDateKey(dateValue(b));if(dayA!==dayB)return dayB.localeCompare(dayA);const pA=statusPriority[a.status]??8,pB=statusPriority[b.status]??8;if(pA!==pB)return pA-pB;return new Date(orderDisplayDate(b)||0)-new Date(orderDisplayDate(a)||0)};let orders=[...state.orders].filter(o=>activeFilter==='Камянское'||o.status!=='Камянское').sort((a,b)=>{const aTransferred=a.status==='Перенесен',bTransferred=b.status==='Перенесен';if(aTransferred!==bTransferred)return aTransferred?-1:1;if(aTransferred&&bTransferred){const d=localDateKey(a.createdAt||a.transferredAt||a.updatedAt).localeCompare(localDateKey(b.createdAt||b.transferredAt||b.updatedAt));return d||new Date(a.createdAt||a.transferredAt||0)-new Date(b.createdAt||b.transferredAt||0)}return compareOrders(a,b)});if(activeFilter!=='all')orders=orders.filter(o=>o.status===activeFilter);if(search)orders=orders.filter(o=>orderSearchText(o).includes(search));if(dateFrom||dateTo)orders=orders.filter(o=>isDateInRange(o,dateFrom,dateTo));const hasDateFilter=!!(dateFrom||dateTo);$('clearDateButton').hidden=!hasDateFilter;const filteredOrderCount=orders.length;const pageCount=Math.max(1,Math.ceil(filteredOrderCount/ordersPageSize));currentOrdersPage=Math.max(1,Math.min(currentOrdersPage,pageCount));const pageOrders=orders.slice((currentOrdersPage-1)*ordersPageSize,currentOrdersPage*ordersPageSize);const rows=[];let previousDate='',previousSection='';for(const o of pageOrders){const transferred=o.status==='Перенесен';const displayDate=transferred?(o.createdAt||o.transferredAt||o.updatedAt||o.createdAt):orderDisplayDate(o);const day=localDateKey(displayDate);const section=transferred?'transferred':'current';if(section!==previousSection){rows.push(`<tr class="date-separator ${transferred?'transferred-date-separator':'current-date-separator'}"><td colspan="7"><span>${transferred?'Перенесённые заказы · дата создания':'Текущие заказы · по дням'}</span></td></tr>`);previousSection=section;previousDate=''}if(day!==previousDate){rows.push(`<tr class="date-separator"><td colspan="7"><span>${esc(fmtDate(displayDate))}</span></td></tr>`);previousDate=day}rows.push(`<tr data-order="${esc(o.id)}" tabindex="0" role="button" aria-label="Открыть заказ № ${esc(o.number)}" class="order-card-row ${transferred?'transferred-order-row':''}"><td><a class="order-number" href="#" data-open="${esc(o.id)}">№ ${esc(o.number)}</a><span class="client-sub">создал ${esc(o.author||'Кладовщик')}</span></td><td><a class="client-name client-open" href="#" data-open="${esc(o.id)}">${esc(o.client)}</a><span class="client-sub">${fmtDateTime(displayDate)}</span></td><td><button type="button" class="row-open-status" data-open="${esc(o.id)}" title="Открыть заказ">${statusPill(o.status)}</button>${assemblyIndicator(o)}</td><td><button type="button" class="delivery-type-pill" data-open="${esc(o.id)}" title="Открыть карточку заказа"><span class="delivery-type-icon" aria-hidden="true">${o.deliveryType==='pickup'?'♧':o.deliveryType==='post'?'✉':o.deliveryType==='kamyanske'?'⌖':'↗'}</span><span>${o.deliveryType==='pickup'?'Самовывоз':o.deliveryType==='post'?'Доставка почтой':o.deliveryType==='kamyanske'?'Доставка в Камянское':'Доставка по городу'}</span></button></td><td><button type="button" class="row-open-comments" data-open="${esc(o.id)}" title="Открыть заказ"><span class="comment-icon">💬</span><span class="entry-count">${entriesCount(o)}</span></button></td><td class="time-cell">${fmtDate(displayDate)}</td><td><button class="row-menu" title="Открыть карточку" data-open="${esc(o.id)}">···</button></td></tr>`)}$('ordersBody').innerHTML=rows.join('');const empty=orders.length===0;$('emptyState').classList.toggle('visible',empty);$('ordersBody').style.display=empty?'none':'';const statusCounts=Object.create(null);for(const order of state.orders)statusCounts[order.status]=(statusCounts[order.status]||0)+1;$('statTotal').textContent=statusCounts['Собран']||0;$('statCreated').textContent=statusCounts['Создан']||0;$('statQuestions').textContent=statusCounts['Под вопросом']||0;$('statApproval').textContent=statusCounts['На согласовании']||0;$('statReady').textContent=statusCounts['Одобрен на отгрузку клиенту']||0;$('statPayment').textContent=statusCounts['Ожидает оплаты']||0;$('statPickup').textContent=statusCounts['Ожидает самовывоза']||0;$('statTransferred').textContent=statusCounts['Перенесен']||0;if($('statKamenskoye'))$('statKamenskoye').textContent=statusCounts['Камянское']||0;$('listSummary').textContent=`${filteredOrderCount} ${plural(filteredOrderCount,'заказ','заказа','заказов')}`;const pagination=$('ordersPagination');if(pagination){const first=filteredOrderCount?(currentOrdersPage-1)*ordersPageSize+1:0;const last=Math.min(currentOrdersPage*ordersPageSize,filteredOrderCount);pagination.innerHTML=`<button type="button" class="secondary-button" data-orders-page="prev" ${currentOrdersPage<=1?'disabled':''}>← Назад</button><span>Страница ${currentOrdersPage} из ${pageCount} · ${first}–${last} из ${filteredOrderCount}</span><button type="button" class="secondary-button" data-orders-page="next" ${currentOrdersPage>=pageCount?'disabled':''}>Вперёд →</button>`;pagination.hidden=filteredOrderCount<=ordersPageSize;}$('userName').textContent=profileName||roles[state.role];$('userRole').textContent=canManageUsers?`Администратор · ${roles[state.role]}`:roles[state.role];foregroundDataSync.repaint();$('today').textContent=todayFormatter.format(new Date());document.querySelectorAll('.nav-item').forEach(b=>b.classList.toggle('active',b.dataset.filter===activeFilter));paintNotices();syncPendingDefectToasts()}
 function render(){renderOrdersUI();const testsNav=$('testsNavButton');if(testsNav)testsNav.hidden=!canManageUsers;const avatar=$('profileAvatar');if(avatar)avatar.innerHTML=profileAvatarUrl?'<img src="'+esc(profileAvatarUrl)+'" alt="">':'СК';}
 function plural(n,a,b,c){n=Math.abs(n)%100;const d=n%10;return n>10&&n<20?c:d>1&&d<5?b:d===1?a:c}
 function toast(msg,orderId='',options={}){const t=document.createElement('div');t.className='toast'+(orderId?' toast-clickable':'');t.textContent=msg;if(orderId)t.addEventListener('click',()=>{if(!t.classList.contains('defect-toast'))t.remove();openOrder(orderId)});$('toastStack').append(t);if(!options.persistent)setTimeout(()=>t.remove(),3500);return t}
@@ -4866,7 +4905,7 @@ window.checkWarehouseSiteUpdate=async function(){
    if(!isNewerSiteVersion(latest,current))return;
    const editing=document.activeElement?.matches?.('input:not([type="button"]):not([type="submit"]),textarea,select');
    const buybackOpen=!!document.querySelector('.buyback-overlay:not([hidden])');
-   if(modal.hidden&&!editing&&!buybackOpen){reloadToLatestSite();return}
+   if(!isAndroidClient()&&modal.hidden&&!editing&&!buybackOpen){reloadToLatestSite();return}
    showSiteUpdateNotice();
   }catch(error){console.debug('Не удалось проверить обновление сайта',error)}
  })();
@@ -4876,9 +4915,9 @@ window.addEventListener('load',()=>{
  void window.checkWarehouseSiteUpdate();
  window.setInterval(()=>{if(document.visibilityState==='visible')void window.checkWarehouseSiteUpdate()},2*60*1000);
 },{once:true});
-// Returning from the Android background must not recreate Firestore listeners.
-// The existing WebView and its live onSnapshot subscriptions remain active.
-window.addEventListener('warehouse-app-resumed',()=>{
+// Restore the connection in the existing page while keeping its UI and drafts.
+window.addEventListener('warehouse-app-resumed',event=>{
+ if(isAndroidClient())foregroundDataSync.resume({backgroundMs:event.detail?.backgroundMs});
  const shell=document.querySelector('.app-shell');
  const gate=$('authGate');
  if((signedInUser&&shell&&!shell.hidden)||(gate&&!gate.hidden))finishInitialLoading();

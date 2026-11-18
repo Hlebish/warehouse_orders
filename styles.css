@@ -8662,3 +8662,13 @@ body.dark-theme .staff-conversation-urgent{background:#c74b4826;color:#f7aaa6}
  .staff-presence-toggle{min-width:34px;min-height:34px;padding:0 7px;font-size:17px}
 }
 @media(prefers-reduced-motion:reduce){.staff-presence-panel,.staff-presence-backdrop,.staff-conversation-row{transition:none}}
+/* Background data refresh stays visible above dialogs without intercepting taps. */
+.data-sync-indicator{position:fixed;inset:0 0 auto;z-index:20020;pointer-events:none;color:#f1fff8;font:600 11px/1.4 system-ui,sans-serif}
+.data-sync-track{display:block;height:3px;background:#2dbb8340;overflow:hidden}
+.data-sync-track::after{content:"";display:block;width:35%;height:100%;background:#42cf98;animation:dataSyncSlide 1.3s ease-in-out infinite}
+.data-sync-label{position:absolute;right:12px;top:8px;max-width:calc(100vw - 24px);padding:5px 10px;border-radius:8px;background:#112d25ed;box-shadow:0 2px 10px #0002}
+.data-sync-indicator:is([data-state="offline"],[data-state="waiting"],[data-state="blocked"]){color:#ffdf9c}
+.data-sync-indicator:is([data-state="offline"],[data-state="waiting"],[data-state="blocked"]) .data-sync-track::after{width:100%;background:#cda04b;animation:none}
+.data-sync-indicator:is([data-state="offline"],[data-state="waiting"],[data-state="blocked"]) .data-sync-label{background:#302819ed}
+@keyframes dataSyncSlide{from{transform:translateX(-100%)}to{transform:translateX(386%)}}
+@media(prefers-reduced-motion:reduce){.data-sync-track::after{animation:none;width:100%;opacity:.7}}

@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
 
-const app=readFileSync(new URL('../app.js',import.meta.url),'utf8');
-const server=readFileSync(new URL('./index.js',import.meta.url),'utf8');
+const app=readFileSync(new URL('../app.js',import.meta.url),'utf8').replaceAll('\r\n','\n');
+const server=readFileSync(new URL('./index.js',import.meta.url),'utf8').replaceAll('\r\n','\n');
 const between=(source,start,end)=>{
  const a=source.indexOf(start),b=source.indexOf(end,a);
  assert.ok(a>=0&&b>a,'Missing source boundary: '+start);

@@ -110,6 +110,7 @@ public class MainActivity extends AppCompatActivity {
     private boolean updateDialogVisible;
     private androidx.appcompat.app.AlertDialog updateProgressDialog;
     private boolean activityResumed;
+    private long lastPausedAt;
     private boolean installPermissionSettingsOpened;
     private volatile boolean forceUpdateCheckRequested;
     private File downloadedUpdateFile;
@@ -434,6 +435,8 @@ public class MainActivity extends AppCompatActivity {
     private void refreshWebViewAfterResume() {
         WebView target = webView;
         if (target == null) return;
+        final long backgroundMs = lastPausedAt == 0 ? 0 : android.os.SystemClock.elapsedRealtime() - lastPausedAt;
+        lastPausedAt = 0;
         target.onResume();
         target.resumeTimers();
         // Reattach the WebView's compositor layer for one frame. On some devices
@@ -444,7 +447,7 @@ public class MainActivity extends AppCompatActivity {
             target.setVisibility(View.VISIBLE);
             requestWebViewRedraw();
             target.evaluateJavascript(
-                "window.dispatchEvent(new Event('warehouse-app-resumed')); window.dispatchEvent(new Event('resize'))",
+                "window.dispatchEvent(new CustomEvent('warehouse-app-resumed',{detail:{backgroundMs:" + backgroundMs + "}})); window.dispatchEvent(new Event('resize'))",
                 null
             );
             if (Build.VERSION.SDK_INT >= 23) {
@@ -488,6 +491,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onPause() {
         activityResumed = false;
+        lastPausedAt = android.os.SystemClock.elapsedRealtime();
         mainHandler.removeCallbacks(offlineRetry);
         mainHandler.removeCallbacks(periodicAppUpdateCheck);
         super.onPause();

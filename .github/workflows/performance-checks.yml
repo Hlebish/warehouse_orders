@@ -7,6 +7,8 @@ on:
       - performance-audit-2026-11
     paths:
       - 'app.js'
+      - 'foreground-sync.mjs'
+      - 'functions/foreground-sync.test.mjs'
       - '.github/workflows/performance-checks.yml'
   workflow_dispatch:
 
@@ -25,3 +27,5 @@ jobs:
           node-version: '22'
       - name: Check app.js syntax
         run: node --check app.js
+      - name: Verify background data refresh and cached orders
+        run: node --test functions/foreground-sync.test.mjs

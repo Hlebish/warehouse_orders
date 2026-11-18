@@ -3,6 +3,7 @@
 const fs=require('node:fs');
 const path=require('node:path');
 const http=require('node:http');
+const os=require('node:os');
 const assert=require('node:assert/strict');
 const {chromium}=require('playwright');
 const root=path.resolve(__dirname,'..');
@@ -76,7 +77,7 @@ async function main(){
   if(pathname==='/qa.js'){res.setHeader('Content-Type','text/javascript; charset=utf-8');res.end(fixture);return;}
   if(pathname==='/'){
    res.setHeader('Content-Type','text/html; charset=utf-8');
-   res.end('<!doctype html><html class="app-booted"><head><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/styles.css"><style>[hidden]{display:none!important}*{animation:none!important;transition:none!important;scroll-behavior:auto!important}</style></head><body class="dark-theme"><div class="app-shell"><aside class="sidebar">Склад</aside>'+drawer+workspace+'<div id="modalBackdrop" class="modal-backdrop" hidden><section class="modal"><span id="modalEyebrow">НОВЫЙ ЗАКАЗ</span><textarea id="orderDraft">Сохранённый текст заказа</textarea></section></div><div id="toastStack"></div></div><script type="module" src="/qa.js"></script></body></html>');return;
+   res.end('<!doctype html><html class="app-booted"><head><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/styles.css"><style id="qaNoMotion">[hidden]{display:none!important}*{animation:none!important;transition:none!important;scroll-behavior:auto!important}</style></head><body class="dark-theme"><div class="app-shell"><aside class="sidebar">Склад</aside>'+drawer+workspace+'<div id="modalBackdrop" class="modal-backdrop" hidden><section class="modal"><span id="modalEyebrow">НОВЫЙ ЗАКАЗ</span><textarea id="orderDraft">Сохранённый текст заказа</textarea></section></div><div id="toastStack"></div></div><script type="module" src="/qa.js"></script></body></html>');return;
   }
   const file=path.join(root,path.basename(pathname));
   if(!fs.existsSync(file)){res.writeHead(404);res.end();return;}
@@ -87,7 +88,7 @@ async function main(){
  const url='http://127.0.0.1:'+server.address().port;
  let browser;
  try{
-  browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_PATH||'/usr/bin/chromium',args:['--no-sandbox']});
+  browser=await chromium.launch({headless:true,...(process.env.CHROMIUM_PATH?{executablePath:process.env.CHROMIUM_PATH}:process.platform==='win32'?{channel:'chrome'}:{executablePath:'/usr/bin/chromium'}),args:['--no-sandbox']});
   const page=await browser.newPage({viewport:{width:1280,height:900}}),errors=[];
   page.on('pageerror',error=>errors.push(error.message));
   await page.route('**/*',route=>route.request().url().startsWith(url)?route.continue():route.abort());
@@ -110,14 +111,14 @@ async function main(){
    const mobile=width<=720,opener=mobile?'staffPresenceToggle':'staffPresenceExpand';
    assert.equal(await page.locator('#staffPresencePanel').isHidden(),mobile,'collapsed mobile rail must be absent');
    const collision=await page.evaluate(()=>{
-    const panel=document.getElementById('staffPresencePanel'),rail=panel.getBoundingClientRect(),shown=panel.getClientRects().length>0;
+    const panel=document.getElementById('staffPresencePanel'),rail=panel.getBoundingClientRect(),shown=panel.getClientRects().length>0&&getComputedStyle(panel).visibility!=='hidden';
     const targets=[...document.querySelectorAll('.topbar button,.stat-card,.orders-panel .list-controls button,.orders-panel .list-controls input')].filter(node=>node.getClientRects().length&&getComputedStyle(node).visibility!=='hidden');
     const outside=[],overlap=[];
     for(const node of targets){const a=node.getBoundingClientRect(),name=node.id||node.getAttribute('data-stat-key')||node.className;if(a.left<-.5||a.right>innerWidth+.5)outside.push({name,left:a.left,right:a.right});if(shown&&a.left<rail.right&&a.right>rail.left&&(node.closest('.content')||(a.top<rail.bottom&&a.bottom>rail.top)))overlap.push({name,control:a.toJSON(),rail:rail.toJSON()});}
     const content=document.querySelector('.content').getBoundingClientRect();
     return {outside,overlap,main:document.querySelector('.main-area').getBoundingClientRect().toJSON(),content:content.toJSON()};
    });
-   if(collision.overlap.length||collision.outside.length){console.log('COLLISION',JSON.stringify({width,dark,native,collision}));await page.screenshot({path:'/tmp/staff-drawer-collision.png'});}
+   if(collision.overlap.length||collision.outside.length){console.log('COLLISION',JSON.stringify({width,dark,native,collision}));await page.screenshot({path:path.join(os.tmpdir(),'staff-drawer-collision.png')});}
    assert.deepEqual(collision.overlap,[],'collapsed rail covers workspace controls at '+width+'/'+native);
    assert.deepEqual(collision.outside,[],'workspace controls outside viewport at '+width+'/'+native);
    if(mobile){assert.ok(Math.abs(collision.main.width-width)<1,'mobile workspace lost width to a rail gutter');assert.ok(collision.content.right<=width+1,'mobile content exceeds viewport');}
@@ -173,7 +174,7 @@ async function main(){
   const refreshed=await page.locator('.staff-panel-scroll').evaluate(scroll=>({uid:document.activeElement.dataset.staffOpenId,top:scroll.scrollTop,header:document.querySelector('.staff-panel-header').getBoundingClientRect().top}));
   assert.equal(refreshed.uid,anchor.uid,'presence refresh lost focused employee');assert.ok(Math.abs(refreshed.top-anchor.top)<2,'presence refresh moved list scroll');assert.ok(Math.abs(refreshed.header-anchor.header)<1,'list scrolling moved drawer header');
   console.log('PASS live presence refresh preserves focused contact, scroll and sticky header');
-  await page.evaluate(()=>{window.qa.reset();document.querySelector('.staff-panel-scroll').scrollTop=0;window.qa.close();document.getElementById('workAction').hidden=true;});await page.setViewportSize({width:390,height:844});await checkClosed();assert.equal(await page.locator('#staffPresencePanel').isHidden(),true);await page.locator('#staffPresenceToggle').click();await checkOpen();await page.waitForFunction(()=>document.activeElement?.id==='staffPresenceClose');await checkNoneditableFocus();await page.keyboard.press('Escape');await checkClosed();await page.waitForFunction(()=>document.activeElement?.id==='staffPresenceToggle');await page.screenshot({path:'/tmp/staff-drawer-mobile-collapsed.png'});await page.locator('#staffPresenceToggle').click();await checkOpen();await page.waitForFunction(()=>document.activeElement?.id==='staffPresenceClose');await checkNoneditableFocus();await page.screenshot({path:'/tmp/staff-drawer-mobile.png'});
+  await page.evaluate(()=>{window.qa.reset();document.querySelector('.staff-panel-scroll').scrollTop=0;window.qa.close();document.getElementById('workAction').hidden=true;});await page.setViewportSize({width:390,height:844});await checkClosed();assert.equal(await page.locator('#staffPresencePanel').isHidden(),true);await page.locator('#staffPresenceToggle').click();await checkOpen();await page.waitForFunction(()=>document.activeElement?.id==='staffPresenceClose');await checkNoneditableFocus();await page.keyboard.press('Escape');await checkClosed();await page.waitForFunction(()=>document.activeElement?.id==='staffPresenceToggle');await page.screenshot({path:path.join(os.tmpdir(),'staff-drawer-mobile-collapsed.png')});await page.locator('#staffPresenceToggle').click();await checkOpen();await page.waitForFunction(()=>document.activeElement?.id==='staffPresenceClose');await checkNoneditableFocus();await page.screenshot({path:path.join(os.tmpdir(),'staff-drawer-mobile.png')});
   const androidContext=await browser.newContext({viewport:{width:390,height:844},deviceScaleFactor:3,isMobile:true,hasTouch:true,userAgent:'Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 Chrome/125.0.0.0 Mobile Safari/537.36 WarehouseOrdersAndroid'});
   const android=await androidContext.newPage();android.on('pageerror',error=>errors.push(error.message));await android.route('**/*',route=>route.request().url().startsWith(url)?route.continue():route.abort());await android.goto(url);await android.waitForFunction(()=>window.qa?.ready);
   await android.evaluate(()=>document.getElementById('workAction').hidden=true);
@@ -181,12 +182,48 @@ async function main(){
    await android.evaluate(dark=>{document.body.classList.toggle('dark-theme',dark);window.qa.close();},dark);
    assert.equal(await android.locator('#staffPresencePanel').isHidden(),true,'Android collapsed rail remains visible');
    const outside=await android.evaluate(()=>[...document.querySelectorAll('.topbar button,.stat-card')].filter(node=>node.getClientRects().length).map(node=>({id:node.id||node.getAttribute('data-stat-key'),box:node.getBoundingClientRect()})).filter(({box})=>box.left<-.5||box.right>innerWidth+.5).map(({id})=>id));assert.deepEqual(outside,[],'Android controls or stats outside viewport');
-   if(dark)await android.screenshot({path:'/tmp/staff-drawer-android-collapsed.png'});
+   if(dark)await android.screenshot({path:path.join(os.tmpdir(),'staff-drawer-android-collapsed.png')});
    await android.locator('#staffPresenceToggle').tap();await android.waitForFunction(()=>document.activeElement?.id==='staffPresenceClose');assert.equal(await android.evaluate(()=>document.activeElement?.matches('input,textarea,[contenteditable="true"]')),false,'Android opening would summon the keyboard');
-   if(dark)await android.screenshot({path:'/tmp/staff-drawer-android-open.png'});
+   if(dark)await android.screenshot({path:path.join(os.tmpdir(),'staff-drawer-android-open.png')});
    await android.locator('#staffDirectorySearch').tap();assert.equal(await android.evaluate(()=>document.activeElement?.id),'staffDirectorySearch','Android explicit search tap did not focus input');await android.locator('#staffPresenceClose').tap();await android.waitForFunction(()=>document.activeElement?.id==='staffPresenceToggle');
   }
   await androidContext.close();console.log('PASS Android touch/DPR3 has clear stats and messages control, no automatic editable focus, and explicit search tap works');
+  // Leave animations enabled here: sample real CSS transitions at fixed times,
+  // including the first frame. Content must translate without changing layout.
+  await page.emulateMedia({reducedMotion:'no-preference'});
+  for(const width of [1280,390])for(const dark of [false,true]){
+   await page.setViewportSize({width,height:844});
+   const samples=await page.evaluate(dark=>{
+    document.body.classList.toggle('dark-theme',dark);window.qa.close();
+    const guard=document.getElementById('qaNoMotion');void document.getElementById('staffPresenceContent').getBoundingClientRect();guard.sheet.disabled=true;
+    const layer=document.getElementById('staffPresenceContent');
+    void layer.getBoundingClientRect();window.qa.open();void layer.getBoundingClientRect();
+    const opening=layer.getAnimations().find(animation=>animation.transitionProperty==='transform');
+    if(!opening)throw Error('Drawer has no opening slide transition');
+    const measure=()=>{
+     const box=layer.getBoundingClientRect(),heading=layer.querySelector('.staff-panel-header').getBoundingClientRect(),row=layer.querySelector('.staff-conversation-row').getBoundingClientRect();
+     return {x:box.x,width:box.width,height:box.height,headingWidth:heading.width,headingHeight:heading.height,rowWidth:row.width,rowHeight:row.height,rowOffset:row.x-box.x,scrollWidth:document.documentElement.scrollWidth};
+    };
+    opening.pause();const enter=[0,70,140,280].map(time=>{opening.currentTime=time;return measure();});opening.finish();
+    window.qa.close();void layer.getBoundingClientRect();
+    const closing=layer.getAnimations().find(animation=>animation.transitionProperty==='transform');
+    if(!closing)throw Error('Drawer has no closing slide transition');
+    closing.pause();const exit=[0,70,140,280].map(time=>{closing.currentTime=time;return measure();});closing.finish();guard.sheet.disabled=false;
+    return {enter,exit};
+   },dark);
+   const reference=samples.enter.at(-1);
+   for(const frame of [...samples.enter,...samples.exit]){
+    for(const key of ['width','height','headingWidth','headingHeight','rowWidth','rowHeight','rowOffset'])assert.ok(Math.abs(frame[key]-reference[key])<.1,'drawer content reflows during animation: '+key+'/'+width+'/'+dark);
+    assert.ok(frame.scrollWidth<=width+1,'offscreen drawer creates horizontal page scrolling');
+   }
+   assert.ok(samples.enter[0].x>=width,'drawer does not start beyond the screen');assert.ok(reference.x<width-reference.width+1,'drawer does not finish inside screen');
+   assert.ok(samples.enter[0].x>samples.enter[1].x&&samples.enter[1].x>samples.enter[2].x&&samples.enter[2].x>reference.x,'opening does not slide left');
+   assert.ok(samples.exit[0].x<samples.exit[1].x&&samples.exit[1].x<samples.exit[2].x&&samples.exit[2].x<samples.exit[3].x,'closing does not slide right');
+  }
+  await page.emulateMedia({reducedMotion:'reduce'});
+  const reduced=await page.evaluate(()=>{document.getElementById('qaNoMotion').sheet.disabled=true;window.qa.open();const layer=document.getElementById('staffPresenceContent'),box=layer.getBoundingClientRect();return {animations:layer.getAnimations().length,inside:box.x>=0&&box.right<=innerWidth};});
+  assert.equal(reduced.animations,0);assert.equal(reduced.inside,true);
+  console.log('PASS opening/closing move a full-width surface without text reflow, horizontal overflow or motion when reduced motion is enabled');
   assert.deepEqual(errors,[],'browser exceptions');console.log('PASS no browser errors');
  }finally{if(browser)await browser.close();await new Promise(resolve=>server.close(resolve));}
 }

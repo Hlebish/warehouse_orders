@@ -1329,7 +1329,7 @@ function openStaffPanel(open=true,{restoreFocus=false}={}){
   if(open){backdrop.hidden=false;requestAnimationFrame(()=>{if(panel.classList.contains('open'))backdrop.classList.add('is-visible');});}
   else{
    backdrop.classList.remove('is-visible');
-   if(wasOpen)staffBackdropHideTimer=setTimeout(()=>{if(!panel.classList.contains('open'))backdrop.hidden=true;staffBackdropHideTimer=null;},180);
+   if(wasOpen)staffBackdropHideTimer=setTimeout(()=>{if(!panel.classList.contains('open'))backdrop.hidden=true;staffBackdropHideTimer=null;},280);
    else backdrop.hidden=true;
   }
  }

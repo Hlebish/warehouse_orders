@@ -8547,9 +8547,9 @@ body.dark-theme .order-history>.timeline>.timeline-item:before{background:#19212
  --drawer-hover:#f4f8f6;--drawer-accent:#267c57;--drawer-soft:#e8f5ed;--drawer-danger:#d7485b;
  position:fixed;z-index:1200;top:76px;right:10px;bottom:14px;
  display:flex;flex-direction:column;width:56px;max-width:calc(100vw - 20px);min-height:0;
- padding:7px;overflow:hidden;box-sizing:border-box;border:1px solid var(--drawer-line);
+ padding:7px;overflow:visible;box-sizing:border-box;border:1px solid var(--drawer-line);
  border-radius:18px;background:var(--drawer-bg);color:var(--drawer-text);box-shadow:0 8px 26px #172a3114;
- transition:width .2s ease,box-shadow .2s ease;isolation:isolate;
+ isolation:isolate;
 }
 body.dark-theme .staff-presence-panel{
  --drawer-bg:#192129;--drawer-line:#34424d;--drawer-text:#e8eff3;--drawer-muted:#9aaab7;
@@ -8560,11 +8560,11 @@ body.dark-theme .staff-presence-panel{
 .staff-presence-panel:not(.open):hover{border-color:var(--drawer-accent);box-shadow:0 8px 28px #172a3124}
 .staff-presence-panel:focus-visible{outline:2px solid var(--drawer-accent);outline-offset:3px}
 .staff-presence-panel.open{
- top:14px;bottom:14px;width:360px;padding:0;border-radius:18px;box-shadow:-12px 8px 48px #111c2733;
+ top:14px;bottom:14px;width:360px;padding:0;border-color:transparent;background:transparent;box-shadow:none;pointer-events:none;
 }
 .staff-presence-panel [hidden]{display:none!important}
-body.dark-theme .staff-presence-panel.open{box-shadow:-12px 8px 48px #0007}
-.staff-presence-backdrop{position:fixed;inset:0;z-index:1190;background:#101b2a4d;opacity:0;pointer-events:auto;transition:opacity .2s ease;backdrop-filter:blur(2px)}
+body.dark-theme .staff-presence-panel.open{box-shadow:none}
+.staff-presence-backdrop{position:fixed;inset:0;z-index:1190;background:#101b2a4d;opacity:0;pointer-events:auto;transition:opacity .28s ease;backdrop-filter:blur(2px)}
 .staff-presence-backdrop.is-visible{opacity:1;pointer-events:auto}
 .staff-presence-backdrop[hidden]{display:none!important;pointer-events:none!important}
 .staff-presence-rail{display:flex;flex:1;flex-direction:column;align-items:center;gap:12px;min-height:0;width:100%}
@@ -8580,8 +8580,19 @@ body.dark-theme .staff-presence-panel.open{box-shadow:-12px 8px 48px #0007}
 .staff-presence-panel .staff-avatar i{width:11px;height:11px;border-color:var(--drawer-bg)}
 .staff-rail-unread-count{position:absolute;right:-1px;top:-4px;display:grid;place-items:center;min-width:17px;height:17px;padding:0 3px;border:2px solid var(--drawer-bg);border-radius:99px;background:var(--drawer-danger);color:#fff;font-size:9px;font-weight:750;line-height:1}
 .staff-rail-loading{padding:6px 0;color:var(--drawer-muted);font-size:12px}
-.staff-presence-content{display:none;flex:1;flex-direction:column;min-width:0;min-height:0;width:100%;overflow:hidden}
-.staff-presence-panel.open .staff-presence-content{display:flex}
+/* The drawer is laid out at its final width even offscreen. Translate the whole
+   surface so text, avatars and controls never reflow during either transition. */
+.staff-drawer-viewport{position:fixed;inset:0;overflow:hidden;pointer-events:none}
+.staff-presence-content{
+ position:absolute;top:14px;right:10px;bottom:14px;display:flex;flex-direction:column;
+ width:360px;max-width:calc(100vw - 20px);min-width:0;min-height:0;overflow:hidden;
+ box-sizing:border-box;border:1px solid var(--drawer-line);border-radius:18px;
+ background:var(--drawer-bg);box-shadow:-12px 8px 48px #111c2733;
+ transform:translateX(calc(100% + 30px));visibility:hidden;pointer-events:none;
+ transition:transform .28s cubic-bezier(.22,1,.36,1),visibility 0s .28s;
+}
+.staff-presence-panel.open .staff-presence-content{transform:translateX(0);visibility:visible;pointer-events:auto;transition-delay:0s}
+body.dark-theme .staff-presence-content{box-shadow:-12px 8px 48px #0007}
 .staff-panel-header{display:flex;flex:none;flex-direction:column;gap:12px;padding:20px 16px 14px;border-bottom:1px solid var(--drawer-line);background:var(--drawer-bg)}
 .staff-panel-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
 .staff-panel-header .eyebrow{font-size:9px;letter-spacing:1.15px;color:var(--drawer-muted)}
@@ -8636,8 +8647,9 @@ body.dark-theme .staff-conversation-urgent{background:#c74b4826;color:#f7aaa6}
  body{min-width:0}
  .app-shell{min-width:0;width:100%}
  .staff-presence-panel{right:6px;max-width:calc(100vw - 12px)}
- .staff-presence-panel:not(.open){display:none}
+ .staff-presence-panel:not(.open){visibility:hidden;pointer-events:none;width:0;padding:0;border:0;box-shadow:none}
  .staff-presence-panel.open{top:8px;bottom:8px;width:min(380px,calc(100vw - 12px));border-radius:16px}
+ .staff-presence-content{top:8px;right:6px;bottom:8px;width:min(380px,calc(100vw - 12px));max-width:calc(100vw - 12px);border-radius:16px}
  body .app-shell>.main-area>.topbar{position:relative!important;display:grid!important;grid-template-columns:42px minmax(0,1fr) 86px!important;grid-template-rows:auto auto!important;align-items:center!important;height:auto!important;gap:8px!important;padding:8px 12px!important;overflow:visible!important;isolation:isolate}
  body .app-shell>.main-area>.topbar::before,body .app-shell>.main-area>.topbar::after{display:none!important;content:none!important}
  body .app-shell>.main-area>.topbar .mobile-menu{grid-column:1!important;grid-row:1!important}
@@ -8661,7 +8673,7 @@ body.dark-theme .staff-conversation-urgent{background:#c74b4826;color:#f7aaa6}
  .staff-presence-message{padding:5px 6px;font-size:9px}
  .staff-presence-toggle{min-width:34px;min-height:34px;padding:0 7px;font-size:17px}
 }
-@media(prefers-reduced-motion:reduce){.staff-presence-panel,.staff-presence-backdrop,.staff-conversation-row{transition:none}}
+@media(prefers-reduced-motion:reduce){.staff-presence-panel,.staff-presence-content,.staff-presence-panel.open .staff-presence-content,.staff-presence-backdrop,.staff-conversation-row{transition:none}}
 /* Background data refresh stays visible above dialogs without intercepting taps. */
 .data-sync-indicator{position:fixed;inset:0 0 auto;z-index:20020;pointer-events:none;color:#f1fff8;font:600 11px/1.4 system-ui,sans-serif}
 .data-sync-track{display:block;height:3px;background:#2dbb8340;overflow:hidden}

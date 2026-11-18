@@ -4,7 +4,7 @@ importScripts(
 );
 
 const SITE_URL = 'https://hlebish.github.io/warehouse_orders/';
-const CACHE = 'order-desk-fcm-v129-compact-counters';
+const CACHE = 'order-desk-fcm-v130-align-counters';
 // Version bump triggers install/activate; activate notifies open tabs to reload.
 const ASSETS = [
   './',

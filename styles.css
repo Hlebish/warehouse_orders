@@ -8477,19 +8477,21 @@ html body:not(.dark-theme) #modalBackdrop .modal.directory-modal .primary-button
 html body .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card{
  --metric-ink:#719fda;--metric-soft:#719fda1c;--metric-line:#719fda45;
  --metric-surface:#1b252d;--metric-text:#e2eaf0;--metric-muted:#9aaeb9;
- position:relative;display:grid!important;grid-template-columns:42px minmax(0,1fr)!important;
- align-items:center!important;gap:11px!important;min-height:102px!important;padding:14px 15px!important;
+ --metric-icon-size:42px;
+ position:relative;display:grid!important;grid-template-columns:var(--metric-icon-size) minmax(0,1fr)!important;
+ align-items:center!important;gap:12px!important;min-height:102px!important;padding:12px 15px!important;
  border:1px solid #35444d!important;border-radius:16px!important;overflow:hidden;
  background:var(--metric-surface)!important;
  color:var(--metric-text)!important;box-shadow:0 4px 14px #00000012!important;
  transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease;
 }
-html body .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card:before{content:''!important;position:absolute;inset:22px auto 22px 0!important;width:3px!important;height:auto!important;border-radius:0 3px 3px 0;background:var(--metric-ink)!important;opacity:.9!important}
+html body .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card:before{content:''!important;position:absolute;inset:50% auto auto 0!important;width:3px!important;height:var(--metric-icon-size)!important;transform:translateY(-50%);border-radius:0 3px 3px 0;background:var(--metric-ink)!important;opacity:.9!important}
 html body .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card:after{display:none!important}
 html body .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card:hover{transform:translateY(-2px);border-color:var(--metric-line)!important;box-shadow:0 8px 22px #162a2420!important}
 html body .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card:focus-visible{outline:2px solid var(--metric-ink)!important;outline-offset:3px}
 html body .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card .stat-icon{
- display:grid!important;place-items:center!important;flex:none!important;width:42px!important;height:42px!important;margin:0!important;
+ display:grid!important;place-items:center!important;flex:none!important;margin:0!important;
+ width:var(--metric-icon-size)!important;min-width:var(--metric-icon-size)!important;height:var(--metric-icon-size)!important;
  color:var(--metric-ink)!important;background:var(--metric-soft)!important;border:1px solid var(--metric-line)!important;
  border-radius:12px!important;box-shadow:inset 0 1px 0 #ffffff08!important;transform:none!important;
 }
@@ -8498,9 +8500,9 @@ html body .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-ca
 html body .app-shell .content .stat-card .stat-icon svg{width:24px!important;height:24px!important;overflow:visible}
 html body .app-shell .content .stat-card .stat-icon svg,
 html body .app-shell .content .stat-card .stat-icon svg *{color:inherit!important;fill:none!important;stroke:currentColor!important;stroke-width:1.7!important;stroke-linecap:round;stroke-linejoin:round}
-html body .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card .stat-copy{min-width:0;color:var(--metric-text)!important}
-html body .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card .stat-label{color:var(--metric-text)!important;font-size:12px!important;font-weight:650!important;line-height:1.4!important}
-html body .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card strong{display:block!important;color:var(--metric-text)!important;font-size:27px!important;font-weight:750!important;line-height:1.15!important;letter-spacing:-1px;margin:5px 0!important;font-variant-numeric:tabular-nums}
+html body .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card .stat-copy{display:grid;gap:4px;min-width:0;color:var(--metric-text)!important}
+html body .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card .stat-label{color:var(--metric-text)!important;font-size:12px!important;font-weight:650!important;line-height:1.25!important;overflow-wrap:anywhere;text-wrap:balance}
+html body .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card strong{display:block!important;color:var(--metric-text)!important;font-size:27px!important;font-weight:750!important;line-height:1.05!important;letter-spacing:-1px;margin:0!important;font-variant-numeric:tabular-nums}
 html body .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card small{display:block!important;color:var(--metric-muted)!important;font-size:10px!important;font-weight:450!important;line-height:1.45!important;margin:0!important}
 html body .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card.stat-created{--metric-surface:#222e39;--metric-ink:#86acdb;--metric-soft:#86acdb1c;--metric-line:#86acdb42}
 html body .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card.stat-assembled{--metric-surface:#22332d;--metric-ink:#79bea4;--metric-soft:#79bea41c;--metric-line:#79bea442}
@@ -8510,7 +8512,7 @@ html body .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-ca
 html body .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card.stat-approval{--metric-surface:#2d2939;--metric-ink:#b5a1dd;--metric-soft:#b5a1dd1c;--metric-line:#b5a1dd42}
 html body .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card.stat-transferred{--metric-surface:#29303a;--metric-ink:#9daec7;--metric-soft:#9daec71c;--metric-line:#9daec742}
 html body .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card.stat-pickup{--metric-surface:#223338;--metric-ink:#7ebdc4;--metric-soft:#7ebdc41c;--metric-line:#7ebdc442}
-html body .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card.kamenskoye-stat-card{--metric-surface:#303329;--metric-ink:#b4c095;--metric-soft:#b4c0951c;--metric-line:#b4c09542;min-height:102px!important}
+html body .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card.kamenskoye-stat-card{--metric-surface:#303329;--metric-ink:#b4c095;--metric-soft:#b4c0951c;--metric-line:#b4c09542}
 html body:not(.dark-theme) .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card{--metric-surface:#edf2eb;--metric-text:#30493b;--metric-muted:#506651;border-color:#c4d2c5!important;box-shadow:0 3px 12px #324b3810!important}
 html body:not(.dark-theme) .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card.stat-created{--metric-surface:#e3ebf1;--metric-ink:#507da1;--metric-soft:#d9e5ef;--metric-line:#b4cbdc}
 html body:not(.dark-theme) .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card.stat-assembled{--metric-surface:#e0ecdf;--metric-ink:#47866c;--metric-soft:#d6e8db;--metric-line:#abcdb9}
@@ -8521,16 +8523,37 @@ html body:not(.dark-theme) .app-shell .content :is(.stats-grid,.kamenskoye-stat-
 html body:not(.dark-theme) .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card.stat-transferred{--metric-surface:#e2e8ef;--metric-ink:#657d97;--metric-soft:#dee5ec;--metric-line:#bdcbd8}
 html body:not(.dark-theme) .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card.stat-pickup{--metric-surface:#dcebe8;--metric-ink:#43868b;--metric-soft:#d3e8e6;--metric-line:#abd0cd}
 html body:not(.dark-theme) .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card.kamenskoye-stat-card{--metric-surface:#e7ead8;--metric-ink:#778749;--metric-soft:#e3e7cf;--metric-line:#c6ceab}
-@media(max-width:1100px){html body .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card{grid-template-columns:42px minmax(0,1fr)!important;gap:11px!important;padding:13px 12px!important}html body .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card .stat-icon{width:42px!important;height:42px!important;border-radius:13px!important}}
-@media(max-width:720px){html body .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card{grid-template-columns:30px minmax(0,1fr)!important;gap:8px!important;align-content:center!important;min-height:92px!important;padding:10px!important}html body .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card .stat-icon{width:30px!important;height:30px!important;border-radius:9px!important}html body .app-shell .content .stat-card .stat-icon svg{width:20px!important;height:20px!important}html body .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card .stat-label{font-size:11px!important;min-height:29px}html body .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card strong{font-size:24px!important;margin:3px 0 0!important}html body .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card small{display:none!important}html body .app-shell .content .kamenskoye-stat-section>.stat-card.kamenskoye-stat-card{grid-template-columns:30px minmax(0,1fr)!important;align-items:center!important;min-height:76px!important}html body .app-shell .content .kamenskoye-stat-section>.stat-card.kamenskoye-stat-card .stat-label{min-height:0}}
+@media(max-width:1100px){
+ html body .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card{padding-inline:12px!important}
+}
+@media(max-width:720px){
+ html body .app-shell .content>.stats-grid{grid-auto-rows:1fr;gap:10px!important;margin-bottom:10px!important}
+ html body .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card{
+  --metric-icon-size:32px;
+  grid-template-rows:1fr;gap:10px!important;min-height:82px!important;padding:9px 11px 11px!important;
+ }
+ html body .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card .stat-icon{border-radius:9px!important}
+ html body .app-shell .content .stat-card .stat-icon svg{width:20px!important;height:20px!important}
+ html body .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card .stat-copy{align-self:end}
+ html body .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card strong{font-size:24px!important}
+ html body .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card small{display:none!important}
+}
+@media(max-width:360px){
+ html body .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card{
+  --metric-icon-size:30px;
+  column-gap:8px!important;padding-inline:8px!important;
+ }
+}
 @media(prefers-reduced-motion:reduce){html body .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card{transition:none!important}}
 
 /* Keep interactive surfaces flat in both palettes. */
 html body :is(.app-shell,#modalBackdrop,.buyback-overlay) :is(button,[role="button"]){background-image:none!important}
 
 /* Separate warehouse flows share the secondary dashboard row. */
-.kamenskoye-stat-section{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
-html body .app-shell .content .kamenskoye-stat-section>.stat-card{width:100%!important;min-height:102px!important}
+.kamenskoye-stat-section{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.kamenskoye-stat-section:has(>.kamenskoye-stat-card:not([hidden])){grid-template-columns:repeat(3,minmax(0,1fr))}
+html body .app-shell .content .kamenskoye-stat-section>.stat-card{width:100%!important}
+html body .app-shell .content .kamenskoye-stat-section>.stat-card[hidden]{display:none!important}
 html body .app-shell .content .kamenskoye-stat-section>.stat-card.stat-inspection-pending{--metric-surface:#332f26;--metric-ink:#ceaf73;--metric-soft:#ceaf731c;--metric-line:#ceaf7342}
 html body .app-shell .content .kamenskoye-stat-section>.stat-card.stat-inspection-checked{--metric-surface:#22332d;--metric-ink:#79bea4;--metric-soft:#79bea41c;--metric-line:#79bea442}
 html body:not(.dark-theme) .app-shell .content .kamenskoye-stat-section>.stat-card.stat-inspection-pending{--metric-surface:#eee7d5;--metric-ink:#937337;--metric-soft:#e6d8b2;--metric-line:#d6c193}
@@ -8576,10 +8599,14 @@ html body:not(.dark-theme) .inspection-item.has-defect{border-color:#c48c91}
 html body:not(.dark-theme) .inspection-defect{background:#eddcd6;color:#7e4348;border-color:#cb9fa3}
 html body:not(.dark-theme) .inspection-defect.resolved{background:#d8e7d6;color:#42674a;border-color:#adc7b1}
 @media(max-width:900px){.kamenskoye-stat-section{gap:10px}.inspection-columns{grid-template-columns:1fr}.inspection-toolbar{align-items:flex-start;flex-wrap:wrap}}
-@media(max-width:720px){.kamenskoye-stat-section{grid-template-columns:repeat(2,minmax(0,1fr))}.kamenskoye-stat-card{grid-column:1/-1}.inspection-item{padding:13px}.inspection-toolbar>button{width:100%}}
+@media(max-width:720px){
+ .kamenskoye-stat-section{margin-top:0}
+ .kamenskoye-stat-section:has(>.kamenskoye-stat-card:not([hidden])){grid-template-columns:repeat(2,minmax(0,1fr))}
+ .kamenskoye-stat-card{grid-column:1/-1}
+ .inspection-item{padding:13px}
+ .inspection-toolbar>button{width:100%}
+}
 
 /* Counters use one charcoal surface in both themes; colour belongs to badges. */
 html body .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card{background:#202b32!important}
 html body:not(.dark-theme) .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card{--metric-text:#e6edf2;--metric-muted:#afbec6;border-color:#3b4a52!important;box-shadow:0 4px 14px #253d3020!important}
-
-@media(max-width:720px){html body .app-shell .content .kamenskoye-stat-section>.stat-card{min-height:92px!important}html body .app-shell .content .kamenskoye-stat-section>.stat-card.kamenskoye-stat-card{min-height:76px!important}}

@@ -14,6 +14,7 @@ import { bindDirectChatDraft } from './direct-chat-draft.mjs?v=2026.11.16.04';
 import { buildOrderHistory, getOrderCreator, getLatestOrderEvent } from './order-history.mjs?v=2026.11.17.01';
 import { buildStaffConversations } from './staff-conversations.mjs?v=2026.11.16.05';
 import { createForegroundSync } from './foreground-sync.mjs?v=2026.11.18.01';
+import { createInspectionItems } from './inspection-items.mjs?v=2026.11.18.05';
 import { createDirectChatReceipts } from './direct-chat-receipts.mjs?v=2026.11.16.02';
 import { createDirectChatNoticeSync } from './direct-chat-notices.mjs?v=2026.11.16.02';
 import { createPhotoSharing, decoratePhotoSharing } from './photo-sharing.mjs?v=2026.11.12.10';
@@ -96,6 +97,16 @@ const foregroundDataSync=createForegroundSync({
 });
 foregroundDataSync.network(navigator.onLine!==false);
 const warehouseMapPanel=createWarehouseMapPanel();
+const inspectionItems=createInspectionItems({
+ watch:(next,error)=>onSnapshot(query(collection(db,'inspectionItems'),where('status','in',['pending','checked'])),{includeMetadataChanges:true},snapshot=>next({items:snapshot.docs.map(doc=>({id:doc.id,...doc.data()})),fromCache:snapshot.metadata.fromCache}),error),
+ manage:async data=>(await httpsCallable(warehouseFunctions,'manageInspectionItem')(data)).data,
+ getSession:()=>signedInUser?{uid:signedInUser.uid,role:state.role,admin:canManageUsers}:null,
+ getClients:()=>clients,getProducts:()=>productsCatalog,showModal,closeModal,toast,
+ upload:async(id,defectId,files)=>{
+  const blobs=await readPhotos(files),uid=signedInUser?.uid;if(!uid)throw new Error('Войдите в приложение.');
+  return Promise.all(blobs.map(async(blob,index)=>{const ref=storageRef(storage,`inspectionItems/${id}/${uid}/${defectId}/${index}.jpg`);try{return await getDownloadURL(ref);}catch(error){if(error.code!=='storage/object-not-found')throw error;}await uploadBytes(ref,blob,{contentType:'image/jpeg'});return getDownloadURL(ref);}));
+ }
+});
 const photoSharing=createPhotoSharing({prepare:source=>Array.isArray(source)?createDefectPhotoCollage(source):fetchPhotoAsPng(source),notify:message=>toast(message)});
 function showArticleOnMap(article){
  if(!mapArticleQuery(article)){toast('В позиции не указан артикул.');return;}
@@ -1000,7 +1011,7 @@ onMessage(messaging,payload=>{
     notify(message,orderId,target,target==='chat'?'chat':'orders');
   }
 });
-function stopCloud(){foregroundDataSync.reset();serverEntriesLoaded.clear();directPhotoCache.clear();directPhotoRequests.clear();flushOrdersCache();if(ordersRetryTimer!==null){clearTimeout(ordersRetryTimer);ordersRetryTimer=null}ordersRetryDelay=3000;ordersConnectionNoticeShown=false;ordersListenerBlocked=false;profileUnsubscribe?.();ordersUnsubscribe?.();chatUnsubscribe?.();chatBadgeUnsubscribe?.();chatUnreadReceiptUnsubscribe?.();notificationsUnsubscribe?.();profileUnsubscribe=ordersUnsubscribe=chatUnsubscribe=chatBadgeUnsubscribe=chatUnreadReceiptUnsubscribe=notificationsUnsubscribe=null;chatUnreadReceiptCount=0;chatLegacyUnread=false;chatUnread=false;for(const stop of entryUnsubscribes.values())stop();entryUnsubscribes.clear();for(const stop of defectEntryUnsubscribes.values())stop();defectEntryUnsubscribes.clear();serverCache.clear();state.orders=[];state.notices=[]}
+function stopCloud(){inspectionItems.stop();foregroundDataSync.reset();serverEntriesLoaded.clear();directPhotoCache.clear();directPhotoRequests.clear();flushOrdersCache();if(ordersRetryTimer!==null){clearTimeout(ordersRetryTimer);ordersRetryTimer=null}ordersRetryDelay=3000;ordersConnectionNoticeShown=false;ordersListenerBlocked=false;profileUnsubscribe?.();ordersUnsubscribe?.();chatUnsubscribe?.();chatBadgeUnsubscribe?.();chatUnreadReceiptUnsubscribe?.();notificationsUnsubscribe?.();profileUnsubscribe=ordersUnsubscribe=chatUnsubscribe=chatBadgeUnsubscribe=chatUnreadReceiptUnsubscribe=notificationsUnsubscribe=null;chatUnreadReceiptCount=0;chatLegacyUnread=false;chatUnread=false;for(const stop of entryUnsubscribes.values())stop();entryUnsubscribes.clear();for(const stop of defectEntryUnsubscribes.values())stop();defectEntryUnsubscribes.clear();serverCache.clear();state.orders=[];state.notices=[]}
 let pendingOrderEntryFocus=(()=>{const params=new URLSearchParams(location.search);return params.get('order')&&params.get('entry')?{orderId:params.get('order'),entryId:params.get('entry')}:null;})();
 const serverEntriesLoaded=new Set();
 function openOrderAtEntry(orderId,entryId='',fromForm=false){
@@ -1074,6 +1085,7 @@ function watchPendingDefectOrders(){
  }
 }
 function watchOrders(){
+ inspectionItems.start();
  if(ordersRetryTimer!==null){clearTimeout(ordersRetryTimer);ordersRetryTimer=null}
  ordersUnsubscribe?.();
  foregroundDataSync.start();
@@ -1444,7 +1456,7 @@ onAuthStateChanged(auth,user=>{
     // Server profile is now confirmed; refresh role-dependent UI without restarting listeners.
     render();
    }
-   startPresence(user);syncPushToken(false);if(window.AndroidWarehouse?.requestNativePushToken){window.AndroidWarehouse.requestNativePushToken();}if(pendingNotificationOrderId)void openPendingNotificationOrder();if(pendingDirectChatThreadId)void openPendingDirectChat();if(pendingNotificationChat){pendingNotificationChat=false;history.replaceState({},'',location.pathname+location.hash);setTimeout(()=>openChat(),0);}
+   inspectionItems.start();startPresence(user);syncPushToken(false);if(window.AndroidWarehouse?.requestNativePushToken){window.AndroidWarehouse.requestNativePushToken();}if(pendingNotificationOrderId)void openPendingNotificationOrder();if(pendingDirectChatThreadId)void openPendingDirectChat();if(pendingNotificationChat){pendingNotificationChat=false;history.replaceState({},'',location.pathname+location.hash);setTimeout(()=>openChat(),0);}
  },err=>{console.error(err);if(!startedWithCache)showAuth('Не удалось проверить профиль сотрудника. Проверьте правила доступа Firestore.');else toast('Не удалось обновить профиль с сервера. Доступ к данным контролируется Firestore.')});
 });
  $('loginForm').addEventListener('submit',async e=>{e.preventDefault();$('authError').textContent='';try{await signInWithEmailAndPassword(auth,$('loginEmail').value.trim(),$('loginPassword').value)}catch(err){console.error('Ошибка входа Firebase:',err.code,err.message);$('authError').textContent=err.code==='auth/invalid-credential'?'Firebase отклонил почту или пароль (auth/invalid-credential).':err.code==='auth/too-many-requests'?'Слишком много попыток. Попробуйте позже. (auth/too-many-requests)':`Не удалось войти: ${err.code||'неизвестная ошибка'}. Проверьте почту, пароль и настройки Firebase.`}});
@@ -4838,7 +4850,7 @@ window.addEventListener('popstate',()=>{
   if(handlingSidebarPop)handlingSidebarPop=false;
 });document.addEventListener('keydown',e=>{if(e.key==='Escape'){if(photoSharing.close()){e.preventDefault();return;}if(warehouseMapPanel.close()){e.preventDefault();return;}if(!$('imageViewer').hidden){e.preventDefault();closeImageViewer();return}if(!modal.hidden){e.preventDefault();closeModal();return}if($('staffPresencePanel').classList.contains('open')){e.preventDefault();openStaffPanel(false);return}if($('sidebar').classList.contains('open')){e.preventDefault();closeSidebar();return}closeSidebar()}});$('closeImageViewer').addEventListener('click',()=>closeImageViewer());
 $('newOrderButton').addEventListener('click',openNewOrder);$('newOrderHintButton').addEventListener('click',openNewOrder);$('emptyAddButton').addEventListener('click',openNewOrder);$('closeModal').addEventListener('click',closeModal);$('searchInput').addEventListener('input',()=>{currentOrdersPage=1;render()});$('dateFromFilter').addEventListener('change',()=>{currentOrdersPage=1;render()});$('dateToFilter').addEventListener('change',()=>{currentOrdersPage=1;render()});$('clearDateButton').addEventListener('click',()=>{$('dateFromFilter').value='';$('dateToFilter').value='';currentOrdersPage=1;render()});$('ordersPagination').addEventListener('click',e=>{const button=e.target.closest('[data-orders-page]');if(!button||button.disabled)return;currentOrdersPage=Math.max(1,currentOrdersPage+(button.dataset.ordersPage==='next'?1:-1));render();});$('notificationButton').addEventListener('click',showNotifications);$('profileButton').addEventListener('click',profileMenu);$('chatSidebarButton').addEventListener('click',openChat);$('mobileMenu').addEventListener('click',openSidebar);function positionFilterMenu(){const button=$('filterButton'),menu=$('filterMenu');if(!button||!menu||menu.hidden)return;const r=button.getBoundingClientRect();const gap=6;const menuWidth=Math.max(205,r.width);let left=Math.min(r.right-menuWidth,window.innerWidth-8);left=Math.max(8,left);let top=r.bottom+gap;const menuHeight=menu.offsetHeight;if(top+menuHeight>window.innerHeight-8&&r.top-menuHeight-gap>=8)top=r.top-menuHeight-gap;menu.style.left=Math.round(left)+'px';menu.style.top=Math.round(top)+'px';menu.style.minWidth=Math.round(menuWidth)+'px'}$('filterButton').addEventListener('click',e=>{e.stopPropagation();const menu=$('filterMenu');const isOpen=!menu.hidden;menu.hidden=isOpen;$('filterButton').setAttribute('aria-expanded',String(!isOpen));if(!isOpen){updateFilterMenu();requestAnimationFrame(positionFilterMenu)}});document.querySelectorAll('[data-menu-filter]').forEach(btn=>btn.addEventListener('click',()=>{activeFilter=btn.dataset.menuFilter;currentOrdersPage=1;render();updateFilterMenu();$('filterMenu').hidden=true;$('filterButton').setAttribute('aria-expanded','false')}));document.addEventListener('click',e=>{if(!e.target.closest('.filter-menu-wrap')){$('filterMenu').hidden=true;$('filterButton').setAttribute('aria-expanded','false')}});window.addEventListener('resize',positionFilterMenu);window.addEventListener('scroll',positionFilterMenu,true);function updateFilterMenu(){document.querySelectorAll('[data-menu-filter]').forEach(btn=>btn.classList.toggle('active',btn.dataset.menuFilter===activeFilter));}document.addEventListener('keydown',e=>{
-  if((e.key==='Enter'||e.key===' ')&&e.target.closest('.stat-card-clickable')){
+  if((e.key==='Enter'||e.key===' ')&&e.target.closest('.stat-card-clickable')?.dataset.statKey){
     e.preventDefault();
     openStatOrders(e.target.closest('.stat-card-clickable').dataset.statKey||'');
   }

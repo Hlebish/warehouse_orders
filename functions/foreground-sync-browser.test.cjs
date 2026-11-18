@@ -9,7 +9,7 @@ const script=`
 import {createForegroundSync} from '/foreground-sync.mjs';
 const $=id=>document.getElementById(id),modal=$('modalBackdrop'),isAndroidClient=()=>true;
 let signedInUser={uid:'qa'},ordersRetryTimer=null,ordersUnsubscribe=null,ordersRetryDelay=3000,ordersConnectionNoticeShown=false,ordersListenerBlocked=false,initialCloudLoad=true;
-let serverListener=null,reconnects=0,subscriptions=0;
+let serverListener=null,reconnects=0,subscriptions=0;const inspectionItems={start(){}};
 const state={orders:[{id:'cached',status:'Создан',number:'1',entries:[]}]},db={},pendingWrites=new Set(),pendingOrderData=new Map(),serverCache=new Map(),entryUnsubscribes=new Map();
 const selectedId=null,pendingNotificationOrderId='',collection=()=>({}),saveOrdersCache=()=>{},flushOrdersCache=()=>{},watchPendingDefectOrders=()=>{},restoreUiState=()=>{},notify=()=>{},toast=()=>{};
 const scheduleRender=()=>{$('statCreated').textContent=state.orders.filter(o=>o.status==='Создан').length;};

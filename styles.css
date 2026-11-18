@@ -8527,3 +8527,57 @@ html body:not(.dark-theme) .app-shell .content :is(.stats-grid,.kamenskoye-stat-
 
 /* Keep interactive surfaces flat in both palettes. */
 html body :is(.app-shell,#modalBackdrop,.buyback-overlay) :is(button,[role="button"]){background-image:none!important}
+
+/* Separate warehouse flows share the secondary dashboard row. */
+.kamenskoye-stat-section{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+html body .app-shell .content .kamenskoye-stat-section>.stat-card{width:100%!important;min-height:120px!important}
+html body .app-shell .content .kamenskoye-stat-section>.stat-card.stat-inspection-pending{--metric-surface:#332f26;--metric-ink:#ceaf73;--metric-soft:#ceaf731c;--metric-line:#ceaf7342}
+html body .app-shell .content .kamenskoye-stat-section>.stat-card.stat-inspection-checked{--metric-surface:#22332d;--metric-ink:#79bea4;--metric-soft:#79bea41c;--metric-line:#79bea442}
+html body:not(.dark-theme) .app-shell .content .kamenskoye-stat-section>.stat-card.stat-inspection-pending{--metric-surface:#eee7d5;--metric-ink:#937337;--metric-soft:#e6d8b2;--metric-line:#d6c193}
+html body:not(.dark-theme) .app-shell .content .kamenskoye-stat-section>.stat-card.stat-inspection-checked{--metric-surface:#e0ecdf;--metric-ink:#47866c;--metric-soft:#cfe1cd;--metric-line:#abcdb9}
+.inspection-toolbar{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:16px}
+.inspection-toolbar>p{max-width:500px;margin:0;color:var(--muted,#96aba0);font-size:12px;line-height:1.6}
+.inspection-toolbar>button{flex:none}
+.modal:has(#inspectionBoard){width:min(1050px,calc(100vw - 32px))}
+.inspection-columns{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;align-items:start}
+.inspection-column{min-width:0;scroll-margin-top:12px}
+.inspection-column h3{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 12px;font-size:15px}
+.inspection-column h3>span{padding:3px 8px;border-radius:8px;background:#344337;color:#cfdfcf;font-size:12px}
+.inspection-list{display:grid;gap:12px}
+.inspection-item,.inspection-add-panel{padding:15px;border:1px solid #3c4c47;border-radius:12px;background:#202b29;color:#e0eae3;min-width:0}
+.inspection-add-panel{margin-bottom:18px}
+.inspection-add-panel summary{cursor:pointer;font-size:13px;font-weight:650}
+.inspection-add-panel form{margin-top:15px}
+.inspection-item-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.inspection-item-heading>div{min-width:0}
+.inspection-item-heading b{font-size:14px;overflow-wrap:anywhere}
+.inspection-item-heading p{margin:5px 0 0;font-size:12px;line-height:1.5;overflow-wrap:anywhere}
+.inspection-state{flex:none;max-width:45%;font-size:10px;color:#c2d0c4;line-height:1.5;text-align:right}
+.inspection-client{margin-top:10px;font-size:12px;overflow-wrap:anywhere}
+.inspection-meta{margin-top:8px;font-size:10px;color:#a3b7aa;line-height:1.6}
+.inspection-actions{display:flex;flex-wrap:wrap;align-items:center;gap:7px;margin-top:13px}
+.inspection-actions button{min-height:34px}
+.inspection-feedback{font-size:12px;line-height:1.5;overflow-wrap:anywhere}
+.inspection-empty{padding:24px 16px;border:1px dashed #526158;border-radius:12px;font-size:12px;line-height:1.5;color:#a4b8aa;text-align:center}
+.inspection-item.has-defect{border-color:#a76664}
+.inspection-defect{padding:12px;margin-top:12px;border:1px solid #995e5b;border-radius:9px;background:#36282a;color:#f1d4cf}
+.inspection-defect.resolved{background:#25352d;border-color:#547b61;color:#d3e6d6}
+.inspection-defect-heading{display:flex;justify-content:space-between;gap:8px;align-items:center;font-size:11px}
+.inspection-defect-heading>span{font-size:10px;text-align:right}
+.inspection-defect p{margin:9px 0;white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;line-height:1.5}
+.inspection-defect small{display:block;margin-top:8px;font-size:10px;color:inherit;opacity:.85}
+.inspection-photos{display:flex;flex-wrap:wrap;gap:7px}
+.inspection-photos button{padding:0;overflow:hidden;border:1px solid #a37d77;background:transparent;border-radius:7px;width:85px;height:75px}
+.inspection-photos img{display:block;width:100%;height:100%;object-fit:cover}
+html body:not(.dark-theme) :is(.inspection-item,.inspection-add-panel){background:#e4ece1;color:var(--text);border-color:#b8cbb7}
+html body:not(.dark-theme) :is(.inspection-meta,.inspection-state,.inspection-empty){color:var(--muted);border-color:#b8cbb7}
+html body:not(.dark-theme) .inspection-column h3>span{background:#d4e3cf;color:#496641}
+html body:not(.dark-theme) .inspection-item.has-defect{border-color:#c48c91}
+html body:not(.dark-theme) .inspection-defect{background:#eddcd6;color:#7e4348;border-color:#cb9fa3}
+html body:not(.dark-theme) .inspection-defect.resolved{background:#d8e7d6;color:#42674a;border-color:#adc7b1}
+@media(max-width:900px){.kamenskoye-stat-section{gap:10px}.inspection-columns{grid-template-columns:1fr}.inspection-toolbar{align-items:flex-start;flex-wrap:wrap}}
+@media(max-width:720px){.kamenskoye-stat-section{grid-template-columns:repeat(2,minmax(0,1fr))}.kamenskoye-stat-card{grid-column:1/-1}.inspection-item{padding:13px}.inspection-toolbar>button{width:100%}}
+
+/* Counters use one charcoal surface in both themes; colour belongs to badges. */
+html body .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card{background:#202b32!important}
+html body:not(.dark-theme) .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card{--metric-text:#e6edf2;--metric-muted:#afbec6;border-color:#3b4a52!important;box-shadow:0 4px 14px #253d3020!important}

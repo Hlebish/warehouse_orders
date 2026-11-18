@@ -371,6 +371,14 @@ service cloud.firestore {
       allow read, update, delete: if false;
     }
 
+    // inspectionItems: article/name/client, pending|checked|ordered|removed,
+    // creator/checker timestamps and defect records. Mutations are validated
+    // by manageInspectionItem; order links are written by server triggers.
+    match /inspectionItems/{itemId} {
+      allow read: if activeUser();
+      allow write: if false;
+    }
+
     match /deletedOrders/{archiveId} {
       allow read: if canViewDeletedOrders();
       allow create: if canManageUsers()

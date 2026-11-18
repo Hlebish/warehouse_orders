@@ -9,6 +9,7 @@ const { getFirestore, FieldValue, Timestamp, FieldPath } = require('firebase-adm
 const { getMessaging } = require('firebase-admin/messaging');
 const { createHash } = require('crypto');
 const { directPushEventId } = require('./direct-push-id');
+const {createInspectionHandlers}=require('./inspection-items');
 const { normalizeBuybackArticle, resolveBuybackArticle, buybackArticleQuantities, buybackShippableArticles } = require('./buyback-articles');
 
 initializeApp();
@@ -1070,6 +1071,16 @@ exports.syncBuybackFromOrder = onDocumentUpdated({ document: 'orders/{orderId}',
 exports.linkBuybackToNewOrder = onDocumentCreated({ document: 'orders/{orderId}', retry: true }, async event => {
   const data = event.data?.data() || {};
   await syncBuybackOrderReferences({ id: event.params.orderId, ...data });
+});
+
+const inspectionHandlers=createInspectionHandlers({db,FieldValue,HttpsError});
+exports.manageInspectionItem=onCall(inspectionHandlers.manage);
+exports.linkInspectionItemsToNewOrder=onDocumentCreated({document:'orders/{orderId}',retry:true},event=>inspectionHandlers.syncOrder(event.data,event.id));
+exports.linkInspectionItemsToOrderUpdate=onDocumentUpdated({document:'orders/{orderId}',retry:true},event=>{
+ const before=event.data?.before.data()||{},after=event.data?.after.data()||{};
+ const articleShape=order=>JSON.stringify((order.articles||[]).map(line=>({article:line.article,quantity:line.quantity||1})));
+ if(articleShape(before)===articleShape(after))return;
+ return inspectionHandlers.syncOrder(event.data.after,event.id,before);
 });
 
 // Ежедневная проверка сроков перекупного товара. Отправляем каждую контрольную отметку один раз.

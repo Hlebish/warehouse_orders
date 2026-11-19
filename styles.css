@@ -4001,6 +4001,7 @@ body.dark-theme tr.date-separator:not(.transferred-date-separator):not(.current-
 /* AMP-branded date divider: fine silver line with a centered wordmark */
 body.dark-theme tr.date-separator:not(.transferred-date-separator):not(.current-date-separator) td{
   position:relative!important;
+  isolation:isolate;
 }
 body.dark-theme tr.date-separator:not(.transferred-date-separator):not(.current-date-separator) td::after{
   content:"AMP"!important;

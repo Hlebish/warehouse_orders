@@ -24,7 +24,7 @@ async function run(){
  });await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const origin='http://127.0.0.1:'+server.address().port;
  let browser;try{
   browser=await chromium.launch({headless:true,...(process.platform==='win32'?{channel:'chrome'}:{executablePath:process.env.CHROMIUM_PATH||'/usr/bin/chromium'})});
-  const page=await browser.newPage({viewport:{width:1440,height:1000}}),errors=[];page.on('pageerror',error=>errors.push(error.message));
+  const page=await browser.newPage({viewport:{width:1440,height:1000},reducedMotion:'reduce'}),errors=[];page.on('pageerror',error=>errors.push(error.message));
   await page.route('**/*',route=>route.request().url().startsWith(origin)?route.continue():route.abort());await page.goto(origin);
   await page.evaluate(()=>{document.documentElement.classList.add('app-booted');document.querySelector('.app-shell').hidden=false;document.getElementById('siteLoader').hidden=true;document.getElementById('userName').textContent='Глеб';document.getElementById('userRole').textContent='Администратор';document.getElementById('today').textContent='ср, 18 ноября';document.querySelectorAll('.stat-card:not([hidden]) strong').forEach((node,i)=>node.textContent=[12,8,3,5,2,4,1,6,4,3][i]);document.getElementById('ordersBody').innerHTML=['Создан','Собран','Ожидает оплаты','Одобрен на отгрузку клиенту'].map((label,i)=>'<tr><td><a class="order-number">№ '+(3188-i)+'</a><span class="client-sub">создал Евген</span></td><td><b class="client-name">'+['Андрей Петренко','ТОВ Автосервис Плюс','Виктор Коваленко','Денис Мельник'][i]+'</b><span class="client-sub">Сегодня, 12:40</span></td><td><span class="status-pill '+['status-neutral','status-assembled','status-payment','status-ready'][i]+'">'+label+'</span></td><td><span class="delivery-type-pill">Самовывоз</span></td><td>2</td><td>18 ноября</td><td>···</td></tr>').join('');});
   const inspect=()=>page.evaluate(()=>{
@@ -34,15 +34,17 @@ async function run(){
     if(Math.max(...c.slice(0,3))<85&&box.width*box.height>600)bad.push({tag:node.tagName,class:node.className,color:style.backgroundColor});
    }return bad;
   });
-  const readable=()=>page.evaluate(()=>{
+  const readable=selector=>page.evaluate(selector=>{
    const rgb=s=>(s.match(/[\d.]+/g)||[]).map(Number),luma=c=>{const a=c.slice(0,3).map(v=>v/255).map(v=>v<=.04045?v/12.92:((v+.055)/1.055)**2.4);return a[0]*.2126+a[1]*.7152+a[2]*.0722;},failures=[];
-   for(const node of document.querySelectorAll('.stat-card .stat-label,.stat-card strong,.stat-card small,.page-heading p,.panel-heading p,.field label,.buyback-supplier-filter label,.buyback-head p,.buyback-meta,.timeline-text,.chat-composer-hint')){
+   for(const node of document.querySelectorAll(selector)){
     if(!node.getClientRects().length||getComputedStyle(node).visibility==='hidden')continue;
     let surface=node,bg;while(surface){bg=rgb(getComputedStyle(surface).backgroundColor);if(bg.length===3||bg[3]>.95)break;surface=surface.parentElement;}
     if(!surface)continue;const a=luma(rgb(getComputedStyle(node).color)),b=luma(bg),ratio=(Math.max(a,b)+.05)/(Math.min(a,b)+.05);
     if(ratio<4.5)failures.push({class:node.className,text:node.textContent.trim().slice(0,60),ratio:ratio.toFixed(2)});
    }return failures;
-  });
+  },selector);
+  const dashboardText='.topbar button,.stat-card .stat-label,.stat-card strong,.stat-card small';
+  const lightThemeText='.page-heading p,.panel-heading p,.field label,.buyback-supplier-filter label,.buyback-head p,.buyback-meta,.timeline-text,.chat-composer-hint';
   for(const width of [1440,390,320])for(const dark of [false,true]){
    await page.setViewportSize({width,height:1000});await page.evaluate(dark=>document.body.classList.toggle('dark-theme',dark),dark);await page.waitForTimeout(320);
    const metrics=await page.locator('.stat-card:visible').evaluateAll(nodes=>nodes.map(node=>{
@@ -62,10 +64,49 @@ async function run(){
     assert.ok(Math.abs(m.numberInset-metrics[0].numberInset)<1&&m.iconGap>=8,'counter columns are misaligned');
     if(width<=720){assert.equal(m.height,metrics[0].height);assert.ok(Math.abs(m.numberBottom-metrics[0].numberBottom)<1);}
    }
+   const palette=await page.locator('.stat-card:visible,.topbar button:visible').evaluateAll(nodes=>nodes.map(node=>{
+    const style=getComputedStyle(node);
+    return [style.backgroundColor,style.borderTopColor,style.color].join(' / ');
+   }));
+   assert.deepEqual([...new Set(palette)],[palette[0]],'header buttons and counters share a palette');
+   assert.equal(new Set(metrics.map(metric=>metric.stroke)).size,1,'counter icons share an accent');
+   for(const color of [...palette[0].split(' / '),metrics[0].stroke]){
+    const channels=color.match(/\d+/g).map(Number);
+    assert.ok(Math.max(...channels)-Math.min(...channels)<=4,'dashboard palette is neutral: '+color);
+   }
+   assert.deepEqual(await readable(dashboardText),[],'dashboard text contrast');
    assert.deepEqual(await page.locator('.app-shell button').evaluateAll(nodes=>nodes.filter(node=>getComputedStyle(node).backgroundImage.includes('gradient')).map(node=>node.id||node.className)),[],'buttons must have flat fills in both themes');
-   if(!dark){const bad=await inspect();assert.deepEqual(bad,[],'dark surfaces on light dashboard');assert.deepEqual(await readable(),[],'light dashboard text contrast');const bg=await page.locator('body').evaluate(node=>getComputedStyle(node).backgroundColor);assert.notEqual(bg,'rgb(255, 255, 255)');}
+   if(!dark){const bad=await inspect();assert.deepEqual(bad,[],'dark surfaces on light dashboard');assert.deepEqual(await readable(lightThemeText),[],'light dashboard text contrast');const bg=await page.locator('body').evaluate(node=>getComputedStyle(node).backgroundColor);assert.notEqual(bg,'rgb(255, 255, 255)');}
    if(width!==320)await page.screenshot({path:path.join(os.tmpdir(),'warehouse-theme-'+(dark?'dark':'light')+'-'+width+'.png'),fullPage:true});
   }
+  await page.setViewportSize({width:390,height:1000});
+  await page.locator('#ordersBody').evaluate(body=>{
+   body.insertAdjacentHTML('afterbegin','<tr class="date-separator"><td colspan="7"><span>19 ноября</span></td></tr>');
+  });
+  const divider=page.locator('#ordersBody .date-separator td');
+  assert.match(await divider.evaluate(cell=>getComputedStyle(cell,'::after').content),/A M P/);
+  // Include the decorative label in hit testing to verify its paint order.
+  await page.addStyleTag({content:'html body.dark-theme #ordersBody tr.date-separator td::after{pointer-events:auto!important}'});
+  const dividerCenter=await divider.evaluate(cell=>{
+   cell.scrollIntoView({block:'center',behavior:'instant'});
+   const {left,top,width,height}=cell.getBoundingClientRect();
+   return {x:left+width/2,y:top+height/2};
+  });
+  const hitAtDivider=selector=>page.evaluate(({point,selector})=>{
+   return Boolean(document.elementFromPoint(point.x,point.y)?.closest(selector));
+  },{point:dividerCenter,selector});
+  assert.equal(await hitAtDivider('.date-separator'),true);
+  const setSidebarOpen=open=>page.evaluate(open=>{
+   document.getElementById('sidebar').classList.toggle('open',open);
+   document.getElementById('sidebarBackdrop').hidden=!open;
+   document.body.classList.toggle('overlay-window-open',open);
+  },open);
+  await setSidebarOpen(true);
+  await page.waitForFunction(()=>document.getElementById('sidebar').getBoundingClientRect().left>=-1);
+  assert.equal(await hitAtDivider('#sidebar'),true,'mobile navigation is in front of the AMP divider');
+  await setSidebarOpen(false);
+  await page.waitForFunction(()=>document.getElementById('sidebar').getBoundingClientRect().right<=1);
+  assert.equal(await hitAtDivider('.date-separator'),true,'AMP divider remains visible when navigation closes');
   const kamenskoye=page.locator('.kamenskoye-stat-card');
   assert.equal(await kamenskoye.isHidden(),true);
   await page.addScriptTag({content:`
@@ -96,11 +137,11 @@ async function run(){
   await page.setViewportSize({width:1280,height:1000});await page.evaluate(()=>document.body.classList.remove('dark-theme'));await page.waitForTimeout(320);
   for(const [title,content,kind] of [['Новый заказ',form,''],['Заказ № 3188',order,''],['Клиенты',directory,'directory-modal'],['Личный чат','<div class="direct-chat-shell">'+chatBody+'</div>','chat-dialog direct-chat-dialog']]){
    await page.evaluate(({title,content,kind})=>{document.getElementById('modalTitle').textContent=title;document.getElementById('modalBody').innerHTML=content;document.querySelector('#modalBackdrop>.modal').className='modal '+kind;document.getElementById('modalFoot').innerHTML='<button class="secondary-button">Закрыть</button><button class="primary-button">Сохранить</button>';document.getElementById('modalBackdrop').hidden=false;},{title,content,kind});
-   await page.waitForTimeout(350);assert.deepEqual(await inspect(),[],'dark surfaces in '+title);assert.deepEqual(await readable(),[],'dialog text contrast');
+   await page.waitForTimeout(350);assert.deepEqual(await inspect(),[],'dark surfaces in '+title);assert.deepEqual(await readable(lightThemeText),[],'dialog text contrast');
    await page.screenshot({path:path.join(os.tmpdir(),'warehouse-theme-dialog-'+(kind?'chat':title.startsWith('Заказ')?'order':'form')+'.png')});
   }
   await page.evaluate(markup=>{document.getElementById('modalBackdrop').hidden=true;const overlay=document.createElement('div');overlay.className='buyback-overlay';overlay.innerHTML=markup;document.body.append(overlay);document.getElementById('buybackSummary').innerHTML='<button class="buyback-chip"><span>В работе</span><b>8</b></button>';document.getElementById('buybackList').innerHTML='<div class="buyback-supplier-groups"><section class="buyback-supplier-group"><button class="buyback-supplier-toggle">Автодетали Плюс <small>2 товара</small></button><div class="buyback-supplier-items"><div class="buyback-card"><div><b class="buyback-article">APMA2506 × 2</b><p class="buyback-meta">Бампер передний · Принят 16.11.2026</p><div class="buyback-progress"><span style="width:25%"></span></div><span class="buyback-status">В работе</span></div><div class="buyback-actions"><button>Продан</button><button class="danger">Отменить</button></div></div></div></section></div>';},buybackMarkup);
   await page.waitForTimeout(350);for(const width of [1280,390]){await page.setViewportSize({width,height:1000});assert.deepEqual(await inspect(),[],'dark surfaces in buyback '+width);await page.screenshot({path:path.join(os.tmpdir(),'warehouse-theme-buyback-'+width+'.png')});}
-  assert.deepEqual(errors,[]);console.log('PASS aligned dashboard counters at 1440/390/320 in both themes, conditional Kamenskoye card, and light dialogs');
+  assert.deepEqual(errors,[]);console.log('PASS dashboard in both themes at 1440/390/320, AMP divider behind mobile navigation, conditional Kamenskoye card, and light dialogs');
  }finally{if(browser)await browser.close();await new Promise(resolve=>server.close(resolve));}
 }run().catch(error=>{console.error(error);process.exitCode=1;});

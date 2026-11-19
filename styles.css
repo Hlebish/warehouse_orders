@@ -4001,6 +4001,7 @@ body.dark-theme tr.date-separator:not(.transferred-date-separator):not(.current-
 /* AMP-branded date divider: fine silver line with a centered wordmark */
 body.dark-theme tr.date-separator:not(.transferred-date-separator):not(.current-date-separator) td{
   position:relative!important;
+  isolation:isolate;
 }
 body.dark-theme tr.date-separator:not(.transferred-date-separator):not(.current-date-separator) td::after{
   content:"AMP"!important;
@@ -8473,26 +8474,62 @@ html body:not(.dark-theme) #modalBackdrop .modal.directory-modal #modalBody{back
 html body:not(.dark-theme) #modalBackdrop .modal.directory-modal :is(.directory-table thead,.directory-help){background:#dfe8dc!important;color:var(--muted)!important;border-color:#bcd0ba!important}
 html body:not(.dark-theme) #modalBackdrop .modal.directory-modal .primary-button{background:#347c55!important;color:#f3faf3!important;border-color:#2b6b49!important}
 
+/* Shared graphite palette for the dashboard and header controls. */
+html body .app-shell{
+ --dashboard-control-surface:#2c2c2e;
+ --dashboard-control-hover:#373739;
+ --dashboard-control-border:#555557;
+ --dashboard-control-text:#f0f0f1;
+ --dashboard-control-muted:#bdbdc0;
+ --dashboard-control-accent:#c6c6c9;
+ --dashboard-control-icon:#3b3b3e;
+}
+html body:not(.dark-theme) .app-shell{
+ --dashboard-control-surface:#dedee0;
+ --dashboard-control-hover:#d2d2d4;
+ --dashboard-control-border:#959598;
+ --dashboard-control-text:#242426;
+ --dashboard-control-muted:#535357;
+ --dashboard-control-accent:#48484b;
+ --dashboard-control-icon:#cfcfd2;
+}
+html body .app-shell>.main-area>.topbar :is(.top-history-button,#mobileMenu,#staffPresenceToggle,#notificationButton){
+ background:var(--dashboard-control-surface)!important;
+ border:1px solid var(--dashboard-control-border)!important;
+ color:var(--dashboard-control-text)!important;
+}
+html body .app-shell>.main-area>.topbar :is(#mobileMenu,#staffPresenceToggle,#notificationButton){border-radius:12px!important}
+html body .app-shell>.main-area>.topbar #mobileMenu::before{color:inherit!important}
+html body .app-shell>.main-area>.topbar :is(.top-history-button,#mobileMenu,#staffPresenceToggle,#notificationButton):is(:hover,:active){
+ background:var(--dashboard-control-hover)!important;
+ border-color:var(--dashboard-control-accent)!important;
+}
+html body .app-shell>.main-area>.topbar :is(.top-history-button,#mobileMenu,#staffPresenceToggle,#notificationButton):focus-visible{
+ outline:2px solid var(--dashboard-control-accent)!important;
+ outline-offset:2px;
+}
+
 /* Status dashboard: the same composition and outline icons in both themes. */
 html body .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card{
- --metric-ink:#719fda;--metric-soft:#719fda1c;--metric-line:#719fda45;
- --metric-surface:#1b252d;--metric-text:#e2eaf0;--metric-muted:#9aaeb9;
  --metric-icon-size:42px;
  position:relative;display:grid!important;grid-template-columns:var(--metric-icon-size) minmax(0,1fr)!important;
  align-items:center!important;gap:12px!important;min-height:102px!important;padding:12px 15px!important;
- border:1px solid #35444d!important;border-radius:16px!important;overflow:hidden;
- background:var(--metric-surface)!important;
- color:var(--metric-text)!important;box-shadow:0 4px 14px #00000012!important;
- transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease;
+ border:1px solid var(--dashboard-control-border)!important;border-radius:16px!important;overflow:hidden;
+ background:var(--dashboard-control-surface)!important;
+ color:var(--dashboard-control-text)!important;box-shadow:0 4px 14px #00000012!important;
+ transition:transform .18s ease,background-color .18s ease,border-color .18s ease,box-shadow .18s ease;
 }
-html body .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card:before{content:''!important;position:absolute;inset:50% auto auto 0!important;width:3px!important;height:var(--metric-icon-size)!important;transform:translateY(-50%);border-radius:0 3px 3px 0;background:var(--metric-ink)!important;opacity:.9!important}
+html body .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card:before{content:''!important;position:absolute;inset:50% auto auto 0!important;width:3px!important;height:var(--metric-icon-size)!important;transform:translateY(-50%);border-radius:0 3px 3px 0;background:var(--dashboard-control-accent)!important;opacity:.9!important}
 html body .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card:after{display:none!important}
-html body .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card:hover{transform:translateY(-2px);border-color:var(--metric-line)!important;box-shadow:0 8px 22px #162a2420!important}
-html body .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card:focus-visible{outline:2px solid var(--metric-ink)!important;outline-offset:3px}
+html body .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card:hover{
+ transform:translateY(-2px);background:var(--dashboard-control-hover)!important;
+ border-color:var(--dashboard-control-accent)!important;box-shadow:0 8px 22px #162a2420!important;
+}
+html body .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card:focus-visible{outline:2px solid var(--dashboard-control-accent)!important;outline-offset:3px}
 html body .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card .stat-icon{
  display:grid!important;place-items:center!important;flex:none!important;margin:0!important;
  width:var(--metric-icon-size)!important;min-width:var(--metric-icon-size)!important;height:var(--metric-icon-size)!important;
- color:var(--metric-ink)!important;background:var(--metric-soft)!important;border:1px solid var(--metric-line)!important;
+ color:var(--dashboard-control-accent)!important;background:var(--dashboard-control-icon)!important;border:1px solid var(--dashboard-control-border)!important;
  border-radius:12px!important;box-shadow:inset 0 1px 0 #ffffff08!important;transform:none!important;
 }
 html body .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card .stat-icon:before,
@@ -8500,29 +8537,10 @@ html body .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-ca
 html body .app-shell .content .stat-card .stat-icon svg{width:24px!important;height:24px!important;overflow:visible}
 html body .app-shell .content .stat-card .stat-icon svg,
 html body .app-shell .content .stat-card .stat-icon svg *{color:inherit!important;fill:none!important;stroke:currentColor!important;stroke-width:1.7!important;stroke-linecap:round;stroke-linejoin:round}
-html body .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card .stat-copy{display:grid;gap:4px;min-width:0;color:var(--metric-text)!important}
-html body .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card .stat-label{color:var(--metric-text)!important;font-size:12px!important;font-weight:650!important;line-height:1.25!important;overflow-wrap:anywhere;text-wrap:balance}
-html body .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card strong{display:block!important;color:var(--metric-text)!important;font-size:27px!important;font-weight:750!important;line-height:1.05!important;letter-spacing:-1px;margin:0!important;font-variant-numeric:tabular-nums}
-html body .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card small{display:block!important;color:var(--metric-muted)!important;font-size:10px!important;font-weight:450!important;line-height:1.45!important;margin:0!important}
-html body .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card.stat-created{--metric-surface:#222e39;--metric-ink:#86acdb;--metric-soft:#86acdb1c;--metric-line:#86acdb42}
-html body .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card.stat-assembled{--metric-surface:#22332d;--metric-ink:#79bea4;--metric-soft:#79bea41c;--metric-line:#79bea442}
-html body .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card.stat-payment{--metric-surface:#332f26;--metric-ink:#ceaf73;--metric-soft:#ceaf731c;--metric-line:#ceaf7342}
-html body .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card.stat-ready{--metric-surface:#283329;--metric-ink:#8fc787;--metric-soft:#8fc7871c;--metric-line:#8fc78742}
-html body .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card.stat-attention{--metric-surface:#352d28;--metric-ink:#e2a079;--metric-soft:#e2a0791c;--metric-line:#e2a07942}
-html body .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card.stat-approval{--metric-surface:#2d2939;--metric-ink:#b5a1dd;--metric-soft:#b5a1dd1c;--metric-line:#b5a1dd42}
-html body .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card.stat-transferred{--metric-surface:#29303a;--metric-ink:#9daec7;--metric-soft:#9daec71c;--metric-line:#9daec742}
-html body .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card.stat-pickup{--metric-surface:#223338;--metric-ink:#7ebdc4;--metric-soft:#7ebdc41c;--metric-line:#7ebdc442}
-html body .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card.kamenskoye-stat-card{--metric-surface:#303329;--metric-ink:#b4c095;--metric-soft:#b4c0951c;--metric-line:#b4c09542}
-html body:not(.dark-theme) .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card{--metric-surface:#edf2eb;--metric-text:#30493b;--metric-muted:#506651;border-color:#c4d2c5!important;box-shadow:0 3px 12px #324b3810!important}
-html body:not(.dark-theme) .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card.stat-created{--metric-surface:#e3ebf1;--metric-ink:#507da1;--metric-soft:#d9e5ef;--metric-line:#b4cbdc}
-html body:not(.dark-theme) .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card.stat-assembled{--metric-surface:#e0ecdf;--metric-ink:#47866c;--metric-soft:#d6e8db;--metric-line:#abcdb9}
-html body:not(.dark-theme) .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card.stat-payment{--metric-surface:#eee7d5;--metric-ink:#937337;--metric-soft:#eee2c3;--metric-line:#d6c193}
-html body:not(.dark-theme) .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card.stat-ready{--metric-surface:#e2ecd8;--metric-ink:#568344;--metric-soft:#dbe8cd;--metric-line:#bbd1a7}
-html body:not(.dark-theme) .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card.stat-attention{--metric-surface:#efe2d6;--metric-ink:#a66b41;--metric-soft:#efddc9;--metric-line:#dabb9b}
-html body:not(.dark-theme) .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card.stat-approval{--metric-surface:#e8e1ee;--metric-ink:#8267a3;--metric-soft:#e5ddef;--metric-line:#c8b8dd}
-html body:not(.dark-theme) .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card.stat-transferred{--metric-surface:#e2e8ef;--metric-ink:#657d97;--metric-soft:#dee5ec;--metric-line:#bdcbd8}
-html body:not(.dark-theme) .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card.stat-pickup{--metric-surface:#dcebe8;--metric-ink:#43868b;--metric-soft:#d3e8e6;--metric-line:#abd0cd}
-html body:not(.dark-theme) .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card.kamenskoye-stat-card{--metric-surface:#e7ead8;--metric-ink:#778749;--metric-soft:#e3e7cf;--metric-line:#c6ceab}
+html body .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card .stat-copy{display:grid;gap:4px;min-width:0;color:var(--dashboard-control-text)!important}
+html body .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card .stat-label{color:var(--dashboard-control-text)!important;font-size:12px!important;font-weight:650!important;line-height:1.25!important;overflow-wrap:anywhere;text-wrap:balance}
+html body .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card strong{display:block!important;color:var(--dashboard-control-text)!important;font-size:27px!important;font-weight:750!important;line-height:1.05!important;letter-spacing:-1px;margin:0!important;font-variant-numeric:tabular-nums}
+html body .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card small{display:block!important;color:var(--dashboard-control-muted)!important;font-size:10px!important;font-weight:450!important;line-height:1.45!important;margin:0!important}
 @media(max-width:1100px){
  html body .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card{padding-inline:12px!important}
 }
@@ -8554,10 +8572,6 @@ html body :is(.app-shell,#modalBackdrop,.buyback-overlay) :is(button,[role="butt
 .kamenskoye-stat-section:has(>.kamenskoye-stat-card:not([hidden])){grid-template-columns:repeat(3,minmax(0,1fr))}
 html body .app-shell .content .kamenskoye-stat-section>.stat-card{width:100%!important}
 html body .app-shell .content .kamenskoye-stat-section>.stat-card[hidden]{display:none!important}
-html body .app-shell .content .kamenskoye-stat-section>.stat-card.stat-inspection-pending{--metric-surface:#332f26;--metric-ink:#ceaf73;--metric-soft:#ceaf731c;--metric-line:#ceaf7342}
-html body .app-shell .content .kamenskoye-stat-section>.stat-card.stat-inspection-checked{--metric-surface:#22332d;--metric-ink:#79bea4;--metric-soft:#79bea41c;--metric-line:#79bea442}
-html body:not(.dark-theme) .app-shell .content .kamenskoye-stat-section>.stat-card.stat-inspection-pending{--metric-surface:#eee7d5;--metric-ink:#937337;--metric-soft:#e6d8b2;--metric-line:#d6c193}
-html body:not(.dark-theme) .app-shell .content .kamenskoye-stat-section>.stat-card.stat-inspection-checked{--metric-surface:#e0ecdf;--metric-ink:#47866c;--metric-soft:#cfe1cd;--metric-line:#abcdb9}
 .inspection-toolbar{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:16px}
 .inspection-toolbar>p{max-width:500px;margin:0;color:var(--muted,#96aba0);font-size:12px;line-height:1.6}
 .inspection-toolbar>button{flex:none}
@@ -8606,7 +8620,3 @@ html body:not(.dark-theme) .inspection-defect.resolved{background:#d8e7d6;color:
  .inspection-item{padding:13px}
  .inspection-toolbar>button{width:100%}
 }
-
-/* Counters use one charcoal surface in both themes; colour belongs to badges. */
-html body .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card{background:#202b32!important}
-html body:not(.dark-theme) .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card{--metric-text:#e6edf2;--metric-muted:#afbec6;border-color:#3b4a52!important;box-shadow:0 4px 14px #253d3020!important}

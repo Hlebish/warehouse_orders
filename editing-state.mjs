@@ -1,4 +1,4 @@
-import { storedOrderDeliveryDetails } from './order-delivery.mjs?v=2026.11.19.07';
+import { storedOrderDeliveryDetails } from './order-delivery.mjs?v=2026.11.19.08';
 
 function stable(value) {
   if (value?.toDate) return value.toDate().toISOString();

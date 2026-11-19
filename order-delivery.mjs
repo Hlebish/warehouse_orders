@@ -36,6 +36,7 @@ export function storedOrderDeliveryDetails(order = {}) {
 
 export function driverOrdersForDate(orders, dateKey, toDateKey) {
   return orders.filter(order => {
+    if (order.status === 'Отменён' || order.status === 'Отменен') return false;
     if (order.deliveryType === 'pickup' || ['Самовывоз', 'Ожидает самовывоза', 'Клиент забрал самовывозом'].includes(order.status)) return false;
     const orderDay = order.shippedAt || order.status === 'Отгружен кладовщиком'
       ? shipmentOrderDateKey(order, toDateKey)

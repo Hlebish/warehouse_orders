@@ -5,8 +5,8 @@ import { getStorage, ref as storageRef, uploadBytes, uploadBytesResumable, getDo
 import { getMessaging, getToken, deleteToken, onMessage } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-messaging.js';
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-functions.js';
 import { firebaseConfig, vapidKey } from './firebase-config.js';
-import { orderEditSnapshot, assertOrderUnchanged } from './editing-state.mjs?v=2026.11.19.07';
-import { orderPaymentLabels, orderPaymentLabel, isOrderPaymentType, deliveryAddressLimit, mainCommentLimit, storedOrderDeliveryDetails, driverOrdersForDate, driverSheetHtml } from './order-delivery.mjs?v=2026.11.19.07';
+import { orderEditSnapshot, assertOrderUnchanged } from './editing-state.mjs?v=2026.11.19.08';
+import { orderPaymentLabels, orderPaymentLabel, isOrderPaymentType, deliveryAddressLimit, mainCommentLimit, storedOrderDeliveryDetails, driverOrdersForDate, driverSheetHtml } from './order-delivery.mjs?v=2026.11.19.08';
 import { drafts, draftKey } from './draft-store.mjs?v=2026.11.16.04';
 import { createWarehouseMapPanel, warehouseMapUrl, mapArticleQuery } from './warehouse-map-panel.mjs?v=2026.11.12.06';
 import { composerHtml, bindChatComposer, chatTime, chatDay } from './chat-ui.mjs?v=2026.11.16.04';

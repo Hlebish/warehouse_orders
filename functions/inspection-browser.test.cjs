@@ -37,7 +37,17 @@ async function main(){const server=http.createServer((req,res)=>{const p=new URL
   await page.evaluate(()=>window.qa.role('accountant'));await page.locator('[data-inspection-decision="approve"]').click();await page.waitForFunction(()=>document.querySelector('.inspection-defect.resolved'));
   await page.evaluate(()=>window.qa.role('warehouse'));await page.locator('[data-inspection-action="check"][data-inspection-id="pending"]').click();await page.waitForFunction(()=>document.querySelector('#inspectionList-checked [data-inspection-item="pending"]'));
   await page.evaluate(()=>window.qa.archive('pending'));assert.equal(await page.locator('[data-inspection-item="pending"]').count(),0);assert.equal(await page.locator('#statInspectionChecked').textContent(),'1');
-  for(const width of [1280,390,320])for(const dark of [false,true]){await page.setViewportSize({width,height:900});await page.evaluate(dark=>document.body.classList.toggle('dark-theme',dark),dark);const overflow=await page.locator('#inspectionBoard').evaluate(node=>node.scrollWidth>node.clientWidth+1);assert.equal(overflow,false,'inspection board overflow '+width);const cards=await page.locator('#inspectionPendingCard,#inspectionCheckedCard').evaluateAll(nodes=>nodes.map(node=>{const b=node.getBoundingClientRect();return {left:b.left,right:b.right,bg:getComputedStyle(node).backgroundColor};}));for(const card of cards){assert.ok(card.left>=0&&card.right<=width+1);assert.equal(card.bg,'rgb(32, 43, 50)');}if(width!==320)await page.screenshot({path:path.join(os.tmpdir(),'warehouse-inspection-'+width+'-'+(dark?'dark':'light')+'.png')});}
+  for(const width of [1280,390,320])for(const dark of [false,true]){
+   await page.setViewportSize({width,height:900});await page.evaluate(dark=>document.body.classList.toggle('dark-theme',dark),dark);
+   const overflow=await page.locator('#inspectionBoard').evaluate(node=>node.scrollWidth>node.clientWidth+1);
+   assert.equal(overflow,false,'inspection board overflow '+width);
+   const counterFill=await page.locator('.stat-created').evaluate(node=>getComputedStyle(node).backgroundColor);
+   const cards=await page.locator('#inspectionPendingCard,#inspectionCheckedCard').evaluateAll(nodes=>nodes.map(node=>{
+    const box=node.getBoundingClientRect();return {left:box.left,right:box.right,fill:getComputedStyle(node).backgroundColor};
+   }));
+   for(const card of cards){assert.ok(card.left>=0&&card.right<=width+1);assert.equal(card.fill,counterFill);}
+   if(width!==320)await page.screenshot({path:path.join(os.tmpdir(),'warehouse-inspection-'+width+'-'+(dark?'dark':'light')+'.png')});
+  }
   await page.locator('#closeModal').click();await page.locator('#inspectionCheckedCard').focus();await page.keyboard.press('Enter');await page.locator('#inspectionBoard').waitFor();assert.deepEqual(errors,[]);console.log('PASS two live counters, role controls, optional fields, catalogue suggestions, defect photos/retry/decisions, automatic disappearance, keyboard and both themes at 1280/390/320');
  }finally{if(browser)await browser.close();await new Promise(resolve=>server.close(resolve));}}
 main().catch(error=>{console.error(error);process.exitCode=1;});

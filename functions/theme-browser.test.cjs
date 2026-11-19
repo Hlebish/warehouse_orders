@@ -34,15 +34,17 @@ async function run(){
     if(Math.max(...c.slice(0,3))<85&&box.width*box.height>600)bad.push({tag:node.tagName,class:node.className,color:style.backgroundColor});
    }return bad;
   });
-  const readable=()=>page.evaluate(()=>{
+  const readable=selector=>page.evaluate(selector=>{
    const rgb=s=>(s.match(/[\d.]+/g)||[]).map(Number),luma=c=>{const a=c.slice(0,3).map(v=>v/255).map(v=>v<=.04045?v/12.92:((v+.055)/1.055)**2.4);return a[0]*.2126+a[1]*.7152+a[2]*.0722;},failures=[];
-   for(const node of document.querySelectorAll('.stat-card .stat-label,.stat-card strong,.stat-card small,.page-heading p,.panel-heading p,.field label,.buyback-supplier-filter label,.buyback-head p,.buyback-meta,.timeline-text,.chat-composer-hint')){
+   for(const node of document.querySelectorAll(selector)){
     if(!node.getClientRects().length||getComputedStyle(node).visibility==='hidden')continue;
     let surface=node,bg;while(surface){bg=rgb(getComputedStyle(surface).backgroundColor);if(bg.length===3||bg[3]>.95)break;surface=surface.parentElement;}
     if(!surface)continue;const a=luma(rgb(getComputedStyle(node).color)),b=luma(bg),ratio=(Math.max(a,b)+.05)/(Math.min(a,b)+.05);
     if(ratio<4.5)failures.push({class:node.className,text:node.textContent.trim().slice(0,60),ratio:ratio.toFixed(2)});
    }return failures;
-  });
+  },selector);
+  const dashboardText='.topbar button,.stat-card .stat-label,.stat-card strong,.stat-card small';
+  const lightThemeText='.page-heading p,.panel-heading p,.field label,.buyback-supplier-filter label,.buyback-head p,.buyback-meta,.timeline-text,.chat-composer-hint';
   for(const width of [1440,390,320])for(const dark of [false,true]){
    await page.setViewportSize({width,height:1000});await page.evaluate(dark=>document.body.classList.toggle('dark-theme',dark),dark);await page.waitForTimeout(320);
    const metrics=await page.locator('.stat-card:visible').evaluateAll(nodes=>nodes.map(node=>{
@@ -62,8 +64,15 @@ async function run(){
     assert.ok(Math.abs(m.numberInset-metrics[0].numberInset)<1&&m.iconGap>=8,'counter columns are misaligned');
     if(width<=720){assert.equal(m.height,metrics[0].height);assert.ok(Math.abs(m.numberBottom-metrics[0].numberBottom)<1);}
    }
+   const palette=await page.locator('.stat-card:visible,.topbar button:visible').evaluateAll(nodes=>nodes.map(node=>{
+    const style=getComputedStyle(node);
+    return [style.backgroundColor,style.borderTopColor,style.color].join(' / ');
+   }));
+   assert.deepEqual([...new Set(palette)],[palette[0]],'header buttons and counters share a palette');
+   assert.equal(new Set(metrics.map(metric=>metric.stroke)).size,1,'counter icons share an accent');
+   assert.deepEqual(await readable(dashboardText),[],'dashboard text contrast');
    assert.deepEqual(await page.locator('.app-shell button').evaluateAll(nodes=>nodes.filter(node=>getComputedStyle(node).backgroundImage.includes('gradient')).map(node=>node.id||node.className)),[],'buttons must have flat fills in both themes');
-   if(!dark){const bad=await inspect();assert.deepEqual(bad,[],'dark surfaces on light dashboard');assert.deepEqual(await readable(),[],'light dashboard text contrast');const bg=await page.locator('body').evaluate(node=>getComputedStyle(node).backgroundColor);assert.notEqual(bg,'rgb(255, 255, 255)');}
+   if(!dark){const bad=await inspect();assert.deepEqual(bad,[],'dark surfaces on light dashboard');assert.deepEqual(await readable(lightThemeText),[],'light dashboard text contrast');const bg=await page.locator('body').evaluate(node=>getComputedStyle(node).backgroundColor);assert.notEqual(bg,'rgb(255, 255, 255)');}
    if(width!==320)await page.screenshot({path:path.join(os.tmpdir(),'warehouse-theme-'+(dark?'dark':'light')+'-'+width+'.png'),fullPage:true});
   }
   const kamenskoye=page.locator('.kamenskoye-stat-card');
@@ -96,7 +105,7 @@ async function run(){
   await page.setViewportSize({width:1280,height:1000});await page.evaluate(()=>document.body.classList.remove('dark-theme'));await page.waitForTimeout(320);
   for(const [title,content,kind] of [['Новый заказ',form,''],['Заказ № 3188',order,''],['Клиенты',directory,'directory-modal'],['Личный чат','<div class="direct-chat-shell">'+chatBody+'</div>','chat-dialog direct-chat-dialog']]){
    await page.evaluate(({title,content,kind})=>{document.getElementById('modalTitle').textContent=title;document.getElementById('modalBody').innerHTML=content;document.querySelector('#modalBackdrop>.modal').className='modal '+kind;document.getElementById('modalFoot').innerHTML='<button class="secondary-button">Закрыть</button><button class="primary-button">Сохранить</button>';document.getElementById('modalBackdrop').hidden=false;},{title,content,kind});
-   await page.waitForTimeout(350);assert.deepEqual(await inspect(),[],'dark surfaces in '+title);assert.deepEqual(await readable(),[],'dialog text contrast');
+   await page.waitForTimeout(350);assert.deepEqual(await inspect(),[],'dark surfaces in '+title);assert.deepEqual(await readable(lightThemeText),[],'dialog text contrast');
    await page.screenshot({path:path.join(os.tmpdir(),'warehouse-theme-dialog-'+(kind?'chat':title.startsWith('Заказ')?'order':'form')+'.png')});
   }
   await page.evaluate(markup=>{document.getElementById('modalBackdrop').hidden=true;const overlay=document.createElement('div');overlay.className='buyback-overlay';overlay.innerHTML=markup;document.body.append(overlay);document.getElementById('buybackSummary').innerHTML='<button class="buyback-chip"><span>В работе</span><b>8</b></button>';document.getElementById('buybackList').innerHTML='<div class="buyback-supplier-groups"><section class="buyback-supplier-group"><button class="buyback-supplier-toggle">Автодетали Плюс <small>2 товара</small></button><div class="buyback-supplier-items"><div class="buyback-card"><div><b class="buyback-article">APMA2506 × 2</b><p class="buyback-meta">Бампер передний · Принят 16.11.2026</p><div class="buyback-progress"><span style="width:25%"></span></div><span class="buyback-status">В работе</span></div><div class="buyback-actions"><button>Продан</button><button class="danger">Отменить</button></div></div></div></section></div>';},buybackMarkup);

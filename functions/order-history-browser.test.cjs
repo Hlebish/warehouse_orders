@@ -16,12 +16,16 @@ const application=[
  between('function showModal(', 'function closeModal('),
  between('function button(', 'function articleRowHtml('),
  between('function statusClass(', 'const statOrderConfig='),
+ between('function orderDeliveryFields(', '/* ===== Справочники клиентов'),
  between('function focusPendingOrderEntry(', 'async function openPendingNotificationOrder('),
- between('function renderOrderHistoryItem(', 'function openOrderActionCategory(')
+ between('function renderOrderHistoryItem(', 'function openOrderActionCategory('),
+ between('function editOrderInfo(', 'const orderEditsInFlight=')
 ].join('\n');
 const photo='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aK9sAAAAASUVORK5CYII=';
 const fixture=`
 ${historyImport.replace("'./order-history", "'/order-history").replace('"./order-history', '"/order-history')}
+import {orderPaymentLabel,orderPaymentLabels,isOrderPaymentType,deliveryAddressLimit,mainCommentLimit,storedOrderDeliveryDetails} from '/order-delivery.mjs';
+import {decorateDefectPhotoActions} from '/photo-sharing.mjs';
 const $=id=>document.getElementById(id),modal=$('modalBackdrop');
 const signedInUser={uid:'current-viewer'},profileName='Текущий сотрудник';
 const state={orders:[],role:'warehouse'},db={},entryUnsubscribes=new Map(),serverCache=new Map(),serverEntriesLoaded=new Set();
@@ -31,6 +35,7 @@ let orderReturnModalSnapshot=null,directChatTarget=null,directChatActiveThreadId
 let directChatUnsubscribe=null,activeEntryDraft=null,modalHistoryEntry=false;
 const photoSharing={isOpen:()=>false,close(){}},persistOpenEntryDraft=()=>{},decoratePhotoSharing=()=>{};
 const openStaffPanel=()=>{},isAndroidWarehouse=()=>false,orderEditSnapshot=x=>x;
+const loadProductsCatalog=()=>{},articlesEditorHtml=()=>'',canEditOrder=o=>!isShipmentLocked(o);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const renderChatText=esc;
 const asDate=value=>{if(!value)return null;if(typeof value.toDate==='function')return value.toDate();if(typeof value.toMillis==='function')return new Date(value.toMillis());if(typeof value==='object'&&Number.isFinite(value.seconds))return new Date(value.seconds*1000);const date=new Date(value);return Number.isNaN(date.getTime())?null:date;};
@@ -58,6 +63,9 @@ window.qa={toasts:[]};
 ${application}
 Object.assign(window.qa,{
  ready:true,
+ createOrder:openNewOrder,
+ readDelivery:readOrderDeliveryFields,
+ editDelivery:()=>{Object.assign(state.orders[0],{status:'Создан',paymentType:'deferred',deliveryAddress:'Улица 12',mainComment:'Вход со двора'});selectedId=seed.id;editOrderInfo();},
  open:(role='warehouse')=>{state.role=role;openOrder(seed.id);},
  loaded:()=>{const ref='orders/'+seed.id+'/entries';listeners.get(ref)?.(snapshot(ref,false));},
  reset:()=>{canManageUsers=false;state.orders[0]=structuredClone(seed);serverEntriesLoaded.clear();entryUnsubscribes.get(seed.id)?.();entryUnsubscribes.delete(seed.id);},
@@ -93,7 +101,19 @@ async function run(){
   page.on('pageerror',error=>errors.push(error.message));
   await page.route('**/*',route=>route.request().url().startsWith(url)?route.continue():route.abort());
   await page.goto(url);await page.waitForFunction(()=>window.qa?.ready);
+  await page.evaluate(()=>window.qa.createOrder());
+  assert.equal(await page.locator('#orderPaymentType').inputValue(),'');
+  assert.equal(await page.evaluate(()=>window.qa.readDelivery()),null);
+  await page.locator('#orderPaymentType').selectOption('unknown');
+  assert.deepEqual(await page.evaluate(()=>window.qa.readDelivery()),{paymentType:'unknown',deliveryAddress:'',mainComment:''});
+  await page.evaluate(()=>window.qa.editDelivery());
+  assert.equal(await page.locator('#orderPaymentType').inputValue(),'deferred');
+  assert.equal(await page.locator('#orderDeliveryAddress').inputValue(),'Улица 12');
+  assert.equal(await page.locator('#orderMainComment').inputValue(),'Вход со двора');
+  await page.evaluate(()=>window.qa.reset());
   await page.evaluate(()=>window.qa.open());
+  assert.match(await page.locator('.order-delivery-summary').textContent(),/Оплата: Неизвестно/);
+  assert.equal(await page.locator('[data-action="print-driver-order"]').isVisible(),true);
   assert.equal(await page.locator('.order-summary').count(),0);
   assert.doesNotMatch(await page.locator('#modalBody').textContent(),/Коротко по заказу|Следующее действие/);
   assert.match(await page.locator('.order-detail-head').textContent(),/Анна Создатель/);

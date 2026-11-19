@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import {orderEditSnapshot,assertOrderUnchanged} from '../editing-state.mjs';
 import { canTransitionOrderStatus, statusAfterDefectDecision } from '../order-workflow.mjs';
+import { deliveryAddressLimit, isOrderPaymentType, mainCommentLimit, orderPaymentLabel, storedOrderDeliveryDetails } from '../order-delivery.mjs';
 const source=readFileSync(new URL('../app.js',import.meta.url),'utf8');
 const between=(start,end)=>{const a=source.indexOf(start),b=source.indexOf(end,a);assert.ok(a>=0&&b>a,'Missing source boundary: '+start);return source.slice(a,b);};
 const clone=value=>JSON.parse(JSON.stringify(value));
@@ -37,6 +38,39 @@ function harness(order,overrides={}){
  return {context,data,events};
 }
 const base=()=>({id:'o',number:'1',status:'Создан',entries:[],articles:[{article:'A',quantity:1,collected:true},{article:'B',quantity:1,collected:false}]});
+
+test('order creation requires a payment choice and writes printable delivery details',async()=>{
+ const fields={orderNumber:{value:'42'},clientName:{value:'Клиент',dataset:{}},deliveryType:{value:'city'},startStatus:{value:'Создан'},
+  orderPaymentType:{value:'',focus(){},reportValidity(){}},orderDeliveryAddress:{value:' Улица 12 '},orderMainComment:{value:' Позвонить '}};
+ const writes=[];
+ const {context}=harness(base(),{
+  $:id=>fields[id],modal:{querySelector:()=>null},readArticles:()=>[],pendingOrderCreateDrafts:new Map(),
+  getDocFromServer:async()=>({exists:()=>false}),writeBatch:()=>({set:(ref,data)=>writes.push({ref,data}),async commit(){}}),
+  closeModal(){},isOrderPaymentType,deliveryAddressLimit,mainCommentLimit,storedOrderDeliveryDetails
+ });
+ vm.runInContext(between('function readOrderDeliveryFields(', 'function openNewOrder('),context);
+ vm.runInContext(between('function orderToCloud(', 'function equal('),context);
+ vm.runInContext(between('async function saveOrder(){', 'function appendClipboardImages('),context);
+ await context.saveOrder();
+ assert.equal(writes.length,0);
+ fields.orderPaymentType.value='unknown';
+ await context.saveOrder();
+ assert.deepEqual(storedOrderDeliveryDetails(writes[0].data),{paymentType:'unknown',deliveryAddress:'Улица 12',mainComment:'Позвонить'});
+});
+
+test('order data editing can replace unknown payment and edit or clear the optional fields',async()=>{
+ const order={...base(),client:'Клиент',deliveryType:'city',paymentType:'unknown',mainComment:'Старая заметка'};
+ const fields={editOrderNumber:{value:'1'},editClientName:{value:'Клиент',dataset:{}},editDeliveryType:{value:'city'},
+  orderPaymentType:{value:'bank_transfer'},orderDeliveryAddress:{value:'Улица 12'},orderMainComment:{value:''}};
+ const {context,data}=harness(order,{$:id=>fields[id],isOrderPaymentType,deliveryAddressLimit,mainCommentLimit,orderPaymentLabel});
+ vm.runInContext(between('function readOrderDeliveryFields(', 'function openNewOrder('),context);
+ vm.runInContext(between('function applyCommittedOrder(', 'let modalHistoryEntry='),context);
+ vm.runInContext(between('const orderEditsInFlight=', 'function editArticles('),context);
+ await context.saveOrderInfo();
+ assert.deepEqual(storedOrderDeliveryDetails(data),{paymentType:'bank_transfer',deliveryAddress:'Улица 12',mainComment:''});
+ assert.match(data.text,/оплата: Неизвестно → На счёт/);
+});
+
 test('checking the last position still automatically changes Created to Assembled',async()=>{
  const {context,data,events}=harness(base());await context.toggleArticleCollected(1);
  assert.equal(data.status,'Собран');assert.equal(data.assemblyInProgress,false);

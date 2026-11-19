@@ -18,7 +18,7 @@ test('normalizing an order version tolerates absent optional fields, but detects
 });
 test('versions include business fields, not property insertion order',()=>{
  const base=order(),expected=orderEditSnapshot(base);
- for(const patch of [{status:'Отгружен кладовщиком'},{client:'Other'},{clientId:'other'},{number:'43'},{updatedAt:'later'},{articles:[{article:'B',quantity:1}]}])assert.throws(()=>assertOrderUnchanged(expected,{...base,...patch}),{code:'order-conflict'});
+ for(const patch of [{status:'Отгружен кладовщиком'},{client:'Other'},{clientId:'other'},{number:'43'},{updatedAt:'later'},{articles:[{article:'B',quantity:1}]},{paymentType:'on_delivery'},{deliveryAddress:'Улица 12'},{mainComment:'Позвонить'}])assert.throws(()=>assertOrderUnchanged(expected,{...base,...patch}),{code:'order-conflict'});
  assert.doesNotThrow(()=>assertOrderUnchanged(expected,{articles:base.articles,status:base.status,client:base.client,number:base.number,createdAt:base.createdAt}));
 });
 test('drafts are isolated by account, order, kind and reply target',()=>{

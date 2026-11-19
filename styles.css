@@ -8655,3 +8655,4 @@ html body:not(.dark-theme) .inspection-defect.resolved{background:#d8e7d6;color:
  .inspection-item{padding:13px}
  .inspection-toolbar>button{width:100%}
 }
+.order-delivery-summary{display:grid;gap:5px;margin:0 0 14px;padding:10px 12px;border:1px solid var(--line);border-radius:9px;font-size:12px;line-height:1.4;white-space:pre-wrap;overflow-wrap:anywhere}

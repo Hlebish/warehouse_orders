@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
 import {createForegroundSync} from '../foreground-sync.mjs';
+import {storedOrderDeliveryDetails} from '../order-delivery.mjs';
 
 function harness(reconnect){
  let time=0,seq=0,calls=0;const timers=new Map(),states=[];
@@ -49,7 +50,7 @@ test('permanent permission errors stop retries until a new session',async()=>{
 
 function ordersHarness(){
  const source=readFileSync(new URL('../app.js',import.meta.url),'utf8');let listener,renders=0;const notices=[];
- const context={ordersRetryTimer:null,ordersUnsubscribe:null,ordersRetryDelay:3000,ordersConnectionNoticeShown:false,initialCloudLoad:true,
+ const context={ordersRetryTimer:null,ordersUnsubscribe:null,ordersRetryDelay:3000,ordersConnectionNoticeShown:false,initialCloudLoad:true,storedOrderDeliveryDetails,
   inspectionItems:{start(){}},foregroundDataSync:{start(){},snapshot(){},fail(){}},db:{},collection:()=>({}),onSnapshot(_ref,opts,fn){assert.equal(opts.includeMetadataChanges,true);listener=fn;return ()=>{};},
   state:{orders:[{id:'cached',number:'1',status:'Создан',entries:[]}]},pendingWrites:new Set(),pendingOrderData:new Map(),serverCache:new Map(),entryUnsubscribes:new Map(),selectedId:null,
   saveOrdersCache(){},watchPendingDefectOrders(){},scheduleRender(){renders++;},restoreUiState(){},pendingNotificationOrderId:'',toast:text=>notices.push(text),notify(){}};
@@ -62,7 +63,8 @@ test('an empty SDK cache never erases the persisted Android orders; a confirmed 
  h.snapshot([],false);assert.equal(h.context.state.orders.length,0);assert.equal(h.renders(),1);
  h.snapshot([],false);assert.equal(h.renders(),1,'metadata-only events do not repaint the interface');
 });
-test('server reconciliation retains pending local orders and updates counters through the existing renderer',()=>{
- const h=ordersHarness();h.context.pendingWrites.add('cached');const added={id:'new',data:()=>({number:'2',status:'Создан',articles:[]})};
+test('server reconciliation retains pending local orders and loads the stored delivery fields',()=>{
+ const h=ordersHarness();h.context.pendingWrites.add('cached');const added={id:'new',data:()=>({number:'2',status:'Создан',articles:[],paymentType:'bank_transfer',deliveryAddress:'Улица 12',mainComment:'Вход со двора'})};
  h.snapshot([added],false,[{doc:added,type:'added'}]);assert.equal(h.context.state.orders.length,2);assert.equal(h.renders(),1);assert.equal(h.notices.length,0);
+ assert.deepEqual(storedOrderDeliveryDetails(h.context.state.orders.find(order=>order.id==='new')),storedOrderDeliveryDetails(added.data()));
 });

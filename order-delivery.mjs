@@ -4,6 +4,7 @@ export const orderPaymentLabels = Object.freeze({
   on_delivery: 'По факту',
   bank_transfer: 'На счёт',
   deferred: 'Отсрочка платежа',
+  cashless: 'Безналичные',
   unknown: 'Неизвестно'
 });
 

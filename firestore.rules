@@ -31,7 +31,7 @@ service cloud.firestore {
     }
     // Older orders and app versions can omit these operational fields.
     function validOrderDeliveryDetails(data) {
-      return (!('paymentType' in data) || data.paymentType in ['on_delivery', 'bank_transfer', 'deferred', 'unknown'])
+      return (!('paymentType' in data) || data.paymentType in ['on_delivery', 'bank_transfer', 'deferred', 'cashless', 'unknown'])
         && (!('deliveryAddress' in data) || data.deliveryAddress is string && data.deliveryAddress.size() <= 500)
         && (!('mainComment' in data) || data.mainComment is string && data.mainComment.size() <= 2000);
     }

@@ -4,7 +4,7 @@ importScripts(
 );
 
 const SITE_URL = 'https://hlebish.github.io/warehouse_orders/';
-const CACHE = 'order-desk-fcm-v135-driver-sheet';
+const CACHE = 'order-desk-fcm-v136-cashless-payment';
 // Version bump triggers install/activate; activate notifies open tabs to reload.
 const ASSETS = [
   './',

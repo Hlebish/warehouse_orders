@@ -106,6 +106,8 @@ async function run(){
   assert.equal(await page.evaluate(()=>window.qa.readDelivery()),null);
   await page.locator('#orderPaymentType').selectOption('unknown');
   assert.deepEqual(await page.evaluate(()=>window.qa.readDelivery()),{paymentType:'unknown',deliveryAddress:'',mainComment:''});
+  await page.locator('#orderPaymentType').selectOption({label:'Безналичные'});
+  assert.equal((await page.evaluate(()=>window.qa.readDelivery())).paymentType,'cashless');
   await page.evaluate(()=>window.qa.editDelivery());
   assert.equal(await page.locator('#orderPaymentType').inputValue(),'deferred');
   assert.equal(await page.locator('#orderDeliveryAddress').inputValue(),'Улица 12');

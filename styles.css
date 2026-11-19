@@ -8610,6 +8610,7 @@ html body .app-shell .content .kamenskoye-stat-section>.stat-card[hidden]{displa
 .inspection-item-heading>div{min-width:0}
 .inspection-item-heading b{font-size:14px;overflow-wrap:anywhere}
 .inspection-item-heading p{margin:5px 0 0;font-size:12px;line-height:1.5;overflow-wrap:anywhere}
+.inspection-item .warehouse-map-address{margin-top:6px;font-size:12px}
 .inspection-state{flex:none;max-width:45%;font-size:10px;color:#c2d0c4;line-height:1.5;text-align:right}
 .inspection-client{margin-top:10px;font-size:12px;overflow-wrap:anywhere}
 .inspection-meta{margin-top:8px;font-size:10px;color:#a3b7aa;line-height:1.6}

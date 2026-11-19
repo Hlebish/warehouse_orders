@@ -14,7 +14,7 @@ import { bindDirectChatDraft } from './direct-chat-draft.mjs?v=2026.11.16.04';
 import { buildOrderHistory, getOrderCreator, getLatestOrderEvent } from './order-history.mjs?v=2026.11.17.01';
 import { buildStaffConversations } from './staff-conversations.mjs?v=2026.11.16.05';
 import { createForegroundSync } from './foreground-sync.mjs?v=2026.11.18.01';
-import { createInspectionItems } from './inspection-items.mjs?v=2026.11.18.05';
+import { createInspectionItems } from './inspection-items.mjs?v=2026.11.19.03';
 import { createDirectChatReceipts } from './direct-chat-receipts.mjs?v=2026.11.16.02';
 import { createDirectChatNoticeSync } from './direct-chat-notices.mjs?v=2026.11.16.02';
 import { createPhotoSharing, decoratePhotoSharing } from './photo-sharing.mjs?v=2026.11.12.10';
@@ -101,7 +101,7 @@ const inspectionItems=createInspectionItems({
  watch:(next,error)=>onSnapshot(query(collection(db,'inspectionItems'),where('status','in',['pending','checked'])),{includeMetadataChanges:true},snapshot=>next({items:snapshot.docs.map(doc=>({id:doc.id,...doc.data()})),fromCache:snapshot.metadata.fromCache}),error),
  manage:async data=>(await httpsCallable(warehouseFunctions,'manageInspectionItem')(data)).data,
  getSession:()=>signedInUser?{uid:signedInUser.uid,role:state.role,admin:canManageUsers}:null,
- getClients:()=>clients,getProducts:()=>productsCatalog,showModal,closeModal,toast,
+ getClients:()=>clients,getProducts:()=>productsCatalog,getStorageAddresses:lookupWarehouseMapAddresses,showModal,closeModal,toast,
  upload:async(id,defectId,files)=>{
   const blobs=await readPhotos(files),uid=signedInUser?.uid;if(!uid)throw new Error('Войдите в приложение.');
   return Promise.all(blobs.map(async(blob,index)=>{const ref=storageRef(storage,`inspectionItems/${id}/${uid}/${defectId}/${index}.jpg`);try{return await getDownloadURL(ref);}catch(error){if(error.code!=='storage/object-not-found')throw error;}await uploadBytes(ref,blob,{contentType:'image/jpeg'});return getDownloadURL(ref);}));
@@ -2445,17 +2445,21 @@ async function saveReturn(){
 }
 const WAREHOUSE_MAP_LOOKUP_URL='https://europe-west1-sklad-18f38.cloudfunctions.net/lookupWarehouseMapAddress';
 function normalizeMapArticleForUi(value){const text=String(value||'').trim().toUpperCase();const code=text.match(/^(AP[A-Z]{2}\d+)/);return code?code[1]:text.replace(/[^A-Z0-9]/g,'')}
-async function loadWarehouseMapAddresses(orderArticles){
-  const elements=[...document.querySelectorAll('[data-map-location-article]')];
-  if(!elements.length)return;
-  const unique=[...new Set((orderArticles||[]).map(item=>String(item?.article||'').trim()).filter(Boolean))];
-  if(!unique.length)return;
-  const setStatus=(article,text)=>elements.filter(el=>normalizeMapArticleForUi(el.dataset.mapLocationArticle)===normalizeMapArticleForUi(article)).forEach(el=>{el.textContent=text});
+async function lookupWarehouseMapAddresses(articles){
+  const unique=[...new Set(articles.map(article=>String(article||'').trim()).filter(Boolean))];
+  const addresses=new Map();
+  const searchable=[];
+  for(const article of unique){
+    if(article.length<=120&&normalizeMapArticleForUi(article))searchable.push(article);
+    else addresses.set(article,'📍 Адрес не найден');
+  }
+  if(!searchable.length)return addresses;
   try{
-    if(!auth.currentUser)throw new Error('Not signed in');
-    const token=await auth.currentUser.getIdToken();
+    const user=auth.currentUser;
+    if(!user)throw new Error('Not signed in');
+    const token=await user.getIdToken();
     const chunks=[];
-    for(let i=0;i<unique.length;i+=100)chunks.push(unique.slice(i,i+100));
+    for(let i=0;i<searchable.length;i+=100)chunks.push(searchable.slice(i,i+100));
     const responses=await Promise.all(chunks.map(async articles=>{
       let chunkToken=token,refreshed=false;
       for(let attempt=0;attempt<3;attempt++){
@@ -2466,7 +2470,7 @@ async function loadWarehouseMapAddresses(orderArticles){
             cache:'no-store',
             body:JSON.stringify({articles})
           });
-          if(response.status===401&&!refreshed){chunkToken=await auth.currentUser.getIdToken(true);refreshed=true;continue}
+          if(response.status===401&&!refreshed){chunkToken=await user.getIdToken(true);refreshed=true;continue}
           if(!response.ok){const error=new Error('Warehouse Map lookup failed: '+response.status);error.status=response.status;if([429,502,503,504].includes(response.status)&&attempt<2){await new Promise(resolve=>setTimeout(resolve,350*(attempt+1)));continue}throw error}
           const data=await response.json();
           if(data?.ok!==true||!Array.isArray(data.results))throw new Error('Invalid Warehouse Map response');
@@ -2478,20 +2482,31 @@ async function loadWarehouseMapAddresses(orderArticles){
       }
       throw new Error('Warehouse Map lookup failed after retries');
     }));
+    if(auth.currentUser!==user)throw new Error('Warehouse Map session changed');
     const resultMap=new Map(responses.flat().map(item=>[normalizeMapArticleForUi(item.article),item]));
-    for(const article of unique){
+    for(const article of searchable){
       const item=resultMap.get(normalizeMapArticleForUi(article));
-      if(!item){setStatus(article,'📍 Адрес не найден');continue}
-      const addresses=(item.locations||[]).map(location=>location.address).filter(Boolean);
-      const text=addresses.length
-        ?'📍 '+addresses.join(', ')
+      if(!item){addresses.set(article,'📍 Адрес не найден');continue}
+      const locations=(item.locations||[]).map(location=>location.address).filter(Boolean);
+      const text=locations.length
+        ?'📍 '+locations.join(', ')
         :(item.unaddressed?'📦 Без адреса':'📍 На карте не найдено');
-      setStatus(article,text);
+      addresses.set(article,text);
     }
   }catch(error){
     console.warn('Warehouse Map address lookup unavailable:',error);
     const message=error?.status===403?'📍 Нет доступа к адресам хранения':'📍 Адрес временно недоступен';
-    elements.forEach(el=>{el.textContent=message});
+    for(const article of searchable)addresses.set(article,message);
+  }
+  return addresses;
+}
+async function loadWarehouseMapAddresses(orderArticles){
+  const elements=[...$('modalBody').querySelectorAll('[data-map-location-article]')];
+  if(!elements.length)return;
+  const addresses=await lookupWarehouseMapAddresses((orderArticles||[]).map(item=>item?.article));
+  for(const element of elements){
+    const text=addresses.get(element.dataset.mapLocationArticle.trim());
+    if(text&&element.isConnected)element.textContent=text;
   }
 }
 function renderOrderHistoryItem(event,o,{isDirector,isManager,isWarehouse,shipmentLocked}){

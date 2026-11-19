@@ -4,7 +4,7 @@ importScripts(
 );
 
 const SITE_URL = 'https://hlebish.github.io/warehouse_orders/';
-const CACHE = 'order-desk-fcm-v131-dashboard-graphite';
+const CACHE = 'order-desk-fcm-v132-orders-panel-colors';
 // Version bump triggers install/activate; activate notifies open tabs to reload.
 const ASSETS = [
   './',

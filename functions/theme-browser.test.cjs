@@ -46,7 +46,13 @@ async function run(){
   const dashboardText='.topbar button,.stat-card .stat-label,.stat-card strong,.stat-card small';
   const lightThemeText='.page-heading p,.panel-heading p,.field label,.buyback-supplier-filter label,.buyback-head p,.buyback-meta,.timeline-text,.chat-composer-hint';
   for(const width of [1440,390,320])for(const dark of [false,true]){
-   await page.setViewportSize({width,height:1000});await page.evaluate(dark=>document.body.classList.toggle('dark-theme',dark),dark);await page.waitForTimeout(320);
+   await page.setViewportSize({width,height:1000});
+   await page.evaluate(async dark=>{
+    document.body.classList.toggle('dark-theme',dark);
+    const controls=[...document.querySelectorAll('.orders-panel,.stat-card,.topbar button')];
+    const transitions=controls.flatMap(node=>node.getAnimations().filter(animation=>animation instanceof CSSTransition));
+    await Promise.allSettled(transitions.map(transition=>transition.finished));
+   },dark);
    const metrics=await page.locator('.stat-card:visible').evaluateAll(nodes=>nodes.map(node=>{
     const badge=node.querySelector('.stat-icon'),icon=badge.querySelector('svg'),count=node.querySelector('strong');
     const box=node.getBoundingClientRect(),badgeBox=badge.getBoundingClientRect(),numberBox=count.getBoundingClientRect();
@@ -69,11 +75,12 @@ async function run(){
     return [style.backgroundColor,style.borderTopColor,style.color].join(' / ');
    }));
    assert.deepEqual([...new Set(palette)],[palette[0]],'header buttons and counters share a palette');
-   assert.equal(new Set(metrics.map(metric=>metric.stroke)).size,1,'counter icons share an accent');
-   for(const color of [...palette[0].split(' / '),metrics[0].stroke]){
-    const channels=color.match(/\d+/g).map(Number);
-    assert.ok(Math.max(...channels)-Math.min(...channels)<=4,'dashboard palette is neutral: '+color);
-   }
+   const ordersPanelPalette=await page.locator('.orders-panel').evaluate(panel=>{
+    const style=getComputedStyle(panel);
+    return [style.backgroundColor,style.borderTopColor];
+   });
+   assert.deepEqual(palette[0].split(' / ').slice(0,2),ordersPanelPalette,'control fill and border match the orders panel');
+   assert.equal(new Set(metrics.map(metric=>metric.stroke)).size,8,'counter icons retain status colors');
    assert.deepEqual(await readable(dashboardText),[],'dashboard text contrast');
    assert.deepEqual(await page.locator('.app-shell button').evaluateAll(nodes=>nodes.filter(node=>getComputedStyle(node).backgroundImage.includes('gradient')).map(node=>node.id||node.className)),[],'buttons must have flat fills in both themes');
    if(!dark){const bad=await inspect();assert.deepEqual(bad,[],'dark surfaces on light dashboard');assert.deepEqual(await readable(lightThemeText),[],'light dashboard text contrast');const bg=await page.locator('body').evaluate(node=>getComputedStyle(node).backgroundColor);assert.notEqual(bg,'rgb(255, 255, 255)');}

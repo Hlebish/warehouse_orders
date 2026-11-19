@@ -139,3 +139,28 @@ export function decoratePhotoSharing(root){
   const target=img.closest('button.chat-photo-open,a')||img,figure=document.createElement('figure');figure.className='shareable-photo';target.replaceWith(figure);figure.append(target,photoShareButton(url));
  });
 }
+
+export function decorateDefectPhotoActions(root,android=false){
+  root.querySelectorAll('[data-viber-photo]').forEach(viberButton=>{
+    const copyButton=viberButton.cloneNode(true);
+    copyButton.removeAttribute('data-viber-photo');
+    copyButton.dataset.copyPhoto=viberButton.dataset.viberPhoto;
+    copyButton.dataset.copyContext=viberButton.dataset.viberContext||'Фото из заказа';
+    copyButton.textContent='📋 Скопировать фото';
+    viberButton.insertAdjacentElement('afterend',copyButton);
+    viberButton.dataset.sharePhoto=viberButton.dataset.viberPhoto;viberButton.removeAttribute('data-viber-photo');viberButton.className='photo-share-button';viberButton.textContent='↗ Поделиться';
+  });
+  root.querySelectorAll('.defect-comment-photos,.defect-modal-photos,.inspection-photos').forEach(photoGroup=>{
+    const photoUrls=[...new Set(Array.from(photoGroup.querySelectorAll('img[data-photo]')).map(item=>item.dataset.photo).filter(Boolean))];
+    const photoButton=photoGroup.querySelector('[data-viber-context],[data-copy-context]');
+    if(photoUrls.length<2||photoGroup.previousElementSibling?.matches('[data-share-photo-group]'))return;
+    const groupButton=document.createElement('button');
+    groupButton.type='button';
+    groupButton.className='small-button primary-soft defect-photo-group-button';
+    groupButton.textContent=android?`Отправить ${photoUrls.length} фото в Viber`:'📋 Скопировать все фото (коллаж)';
+    groupButton.dataset.photoGroup=JSON.stringify(photoUrls);
+    groupButton.dataset.photoGroupContext=photoButton?.dataset.viberContext||photoButton?.dataset.copyContext||'Фото дефекта';
+    photoGroup.insertAdjacentElement('beforebegin',groupButton);
+    const shareButton=document.createElement('button');shareButton.type='button';shareButton.className='small-button primary-soft defect-photo-group-button';shareButton.textContent='↗ Поделиться коллажем';shareButton.dataset.sharePhotoGroup=JSON.stringify(photoUrls);photoGroup.insertAdjacentElement('beforebegin',shareButton);
+  });
+}

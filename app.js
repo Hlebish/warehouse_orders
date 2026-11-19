@@ -14,10 +14,10 @@ import { bindDirectChatDraft } from './direct-chat-draft.mjs?v=2026.11.16.04';
 import { buildOrderHistory, getOrderCreator, getLatestOrderEvent } from './order-history.mjs?v=2026.11.17.01';
 import { buildStaffConversations } from './staff-conversations.mjs?v=2026.11.16.05';
 import { createForegroundSync } from './foreground-sync.mjs?v=2026.11.18.01';
-import { createInspectionItems } from './inspection-items.mjs?v=2026.11.19.03';
+import { createInspectionItems } from './inspection-items.mjs?v=2026.11.19.04';
 import { createDirectChatReceipts } from './direct-chat-receipts.mjs?v=2026.11.16.02';
 import { createDirectChatNoticeSync } from './direct-chat-notices.mjs?v=2026.11.16.02';
-import { createPhotoSharing, decoratePhotoSharing } from './photo-sharing.mjs?v=2026.11.12.10';
+import { createPhotoSharing, decoratePhotoSharing, decorateDefectPhotoActions, photoDataUrl } from './photo-sharing.mjs?v=2026.11.19.04';
 import { canTransitionOrderStatus, statusAfterDefectDecision } from './order-workflow.mjs?v=2026.11.12.03';
 import { NOTIFICATION_CATEGORIES, NOTIFICATION_CATEGORY_KEYS, normalizeNotificationSettings, groupNotifications, NOTIFICATION_SECTIONS } from './notification-settings.mjs?v=2026.11.12.02';
 import { searchClients, searchProducts, findClientCandidates, clientPhone, clientAddress, clientComment } from './client-directory.mjs?v=2026.11.12.07';
@@ -102,6 +102,8 @@ const inspectionItems=createInspectionItems({
  manage:async data=>(await httpsCallable(warehouseFunctions,'manageInspectionItem')(data)).data,
  getSession:()=>signedInUser?{uid:signedInUser.uid,role:state.role,admin:canManageUsers}:null,
  getClients:()=>clients,getProducts:()=>productsCatalog,getStorageAddresses:lookupWarehouseMapAddresses,showModal,closeModal,toast,
+ decoratePhotos:root=>decorateDefectPhotoActions(root,isAndroidWarehouse()),
+ preparePhotoPreviews:async files=>Promise.all((await readPhotos(files)).map(photoDataUrl)),
  upload:async(id,defectId,files)=>{
   const blobs=await readPhotos(files),uid=signedInUser?.uid;if(!uid)throw new Error('Войдите в приложение.');
   return Promise.all(blobs.map(async(blob,index)=>{const ref=storageRef(storage,`inspectionItems/${id}/${uid}/${defectId}/${index}.jpg`);try{return await getDownloadURL(ref);}catch(error){if(error.code!=='storage/object-not-found')throw error;}await uploadBytes(ref,blob,{contentType:'image/jpeg'});return getDownloadURL(ref);}));
@@ -1787,28 +1789,7 @@ function showModal(title,body,buttons=[],eyebrow='КАРТОЧКА ЗАКАЗА'
   $('modalEyebrow').textContent=eyebrow;
   $('modalBody').innerHTML=body;
   const dialog=modal.querySelector('.modal');dialog?.classList.toggle('chat-dialog',!!$('modalBody').querySelector('.chat-composer'));dialog?.classList.toggle('direct-chat-dialog',!!$('directChatForm'));
-  $('modalBody').querySelectorAll('[data-viber-photo]').forEach(viberButton=>{
-    const copyButton=viberButton.cloneNode(true);
-    copyButton.removeAttribute('data-viber-photo');
-    copyButton.dataset.copyPhoto=viberButton.dataset.viberPhoto;
-    copyButton.dataset.copyContext=viberButton.dataset.viberContext||'Фото из заказа';
-    copyButton.textContent='📋 Скопировать фото';
-    viberButton.insertAdjacentElement('afterend',copyButton);
-    viberButton.dataset.sharePhoto=viberButton.dataset.viberPhoto;viberButton.removeAttribute('data-viber-photo');viberButton.className='photo-share-button';viberButton.textContent='↗ Поделиться';
-  });
-  $('modalBody').querySelectorAll('.defect-comment-photos,.defect-modal-photos').forEach(photoGroup=>{
-    const photoUrls=[...new Set(Array.from(photoGroup.querySelectorAll('img[data-photo]')).map(item=>item.dataset.photo).filter(Boolean))];
-    const photoButton=photoGroup.querySelector('[data-viber-context],[data-copy-context]');
-    if(photoUrls.length<2)return;
-    const groupButton=document.createElement('button');
-    groupButton.type='button';
-    groupButton.className='small-button primary-soft defect-photo-group-button';
-    groupButton.textContent=isAndroidWarehouse()?`Отправить ${photoUrls.length} фото в Viber`:'📋 Скопировать все фото (коллаж)';
-    groupButton.dataset.photoGroup=JSON.stringify(photoUrls);
-    groupButton.dataset.photoGroupContext=photoButton?.dataset.viberContext||photoButton?.dataset.copyContext||'Фото дефекта';
-    photoGroup.insertAdjacentElement('beforebegin',groupButton);
-    const shareButton=document.createElement('button');shareButton.type='button';shareButton.className='small-button primary-soft defect-photo-group-button';shareButton.textContent='↗ Поделиться коллажем';shareButton.dataset.sharePhotoGroup=JSON.stringify(photoUrls);photoGroup.insertAdjacentElement('beforebegin',shareButton);
-  });
+  decorateDefectPhotoActions($('modalBody'),isAndroidWarehouse());
   decoratePhotoSharing($('modalBody'));
   $('modalFoot').innerHTML=buttons.join('');
   modal.hidden=false;

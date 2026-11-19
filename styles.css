@@ -2534,6 +2534,7 @@ body.dark-theme .shipment-order-header .shipment-client-name{font-size:13px!impo
 }
 .top-history-button:hover{background:#2b3525;border-color:#75964f;color:#f4ffe8;transform:translateY(-1px)}
 .top-history-button:focus-visible{outline:2px solid #9fca5b;outline-offset:2px}
+.shipment-driver-print{width:100%;min-height:44px;margin:0 0 12px}
 .shipment-search-wrap{display:grid;gap:6px;margin:2px 0 12px}
 .shipment-search-wrap label{font-size:12px;font-weight:750;color:var(--text,#e9eee7)}
 .shipment-search-wrap input{width:100%;min-width:0;min-height:44px;padding:10px 12px;border:1px solid var(--border,#394039);border-radius:11px;background:var(--surface,#1a1d1b);color:var(--text,#edf0ed);font:inherit;font-size:13px;outline:none}

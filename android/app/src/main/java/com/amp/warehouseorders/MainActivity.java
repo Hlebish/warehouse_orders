@@ -9,9 +9,15 @@ import android.content.ClipData;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.CancellationSignal;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.ParcelFileDescriptor;
+import android.print.PageRange;
+import android.print.PrintAttributes;
+import android.print.PrintDocumentAdapter;
+import android.print.PrintManager;
 import android.provider.Settings;
 import android.graphics.Rect;
 import android.graphics.Color;
@@ -78,6 +84,7 @@ public class MainActivity extends AppCompatActivity {
     private static final String GOOGLE_WEB_CLIENT_ID = "329606730319-bqe5c2lkngq4jk87atifp6n9qnn3chfh.apps.googleusercontent.com";
 
     private WebView webView;
+    private WebView driverPrintView;
     private View networkErrorView;
     private String lastPageUrl = SITE_URL;
     private final OfflineRecovery offlineRecovery = new OfflineRecovery();
@@ -977,7 +984,63 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
+    private void closeDriverPrintView(WebView view) {
+        if (driverPrintView != view) return;
+        driverPrintView = null;
+        view.destroy();
+    }
+
+    private void printDriverSheet(String html) {
+        if (isFinishing() || isDestroyed() || webView == null || webView.getUrl() == null
+                || !webView.getUrl().startsWith(SITE_URL) || driverPrintView != null) return;
+        PrintManager manager = (PrintManager) getSystemService(PRINT_SERVICE);
+        if (manager == null) return;
+        WebView printView = new WebView(this);
+        driverPrintView = printView;
+        WebSettings printSettings = printView.getSettings();
+        printSettings.setAllowFileAccess(false);
+        printSettings.setAllowContentAccess(false);
+        printSettings.setBlockNetworkLoads(true);
+        printView.setWebViewClient(new WebViewClient() {
+            private boolean started;
+
+            @Override public void onPageFinished(WebView view, String url) {
+                if (started || driverPrintView != view || isFinishing() || isDestroyed()) return;
+                started = true;
+                String title = "Лист водителя";
+                try {
+                    PrintDocumentAdapter adapter = view.createPrintDocumentAdapter(title);
+                    manager.print(title, new PrintDocumentAdapter() {
+                        @Override public void onStart() { adapter.onStart(); }
+                        @Override public void onLayout(PrintAttributes oldAttributes, PrintAttributes newAttributes,
+                                CancellationSignal signal, LayoutResultCallback callback, Bundle extras) {
+                            adapter.onLayout(oldAttributes, newAttributes, signal, callback, extras);
+                        }
+                        @Override public void onWrite(PageRange[] pages, ParcelFileDescriptor destination,
+                                CancellationSignal signal, WriteResultCallback callback) {
+                            adapter.onWrite(pages, destination, signal, callback);
+                        }
+                        @Override public void onFinish() {
+                            try { adapter.onFinish(); }
+                            finally { closeDriverPrintView(view); }
+                        }
+                    }, new PrintAttributes.Builder().setMediaSize(PrintAttributes.MediaSize.ISO_A4).build());
+                } catch (RuntimeException error) {
+                    closeDriverPrintView(view);
+                    android.widget.Toast.makeText(MainActivity.this, "Не удалось открыть печать", android.widget.Toast.LENGTH_LONG).show();
+                }
+            }
+        });
+        printView.loadDataWithBaseURL(null, html, "text/html", "UTF-8", null);
+    }
+
     private class AndroidBridge {
+        @JavascriptInterface
+        public void printDriverSheet(String html) {
+            if (html == null || html.isEmpty()) return;
+            runOnUiThread(() -> MainActivity.this.printDriverSheet(html));
+        }
+
         @JavascriptInterface
         public void checkForAppUpdate() {
             runOnUiThread(() -> forceCheckForAppUpdate());
@@ -1086,6 +1149,7 @@ public class MainActivity extends AppCompatActivity {
     protected void onDestroy() {
         mainHandler.removeCallbacks(offlineRetry);
         mainHandler.removeCallbacks(offlineLoadTimeout);
+        if (driverPrintView != null) closeDriverPrintView(driverPrintView);
         if (filePathCallback != null) {
             filePathCallback.onReceiveValue(null);
             filePathCallback = null;

@@ -1,3 +1,5 @@
+import { storedOrderDeliveryDetails } from './order-delivery.mjs?v=2026.11.19.05';
+
 function stable(value) {
   if (value?.toDate) return value.toDate().toISOString();
   if (value instanceof Date) return value.toISOString();
@@ -9,6 +11,7 @@ export function orderEditSnapshot(order = {}) {
   return stable({
     number: String(order.number || ''), client: String(order.client || ''), clientId: String(order.clientId || ''),
     deliveryType: order.deliveryType || 'city', status: order.status || '', updatedAt: order.updatedAt || order.createdAt || '',
+    ...storedOrderDeliveryDetails(order),
     articles: (order.articles || []).map(line => ({article: String(line.article || '').trim(), quantity: Math.max(1, Number(line.quantity) || 1), collected: line.collected === true, shipmentChecked: line.shipmentChecked === true})),
     returns: order.returns || [], assemblyInProgress: order.assemblyInProgress === true
   });

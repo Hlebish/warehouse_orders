@@ -21,7 +21,8 @@
     "test:foreground-sync-browser": "node foreground-sync-browser.test.cjs",
     "test:theme-browser": "node theme-browser.test.cjs",
     "test:inspection-emulator": "firebase emulators:exec --config ../firebase.inspection-test.json --project demo-warehouse-inspections --only firestore,storage \"node inspection-emulator.test.cjs\"",
-    "test:inspection-browser": "node inspection-browser.test.cjs"
+    "test:inspection-browser": "node inspection-browser.test.cjs",
+    "test:order-delivery-rules": "firebase emulators:exec --config ../firebase.inspection-test.json --project demo-warehouse-order-delivery --only firestore \"node --test order-delivery-rules.test.cjs\""
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^5.0.2",

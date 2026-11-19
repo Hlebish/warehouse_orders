@@ -25,8 +25,10 @@ test('order delivery fields respect role and status rules, including legacy orde
       }
     });
     await assertSucceeds(setDoc(order('warehouse', 'new'), { ...legacy, ...details }));
+    await assertSucceeds(setDoc(order('warehouse', 'cashless'), { ...legacy, ...details, paymentType: 'cashless' }));
     await assertSucceeds(setDoc(order('warehouse', 'old-app'), legacy));
     await assertSucceeds(updateDoc(order('manager', 'legacy'), patch('manager', { ...details, deliveryType: 'kamyanske' })));
+    await assertSucceeds(updateDoc(order('manager', 'legacy'), patch('manager', { paymentType: 'cashless' })));
     await assertSucceeds(updateDoc(order('warehouse', 'legacy'), patch('warehouse', { paymentType: 'bank_transfer', mainComment: '' })));
     await assertSucceeds(updateDoc(order('director', 'dispatched'), patch('director', details)));
     await assertFails(updateDoc(order('warehouse', 'dispatched'), patch('warehouse', details)));

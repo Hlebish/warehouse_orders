@@ -98,7 +98,7 @@ test('shipment list aggregation excludes removed defect lines and uses shipment 
   ]);
 });
 
-test('driver sheet includes all non-pickup orders assigned to the selected day', () => {
+test('driver sheet includes the selected day’s orders excluding cancellations and pickup', () => {
   const today = '2026-11-19', yesterday = '2026-11-18';
   const date = value => String(value || '').slice(0, 10);
   const ready = { number: '10', status: 'Одобрен на отгрузку клиенту', deliveryType: 'kamyanske', createdAt: today };
@@ -108,8 +108,10 @@ test('driver sheet includes all non-pickup orders assigned to the selected day',
   const previous = { ...ready, number: '5', createdAt: yesterday, updatedAt: today };
   const pickup = { ...assembled, number: '6', deliveryType: 'pickup' };
   const pickedUp = { ...pickup, number: '7', status: 'Клиент забрал самовывозом', createdAt: yesterday, shippedAt: today };
+  const cancelled = { ...assembled, number: '8', status: 'Отменён' };
+  const cancelledAfterShipment = { ...shipped, number: '9', status: 'Отменен' };
   const legacyPickup = ['Самовывоз', 'Ожидает самовывоза', 'Клиент забрал самовывозом'].map(status => ({ status, createdAt: today }));
-  const orders = [ready, shipped, legacy, assembled, previous, pickup, pickedUp, ...legacyPickup];
+  const orders = [ready, shipped, legacy, assembled, previous, pickup, pickedUp, cancelled, cancelledAfterShipment, ...legacyPickup];
   assert.deepEqual(driverOrdersForDate(orders, today, date), [shipped, assembled, ready]);
   assert.deepEqual(driverOrdersForDate(orders, yesterday, date), [legacy, previous]);
   assert.deepEqual(driverOrdersForDate(orders, '2026-11-20', date), []);

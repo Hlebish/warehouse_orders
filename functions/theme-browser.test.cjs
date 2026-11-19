@@ -70,6 +70,10 @@ async function run(){
    }));
    assert.deepEqual([...new Set(palette)],[palette[0]],'header buttons and counters share a palette');
    assert.equal(new Set(metrics.map(metric=>metric.stroke)).size,1,'counter icons share an accent');
+   for(const color of [...palette[0].split(' / '),metrics[0].stroke]){
+    const channels=color.match(/\d+/g).map(Number);
+    assert.ok(Math.max(...channels)-Math.min(...channels)<=4,'dashboard palette is neutral: '+color);
+   }
    assert.deepEqual(await readable(dashboardText),[],'dashboard text contrast');
    assert.deepEqual(await page.locator('.app-shell button').evaluateAll(nodes=>nodes.filter(node=>getComputedStyle(node).backgroundImage.includes('gradient')).map(node=>node.id||node.className)),[],'buttons must have flat fills in both themes');
    if(!dark){const bad=await inspect();assert.deepEqual(bad,[],'dark surfaces on light dashboard');assert.deepEqual(await readable(lightThemeText),[],'light dashboard text contrast');const bg=await page.locator('body').evaluate(node=>getComputedStyle(node).backgroundColor);assert.notEqual(bg,'rgb(255, 255, 255)');}

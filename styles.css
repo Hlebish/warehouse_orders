@@ -8473,24 +8473,24 @@ html body:not(.dark-theme) #modalBackdrop .modal.directory-modal #modalBody{back
 html body:not(.dark-theme) #modalBackdrop .modal.directory-modal :is(.directory-table thead,.directory-help){background:#dfe8dc!important;color:var(--muted)!important;border-color:#bcd0ba!important}
 html body:not(.dark-theme) #modalBackdrop .modal.directory-modal .primary-button{background:#347c55!important;color:#f3faf3!important;border-color:#2b6b49!important}
 
-/* Shared accent surfaces for the dashboard and header controls. */
+/* Shared graphite palette for the dashboard and header controls. */
 html body .app-shell{
- --dashboard-control-surface:#1b385a;
- --dashboard-control-hover:#25466d;
- --dashboard-control-border:#416b96;
- --dashboard-control-text:#e6edf3;
- --dashboard-control-muted:#b8cade;
- --dashboard-control-accent:#79c0ff;
- --dashboard-control-icon:#244a75;
+ --dashboard-control-surface:#2c2c2e;
+ --dashboard-control-hover:#373739;
+ --dashboard-control-border:#555557;
+ --dashboard-control-text:#f0f0f1;
+ --dashboard-control-muted:#bdbdc0;
+ --dashboard-control-accent:#c6c6c9;
+ --dashboard-control-icon:#3b3b3e;
 }
 html body:not(.dark-theme) .app-shell{
- --dashboard-control-surface:#cfe3fa;
- --dashboard-control-hover:#bdd9f6;
- --dashboard-control-border:#84acd6;
- --dashboard-control-text:#172f4e;
- --dashboard-control-muted:#405a77;
- --dashboard-control-accent:#0969da;
- --dashboard-control-icon:#bbd7f5;
+ --dashboard-control-surface:#dedee0;
+ --dashboard-control-hover:#d2d2d4;
+ --dashboard-control-border:#959598;
+ --dashboard-control-text:#242426;
+ --dashboard-control-muted:#535357;
+ --dashboard-control-accent:#48484b;
+ --dashboard-control-icon:#cfcfd2;
 }
 html body .app-shell>.main-area>.topbar :is(.top-history-button,#mobileMenu,#staffPresenceToggle,#notificationButton){
  background:var(--dashboard-control-surface)!important;

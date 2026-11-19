@@ -7044,10 +7044,9 @@ body.dark-theme .chat-sidebar-button,
 body.dark-theme .sidebar .chat-entry,
 body.dark-theme .sidebar .user-card,
 body.dark-theme .sidebar .online-card{
-  background:#161b22!important;
-  background-color:#161b22!important;
+  background:var(--wo-surface)!important;
   background-image:none!important;
-  border-color:#30363d!important;
+  border-color:var(--wo-line)!important;
   box-shadow:none!important;
   color:#c9d1d9;
 }
@@ -8474,24 +8473,24 @@ html body:not(.dark-theme) #modalBackdrop .modal.directory-modal #modalBody{back
 html body:not(.dark-theme) #modalBackdrop .modal.directory-modal :is(.directory-table thead,.directory-help){background:#dfe8dc!important;color:var(--muted)!important;border-color:#bcd0ba!important}
 html body:not(.dark-theme) #modalBackdrop .modal.directory-modal .primary-button{background:#347c55!important;color:#f3faf3!important;border-color:#2b6b49!important}
 
-/* Shared graphite palette for the dashboard and header controls. */
+/* Dashboard and header controls use the orders panel's theme colors. */
 html body .app-shell{
- --dashboard-control-surface:#2c2c2e;
- --dashboard-control-hover:#373739;
- --dashboard-control-border:#555557;
- --dashboard-control-text:#f0f0f1;
- --dashboard-control-muted:#bdbdc0;
- --dashboard-control-accent:#c6c6c9;
- --dashboard-control-icon:#3b3b3e;
+ --dashboard-control-surface:var(--wo-surface);
+ --dashboard-control-hover:var(--wo-surface-hover);
+ --dashboard-control-border:var(--wo-line);
+ --dashboard-control-text:var(--wo-text);
+ --dashboard-control-muted:var(--wo-muted);
+ --dashboard-control-accent:var(--wo-muted);
+ --dashboard-control-icon:var(--wo-surface-hover);
 }
 html body:not(.dark-theme) .app-shell{
- --dashboard-control-surface:#dedee0;
- --dashboard-control-hover:#d2d2d4;
- --dashboard-control-border:#959598;
- --dashboard-control-text:#242426;
- --dashboard-control-muted:#535357;
- --dashboard-control-accent:#48484b;
- --dashboard-control-icon:#cfcfd2;
+ --dashboard-control-surface:var(--surface);
+ --dashboard-control-hover:var(--surface-inset);
+ --dashboard-control-border:var(--line);
+ --dashboard-control-text:var(--text);
+ --dashboard-control-muted:var(--muted);
+ --dashboard-control-accent:var(--muted);
+ --dashboard-control-icon:var(--surface-soft);
 }
 html body .app-shell>.main-area>.topbar :is(.top-history-button,#mobileMenu,#staffPresenceToggle,#notificationButton){
  background:var(--dashboard-control-surface)!important;
@@ -8529,9 +8528,31 @@ html body .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-ca
 html body .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card .stat-icon{
  display:grid!important;place-items:center!important;flex:none!important;margin:0!important;
  width:var(--metric-icon-size)!important;min-width:var(--metric-icon-size)!important;height:var(--metric-icon-size)!important;
- color:var(--dashboard-control-accent)!important;background:var(--dashboard-control-icon)!important;border:1px solid var(--dashboard-control-border)!important;
+ color:var(--stat-icon-ink,var(--dashboard-control-accent))!important;
+ background:var(--stat-icon-fill,var(--dashboard-control-icon))!important;
+ border:1px solid var(--stat-icon-line,var(--dashboard-control-border))!important;
  border-radius:12px!important;box-shadow:inset 0 1px 0 #ffffff08!important;transform:none!important;
 }
+.stat-card.stat-created{--stat-icon-ink:#86acdb;--stat-icon-fill:#86acdb1c;--stat-icon-line:#86acdb42}
+.stat-card:is(.stat-assembled,.stat-inspection-checked){--stat-icon-ink:#79bea4;--stat-icon-fill:#79bea41c;--stat-icon-line:#79bea442}
+.stat-card:is(.stat-payment,.stat-inspection-pending){--stat-icon-ink:#ceaf73;--stat-icon-fill:#ceaf731c;--stat-icon-line:#ceaf7342}
+.stat-card.stat-ready{--stat-icon-ink:#8fc787;--stat-icon-fill:#8fc7871c;--stat-icon-line:#8fc78742}
+.stat-card.stat-attention{--stat-icon-ink:#e2a079;--stat-icon-fill:#e2a0791c;--stat-icon-line:#e2a07942}
+.stat-card.stat-approval{--stat-icon-ink:#b5a1dd;--stat-icon-fill:#b5a1dd1c;--stat-icon-line:#b5a1dd42}
+.stat-card.stat-transferred{--stat-icon-ink:#9daec7;--stat-icon-fill:#9daec71c;--stat-icon-line:#9daec742}
+.stat-card.stat-pickup{--stat-icon-ink:#7ebdc4;--stat-icon-fill:#7ebdc41c;--stat-icon-line:#7ebdc442}
+.stat-card.kamenskoye-stat-card{--stat-icon-ink:#b4c095;--stat-icon-fill:#b4c0951c;--stat-icon-line:#b4c09542}
+body:not(.dark-theme) .stat-card.stat-created{--stat-icon-ink:#507da1;--stat-icon-fill:#d9e5ef;--stat-icon-line:#b4cbdc}
+body:not(.dark-theme) .stat-card.stat-assembled{--stat-icon-ink:#47866c;--stat-icon-fill:#d6e8db;--stat-icon-line:#abcdb9}
+body:not(.dark-theme) .stat-card.stat-payment{--stat-icon-ink:#937337;--stat-icon-fill:#eee2c3;--stat-icon-line:#d6c193}
+body:not(.dark-theme) .stat-card.stat-ready{--stat-icon-ink:#568344;--stat-icon-fill:#dbe8cd;--stat-icon-line:#bbd1a7}
+body:not(.dark-theme) .stat-card.stat-attention{--stat-icon-ink:#a66b41;--stat-icon-fill:#efddc9;--stat-icon-line:#dabb9b}
+body:not(.dark-theme) .stat-card.stat-approval{--stat-icon-ink:#8267a3;--stat-icon-fill:#e5ddef;--stat-icon-line:#c8b8dd}
+body:not(.dark-theme) .stat-card.stat-transferred{--stat-icon-ink:#657d97;--stat-icon-fill:#dee5ec;--stat-icon-line:#bdcbd8}
+body:not(.dark-theme) .stat-card.stat-pickup{--stat-icon-ink:#43868b;--stat-icon-fill:#d3e8e6;--stat-icon-line:#abd0cd}
+body:not(.dark-theme) .stat-card.kamenskoye-stat-card{--stat-icon-ink:#778749;--stat-icon-fill:#e3e7cf;--stat-icon-line:#c6ceab}
+body:not(.dark-theme) .stat-card.stat-inspection-pending{--stat-icon-ink:#937337;--stat-icon-fill:#e6d8b2;--stat-icon-line:#d6c193}
+body:not(.dark-theme) .stat-card.stat-inspection-checked{--stat-icon-ink:#47866c;--stat-icon-fill:#cfe1cd;--stat-icon-line:#abcdb9}
 html body .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card .stat-icon:before,
 html body .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-card .stat-icon:after{display:none!important}
 html body .app-shell .content .stat-card .stat-icon svg{width:24px!important;height:24px!important;overflow:visible}

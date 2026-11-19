@@ -34,11 +34,13 @@ export function storedOrderDeliveryDetails(order = {}) {
   return details;
 }
 
-export function driverOrdersForDate(orders, dateKey, todayKey, toDateKey) {
+export function driverOrdersForDate(orders, dateKey, toDateKey) {
   return orders.filter(order => {
-    if (!['city', 'kamyanske'].includes(order.deliveryType)) return false;
-    if (order.status === 'Отгружен кладовщиком') return shipmentOrderDateKey(order, toDateKey) === dateKey;
-    return dateKey === todayKey && order.status === 'Одобрен на отгрузку клиенту';
+    if (order.deliveryType === 'pickup' || ['Самовывоз', 'Ожидает самовывоза', 'Клиент забрал самовывозом'].includes(order.status)) return false;
+    const orderDay = order.shippedAt || order.status === 'Отгружен кладовщиком'
+      ? shipmentOrderDateKey(order, toDateKey)
+      : toDateKey(order.createdAt);
+    return orderDay === dateKey;
   }).sort((a, b) => String(a.number ?? '').localeCompare(String(b.number ?? ''), 'ru', { numeric: true }));
 }
 

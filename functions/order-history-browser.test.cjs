@@ -115,7 +115,7 @@ async function run(){
   await page.evaluate(()=>window.qa.reset());
   await page.evaluate(()=>window.qa.open());
   assert.match(await page.locator('.order-delivery-summary').textContent(),/Оплата: Неизвестно/);
-  assert.equal(await page.locator('[data-action="print-driver-order"]').isVisible(),true);
+  assert.equal(await page.locator('[data-action="print-driver-order"]').count(),0);
   assert.equal(await page.locator('.order-summary').count(),0);
   assert.doesNotMatch(await page.locator('#modalBody').textContent(),/Коротко по заказу|Следующее действие/);
   assert.match(await page.locator('.order-detail-head').textContent(),/Анна Создатель/);

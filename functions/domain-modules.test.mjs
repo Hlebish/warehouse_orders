@@ -112,9 +112,28 @@ test('driver sheet includes the selected day’s orders excluding cancellations 
   const cancelledAfterShipment = { ...shipped, number: '9', status: 'Отменен' };
   const legacyPickup = ['Самовывоз', 'Ожидает самовывоза', 'Клиент забрал самовывозом'].map(status => ({ status, createdAt: today }));
   const orders = [ready, shipped, legacy, assembled, previous, pickup, pickedUp, cancelled, cancelledAfterShipment, ...legacyPickup];
-  assert.deepEqual(driverOrdersForDate(orders, today, date), [shipped, assembled, ready]);
-  assert.deepEqual(driverOrdersForDate(orders, yesterday, date), [legacy, previous]);
-  assert.deepEqual(driverOrdersForDate(orders, '2026-11-20', date), []);
+  assert.deepEqual(driverOrdersForDate(orders, today, today, date), [shipped, assembled, previous, ready]);
+  assert.deepEqual(driverOrdersForDate(orders, yesterday, today, date), [legacy, previous]);
+});
+
+test('driver sheet carries older open deliveries into current and future days only', () => {
+  const yesterday = '2026-11-19', today = '2026-11-20', tomorrow = '2026-11-21';
+  const date = value => String(value || '').slice(0, 10);
+  const open = { deliveryType: 'city', createdAt: '2026-11-18T22:30:00' };
+  const carryovers = ['Создан', 'Собран', 'Ожидает оплаты', 'Одобрен на отгрузку клиенту', 'Камянское']
+    .map((status, index) => ({ ...open, number: String(index + 1), status }));
+  const shippedYesterday = { ...open, number: '6', status: 'Отгружен кладовщиком', shippedAt: yesterday };
+  const shippedToday = { ...open, number: '7', status: 'Отгружен кладовщиком', shippedAt: today };
+  const createdTomorrow = { ...carryovers[0], number: '8', createdAt: tomorrow };
+  const excluded = [
+    { ...carryovers[0], deliveryType: 'pickup' },
+    { ...carryovers[0], createdAt: '' },
+    ...['Ожидает самовывоза', 'Отменён', 'Возврат', 'Перенесен', 'Дефект'].map(status => ({ ...open, status }))
+  ];
+  const orders = [...carryovers, shippedYesterday, shippedToday, createdTomorrow, ...excluded];
+  assert.deepEqual(driverOrdersForDate(orders, today, today, date), [...carryovers, shippedToday]);
+  assert.deepEqual(driverOrdersForDate(orders, tomorrow, today, date), [...carryovers, createdTomorrow]);
+  assert.deepEqual(driverOrdersForDate(orders, yesterday, today, date), [shippedYesterday]);
 });
 
 test('driver sheet prints the operational fields and uses explicit defaults for old orders', () => {

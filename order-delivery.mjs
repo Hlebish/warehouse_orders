@@ -34,14 +34,20 @@ export function storedOrderDeliveryDetails(order = {}) {
   return details;
 }
 
-export function driverOrdersForDate(orders, dateKey, toDateKey) {
+const driverCarryoverStatuses = new Set([
+  'Создан', 'Собран', 'Ожидает оплаты', 'Одобрен на отгрузку клиенту', 'Камянское'
+]);
+
+export function driverOrdersForDate(orders, dateKey, todayKey, toDateKey) {
+  const includeCarryovers = dateKey >= todayKey;
   return orders.filter(order => {
     if (order.status === 'Отменён' || order.status === 'Отменен') return false;
     if (order.deliveryType === 'pickup' || ['Самовывоз', 'Ожидает самовывоза', 'Клиент забрал самовывозом'].includes(order.status)) return false;
-    const orderDay = order.shippedAt || order.status === 'Отгружен кладовщиком'
-      ? shipmentOrderDateKey(order, toDateKey)
-      : toDateKey(order.createdAt);
-    return orderDay === dateKey;
+    if (order.shippedAt || order.status === 'Отгружен кладовщиком') {
+      return shipmentOrderDateKey(order, toDateKey) === dateKey;
+    }
+    const createdDay = toDateKey(order.createdAt);
+    return createdDay === dateKey || (includeCarryovers && !!createdDay && createdDay < dateKey && driverCarryoverStatuses.has(order.status));
   }).sort((a, b) => String(a.number ?? '').localeCompare(String(b.number ?? ''), 'ru', { numeric: true }));
 }
 

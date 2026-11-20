@@ -84,7 +84,7 @@ test('order data editing can replace unknown payment and edit or clear the optio
  vm.runInContext(between('const orderEditsInFlight=', 'function editArticles('),context);
  await context.saveOrderInfo();
  assert.deepEqual(storedOrderDeliveryDetails(data),{paymentType:'bank_transfer',deliveryAddress:'Улица 12',mainComment:''});
- assert.match(data.text,/оплата: Неизвестно → На счёт/);
+ assert.match(data.text,/оплата: Неизвестно → На рахунок/);
 });
 
 test('checking the last position still automatically changes Created to Assembled',async()=>{

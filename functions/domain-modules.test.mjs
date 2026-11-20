@@ -120,8 +120,8 @@ test('driver sheet includes the selected day’s orders excluding cancellations 
 test('driver sheet prints the operational fields and uses explicit defaults for old orders', () => {
   const escape = value => String(value).replaceAll('<', '&lt;').replaceAll('>', '&gt;');
   const order = { number: '10', client: '<Компания>', deliveryType: 'city', deliveryAddress: 'Улица 12', paymentType: 'deferred', mainComment: 'Уточнить\nвход', entries: [{ text: 'Обычный комментарий' }] };
-  const output = driverSheetHtml([order, { number: '20', client: 'Второй клиент' }, { number: '30', paymentType: 'cashless' }], '19 ноября', escape, false);
-  for (const text of ['size:A4 portrait', '&lt;Компания&gt;', 'Улица 12', 'Отсрочка платежа', 'Уточнить\nвход', 'Неизвестно', 'Адрес не указан', 'Безналичные']) assert.ok(output.includes(text), text);
+  const output = driverSheetHtml([order, { number: '20', client: 'Второй клиент' }, { number: '30', paymentType: 'cashless' }, { number: '40', paymentType: 'bank_transfer' }], '19 ноября', escape, false);
+  for (const text of ['size:A4 portrait', '&lt;Компания&gt;', 'Улица 12', 'Отсрочка платежа', 'Уточнить\nвход', 'Неизвестно', 'Адрес не указан', 'Безналичные', 'На рахунок']) assert.ok(output.includes(text), text);
   assert.doesNotMatch(output, /Обычный комментарий|window\.print/);
   assert.equal(orderPaymentLabel(undefined), 'Неизвестно');
   assert.equal(isOrderPaymentType(''), false);

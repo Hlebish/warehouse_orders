@@ -108,9 +108,19 @@ async function run(){
   assert.deepEqual(await page.evaluate(()=>window.qa.readDelivery()),{paymentType:'unknown',deliveryAddress:'',mainComment:''});
   await page.locator('#orderPaymentType').selectOption({label:'Безналичные'});
   assert.equal((await page.evaluate(()=>window.qa.readDelivery())).paymentType,'cashless');
+  const address=page.locator('#orderDeliveryAddress');
+  for(const type of ['city','kamyanske','post']){
+   await page.locator('#deliveryType').selectOption(type);
+   assert.equal(await address.evaluate(input=>input.validity.valueMissing),true);
+   assert.equal(await page.locator('label[for="orderDeliveryAddress"]').textContent(),'Адрес доставки *');
+  }
+  await page.locator('#deliveryType').selectOption('pickup');
+  assert.equal(await address.evaluate(input=>input.required),false);
+  assert.equal(await page.locator('label[for="orderDeliveryAddress"]').textContent(),'Адрес доставки');
   await page.evaluate(()=>window.qa.editDelivery());
   assert.equal(await page.locator('#orderPaymentType').inputValue(),'deferred');
   assert.equal(await page.locator('#orderDeliveryAddress').inputValue(),'Улица 12');
+  assert.equal(await address.evaluate(input=>input.required),false);
   assert.equal(await page.locator('#orderMainComment').inputValue(),'Вход со двора');
   await page.evaluate(()=>window.qa.reset());
   await page.evaluate(()=>window.qa.open());

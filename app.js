@@ -1942,14 +1942,13 @@ function orderDeliveryFields(order){
   const selected=order?(paymentType||'unknown'):'';
   const paymentOptions=Object.entries(orderPaymentLabels).map(([value,label])=>`<option value="${value}"${value===selected?' selected':''}>${label}</option>`).join('');
   return `<div class="field"><label for="orderPaymentType">Способ оплаты *</label><select id="orderPaymentType" required><option value="" disabled${selected?'':' selected'}>Выберите способ оплаты</option>${paymentOptions}</select></div>
-    <div class="field"><label for="orderDeliveryAddress">Адрес доставки</label><input id="orderDeliveryAddress" autocomplete="off" maxlength="${deliveryAddressLimit}" value="${esc(deliveryAddress)}" placeholder="Например, ул. Центральная, 12, вход со двора"></div>
+    <div class="field"><label for="orderDeliveryAddress">Адрес доставки (необязательно)</label><input id="orderDeliveryAddress" autocomplete="off" maxlength="${deliveryAddressLimit}" value="${esc(deliveryAddress)}" placeholder="Например, ул. Центральная, 12, вход со двора"></div>
     <div class="field"><label for="orderMainComment">Основной комментарий к заказу</label><textarea id="orderMainComment" maxlength="${mainCommentLimit}" placeholder="Например, позвонить перед приездом">${esc(mainComment)}</textarea><span class="field-hint">Попадёт в лист водителя.</span></div>`;
 }
-function readOrderDeliveryFields({requireAddress=false}={}){
+function readOrderDeliveryFields(){
   const payment=$('orderPaymentType'),paymentType=payment.value;
   if(!isOrderPaymentType(paymentType)){payment.focus();payment.reportValidity();toast('Выберите способ оплаты или «Неизвестно».');return null;}
-  const address=$('orderDeliveryAddress'),deliveryAddress=address.value.trim(),mainComment=$('orderMainComment').value.trim();
-  if(requireAddress&&!deliveryAddress){address.focus();toast('Укажите адрес доставки, чтобы создать заказ.');return null;}
+  const deliveryAddress=$('orderDeliveryAddress').value.trim(),mainComment=$('orderMainComment').value.trim();
   if(deliveryAddress.length>deliveryAddressLimit||mainComment.length>mainCommentLimit){toast('Сократите адрес доставки или основной комментарий.');return null;}
   return {paymentType,deliveryAddress,mainComment};
 }
@@ -1971,13 +1970,11 @@ function openNewOrder(){
     <div class="field"><label for="startStatus">Начальный статус</label><select id="startStatus">${statusOptions}</select><span class="field-hint">${statusHint}</span></div>
   </form>`;
   showModal('Добавить заказ',body,[button('Отмена','close'),button('Создать карточку','create-order','primary-button')],'НОВЫЙ ЗАКАЗ');
-  const deliveryType=$('deliveryType'),address=$('orderDeliveryAddress');
+  const deliveryType=$('deliveryType');
   deliveryType.addEventListener('change',()=>{
     $('deliveryTypeField').classList.remove('delivery-type-invalid');
     deliveryType.removeAttribute('aria-invalid');
     $('deliveryTypeError').hidden=true;
-    address.required=!!deliveryType.value&&deliveryType.value!=='pickup';
-    address.labels[0].textContent=address.required?'Адрес доставки *':'Адрес доставки';
   });
   setTimeout(()=>{
     const input=$('orderClipboardText'),parse=$('parseOrderClipboard');
@@ -2787,7 +2784,7 @@ async function saveOrder(){
  if(!n||!client){toast('Укажите номер заказа и имя клиента.');return}
  if(!['city','pickup','post','kamyanske'].includes(deliveryType)){const field=$('deliveryTypeField'),select=$('deliveryType'),error=$('deliveryTypeError');field?.classList.add('delivery-type-invalid');if(select){select.setAttribute('aria-invalid','true');select.focus();}if(error)error.hidden=false;toast('Укажите способ доставки, чтобы создать заказ.');return}
  if(state.orders.some(o=>String(o.number).trim().toLocaleLowerCase('ru')===n.toLocaleLowerCase('ru'))){toast('Карточка с таким номером уже есть.');return}
- const delivery=readOrderDeliveryFields({requireAddress:deliveryType!=='pickup'});if(!delivery)return;
+ const delivery=readOrderDeliveryFields();if(!delivery)return;
  const articles=readArticles(),status=$('startStatus').value,comment=delivery.mainComment;
  const fingerprint=JSON.stringify([n,client,clientId,deliveryType,delivery,status,articles,signedInUser.uid]);
  if(!pendingOrderCreateDrafts.has(fingerprint)){

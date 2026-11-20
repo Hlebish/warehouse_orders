@@ -109,14 +109,12 @@ async function run(){
   await page.locator('#orderPaymentType').selectOption({label:'Безналичные'});
   assert.equal((await page.evaluate(()=>window.qa.readDelivery())).paymentType,'cashless');
   const address=page.locator('#orderDeliveryAddress');
-  for(const type of ['city','kamyanske','post']){
+  for(const type of ['city','kamyanske','post','pickup']){
    await page.locator('#deliveryType').selectOption(type);
-   assert.equal(await address.evaluate(input=>input.validity.valueMissing),true);
-   assert.equal(await page.locator('label[for="orderDeliveryAddress"]').textContent(),'Адрес доставки *');
+   assert.equal(await address.evaluate(input=>input.required),false);
+   assert.equal(await address.inputValue(),'');
+   assert.equal(await page.locator('label[for="orderDeliveryAddress"]').textContent(),'Адрес доставки (необязательно)');
   }
-  await page.locator('#deliveryType').selectOption('pickup');
-  assert.equal(await address.evaluate(input=>input.required),false);
-  assert.equal(await page.locator('label[for="orderDeliveryAddress"]').textContent(),'Адрес доставки');
   await page.evaluate(()=>window.qa.editDelivery());
   assert.equal(await page.locator('#orderPaymentType').inputValue(),'deferred');
   assert.equal(await page.locator('#orderDeliveryAddress').inputValue(),'Улица 12');

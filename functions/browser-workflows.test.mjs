@@ -39,12 +39,14 @@ function harness(order,overrides={}){
 }
 const base=()=>({id:'o',number:'1',status:'Создан',entries:[],articles:[{article:'A',quantity:1,collected:true},{article:'B',quantity:1,collected:false}]});
 
-test('order creation requires a payment choice and writes printable delivery details',async()=>{
+test('order creation requires payment and a nonblank address for every delivery method except pickup',async()=>{
  const fields={orderNumber:{value:'42'},clientName:{value:'Клиент',dataset:{}},deliveryType:{value:'city'},startStatus:{value:'Создан'},
-  orderPaymentType:{value:'',focus(){},reportValidity(){}},orderDeliveryAddress:{value:' Улица 12 '},orderMainComment:{value:' Позвонить '}};
+  orderPaymentType:{value:'',focus(){},reportValidity(){}},orderDeliveryAddress:{value:'   ',focus(){}},orderMainComment:{value:' Позвонить '}};
  const writes=[];
- const {context}=harness(base(),{
+ let nextId=0;
+ const {context,events}=harness(base(),{
   $:id=>fields[id],modal:{querySelector:()=>null},readArticles:()=>[],pendingOrderCreateDrafts:new Map(),
+  crypto:{randomUUID:()=>String(++nextId)},
   getDocFromServer:async()=>({exists:()=>false}),writeBatch:()=>({set:(ref,data)=>writes.push({ref,data}),async commit(){}}),
   closeModal(){},isOrderPaymentType,deliveryAddressLimit,mainCommentLimit,storedOrderDeliveryDetails
  });
@@ -53,9 +55,23 @@ test('order creation requires a payment choice and writes printable delivery det
  vm.runInContext(between('async function saveOrder(){', 'function appendClipboardImages('),context);
  await context.saveOrder();
  assert.equal(writes.length,0);
+ assert.deepEqual(events.at(-1),['toast','Выберите способ оплаты или «Неизвестно».']);
  fields.orderPaymentType.value='unknown';
+ for(const type of ['city','kamyanske','post']){
+  fields.deliveryType.value=type;
+  await context.saveOrder();
+  assert.equal(writes.length,0,type);
+  assert.deepEqual(events.at(-1),['toast','Укажите адрес доставки, чтобы создать заказ.']);
+ }
+ fields.orderDeliveryAddress.value=' Улица 12 ';
  await context.saveOrder();
  assert.deepEqual(storedOrderDeliveryDetails(writes[0].data),{paymentType:'unknown',deliveryAddress:'Улица 12',mainComment:'Позвонить'});
+ fields.orderNumber.value='43';
+ fields.deliveryType.value='pickup';
+ fields.orderDeliveryAddress.value='';
+ fields.orderMainComment.value='';
+ await context.saveOrder();
+ assert.deepEqual(storedOrderDeliveryDetails(writes.at(-1).data),{paymentType:'unknown',deliveryAddress:'',mainComment:''});
 });
 
 test('order data editing can replace unknown payment and edit or clear the optional fields',async()=>{

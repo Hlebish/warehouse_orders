@@ -17,3 +17,30 @@ test('copying a defect photo group never forwards a private comment into the col
  await context.copyPhotoGroup(['a','b'],'Личный комментарий о дефекте');assert.equal(argumentsList[0].length,1);
  context.window.AndroidWarehouse={sharePhotosToViber:(_urls,caption)=>captions.push(caption)};await context.copyPhotoGroup(['a','b'],'Личный комментарий');assert.deepEqual(captions,['']);
 });
+
+test('the sidebar collage copies during the click and sends a generated PNG to Android',async()=>{
+ const blob=new Blob(['png'],{type:'image/png'}),dataUrl='data:image/png;base64,cG5n';
+ let finish,clipboardPayload,shared;
+ const collage=new Promise(resolve=>{finish=resolve;});
+ const context={
+  modal:{dataset:{collageUrls:'["one","two"]'}},$:()=>({value:'Иван'}),toast(){},
+  createDefectPhotoCollage:()=>collage,
+  window:{AndroidWarehouse:{sharePhoto:data=>{shared=data;}}},
+  navigator:{clipboard:{write:([item])=>{clipboardPayload=item.data['image/png'];return clipboardPayload;}}},
+  ClipboardItem:class{constructor(data){this.data=data;}},
+  photoDataUrl:async value=>{assert.equal(value,blob);return dataUrl;}
+ };
+ vm.createContext(context);
+ vm.runInContext(source.slice(source.indexOf('async function exportPhotoCollage('),source.indexOf('function startBrowserPhotoCopy(')),context);
+ const copy={dataset:{action:'copy-photo-collage'}},copying=context.exportPhotoCollage(copy);
+ assert.equal(clipboardPayload,collage);
+ assert.equal(copy.disabled,true);
+ finish(blob);
+ await copying;
+ assert.equal(copy.disabled,false);
+ const share={dataset:{action:'share-photo-collage'}};
+ delete context.navigator.clipboard;
+ await context.exportPhotoCollage(share);
+ assert.equal(shared,dataUrl);
+ assert.equal(share.disabled,false);
+});

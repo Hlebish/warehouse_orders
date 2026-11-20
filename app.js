@@ -1778,7 +1778,7 @@ async function commitOrderEdit(order,expected,patch,entry){
 
 let modalHistoryEntry=false;
 let orderReturnModalSnapshot=null;
-function showModal(title,body,buttons=[],eyebrow='КАРТОЧКА ЗАКАЗА'){
+function showModal(title,body,buttons=[],eyebrow='КАРТОЧКА ЗАКАЗА',{replaceSidebar=false}={}){
   openStaffPanel(false);
   directChatOpenRequest++;
   directChatUnsubscribe?.();directChatUnsubscribe=null;
@@ -1801,7 +1801,8 @@ function showModal(title,body,buttons=[],eyebrow='КАРТОЧКА ЗАКАЗА'
   // Every modal gets one browser-history entry. Opening another modal while
   // one is already open keeps the same entry, so Back still closes the UI.
   if(!wasOpen&&!modalHistoryEntry){
-    history.pushState({modal:true},'',location.href);
+    if(replaceSidebar)history.replaceState({modal:true},'',location.pathname+location.search);
+    else history.pushState({modal:true},'',location.href);
     modalHistoryEntry=true;
   }
 }
@@ -3418,9 +3419,48 @@ async function createDefectPhotoCollage(urls,context=''){
   return result;
 }
 function openPhotoCollageTool(){
-  showModal('Создать коллаж','<p class="field-hint">Выберите несколько фотографий, проверьте порядок и соберите их в одно изображение.</p><div class="field"><label for="collageClientName">Имя клиента (необязательно)</label><input id="collageClientName" type="text" maxlength="100" placeholder="Например, Иван Петров"></div><div class="field"><label for="collageFiles">Фотографии</label><div class="upload-box">Выбрать фото<input id="collageFiles" type="file" accept="image/*" multiple></div><span class="field-hint">Поддерживаются JPG, PNG и WebP. Рекомендуется до 12 фото.</span></div><div id="collagePreview" class="collage-tool-preview"><div class="field-hint">Добавьте фотографии для предпросмотра.</div></div>',[button('Закрыть','close'),button('Скачать коллаж','download-photo-collage','small-button'),button('Скопировать коллаж','copy-photo-collage','primary-button')],'ИНСТРУМЕНТЫ ФОТО');modal.dataset.collageUrls='[]';modal.dataset.collageNames='[]';}
-function renderPhotoCollagePreview(){if(!modal)return;const preview=$('collagePreview');if(!preview)return;let urls=[],names=[];try{urls=JSON.parse(modal.dataset.collageUrls||'[]');names=JSON.parse(modal.dataset.collageNames||'[]')}catch{}preview.innerHTML=urls.length?'<div class="collage-preview-grid">'+urls.map((url,index)=>'<div class="collage-preview-item"><img src="'+esc(url)+'" alt="Фото '+(index+1)+'"><span>'+(index+1)+'</span><button type="button" aria-label="Убрать фото" data-remove-collage-photo="'+index+'">×</button></div>').join('')+'</div><small class="field-hint">'+urls.length+' фото · перетащите сюда файлы, чтобы добавить ещё</small>':'<div class="field-hint">Добавьте фотографии для предпросмотра.</div>';}
-async function exportPhotoCollage(copy){if(!modal)return;let urls=[];try{urls=JSON.parse(modal.dataset.collageUrls||'[]')}catch{}if(urls.length<2){toast('Выберите хотя бы две фотографии.');return;}const buttonEl=document.querySelector(`[data-action="${copy?'copy-photo-collage':'download-photo-collage'}"]`);if(buttonEl)buttonEl.disabled=true;try{const name=$('collageClientName')?.value.trim()||'Клиент';const blob=await createDefectPhotoCollage(urls,name);if(copy){if(window.warehouseDesktop?.sharePhotoToViber){const reader=new FileReader();const dataUrl=await new Promise((resolve,reject)=>{reader.onload=()=>resolve(String(reader.result||''));reader.onerror=()=>reject(new Error('Не удалось прочитать коллаж.'));reader.readAsDataURL(blob)});const result=await window.warehouseDesktop.sharePhotoToViber(dataUrl,name,false);if(!result?.copied)throw new Error('Приложение не подтвердило копирование.');}else{if(!navigator.clipboard?.write||typeof ClipboardItem==='undefined')throw new Error('Браузер не поддерживает копирование изображений.');await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]);}toast('Коллаж скопирован. Вставьте его через Ctrl+V.');}else{const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='collage-'+Date.now()+'.png';a.click();setTimeout(()=>URL.revokeObjectURL(url),5000);toast('Коллаж скачан.');}}catch(err){toast('Не удалось создать коллаж: '+(err?.message||'попробуйте ещё раз'));}finally{if(buttonEl)buttonEl.disabled=false;}}
+  const replaceSidebar=sidebarHistoryEntry;
+  if(replaceSidebar)closeSidebar(true);
+  const actions=typeof window.AndroidWarehouse?.sharePhoto==='function'
+    ? [button('Поделиться коллажем','share-photo-collage','primary-button')]
+    : [button('Скачать коллаж','download-photo-collage'),button('Скопировать коллаж','copy-photo-collage','primary-button')];
+  showModal('Создать коллаж',`<p class="field-hint">Выберите несколько фотографий, проверьте порядок и соберите их в одно изображение.</p>
+    <div class="field"><label for="collageClientName">Имя клиента (необязательно)</label><input id="collageClientName" type="text" maxlength="100" placeholder="Например, Иван Петров"></div>
+    <div class="field"><label class="upload-box" for="collageFiles">Выбрать фото<input id="collageFiles" type="file" accept="image/*" multiple></label><span class="field-hint">Поддерживаются JPG, PNG и WebP. Можно добавить до 12 фото.</span></div>
+    <div id="collagePreview" class="collage-tool-preview"><div class="field-hint">Добавьте фотографии для предпросмотра.</div></div>`,[button('Закрыть','close'),...actions],'ИНСТРУМЕНТЫ ФОТО',{replaceSidebar});
+  modal.dataset.collageUrls='[]';
+}
+function renderPhotoCollagePreview(){if(!modal)return;const preview=$('collagePreview');if(!preview)return;let urls=[];try{urls=JSON.parse(modal.dataset.collageUrls||'[]')}catch{}preview.innerHTML=urls.length?'<div class="collage-preview-grid">'+urls.map((url,index)=>'<div class="collage-preview-item"><img src="'+esc(url)+'" alt="Фото '+(index+1)+'"><span>'+(index+1)+'</span><button type="button" aria-label="Убрать фото" data-remove-collage-photo="'+index+'">×</button></div>').join('')+'</div><small class="field-hint">'+urls.length+' фото · перетащите сюда файлы, чтобы добавить ещё</small>':'<div class="field-hint">Добавьте фотографии для предпросмотра.</div>';}
+async function exportPhotoCollage(control){
+  const urls=JSON.parse(modal.dataset.collageUrls||'[]');
+  if(urls.length<2){toast('Выберите хотя бы две фотографии.');return;}
+  control.disabled=true;
+  const name=$('collageClientName').value.trim()||'Клиент';
+  try{
+    if(control.dataset.action==='share-photo-collage'){
+      const blob=await createDefectPhotoCollage(urls,name);
+      window.AndroidWarehouse.sharePhoto(await photoDataUrl(blob));
+    }else if(control.dataset.action==='copy-photo-collage'){
+      if(window.warehouseDesktop?.sharePhotoToViber){
+        const blob=await createDefectPhotoCollage(urls,name);
+        const result=await window.warehouseDesktop.sharePhotoToViber(await photoDataUrl(blob),name,false);
+        if(!result?.copied)throw new Error('Приложение не подтвердило копирование.');
+      }else{
+        if(!navigator.clipboard?.write||typeof ClipboardItem==='undefined')throw new Error('В этом браузере копирование недоступно. Скачайте коллаж.');
+        const collage=createDefectPhotoCollage(urls,name);
+        await navigator.clipboard.write([new ClipboardItem({'image/png':collage})]);
+      }
+      toast('Коллаж скопирован. Вставьте его через Ctrl+V.');
+    }else{
+      const blob=await createDefectPhotoCollage(urls,name);
+      const url=URL.createObjectURL(blob),link=document.createElement('a');
+      link.href=url;link.download='collage-'+Date.now()+'.png';link.click();
+      setTimeout(()=>URL.revokeObjectURL(url),5000);
+      toast('Коллаж скачан.');
+    }
+  }catch(err){toast('Не удалось обработать коллаж: '+(err?.message||'попробуйте ещё раз'));}
+  finally{control.disabled=false;}
+}
 function startBrowserPhotoCopy(url){
   if(!navigator.clipboard?.write||typeof ClipboardItem==='undefined')throw new Error('Этот браузер не поддерживает копирование изображений.');
   const pngPromise=fetchPhotoAsPng(url);
@@ -5111,7 +5151,7 @@ showAuth();
       });
   }, true);
 })();
-document.addEventListener('click',e=>{const remove=e.target.closest('[data-remove-collage-photo]');if(remove&&modal){let urls=[];try{urls=JSON.parse(modal.dataset.collageUrls||'[]')}catch{}const index=Number(remove.dataset.removeCollagePhoto);const url=urls[index];if(url?.startsWith('blob:'))URL.revokeObjectURL(url);urls.splice(index,1);modal.dataset.collageUrls=JSON.stringify(urls);renderPhotoCollagePreview();return;}if(e.target.closest('[data-action="copy-photo-collage"]')){void exportPhotoCollage(true);return;}if(e.target.closest('[data-action="download-photo-collage"]'))void exportPhotoCollage(false);});
+document.addEventListener('click',e=>{const remove=e.target.closest('[data-remove-collage-photo]');if(remove&&modal){let urls=[];try{urls=JSON.parse(modal.dataset.collageUrls||'[]')}catch{}const index=Number(remove.dataset.removeCollagePhoto);const url=urls[index];if(url?.startsWith('blob:'))URL.revokeObjectURL(url);urls.splice(index,1);modal.dataset.collageUrls=JSON.stringify(urls);renderPhotoCollagePreview();return;}const control=e.target.closest('[data-action="copy-photo-collage"],[data-action="download-photo-collage"],[data-action="share-photo-collage"]');if(control&&!control.disabled)void exportPhotoCollage(control);});
 document.addEventListener('dragover',e=>{if(e.target.closest('#collagePreview'))e.preventDefault()});document.addEventListener('drop',e=>{if(!e.target.closest('#collagePreview')||!modal)return;e.preventDefault();const files=[...(e.dataTransfer?.files||[])].filter(file=>file.type.startsWith('image/'));let urls=[];try{urls=JSON.parse(modal.dataset.collageUrls||'[]')}catch{}if(urls.length+files.length>12){toast('В один коллаж можно добавить не более 12 фото.');return;}urls.push(...files.map(file=>URL.createObjectURL(file)));modal.dataset.collageUrls=JSON.stringify(urls);renderPhotoCollagePreview()});
 
 // Capture before the modal DOM is replaced; files are stored as IndexedDB blobs.

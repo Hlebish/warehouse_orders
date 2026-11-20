@@ -43,6 +43,8 @@ window.qa={toasts:[],calls,mapCalls,releaseAddresses,role(value){role=value;emit
 async function main(){const server=http.createServer((req,res)=>{const p=new URL(req.url,'http://local').pathname;if(p==='/'){res.setHeader('Content-Type','text/html; charset=utf-8');res.end(index.replace('</body>','<script type="module" src="/fixture.mjs"></script></body>'));return;}if(p==='/fixture.mjs'){res.setHeader('Content-Type','text/javascript; charset=utf-8');res.end(fixture);return;}const file=path.join(root,path.basename(p));if(!fs.existsSync(file)){res.writeHead(204);res.end();return;}res.setHeader('Content-Type',p.endsWith('.css')?'text/css':'text/javascript');res.end(fs.readFileSync(file,'utf8').replace(/@import[^;]*;/g,''));});await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const origin='http://127.0.0.1:'+server.address().port;let browser;
  try{browser=await chromium.launch({headless:true,...(process.platform==='win32'?{channel:'chrome'}:{executablePath:process.env.CHROMIUM_PATH||'/usr/bin/chromium'})});const page=await browser.newPage({viewport:{width:1280,height:900},hasTouch:true,reducedMotion:'reduce'}),errors=[];page.on('pageerror',error=>errors.push(error.message));await page.route('**/*',route=>route.request().url().startsWith(origin)?route.continue():route.abort());await page.goto(origin);await page.waitForFunction(()=>window.qa?.ready);
   assert.equal(await page.locator('#statInspectionPending').textContent(),'1');assert.equal(await page.locator('#statInspectionChecked').textContent(),'1');
+  const defectCounter=page.locator('#statInspectionDefects');
+  assert.equal(await defectCounter.textContent(),'0');
   await page.locator('#inspectionPendingCard').click();await page.locator('#inspectionBoard').waitFor();assert.equal(await page.locator('[data-inspection-action="check"]').count(),0,'manager must not see warehouse checks');
   await page.locator('[data-inspection-address="APMA2506"]').getByText('Адрес: загружается').waitFor();
   assert.deepEqual(await page.evaluate(()=>window.qa.mapCalls),[{articles:['APMA2506','APHD4307'],authorization:'Bearer test-token'}]);
@@ -85,7 +87,18 @@ async function main(){const server=http.createServer((req,res)=>{const p=new URL
   assert.equal(await savedDefect.locator('.inspection-photos img').count(),2);
   assert.equal(await savedDefect.locator('[data-share-photo]').count(),2);
   assert.deepEqual(JSON.parse(await savedDefect.locator('[data-photo-group]').getAttribute('data-photo-group')),['/fixture-0.jpg','/fixture-1.jpg']);assert.equal(await page.locator('[data-inspection-action="check"][data-inspection-id="pending"]').isDisabled(),true);
-  await page.evaluate(()=>window.qa.role('accountant'));await page.locator('[data-inspection-decision="approve"]').click();await page.waitForFunction(()=>document.querySelector('.inspection-defect.resolved'));
+  assert.equal(await defectCounter.textContent(),'1');
+  assert.equal(await defectCounter.getAttribute('data-active'),'');
+  await page.locator('#closeModal').click();await page.locator('#inspectionDefectsCard').click();
+  assert.equal(await page.locator('#modalTitle').textContent(),'Дефекты на проверке');
+  assert.equal(await page.locator('#inspectionDefectList [data-inspection-item]').count(),1);
+  assert.equal(await page.locator('#inspectionDefectList .inspection-photos img').count(),2);
+  assert.equal(await page.locator('[data-inspection-decision="approve"]').count(),0);
+  await page.evaluate(()=>window.qa.role('accountant'));await page.locator('[data-inspection-decision="approve"]').click();
+  await page.getByText('Нет дефектов, ожидающих решения.',{exact:true}).waitFor();
+  assert.equal(await defectCounter.textContent(),'0');
+  assert.equal(await defectCounter.getAttribute('data-active'),null);
+  await page.locator('#closeModal').click();await page.locator('#inspectionPendingCard').click();await page.locator('.inspection-defect.resolved').waitFor();
   await page.evaluate(()=>window.qa.role('warehouse'));await page.locator('[data-inspection-action="check"][data-inspection-id="pending"]').click();await page.waitForFunction(()=>document.querySelector('#inspectionList-checked [data-inspection-item="pending"]'));
   await page.evaluate(()=>window.qa.archive('pending'));assert.equal(await page.locator('[data-inspection-item="pending"]').count(),0);assert.equal(await page.locator('#statInspectionChecked').textContent(),'1');
   for(const width of [1280,390,320])for(const dark of [false,true]){

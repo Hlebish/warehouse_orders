@@ -6,6 +6,7 @@ const root=path.resolve(__dirname,'..');
 const index=fs.readFileSync(path.join(root,'index.html'),'utf8').replace(/<script\b[\s\S]*?<\/script>/g,'');
 const app=fs.readFileSync(path.join(root,'app.js'),'utf8');
 const renderOrders=app.slice(app.indexOf('function renderOrdersUI('),app.indexOf('\nfunction render(){'));
+const unresolvedOrderDefects=app.match(/^function unresolvedOrderDefects.*$/m)[0];
 const buyback=fs.readFileSync(path.join(root,'buyback.js'),'utf8');
 const injectedStyles=[...buyback.matchAll(/style\.textContent\s*(?:=|\+=)\s*`([\s\S]*?)`/g)].map(match=>match[1]).join('\n');
 const buybackMarkup=buyback.match(/overlay\.innerHTML=`([\s\S]*?)`;/)?.[1];assert.ok(buybackMarkup);
@@ -121,13 +122,15 @@ async function run(){
     const $=id=>document.getElementById(id),state={orders:[],role:'warehouse'};
     const activeFilter='all',ordersPageSize=20,profileName='Глеб',roles={warehouse:'Кладовщик'},canManageUsers=false;
     let currentOrdersPage=1;
-    const plural=(_n,_one,_few,many)=>many,paintNotices=()=>{},syncPendingDefectToasts=()=>{};
+    const plural=(_n,_one,_few,many)=>many,paintNotices=()=>{};
     const foregroundDataSync={repaint(){}},todayFormatter=new Intl.DateTimeFormat('ru');
+    ${unresolvedOrderDefects}
     ${renderOrders}
     window.setKamenskoyeOrders=count=>{
      state.orders=Array.from({length:count},()=>({status:'Камянское'}));
      renderOrdersUI();
     };
+    window.setOrderDefects=entries=>{state.orders=[{status:'Камянское',entries}];renderOrdersUI();};
    })();`});
   for(const width of [390,1440]){
    await page.setViewportSize({width,height:1000});
@@ -141,6 +144,22 @@ async function run(){
    assert.ok(Math.abs(pending.x-section.x)<1&&Math.abs(checked.x+checked.width-section.x-section.width)<1);
    assert.ok(Math.abs(pending.y-checked.y)<1&&Math.abs(pending.width-checked.width)<1,'inspection cards fill the row equally');
   }
+  await page.evaluate(()=>window.setOrderDefects([{kind:'defect'},{kind:'defect',decision:'Подтверждён'},{kind:'defect'},{kind:'comment'}]));
+  assert.equal(await page.locator('#statOrderDefects').textContent(),'2');
+  assert.equal(await page.locator('#statOrderDefects').getAttribute('data-active'),'');
+  assert.equal(await page.locator('[data-defect-summary]').count(),0);
+  for(const width of [320,390,1440]){
+   await page.setViewportSize({width,height:1000});
+   await page.waitForFunction(width=>window.innerWidth===width,width);
+   await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+   const boxes=await page.locator('.defect-counter').evaluateAll(nodes=>nodes.map(node=>{
+    const box=node.getBoundingClientRect();return {left:box.left,right:box.right,top:box.top,height:box.height};
+   }));
+   assert.equal(boxes.length,2);assert.equal(boxes[0].top,boxes[1].top);
+   assert.ok(boxes.every(box=>box.left>=0&&box.right<=width+1&&box.height<=50),'defect counters must fit on one compact row at '+width+'px: '+JSON.stringify(boxes));
+  }
+  await page.evaluate(()=>window.setKamenskoyeOrders(0));
+  assert.equal(await page.locator('#statOrderDefects').textContent(),'0');
   await page.setViewportSize({width:1280,height:1000});await page.evaluate(()=>document.body.classList.remove('dark-theme'));await page.waitForTimeout(320);
   for(const [title,content,kind] of [['Новый заказ',form,''],['Заказ № 3188',order,''],['Клиенты',directory,'directory-modal'],['Личный чат','<div class="direct-chat-shell">'+chatBody+'</div>','chat-dialog direct-chat-dialog']]){
    await page.evaluate(({title,content,kind})=>{document.getElementById('modalTitle').textContent=title;document.getElementById('modalBody').innerHTML=content;document.querySelector('#modalBackdrop>.modal').className='modal '+kind;document.getElementById('modalFoot').innerHTML='<button class="secondary-button">Закрыть</button><button class="primary-button">Сохранить</button>';document.getElementById('modalBackdrop').hidden=false;},{title,content,kind});

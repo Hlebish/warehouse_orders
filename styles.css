@@ -2725,8 +2725,6 @@ body.dark-theme .client-suggestions[hidden]{display:none!important}
 /* Defects must stand out immediately in order lists and in-page alerts. */
 .status-defect{background:#ff2020!important;color:#fff!important;border:1px solid #ff2020!important;font-weight:900!important;box-shadow:0 0 0 1px #ff2020,0 0 12px rgba(255,32,32,.45)!important}
 .status-defect:before{background:#fff!important}
-.toast.defect-toast{background:#e50914!important;color:#fff!important;border:1px solid #ff5962!important;box-shadow:0 8px 28px rgba(229,9,20,.38)!important;font-weight:900!important;cursor:pointer}
-.toast.defect-toast:before{content:'⚠ ';}
 
 /* Make buyback category filters visibly interactive */
 .buyback-chip[data-status],#buybackSummary [data-summary-status]{cursor:pointer!important;}
@@ -7428,21 +7426,7 @@ button:active:not(:disabled){
 }
 
 
-/* Hide only the persistent defect reminder while a modal or drawer is open.
-   Transient toasts (role changes, saves, errors and mentions) remain visible. */
-body.overlay-window-open #toastStack .defect-toast,
-body.overlay-window-open .toast-stack .defect-toast {
-  display: none !important;
-}
-
-/* The buyback panel is a standalone overlay, not the shared modal; hide persistent defect reminders there too. */
-body:has(.buyback-overlay:not([hidden])) #toastStack .defect-toast,
-body:has(.buyback-overlay:not([hidden])) .toast-stack .defect-toast {
-  display: none !important;
-}
-
-
-/* Desktop: keep persistent defect notices in the lower-left corner, away from centered dialogs and primary actions. */
+/* Desktop: keep notices in the lower-left corner, away from centered dialogs and primary actions. */
 @media (min-width: 721px) {
   #toastStack, .toast-stack {
     left: 270px !important;
@@ -7630,31 +7614,8 @@ body:has(.buyback-overlay:not([hidden])) .toast-stack .defect-toast {
 /* Keep attention toasts readable and prevent long messages from stretching the stack. */
 #toastStack .toast{max-width:min(460px,calc(100vw - 24px));overflow-wrap:anywhere;white-space:normal;line-height:1.4}
 #toastStack .mention-toast{max-height:120px;overflow:auto}
-#toastStack .defect-toast{max-width:min(460px,calc(100vw - 24px))}
 
 
-/* High-visibility red frame for persistent defect-order notifications on desktop and mobile. */
-#toastStack .toast.defect-toast,
-.toast-stack .toast.defect-toast {
-  border: 3px solid #ff2638 !important;
-  outline: 1px solid rgba(255, 38, 56, .72) !important;
-  outline-offset: 1px !important;
-  box-shadow:
-    0 0 0 2px rgba(255, 38, 56, .28),
-    0 0 16px rgba(255, 20, 40, .58),
-    0 8px 28px rgba(120, 0, 12, .48) !important;
-}
-@media (max-width: 720px) {
-  #toastStack .toast.defect-toast,
-  .toast-stack .toast.defect-toast {
-    border-width: 3px !important;
-    outline-width: 1px !important;
-    box-shadow:
-      0 0 0 2px rgba(255, 38, 56, .32),
-      0 0 18px rgba(255, 20, 40, .62),
-      0 8px 24px rgba(120, 0, 12, .5) !important;
-  }
-}
 /* Notification grouping */
 .notification-group-count{display:inline-block;margin-top:3px;padding:2px 6px;border-radius:99px;background:#e9f1eb;color:#587365;font-size:8px;font-weight:700}
 .notification-group-actions{display:flex;align-items:center;gap:7px;flex:0 0 auto}
@@ -7912,11 +7873,6 @@ body.dark-theme .direct-chat-form textarea{background:#1d242b;color:#f1f4f6;bord
 .in-app-notice-popup>p{font-size:14px!important;line-height:1.45!important;margin:8px 0 12px!important}
 .in-app-notice-actions{gap:8px!important}
 .in-app-notice-actions .small-button{min-height:36px!important;padding:8px 12px!important;font-size:13px!important}
-#toastStack .toast.defect-toast,.toast-stack .toast.defect-toast{
- border:1px solid #dc5961!important;outline:0!important;border-radius:9px!important;
- padding:15px 17px!important;font-size:14px!important;box-shadow:0 6px 18px #b4231844!important;
- animation:none!important;
-}
 @media(max-width:720px){
  #toastStack,.toast-stack{
   top:auto!important;right:10px!important;bottom:calc(10px + env(safe-area-inset-bottom,0px))!important;left:auto!important;
@@ -8421,7 +8377,6 @@ html body:not(.dark-theme) :is(.status-violet,.status-approval,.status-transferr
 html body:not(.dark-theme) :is(.status-cyan,.status-pickup){background:#d8e9e8!important;color:#3c7675!important;border-color:#afcbca!important}
 html body:not(.dark-theme) :is(.toast,#toastStack .toast,.in-app-notice-popup,.direct-chat-notice-popup){background:#dce9de!important;background-image:none!important;color:#2c513d!important;border-color:#a5c1ae!important;box-shadow:0 6px 24px #2a443521!important}
 html body:not(.dark-theme) :is(.toast,#toastStack .toast) :is(b,strong,p,small){color:inherit!important}
-html body:not(.dark-theme) #toastStack .toast.defect-toast{background:#f0ded9!important;color:#874553!important;border-color:#cf9ca5!important;box-shadow:0 6px 20px #7a3e4a15!important}
 html body:not(.dark-theme) :is(.staff-urgent-section,.staff-urgent-card,.urgent-direct-alert-card){background:#efded8!important;background-image:none!important;color:#81424b!important;border-color:#d6afb0!important}
 html body:not(.dark-theme) :is(.staff-urgent-heading,.staff-urgent-copy b,.staff-urgent-copy small,.staff-urgent-arrow){color:#934856!important}
 html body:not(.dark-theme) .staff-presence-panel{--drawer-bg:#edf2ea;--drawer-line:#c2d1c4;--drawer-text:#2c4535;--drawer-muted:#586f5c;--drawer-hover:#e0eade;--drawer-accent:#40785a;--drawer-soft:#cfe1d0;--drawer-danger:#b45565}
@@ -8593,6 +8548,27 @@ html body .app-shell .content :is(.stats-grid,.kamenskoye-stat-section)>.stat-ca
 
 /* Keep interactive surfaces flat in both palettes. */
 html body :is(.app-shell,#modalBackdrop,.buyback-overlay) :is(button,[role="button"]){background-image:none!important}
+
+/* Compact defect counters above the dashboard metrics. */
+.defect-counters{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;max-width:480px;margin:0 0 12px}
+.defect-counter{
+ display:grid;grid-template-columns:16px minmax(0,1fr) auto;align-items:center;gap:7px;min-width:0;min-height:40px;
+ padding:6px 9px;border:1px solid var(--dashboard-control-border);border-radius:9px;background:var(--dashboard-control-surface);
+ color:var(--dashboard-control-text);font-size:12px;font-weight:650;line-height:1.2;text-align:left;
+}
+.defect-counter:hover{background:var(--dashboard-control-hover)}
+.defect-counter:focus-visible{outline:2px solid var(--dashboard-control-muted);outline-offset:2px}
+.defect-counter svg{width:16px;height:16px;color:var(--dashboard-control-muted)}
+.defect-counter-value{min-width:22px;padding:3px 4px;border-radius:5px;background:var(--dashboard-control-icon);color:var(--dashboard-control-text);text-align:center;font-variant-numeric:tabular-nums}
+.defect-counter-value[data-active]{background:#532b32;color:#ffd4d8}
+.defect-counter:has(.defect-counter-value[data-active]) svg{color:#f0a1a9}
+body:not(.dark-theme) .defect-counter-value[data-active]{background:#f0d8dc;color:#8e3241}
+body:not(.dark-theme) .defect-counter:has(.defect-counter-value[data-active]) svg{color:#9b4552}
+@media(max-width:720px){.defect-counter{min-height:44px}}
+@media(max-width:360px){
+ .defect-counter{grid-template-columns:14px minmax(0,1fr) auto;gap:5px;padding-inline:7px;font-size:11px}
+ .defect-counter svg{width:14px;height:14px}
+}
 
 /* Separate warehouse flows share the secondary dashboard row. */
 .kamenskoye-stat-section{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}

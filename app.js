@@ -15,7 +15,7 @@ import { bindDirectChatDraft } from './direct-chat-draft.mjs?v=2026.11.16.04';
 import { buildOrderHistory, getOrderCreator, getLatestOrderEvent } from './order-history.mjs?v=2026.11.17.01';
 import { buildStaffConversations } from './staff-conversations.mjs?v=2026.11.16.05';
 import { createForegroundSync } from './foreground-sync.mjs?v=2026.11.18.01';
-import { createInspectionItems } from './inspection-items.mjs?v=2026.11.19.04';
+import { createInspectionItems } from './inspection-items.mjs?v=2026.11.20.06';
 import { createDirectChatReceipts } from './direct-chat-receipts.mjs?v=2026.11.16.02';
 import { createDirectChatNoticeSync } from './direct-chat-notices.mjs?v=2026.11.16.02';
 import { createPhotoSharing, decoratePhotoSharing, decorateDefectPhotoActions, deliverSharedPhoto, photoDataUrl } from './photo-sharing.mjs?v=2026.11.19.04';
@@ -1491,6 +1491,7 @@ function statusPill(s){return `<span class="status-pill ${statusClass(s)}">${esc
 function assemblyIndicator(o){if(o?.assemblyInProgress!==true)return '';const startedBy=String(o.assemblyStartedByName||'Кладовщик');const startedAt=o.assemblyStartedAt?fmtDateTime(o.assemblyStartedAt):'';return `<span class="assembly-indicator" title="Сборку начал: ${esc(startedBy)}${startedAt?' · '+esc(startedAt):''}"><span class="assembly-light"></span><span>Идёт сборка</span></span>`}
 function entriesCount(o){return(o.entries||[]).length}
 const statOrderConfig={
+  'order-defects':{title:'Дефекты в заказах',hint:'Заказы с дефектами, ожидающими решения'},
   'Собран':{title:'Собранные заказы',hint:'Заказы со статусом «Собран»'},
   'Создан':{title:'Созданные заказы',hint:'Заказы со статусом «Создан»'},
   attention:{title:'Заказы требуют внимания',hint:'Заказы с вопросами и дефектами'},
@@ -1501,8 +1502,10 @@ const statOrderConfig={
   'Перенесен':{title:'Перенесённые заказы',hint:'Висят сверху списка независимо от даты'},
   'Камянское':{title:'Заказы · Камянское',hint:'Отдельный список заказов Камянского'}
 };
+function unresolvedOrderDefects(order){return (order.entries||[]).filter(entry=>entry.kind==='defect'&&!entry.decision);}
 function statOrderMatches(o,key){
   if(key==='attention')return o.status==='Под вопросом'||o.status==='Дефект';
+  if(key==='order-defects')return hasPendingDefect(o);
   return o.status===key;
 }
 function openStatOrders(key){
@@ -1514,6 +1517,10 @@ function openStatOrders(key){
     return new Date(orderDisplayDate(b)||0)-new Date(orderDisplayDate(a)||0);
   });
   const rows=orders.map(o=>{
+    if(key==='order-defects'){
+      const defects=unresolvedOrderDefects(o),details=defects.map(entry=>entry.text||entry.description||entry.comment||entry.note||'Причина не указана').join(' · ');
+      return `<button type="button" class="mention-center-item" data-open="${esc(o.id)}"><b>Заказ № ${esc(o.number||'—')} · ${esc(o.client||'Клиент не указан')}</b><span>${esc(details)}</span><small>Дефектов: ${defects.length}</small></button>`;
+    }
     const articleCount=Array.isArray(o.articles)?o.articles.length:0;
     return `<button type="button" class="stat-order-item" data-open="${esc(o.id)}">
       <span class="stat-order-main">
@@ -1528,7 +1535,7 @@ function openStatOrders(key){
   }).join('');
   const body=orders.length
     ? `<p class="stat-modal-hint">${esc(config.hint)} · найдено: <b>${orders.length}</b></p><div class="stat-order-list">${rows}</div>`
-    : `<div class="danger-note">Сейчас здесь нет заказов.</div>`;
+    : `<div class="danger-note">${key==='order-defects'?'Нет дефектов, ожидающих решения.':'Сейчас здесь нет заказов.'}</div>`;
   showModal(config.title,body,[button('Закрыть','close')],'СПИСОК ЗАКАЗОВ');
 }
 function localDateKey(value){const d=asDate(value);if(!d)return '';return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-')}
@@ -1653,37 +1660,16 @@ function renderOrdersUI(){const search=$('searchInput').value.toLocaleLowerCase(
   kamenskoyeCounter.textContent=count;
   kamenskoyeCounter.closest('.stat-card').hidden=count===0;
  }
- $('listSummary').textContent=`${filteredOrderCount} ${plural(filteredOrderCount,'заказ','заказа','заказов')}`;const pagination=$('ordersPagination');if(pagination){const first=filteredOrderCount?(currentOrdersPage-1)*ordersPageSize+1:0;const last=Math.min(currentOrdersPage*ordersPageSize,filteredOrderCount);pagination.innerHTML=`<button type="button" class="secondary-button" data-orders-page="prev" ${currentOrdersPage<=1?'disabled':''}>← Назад</button><span>Страница ${currentOrdersPage} из ${pageCount} · ${first}–${last} из ${filteredOrderCount}</span><button type="button" class="secondary-button" data-orders-page="next" ${currentOrdersPage>=pageCount?'disabled':''}>Вперёд →</button>`;pagination.hidden=filteredOrderCount<=ordersPageSize;}$('userName').textContent=profileName||roles[state.role];$('userRole').textContent=canManageUsers?`Администратор · ${roles[state.role]}`:roles[state.role];foregroundDataSync.repaint();$('today').textContent=todayFormatter.format(new Date());document.querySelectorAll('.nav-item').forEach(b=>b.classList.toggle('active',b.dataset.filter===activeFilter));paintNotices();syncPendingDefectToasts()}
+ const defectCounter=$('statOrderDefects');
+ if(defectCounter){
+  const count=state.orders.reduce((sum,order)=>sum+unresolvedOrderDefects(order).length,0);
+  if(defectCounter.textContent!==String(count))defectCounter.textContent=String(count);
+  defectCounter.toggleAttribute('data-active',count>0);
+ }
+ $('listSummary').textContent=`${filteredOrderCount} ${plural(filteredOrderCount,'заказ','заказа','заказов')}`;const pagination=$('ordersPagination');if(pagination){const first=filteredOrderCount?(currentOrdersPage-1)*ordersPageSize+1:0;const last=Math.min(currentOrdersPage*ordersPageSize,filteredOrderCount);pagination.innerHTML=`<button type="button" class="secondary-button" data-orders-page="prev" ${currentOrdersPage<=1?'disabled':''}>← Назад</button><span>Страница ${currentOrdersPage} из ${pageCount} · ${first}–${last} из ${filteredOrderCount}</span><button type="button" class="secondary-button" data-orders-page="next" ${currentOrdersPage>=pageCount?'disabled':''}>Вперёд →</button>`;pagination.hidden=filteredOrderCount<=ordersPageSize;}$('userName').textContent=profileName||roles[state.role];$('userRole').textContent=canManageUsers?`Администратор · ${roles[state.role]}`:roles[state.role];foregroundDataSync.repaint();$('today').textContent=todayFormatter.format(new Date());document.querySelectorAll('.nav-item').forEach(b=>b.classList.toggle('active',b.dataset.filter===activeFilter));paintNotices()}
 function render(){renderOrdersUI();const testsNav=$('testsNavButton');if(testsNav)testsNav.hidden=!canManageUsers;const avatar=$('profileAvatar');if(avatar)avatar.innerHTML=profileAvatarUrl?'<img src="'+esc(profileAvatarUrl)+'" alt="">':'СК';}
 function plural(n,a,b,c){n=Math.abs(n)%100;const d=n%10;return n>10&&n<20?c:d>1&&d<5?b:d===1?a:c}
-function toast(msg,orderId='',options={}){const t=document.createElement('div');t.className='toast'+(orderId?' toast-clickable':'');t.textContent=msg;if(orderId)t.addEventListener('click',()=>{if(!t.classList.contains('defect-toast'))t.remove();openOrder(orderId)});$('toastStack').append(t);if(!options.persistent)setTimeout(()=>t.remove(),3500);return t}
-function syncPendingDefectToasts(){
- const stack=$('toastStack');if(!stack)return;
- const getPending=()=>state.orders.flatMap(o=>(o.entries||[]).filter(e=>e.kind==='defect'&&!e.decision).map(e=>({orderId:o.id,number:o.number,client:o.client,entry:e})));
- const pending=getPending();
- const summary=stack.querySelector('[data-defect-summary]');
- if(!pending.length){summary?.remove();return;}
- const count=pending.length,orders=new Set(pending.map(x=>x.orderId)).size;
- const message=`⚠️ Незакрытые дефекты: ${count} · заказов: ${orders}`;
- if(summary){summary.textContent=message;return;}
- const t=toast(message,'',{persistent:true});
- t.classList.add('defect-toast');t.dataset.defectSummary='true';t.setAttribute('role','button');t.tabIndex=0;
- const open=()=>{
-  // Read the latest order state when the window is opened, not the snapshot
-  // captured when the notification was first created.
-  const currentPending=getPending();
-  const grouped=new Map();
-  currentPending.forEach(item=>{if(!grouped.has(item.orderId))grouped.set(item.orderId,{...item,entries:[]});grouped.get(item.orderId).entries.push(item.entry);});
-  const body='<p class="modal-description">Выберите заказ, чтобы открыть карточку и вынести решение по каждому дефекту.</p><div class="mention-center-list defect-pending-list">'+Array.from(grouped.values()).map(order=>{
-   const details=order.entries.map(e=>String(e.text||e.description||e.comment||e.note||'Причина не указана')).join(' · ');
-   return '<button type="button" class="mention-center-item" data-open="'+esc(order.orderId)+'"><b>Заказ № '+esc(order.number||'—')+' · '+esc(order.client||'Клиент не указан')+'</b><span>'+esc(details)+'</span><small>Незакрытых дефектов: '+order.entries.length+' · Нажмите, чтобы открыть заказ</small></button>';
-  }).join('')+'</div>';
-  showModal('Незакрытые дефекты',body,[button('Закрыть','close')],'ТРЕБУЮТ РЕШЕНИЯ');
- };
- t.addEventListener('click',open);
- t.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open()}});
-}
-
+function toast(msg,orderId='',options={}){const t=document.createElement('div');t.className='toast'+(orderId?' toast-clickable':'');t.textContent=msg;if(orderId)t.addEventListener('click',()=>{t.remove();openOrder(orderId)});$('toastStack').append(t);if(!options.persistent)setTimeout(()=>t.remove(),3500);return t}
 let activeEntryDraft=null;
 const restoredDraftFiles=new WeakMap();
 function filesForInput(input){return input?.files?.length?[...input.files]:restoredDraftFiles.get(input)||[];}

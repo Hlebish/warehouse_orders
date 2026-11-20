@@ -18,7 +18,7 @@ import { createForegroundSync } from './foreground-sync.mjs?v=2026.11.18.01';
 import { createInspectionItems } from './inspection-items.mjs?v=2026.11.19.04';
 import { createDirectChatReceipts } from './direct-chat-receipts.mjs?v=2026.11.16.02';
 import { createDirectChatNoticeSync } from './direct-chat-notices.mjs?v=2026.11.16.02';
-import { createPhotoSharing, decoratePhotoSharing, decorateDefectPhotoActions, photoDataUrl } from './photo-sharing.mjs?v=2026.11.19.04';
+import { createPhotoSharing, decoratePhotoSharing, decorateDefectPhotoActions, deliverSharedPhoto, photoDataUrl } from './photo-sharing.mjs?v=2026.11.19.04';
 import { canTransitionOrderStatus, statusAfterDefectDecision } from './order-workflow.mjs?v=2026.11.12.03';
 import { NOTIFICATION_CATEGORIES, NOTIFICATION_CATEGORY_KEYS, normalizeNotificationSettings, groupNotifications, NOTIFICATION_SECTIONS } from './notification-settings.mjs?v=2026.11.12.02';
 import { searchClients, searchProducts, findClientCandidates, clientPhone, clientAddress, clientComment } from './client-directory.mjs?v=2026.11.12.07';
@@ -3374,25 +3374,28 @@ async function shareChatMessage(id){
   try{await navigator.clipboard.writeText(value);toast(urls.length?'Текст и ссылки на фото скопированы.':'Текст сообщения скопирован.');}
   catch{toast('Поделиться не удалось. Используй «Копировать» в меню сообщения.');}
 }
-function fetchPhotoAsPng(url){
-  return fetch(url,{mode:'cors'}).then(async response=>{
-    if(!response.ok)throw new Error(`Не удалось загрузить фото (HTTP ${response.status}).`);
-    const source=await response.blob();
-    if(!source.type.startsWith('image/'))throw new Error('Ссылка не вернула изображение.');
-    if(source.type==='image/png')return source;
-    if(typeof createImageBitmap!=='function')throw new Error('Браузер не умеет преобразовать фото для буфера обмена.');
-    const bitmap=await createImageBitmap(source),canvas=document.createElement('canvas');
-    canvas.width=bitmap.width;canvas.height=bitmap.height;
-    canvas.getContext('2d').drawImage(bitmap,0,0);bitmap.close();
-    const png=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));
-    if(!png)throw new Error('Не удалось подготовить PNG для буфера обмена.');
-    return png;
-  });
+async function fetchPhotoBlob(url){
+  const response=await fetch(url,{mode:'cors'});
+  if(!response.ok)throw new Error(`Не удалось загрузить фото (HTTP ${response.status}).`);
+  const source=await response.blob();
+  if(!source.type.startsWith('image/'))throw new Error('Ссылка не вернула изображение.');
+  return source;
 }
-async function createDefectPhotoCollage(urls,context=''){
+async function fetchPhotoAsPng(url){
+  const source=await fetchPhotoBlob(url);
+  if(source.type==='image/png')return source;
+  if(typeof createImageBitmap!=='function')throw new Error('Браузер не умеет преобразовать фото для буфера обмена.');
+  const bitmap=await createImageBitmap(source),canvas=document.createElement('canvas');
+  canvas.width=bitmap.width;canvas.height=bitmap.height;
+  canvas.getContext('2d').drawImage(bitmap,0,0);bitmap.close();
+  const png=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));
+  if(!png)throw new Error('Не удалось подготовить PNG для буфера обмена.');
+  return png;
+}
+async function createDefectPhotoCollage(photos,context=''){
   const label=String(context||'').trim();
   const columns=2,outer=18,gap=12,tileWidth=900,imageHeight=630,headerHeight=label?48:0;
-  const rows=Math.ceil(urls.length/columns),tileHeight=imageHeight;
+  const rows=Math.ceil(photos.length/columns),tileHeight=imageHeight;
   const canvas=document.createElement('canvas');
   canvas.width=outer*2+columns*tileWidth+gap*(columns-1);
   canvas.height=outer*2+headerHeight+rows*tileHeight+gap*(rows-1);
@@ -3402,16 +3405,22 @@ async function createDefectPhotoCollage(urls,context=''){
   ctx.fillStyle='#111820';ctx.fillRect(0,0,canvas.width,canvas.height);
   ctx.fillStyle='#f4f7fb';ctx.font='600 24px system-ui, sans-serif';
   if(label)ctx.fillText(label.slice(0,100),outer,outer+30);
-  for(let index=0;index<urls.length;index++){
-    const blob=await fetchPhotoAsPng(urls[index]);
-    const bitmap=await createImageBitmap(blob);
-    const col=index%columns,row=Math.floor(index/columns);
-    const x=outer+col*(tileWidth+gap),y=outer+headerHeight+row*(tileHeight+gap);
-    ctx.fillStyle='#05080c';ctx.fillRect(x,y,tileWidth,imageHeight);
-    const scale=Math.min((tileWidth-16)/bitmap.width,(imageHeight-16)/bitmap.height);
-    const width=bitmap.width*scale,height=bitmap.height*scale;
-    ctx.drawImage(bitmap,x+(tileWidth-width)/2,y+(imageHeight-height)/2,width,height);
-    bitmap.close();
+  for(const [index,source] of photos.entries()){
+    const blob=typeof source==='string'?await fetchPhotoBlob(source):source;
+    const url=URL.createObjectURL(blob),image=new Image();
+    try{
+      await new Promise((resolve,reject)=>{
+        image.onload=resolve;
+        image.onerror=()=>reject(new Error(`Не удалось открыть фото ${index+1}. Выберите JPG, PNG или WebP.`));
+        image.src=url;
+      });
+      const col=index%columns,row=Math.floor(index/columns);
+      const x=outer+col*(tileWidth+gap),y=outer+headerHeight+row*(tileHeight+gap);
+      ctx.fillStyle='#05080c';ctx.fillRect(x,y,tileWidth,imageHeight);
+      const scale=Math.min((tileWidth-16)/image.naturalWidth,(imageHeight-16)/image.naturalHeight);
+      const width=image.naturalWidth*scale,height=image.naturalHeight*scale;
+      ctx.drawImage(image,x+(tileWidth-width)/2,y+(imageHeight-height)/2,width,height);
+    }finally{URL.revokeObjectURL(url);}
   }
   const result=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));
   if(!result)throw new Error('Не удалось собрать коллаж из фотографий.');
@@ -3421,45 +3430,105 @@ async function createDefectPhotoCollage(urls,context=''){
 function openPhotoCollageTool(){
   const replaceSidebar=sidebarHistoryEntry;
   if(replaceSidebar)closeSidebar(true);
-  const actions=typeof window.AndroidWarehouse?.sharePhoto==='function'
+  const native=window.AndroidWarehouse,android=typeof native?.sharePhoto==='function';
+  const actions=android
     ? [button('Поделиться коллажем','share-photo-collage','primary-button')]
-    : [button('Скачать коллаж','download-photo-collage'),button('Скопировать коллаж','copy-photo-collage','primary-button')];
+    : ['<a id="collageDownload" class="small-button collage-download" aria-disabled="true" download>Скачать коллаж</a>',button('Скопировать коллаж','copy-photo-collage','primary-button')];
   showModal('Создать коллаж',`<p class="field-hint">Выберите несколько фотографий, проверьте порядок и соберите их в одно изображение.</p>
     <div class="field"><label for="collageClientName">Имя клиента (необязательно)</label><input id="collageClientName" type="text" maxlength="100" placeholder="Например, Иван Петров"></div>
     <div class="field"><label class="upload-box" for="collageFiles">Выбрать фото<input id="collageFiles" type="file" accept="image/*" multiple></label><span class="field-hint">Поддерживаются JPG, PNG и WebP. Можно добавить до 12 фото.</span></div>
-    <div id="collagePreview" class="collage-tool-preview"><div class="field-hint">Добавьте фотографии для предпросмотра.</div></div>`,[button('Закрыть','close'),...actions],'ИНСТРУМЕНТЫ ФОТО',{replaceSidebar});
-  modal.dataset.collageUrls='[]';
-}
-function renderPhotoCollagePreview(){if(!modal)return;const preview=$('collagePreview');if(!preview)return;let urls=[];try{urls=JSON.parse(modal.dataset.collageUrls||'[]')}catch{}preview.innerHTML=urls.length?'<div class="collage-preview-grid">'+urls.map((url,index)=>'<div class="collage-preview-item"><img src="'+esc(url)+'" alt="Фото '+(index+1)+'"><span>'+(index+1)+'</span><button type="button" aria-label="Убрать фото" data-remove-collage-photo="'+index+'">×</button></div>').join('')+'</div><small class="field-hint">'+urls.length+' фото · перетащите сюда файлы, чтобы добавить ещё</small>':'<div class="field-hint">Добавьте фотографии для предпросмотра.</div>';}
-async function exportPhotoCollage(control){
-  const urls=JSON.parse(modal.dataset.collageUrls||'[]');
-  if(urls.length<2){toast('Выберите хотя бы две фотографии.');return;}
-  control.disabled=true;
-  const name=$('collageClientName').value.trim()||'Клиент';
-  try{
-    if(control.dataset.action==='share-photo-collage'){
-      const blob=await createDefectPhotoCollage(urls,name);
-      window.AndroidWarehouse.sharePhoto(await photoDataUrl(blob));
-    }else if(control.dataset.action==='copy-photo-collage'){
-      if(window.warehouseDesktop?.sharePhotoToViber){
-        const blob=await createDefectPhotoCollage(urls,name);
-        const result=await window.warehouseDesktop.sharePhotoToViber(await photoDataUrl(blob),name,false);
-        if(!result?.copied)throw new Error('Приложение не подтвердило копирование.');
-      }else{
-        if(!navigator.clipboard?.write||typeof ClipboardItem==='undefined')throw new Error('В этом браузере копирование недоступно. Скачайте коллаж.');
-        const collage=createDefectPhotoCollage(urls,name);
-        await navigator.clipboard.write([new ClipboardItem({'image/png':collage})]);
-      }
-      toast('Коллаж скопирован. Вставьте его через Ctrl+V.');
-    }else{
-      const blob=await createDefectPhotoCollage(urls,name);
-      const url=URL.createObjectURL(blob),link=document.createElement('a');
-      link.href=url;link.download='collage-'+Date.now()+'.png';link.click();
-      setTimeout(()=>URL.revokeObjectURL(url),5000);
-      toast('Коллаж скачан.');
+    <div id="collagePreview" class="collage-tool-preview"><div class="field-hint">Перетащите сюда фотографии или выберите их выше.</div></div>`,[
+    '<p id="collageStatus" class="field-hint collage-export-status" role="status">Выберите хотя бы две фотографии.</p>',button('Закрыть','close'),...actions
+  ],'ИНСТРУМЕНТЫ ФОТО',{replaceSidebar});
+
+  const picker=$('collageFiles'),name=$('collageClientName'),preview=$('collagePreview'),status=$('collageStatus'),download=$('collageDownload');
+  const send=$('modalFoot').querySelector('[data-action="copy-photo-collage"],[data-action="share-photo-collage"]');
+  const photos=[];
+  let prepared=null,revision=0,timer,queue=Promise.resolve();
+  send.disabled=true;
+
+  const clearPrepared=()=>{
+    prepared=null;
+    if(download?.hasAttribute('href')){
+      URL.revokeObjectURL(download.href);
+      download.removeAttribute('href');
+      download.setAttribute('aria-disabled','true');
     }
-  }catch(err){toast('Не удалось обработать коллаж: '+(err?.message||'попробуйте ещё раз'));}
-  finally{control.disabled=false;}
+  };
+  const prepare=()=>{
+    clearTimeout(timer);
+    const current=++revision;
+    clearPrepared();
+    send.disabled=true;
+    if(photos.length<2){status.textContent='Выберите хотя бы две фотографии.';return;}
+    status.textContent='Собираю коллаж…';
+    const files=photos.map(photo=>photo.file),label=name.value.trim()||'Клиент';
+    timer=setTimeout(()=>{
+      queue=queue.then(async()=>{
+        if(current!==revision)return;
+        try{
+          const blob=await createDefectPhotoCollage(files,label);
+          if(current!==revision)return;
+          prepared=blob;
+          if(download){
+            download.href=URL.createObjectURL(blob);
+            download.download='collage-'+Date.now()+'.png';
+            download.removeAttribute('aria-disabled');
+          }
+          send.disabled=false;
+          status.textContent='Коллаж готов.';
+        }catch(error){if(current===revision)status.textContent=error.message||'Не удалось собрать коллаж.';}
+      });
+    },150);
+  };
+  const renderPreview=()=>{
+    preview.innerHTML=photos.length?'<div class="collage-preview-grid">'+photos.map(({url},index)=>
+      '<div class="collage-preview-item"><img src="'+esc(url)+'" alt="Фото '+(index+1)+'"><span>'+(index+1)+'</span><button type="button" aria-label="Убрать фото" data-remove-collage-photo="'+index+'">×</button></div>'
+    ).join('')+'</div><small class="field-hint">'+photos.length+' фото · перетащите сюда файлы, чтобы добавить ещё</small>':'<div class="field-hint">Перетащите сюда фотографии или выберите их выше.</div>';
+    prepare();
+  };
+  const addPhotos=files=>{
+    const images=[...files].filter(file=>file.type.startsWith('image/')||/\.(?:jpe?g|png|webp)$/i.test(file.name));
+    if(!images.length){status.textContent='Выберите фотографии JPG, PNG или WebP.';return;}
+    if(photos.length+images.length>12){status.textContent='В один коллаж можно добавить не более 12 фото.';return;}
+    photos.push(...images.map(file=>({file,url:URL.createObjectURL(file)})));
+    renderPreview();
+  };
+  picker.addEventListener('change',()=>{if(picker.files.length)addPhotos(picker.files);picker.value='';});
+  name.addEventListener('input',prepare);
+  preview.addEventListener('click',event=>{
+    const remove=event.target.closest('[data-remove-collage-photo]');
+    if(!remove)return;
+    const [photo]=photos.splice(Number(remove.dataset.removeCollagePhoto),1);
+    URL.revokeObjectURL(photo.url);
+    renderPreview();
+  });
+  preview.addEventListener('dragover',event=>event.preventDefault());
+  preview.addEventListener('drop',event=>{event.preventDefault();if(event.dataTransfer?.files.length)addPhotos(event.dataTransfer.files);});
+  download?.addEventListener('click',()=>{if(prepared)status.textContent='Скачивание PNG началось.';});
+  send.addEventListener('click',async()=>{
+    if(!prepared)return;
+    const current=revision;
+    send.disabled=true;
+    status.textContent=android?'Открываю меню отправки…':'Копирую коллаж…';
+    try{
+      await deliverSharedPhoto(prepared,android?'apps':'copy',{native,desktop:window.warehouseDesktop,nav:navigator});
+      if(current===revision)status.textContent=android?'Коллаж готов к отправке.':'Коллаж скопирован.';
+    }catch(error){
+      if(current===revision)status.textContent=!android&&error.name==='NotAllowedError'
+        ? 'Браузер не разрешил копирование. Скачайте PNG.'
+        : error.message||'Не удалось обработать коллаж.';
+    }
+    finally{if(current===revision)send.disabled=false;}
+  });
+  const observer=new MutationObserver(()=>{
+    if(!modal.hidden&&preview.isConnected)return;
+    observer.disconnect();
+    revision++;clearTimeout(timer);clearPrepared();
+    photos.forEach(photo=>URL.revokeObjectURL(photo.url));
+  });
+  observer.observe(modal,{attributes:true,attributeFilter:['hidden']});
+  observer.observe($('modalBody'),{childList:true});
 }
 function startBrowserPhotoCopy(url){
   if(!navigator.clipboard?.write||typeof ClipboardItem==='undefined')throw new Error('Этот браузер не поддерживает копирование изображений.');
@@ -4783,7 +4852,6 @@ async function toggleStaff(uid,active){if(!canManageUsers||uid===signedInUser.ui
 async function changeStaffRole(uid){if(!canManageUsers||uid===signedInUser.uid)return;const role=$(`staff-role-${uid}`)?.value;if(!roles[role])return;try{await updateDoc(doc(db,'users',uid),{role});toast(`Роль изменена: ${roles[role]}.`);showStaff()}catch(err){console.error(err);toast('Не удалось изменить роль. Проверьте права администратора и правила Firestore.')}}
 function backDetail(){if(selectedId)openOrder(selectedId,{fromForm:true});}
 document.addEventListener('change',e=>{
-  if(e.target?.id==='collageFiles'){const files=[...(e.target.files||[])].filter(file=>file.type.startsWith('image/'));if(!files.length)return;let urls=[];try{urls=JSON.parse(modal?.dataset.collageUrls||'[]')}catch{}if(urls.length+files.length>12){toast('В один коллаж можно добавить не более 12 фото.');return;}urls.push(...files.map(file=>URL.createObjectURL(file)));if(modal)modal.dataset.collageUrls=JSON.stringify(urls);renderPhotoCollagePreview();e.target.value='';return;}
   if(e.target?.id==='clientsExcelInput'){
     const file=e.target.files?.[0];if(file)importClientsExcel(file);
     e.target.value='';
@@ -5151,8 +5219,6 @@ showAuth();
       });
   }, true);
 })();
-document.addEventListener('click',e=>{const remove=e.target.closest('[data-remove-collage-photo]');if(remove&&modal){let urls=[];try{urls=JSON.parse(modal.dataset.collageUrls||'[]')}catch{}const index=Number(remove.dataset.removeCollagePhoto);const url=urls[index];if(url?.startsWith('blob:'))URL.revokeObjectURL(url);urls.splice(index,1);modal.dataset.collageUrls=JSON.stringify(urls);renderPhotoCollagePreview();return;}const control=e.target.closest('[data-action="copy-photo-collage"],[data-action="download-photo-collage"],[data-action="share-photo-collage"]');if(control&&!control.disabled)void exportPhotoCollage(control);});
-document.addEventListener('dragover',e=>{if(e.target.closest('#collagePreview'))e.preventDefault()});document.addEventListener('drop',e=>{if(!e.target.closest('#collagePreview')||!modal)return;e.preventDefault();const files=[...(e.dataTransfer?.files||[])].filter(file=>file.type.startsWith('image/'));let urls=[];try{urls=JSON.parse(modal.dataset.collageUrls||'[]')}catch{}if(urls.length+files.length>12){toast('В один коллаж можно добавить не более 12 фото.');return;}urls.push(...files.map(file=>URL.createObjectURL(file)));modal.dataset.collageUrls=JSON.stringify(urls);renderPhotoCollagePreview()});
 
 // Capture before the modal DOM is replaced; files are stored as IndexedDB blobs.
 for(const eventName of ['input','change'])document.addEventListener(eventName,event=>{

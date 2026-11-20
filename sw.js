@@ -4,7 +4,7 @@ importScripts(
 );
 
 const SITE_URL = 'https://hlebish.github.io/warehouse_orders/';
-const CACHE = 'order-desk-fcm-v139-required-delivery-address';
+const CACHE = 'order-desk-fcm-v140-payment-label';
 // Version bump triggers install/activate; activate notifies open tabs to reload.
 const ASSETS = [
   './',

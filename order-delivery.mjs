@@ -2,7 +2,7 @@ import { shipmentOrderDateKey } from './warehouse-operations.mjs';
 
 export const orderPaymentLabels = Object.freeze({
   on_delivery: 'По факту',
-  bank_transfer: 'На счёт',
+  bank_transfer: 'На рахунок',
   deferred: 'Отсрочка платежа',
   cashless: 'Безналичные',
   unknown: 'Неизвестно'

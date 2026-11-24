@@ -62,7 +62,7 @@ async function run(){
      backgroundImage:getComputedStyle(node).backgroundImage,overflow:node.scrollWidth>node.clientWidth+1,
      fill:getComputedStyle(icon.querySelector('path')).fill,stroke:getComputedStyle(icon).stroke,font:parseFloat(getComputedStyle(count).fontSize)};
    }));
-   assert.equal(metrics.length,10);
+   assert.equal(metrics.length,8);
    for(const m of metrics){
     assert.equal(m.backgroundImage,'none');assert.equal(m.fill,'none');assert.notEqual(m.stroke,'rgb(0, 0, 0)');
     assert.ok(m.font>=(width<=720?23:26));assert.ok(m.height<=(width<=720?104:118),'dashboard card is too tall: '+m.height);
@@ -139,23 +139,22 @@ async function run(){
    assert.equal(await page.locator('#statKamenskoye').textContent(),'2');
    await page.evaluate(()=>window.setKamenskoyeOrders(0));
    assert.equal(await kamenskoye.isHidden(),true);
-   const section=await page.locator('.kamenskoye-stat-section').boundingBox();
-   const pending=await page.locator('#inspectionPendingCard').boundingBox(),checked=await page.locator('#inspectionCheckedCard').boundingBox();
-   assert.ok(Math.abs(pending.x-section.x)<1&&Math.abs(checked.x+checked.width-section.x-section.width)<1);
-   assert.ok(Math.abs(pending.y-checked.y)<1&&Math.abs(pending.width-checked.width)<1,'inspection cards fill the row equally');
+   assert.equal(await page.locator('.kamenskoye-stat-section').isHidden(),true);
+   for(const id of ['inspectionPendingCard','inspectionCheckedCard','inspectionDefectsCard'])assert.equal(await page.locator('#'+id).isHidden(),true);
   }
   await page.evaluate(()=>window.setOrderDefects([{kind:'defect'},{kind:'defect',decision:'Подтверждён'},{kind:'defect'},{kind:'comment'}]));
-  assert.equal(await page.locator('#statOrderDefects').textContent(),'2');
+  assert.equal(await page.locator('#statOrderDefects').textContent(),'1');
   assert.equal(await page.locator('#statOrderDefects').getAttribute('data-active'),'');
   assert.equal(await page.locator('[data-defect-summary]').count(),0);
   for(const width of [320,390,1440]){
    await page.setViewportSize({width,height:1000});
    await page.waitForFunction(width=>window.innerWidth===width,width);
    await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
-   const boxes=await page.locator('.defect-counter').evaluateAll(nodes=>nodes.map(node=>{
+   const boxes=await page.locator('.defect-counter:visible').evaluateAll(nodes=>nodes.map(node=>{
     const box=node.getBoundingClientRect();return {left:box.left,right:box.right,top:box.top,height:box.height};
    }));
-   assert.equal(boxes.length,2);assert.equal(boxes[0].top,boxes[1].top);
+   assert.equal(boxes.length,1);
+   assert.equal(await page.locator('[data-stat-key="order-defects"]').evaluate(node=>getComputedStyle(node).borderTopWidth),'2px');
    assert.ok(boxes.every(box=>box.left>=0&&box.right<=width+1&&box.height<=50),'defect counters must fit on one compact row at '+width+'px: '+JSON.stringify(boxes));
   }
   await page.evaluate(()=>window.setKamenskoyeOrders(0));

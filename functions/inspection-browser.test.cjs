@@ -1,6 +1,7 @@
 const fs=require('node:fs'),path=require('node:path'),os=require('node:os'),http=require('node:http'),assert=require('node:assert/strict');
 const {chromium}=require('playwright');const root=path.resolve(__dirname,'..');
-const index=fs.readFileSync(path.join(root,'index.html'),'utf8').replace(/<script\b[\s\S]*?<\/script>/g,'');
+// Re-enable the retained inspection UI only in this isolated mechanics test.
+const index=fs.readFileSync(path.join(root,'index.html'),'utf8').replace(/<script\b[\s\S]*?<\/script>/g,'').replace(/(id="inspection(?:Pending|Checked|Defects)Card") hidden/g,'$1');
 const app=fs.readFileSync(path.join(root,'app.js'),'utf8');
 const mapLookup=app.slice(app.indexOf('const WAREHOUSE_MAP_LOOKUP_URL='),app.indexOf('async function loadWarehouseMapAddresses('));
 const fixture=`

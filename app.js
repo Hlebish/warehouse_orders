@@ -1491,7 +1491,7 @@ function statusPill(s){return `<span class="status-pill ${statusClass(s)}">${esc
 function assemblyIndicator(o){if(o?.assemblyInProgress!==true)return '';const startedBy=String(o.assemblyStartedByName||'Кладовщик');const startedAt=o.assemblyStartedAt?fmtDateTime(o.assemblyStartedAt):'';return `<span class="assembly-indicator" title="Сборку начал: ${esc(startedBy)}${startedAt?' · '+esc(startedAt):''}"><span class="assembly-light"></span><span>Идёт сборка</span></span>`}
 function entriesCount(o){return(o.entries||[]).length}
 const statOrderConfig={
-  'order-defects':{title:'Дефекты в заказах',hint:'Заказы с дефектами, ожидающими решения'},
+  'order-defects':{title:'Заказы с дефектами',hint:'Заказы с дефектами, ожидающими решения'},
   'Собран':{title:'Собранные заказы',hint:'Заказы со статусом «Собран»'},
   'Создан':{title:'Созданные заказы',hint:'Заказы со статусом «Создан»'},
   attention:{title:'Заказы требуют внимания',hint:'Заказы с вопросами и дефектами'},
@@ -1662,7 +1662,7 @@ function renderOrdersUI(){const search=$('searchInput').value.toLocaleLowerCase(
  }
  const defectCounter=$('statOrderDefects');
  if(defectCounter){
-  const count=state.orders.reduce((sum,order)=>sum+unresolvedOrderDefects(order).length,0);
+  const count=state.orders.filter(order=>unresolvedOrderDefects(order).length>0).length;
   if(defectCounter.textContent!==String(count))defectCounter.textContent=String(count);
   defectCounter.toggleAttribute('data-active',count>0);
  }

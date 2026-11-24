@@ -8556,6 +8556,12 @@ html body :is(.app-shell,#modalBackdrop,.buyback-overlay) :is(button,[role="butt
  padding:6px 9px;border:1px solid var(--dashboard-control-border);border-radius:9px;background:var(--dashboard-control-surface);
  color:var(--dashboard-control-text);font-size:12px;font-weight:650;line-height:1.2;text-align:left;
 }
+.defect-counters:not(:has(>#inspectionDefectsCard:not([hidden]))){grid-template-columns:minmax(0,1fr);max-width:280px}
+#inspectionDefectsCard[hidden]{display:none!important}
+.defect-counter[data-stat-key="order-defects"]{border:2px solid #c65b65;font-weight:750}
+.defect-counter[data-stat-key="order-defects"] svg{color:#c65b65}
+body:not(.dark-theme) .defect-counter[data-stat-key="order-defects"]{border-color:#a83e4c}
+body:not(.dark-theme) .defect-counter[data-stat-key="order-defects"] svg{color:#a83e4c}
 .defect-counter:hover{background:var(--dashboard-control-hover)}
 .defect-counter:focus-visible{outline:2px solid var(--dashboard-control-muted);outline-offset:2px}
 .defect-counter svg{width:16px;height:16px;color:var(--dashboard-control-muted)}
@@ -8575,6 +8581,9 @@ body:not(.dark-theme) .defect-counter:has(.defect-counter-value[data-active]) sv
 .kamenskoye-stat-section:has(>.kamenskoye-stat-card:not([hidden])){grid-template-columns:repeat(3,minmax(0,1fr))}
 html body .app-shell .content .kamenskoye-stat-section>.stat-card{width:100%!important}
 html body .app-shell .content .kamenskoye-stat-section>.stat-card[hidden]{display:none!important}
+.kamenskoye-stat-section:not(:has(>.stat-card:not([hidden]))){display:none}
+.kamenskoye-stat-section:has(>#inspectionPendingCard[hidden]):has(>#inspectionCheckedCard[hidden]):has(>.kamenskoye-stat-card:not([hidden])){grid-template-columns:repeat(2,minmax(0,1fr))}
+@media(max-width:720px){.kamenskoye-stat-section:has(>#inspectionPendingCard[hidden]):has(>#inspectionCheckedCard[hidden]):has(>.kamenskoye-stat-card:not([hidden])){grid-template-columns:minmax(0,1fr)}}
 .inspection-toolbar{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:16px}
 .inspection-toolbar>p{max-width:500px;margin:0;color:var(--muted,#96aba0);font-size:12px;line-height:1.6}
 .inspection-toolbar>button{flex:none}

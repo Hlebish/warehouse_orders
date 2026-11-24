@@ -341,7 +341,7 @@ function showInAppNoticePopup(n){
  const stack=$('toastStack');if(!stack)return;
  const card=document.createElement('article');card.className='in-app-notice-popup'+(isDirectChat?' direct-chat-notice-popup':'');
  card.dataset.noticeKey=key;
- const heading=n.forwardedContext?(n.forwardedContext.isReply?'Вам ответили':'Вас упомянули'):n.directChatThreadId?'Новое личное сообщение':n.isUrgent?'🚨 Срочное сообщение':isMentionNotice(n)?'Вас упомянули':n.isReply?'Вам ответили':n.target==='chat'?'Новое сообщение в общем чате':'Новое уведомление';
+ const heading=n.forwardedContext?((n.forwardedContext.isUrgent?'Срочно · ':'')+(n.forwardedContext.isReply?'Вам ответили':'Вас упомянули')):n.directChatThreadId?'Новое личное сообщение':n.isUrgent?'🚨 Срочное сообщение':isMentionNotice(n)?'Вас упомянули':n.isReply?'Вам ответили':n.target==='chat'?'Новое сообщение в общем чате':'Новое уведомление';
  const sender=String(n.title||'Заказы · Склад');
  const message=String(n.message||n.body||'Откройте, чтобы посмотреть подробности');
  const title=document.createElement('b');title.textContent=heading;
@@ -2958,7 +2958,7 @@ async function saveEntry(){
   const mentions=resolution.recipients.filter(person=>person.id!==replyTarget?.authorId);
   if(mentions.length>20)throw new Error('В одном комментарии можно упомянуть не более 20 сотрудников.');
   const photos=await uploadPhotos(o.id,entryId,await readPhotos(files));
-  const entry={id:entryId,kind:'comment',article:'',...(replyTarget?{replyToEntryId:replyTarget.id,replyToAuthorId:replyTarget.authorId||'',replyToAuthorName:replyTarget.author||'Сотрудника',replyToText:String(replyTarget.text||'').slice(0,500)}:{}),text,important,mentionUserIds:mentions.map(person=>person.id),authorId:signedInUser.uid,author:profileName||roles[state.role],createdAt,photos};
+  const entry={id:entryId,kind:'comment',article:'',...(replyTarget?{replyToEntryId:replyTarget.id,replyToAuthorId:replyTarget.authorId||'',replyToAuthorName:replyTarget.author||'Сотрудника',replyToText:String(replyTarget.text||'').slice(0,500)}:{}),text,important,...(mentions.length?{mentionUserIds:mentions.map(person=>person.id)}:{}),authorId:signedInUser.uid,author:profileName||roles[state.role],createdAt,photos};
   const result=await runTransaction(db,async transaction=>{
    const orderSnap=await transaction.get(doc(db,'orders',o.id)),entryRef=doc(db,'orders',o.id,'entries',entryId),existing=await transaction.get(entryRef);
    if(!orderSnap.exists())throw new Error('Заказ уже удалён. Черновик сохранён на устройстве.');

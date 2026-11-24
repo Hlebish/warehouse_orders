@@ -64,7 +64,7 @@ function pluralRu(value, one, few, many) {
 }
 function notificationCopy(data, count, category) {
   if (data.forwardedContext && data.directChatThreadId) {
-    return {title:data.forwardedContext.isReply?'Вам ответили':'Вас упомянули',body:String(data.body||'').slice(0,500)};
+    return {title:(data.forwardedContext.isUrgent?'🚨 Срочно · ':'')+(data.forwardedContext.isReply?'Вам ответили':'Вас упомянули'),body:String(data.body||'').slice(0,500)};
   }
   if (data.directChatThreadId) {
     const rawSender = String(data.title || 'Сотрудник').trim();
@@ -696,7 +696,7 @@ async function forwardAddressedMessage(snapshot,kind,orderId=''){
    const threadData={updatedAt:createdAt,lastMessage:(label+': '+text).slice(0,180),lastMessageAt:at,lastSenderId:authorId};
    if(!thread.exists)tx.create(threadRef,{participants,createdAt,...threadData});
    else if(!previousAt||!(previousAt instanceof Timestamp)||previousAt.toMillis()<=at.toMillis())tx.update(threadRef,threadData);
-   const title=label.slice(0,120);
+   const title=((source.isUrgent===true?'🚨 СРОЧНО · ':'')+label).slice(0,120);
    const notice={title,message:body,body,authorId,orderId:'',target:'chat',category:'replies',isMention:recipient.isMention,isReply:recipient.isReply,isUrgent:false,directChatThreadId:threadId,directMessageId:messageId,forwardedContext,eventId,notificationTag:'event-'+eventId,createdAt,expiresAt:Date.now()+60000,read:false};
    tx.create(noticeRef,notice);
    tx.create(queueRef,{title,body,authorId,orderId:'',target:'chat',category:'replies',recipientUserId:uid,mentionRecipientIds:[],isMention:recipient.isMention,isReply:recipient.isReply,isUrgent:false,directChatThreadId:threadId,directMessageId:messageId,forwardedContext,createdAt:new Date().toISOString(),expiresAt:Date.now()+60000,sentAt:null});

@@ -295,7 +295,7 @@ function watchNotifications(){
 }
 function flagOn(n,key){return n?.[key]===true||n?.[key]==='true'||n?.[key]===1}
 function isMentionNotice(n){if(n?.directChatThreadId)return false;const t=String(n?.title||'').toLocaleLowerCase('ru');return flagOn(n,'isMention')||t.includes('упомянули вас')||t.includes('вас упомянули')||n?.category==='mention'}
-function shouldShowAttentionToast(n){return isMentionNotice(n)||flagOn(n,'isReply')||!!(n?.directChatThreadId&&flagOn(n,'isUrgent'))}
+function shouldShowAttentionToast(n){return isMentionNotice(n)||flagOn(n,'isReply')||!!(n?.directChatThreadId&&(flagOn(n,'isUrgent')||n.forwardedContext||flagOn(n,'isMention')))}
 function isInboxNotice(n){return isMentionNotice(n)||flagOn(n,'isReply')||!!n?.directChatThreadId||n?.target==='chat'}
 const notificationSound=new Audio('./elivered-message-sound.mp3');
 notificationSound.preload='auto';
@@ -341,7 +341,7 @@ function showInAppNoticePopup(n){
  const stack=$('toastStack');if(!stack)return;
  const card=document.createElement('article');card.className='in-app-notice-popup'+(isDirectChat?' direct-chat-notice-popup':'');
  card.dataset.noticeKey=key;
- const heading=n.directChatThreadId?'Новое личное сообщение':n.isUrgent?'🚨 Срочное сообщение':isMentionNotice(n)?'Вас упомянули':n.isReply?'Вам ответили':n.target==='chat'?'Новое сообщение в общем чате':'Новое уведомление';
+ const heading=n.forwardedContext?(n.forwardedContext.isReply?'Вам ответили':'Вас упомянули'):n.directChatThreadId?'Новое личное сообщение':n.isUrgent?'🚨 Срочное сообщение':isMentionNotice(n)?'Вас упомянули':n.isReply?'Вам ответили':n.target==='chat'?'Новое сообщение в общем чате':'Новое уведомление';
  const sender=String(n.title||'Заказы · Склад');
  const message=String(n.message||n.body||'Откройте, чтобы посмотреть подробности');
  const title=document.createElement('b');title.textContent=heading;
@@ -577,11 +577,11 @@ function entryToCloud(e){
     createdAt:e.createdAt,
     photos:Array.isArray(e.photos)?e.photos.filter(p=>typeof p==='string'):[]
   };
-  for(const k of ['decision','decisionText','decidedBy','decidedByName','decidedAt','articleIndex','replyToEntryId','replyToAuthorId','replyToAuthorName','replyToText']){
+  for(const k of ['decision','decisionText','decidedBy','decidedByName','decidedAt','articleIndex','replyToEntryId','replyToAuthorId','replyToAuthorName','replyToText','mentionUserIds']){
     if(e[k]!==undefined)out[k]=e[k];
   }
   return out;
-}function entryFromCloud(id,d){return{id,kind:d.kind,article:d.article||'',text:d.text||'',authorId:d.authorId,author:d.authorName||'Сотрудник',createdAt:d.createdAt,photos:d.photos||[],important:d.important===true,...Object.fromEntries(['decision','decisionText','decidedBy','decidedByName','decidedAt','articleIndex','replyToEntryId','replyToAuthorId','replyToAuthorName','replyToText'].filter(k=>d[k]!==undefined).map(k=>[k,d[k]]))}}
+}function entryFromCloud(id,d){return{id,kind:d.kind,article:d.article||'',text:d.text||'',authorId:d.authorId,author:d.authorName||'Сотрудник',createdAt:d.createdAt,photos:d.photos||[],important:d.important===true,...Object.fromEntries(['decision','decisionText','decidedBy','decidedByName','decidedAt','articleIndex','replyToEntryId','replyToAuthorId','replyToAuthorName','replyToText','mentionUserIds'].filter(k=>d[k]!==undefined).map(k=>[k,d[k]]))}}
 function orderToCloud(o,isNew=false){return{number:o.number,client:o.client||'',...(o.clientId?{clientId:String(o.clientId)}:{}),deliveryType:['city','pickup','post','kamyanske'].includes(o.deliveryType)?o.deliveryType:'city',...(isNew?storedOrderDeliveryDetails(o):{}),status:o.status,...(o.returnCancelled===true?{returnCancelled:true}:{}),articles:Array.isArray(o.articles)?o.articles.map(x=>({article:String(x.article||'').trim(),quantity:Math.max(1,Number(x.quantity)||1),collected:x.collected===true,shipmentChecked:x.shipmentChecked===true})).filter(x=>x.article):[],createdAt:o.createdAt,createdBy:o.createdBy||auth.currentUser.uid,createdByName:o.author||profileName,updatedAt:o.updatedAt||o.createdAt,...(!isNew&&o.updatedBy?{updatedBy:o.updatedBy,updatedByName:o.updatedByName}:{}),...(o.transferredAt?{transferredAt:o.transferredAt}:{}),...(o.resumedAt?{resumedAt:o.resumedAt}:{}),...(o.assembledAt?{assembledAt:o.assembledAt}:{}),...(o.shippedAt?{shippedAt:o.shippedAt}:{}),...(typeof o.assemblyInProgress==='boolean'?{assemblyInProgress:o.assemblyInProgress}:{}),...(o.assemblyStartedAt?{assemblyStartedAt:o.assemblyStartedAt}:{}),...(o.assemblyStartedBy?{assemblyStartedBy:o.assemblyStartedBy}:{}),...(o.assemblyStartedByName?{assemblyStartedByName:o.assemblyStartedByName}:{}),...(Array.isArray(o.returns)?{returns:o.returns}:{} )}}
 function equal(a,b){return JSON.stringify(a)===JSON.stringify(b)}
 async function writeAudit(action,details='',orderId='',meta={}){
@@ -2958,7 +2958,7 @@ async function saveEntry(){
   const mentions=resolution.recipients.filter(person=>person.id!==replyTarget?.authorId);
   if(mentions.length>20)throw new Error('В одном комментарии можно упомянуть не более 20 сотрудников.');
   const photos=await uploadPhotos(o.id,entryId,await readPhotos(files));
-  const entry={id:entryId,kind:'comment',article:'',...(replyTarget?{replyToEntryId:replyTarget.id,replyToAuthorId:replyTarget.authorId||'',replyToAuthorName:replyTarget.author||'Сотрудника',replyToText:String(replyTarget.text||'').slice(0,500)}:{}),text,important,authorId:signedInUser.uid,author:profileName||roles[state.role],createdAt,photos};
+  const entry={id:entryId,kind:'comment',article:'',...(replyTarget?{replyToEntryId:replyTarget.id,replyToAuthorId:replyTarget.authorId||'',replyToAuthorName:replyTarget.author||'Сотрудника',replyToText:String(replyTarget.text||'').slice(0,500)}:{}),text,important,mentionUserIds:mentions.map(person=>person.id),authorId:signedInUser.uid,author:profileName||roles[state.role],createdAt,photos};
   const result=await runTransaction(db,async transaction=>{
    const orderSnap=await transaction.get(doc(db,'orders',o.id)),entryRef=doc(db,'orders',o.id,'entries',entryId),existing=await transaction.get(entryRef);
    if(!orderSnap.exists())throw new Error('Заказ уже удалён. Черновик сохранён на устройстве.');
@@ -2971,9 +2971,8 @@ async function saveEntry(){
   applyCommittedOrder(o.id,{},result.entry);feedback.success();await clearSubmittedDraft(session);
   if(!result.duplicate){
    void writeAudit('Добавлен комментарий',text,o.id,{entryId});
-   if(replyTarget){void queuePush(o.client||'Клиент не указан',text.slice(0,500),signedInUser.uid,o.id,'site','replies',replyTarget.authorId,{isReply:true,entryId});
-    mentions.forEach(person=>void queuePush(profileName+' · заказ № '+o.number,text.slice(0,500),signedInUser.uid,o.id,'site','replies',person.id,{isMention:true,entryId}));
-   }else void queuePush(o.client||'Клиент не указан',text.slice(0,500),signedInUser.uid,o.id,'site','comments','',{mentionRecipientIds:mentions.map(person=>person.id),entryId});
+   // Personal mention/reply cards and their push are generated from the saved entry on the server.
+   if(!replyTarget)void queuePush(o.client||'Клиент не указан',text.slice(0,500),signedInUser.uid,o.id,'site','comments','',{entryId});
   }
   render();toast(result.duplicate?'Запись уже была сохранена.':'Комментарий сохранён.');if(feedback.isCurrent()&&selectedId===o.id){openOrderAtEntry(o.id,entryId,true);}
  }catch(error){feedback.fail(error);toast(error.message||'Не удалось сохранить комментарий.');}
@@ -3698,7 +3697,7 @@ function renderChatMessages(options={}){
 
       const roleMeta=({admin:{label:'Администратор',icon:'⚙',tone:'admin'},administrator:{label:'Администратор',icon:'⚙',tone:'admin'},warehouse:{label:'Кладовщик',icon:'▦',tone:'warehouse'},manager:{label:'Менеджер',icon:'↗',tone:'manager'},chief_accountant:{label:'Главный бухгалтер',icon:'₴',tone:'chief-accountant'},accountant:{label:'Бухгалтер',icon:'▤',tone:'accountant'},director:{label:'Директор',icon:'♛',tone:'director'}})[m.authorRole]||{label:'Сотрудник',icon:'•',tone:'unknown'};
       const roleBadge='<span class="chat-role-badge chat-role-'+roleMeta.tone+'" title="'+esc(roleMeta.label)+'"><span aria-hidden="true">'+roleMeta.icon+'</span>'+esc(roleMeta.label)+'</span>';
-      return chatDayDivider+'<article class="chat-message chat-author-role-'+roleMeta.tone+' '+(mine?'mine':'')+'"><div class="chat-bubble-head"><div class="chat-bubble-author"><b>'+esc(chatDisplayName(m.authorName))+'</b><span class="chat-bubble-role">'+esc(roleMeta.label)+'</span></div><time title="'+esc(fmtDateTime(m.createdAt))+'">'+esc(chatTime(m.createdAt))+'</time></div>'+replyHtml+'<div class="chat-message-text">'+renderChatText(m.text)+'</div>'+(m.editedAt?'<small class="chat-edited-label">изменено</small>':'')+photoHtml+(m.isUrgent?'<div class="chat-urgent-banner">🚨 СРОЧНОЕ ОБРАЩЕНИЕ</div>':'')+'<div class="chat-message-actions">'+likeHtml+menuHtml+receipt+urgentAckButton+'</div></article>';
+      return chatDayDivider+'<article class="chat-message chat-author-role-'+roleMeta.tone+' '+(mine?'mine':'')+'" data-group-message-id="'+esc(m.id)+'"><div class="chat-bubble-head"><div class="chat-bubble-author"><b>'+esc(chatDisplayName(m.authorName))+'</b><span class="chat-bubble-role">'+esc(roleMeta.label)+'</span></div><time title="'+esc(fmtDateTime(m.createdAt))+'">'+esc(chatTime(m.createdAt))+'</time></div>'+replyHtml+'<div class="chat-message-text">'+renderChatText(m.text)+'</div>'+(m.editedAt?'<small class="chat-edited-label">изменено</small>':'')+photoHtml+(m.isUrgent?'<div class="chat-urgent-banner">🚨 СРОЧНОЕ ОБРАЩЕНИЕ</div>':'')+'<div class="chat-message-actions">'+likeHtml+menuHtml+receipt+urgentAckButton+'</div></article>';
     }).join('');
     decoratePhotoSharing(box);
     if(chatPendingScrollRestore){box.scrollTop=chatPendingScrollRestore.top+(box.scrollHeight-chatPendingScrollRestore.height);chatPendingScrollRestore=null;}
@@ -3743,11 +3742,14 @@ function renderDirectChatMessages(messages,options={}){
  box.innerHTML=messages.map(message=>{
   const day=chatDay(message.createdAt),divider=day!==previousDay?'<div class="chat-day-divider"><span>'+esc(day)+'</span></div>':'';previousDay=day;
   const mine=message.authorId===signedInUser?.uid,peerId=directChatTarget?.uid;
+  const source=message.forwardedContext,forwarded=source&&(source.kind==='order'||source.kind==='chat');
+  const sourceHtml=forwarded?'<div class="direct-forwarded-label">'+(source.isReply?'Ответ':'Упоминание')+' · '+(source.kind==='order'?'Заказ № '+esc(source.orderNumber||'—'):'Общий чат')+(source.isUrgent?' · Срочно':'')+'</div>':'';
+  const sourceLink=forwarded?'<button type="button" class="direct-forwarded-link" data-forwarded-kind="'+esc(source.kind)+'" data-forwarded-id="'+esc(source.messageId||'')+'" data-forwarded-order="'+esc(source.orderId||'')+'">Открыть оригинал ↗</button>':'';
   const peerRead=mine&&!!peerId&&((Array.isArray(message.readBy)&&message.readBy.includes(peerId))||(message.isUrgent===true&&Array.isArray(message.urgentAckBy)&&message.urgentAckBy.includes(peerId)));
   const urgentPending=message.isUrgent===true&&!mine&&!(Array.isArray(message.urgentAckBy)&&message.urgentAckBy.includes(signedInUser?.uid));
   const photos=Array.isArray(message.photos)?message.photos:[];
   const photoHtml=photos.length?'<div class="chat-photo-grid">'+photos.map(path=>'<button type="button" class="chat-photo-open" data-direct-photo="'+esc(path)+'" aria-label="Открыть фотографию" disabled>Загрузка фото…</button>').join('')+'</div>':'';
-  return divider+'<article class="chat-message '+(mine?'mine':'')+(message.isUrgent?' direct-chat-urgent':'')+'" data-direct-message-id="'+esc(message.id)+'">'+(message.isUrgent?'<div class="chat-urgent-banner">СРОЧНОЕ ОБРАЩЕНИЕ</div>':'')+(message.text?'<div class="chat-message-text">'+renderChatText(message.text)+'</div>':'')+photoHtml+'<div class="direct-message-meta"><time title="'+esc(fmtDateTime(message.createdAt))+'">'+esc(chatTime(message.createdAt))+'</time>'+(mine?'<small class="direct-chat-read-status '+(peerRead?'is-read':'')+'" title="'+(peerRead?'Собеседник прочитал сообщение':'Сообщение отправлено')+'">'+(peerRead?'✓✓ Прочитано':'✓ Отправлено')+'</small>':'')+'</div>'+(urgentPending?'<button type="button" class="chat-urgent-ack" data-direct-urgent-ack="'+esc(message.id)+'">✓ Подтвердить получение</button>':(message.isUrgent&&!mine?'<small class="direct-urgent-acknowledged">✓ Получение подтверждено</small>':''))+'</article>';
+  return divider+'<article class="chat-message '+(mine?'mine':'')+(message.isUrgent?' direct-chat-urgent':'')+(forwarded?' direct-chat-forwarded':'')+'" data-direct-message-id="'+esc(message.id)+'">'+sourceHtml+(message.isUrgent?'<div class="chat-urgent-banner">СРОЧНОЕ ОБРАЩЕНИЕ</div>':'')+(message.text?'<div class="chat-message-text">'+renderChatText(message.text)+'</div>':'')+photoHtml+sourceLink+'<div class="direct-message-meta"><time title="'+esc(fmtDateTime(message.createdAt))+'">'+esc(chatTime(message.createdAt))+'</time>'+(mine?'<small class="direct-chat-read-status '+(peerRead?'is-read':'')+'" title="'+(peerRead?'Собеседник прочитал сообщение':'Сообщение отправлено')+'">'+(peerRead?'✓✓ Прочитано':'✓ Отправлено')+'</small>':'')+'</div>'+(urgentPending?'<button type="button" class="chat-urgent-ack" data-direct-urgent-ack="'+esc(message.id)+'">✓ Подтвердить получение</button>':(message.isUrgent&&!mine?'<small class="direct-urgent-acknowledged">✓ Получение подтверждено</small>':''))+'</article>';
  }).join('');
  const photoButtons=box.querySelectorAll('[data-direct-photo]');
  if(typeof IntersectionObserver==='function'){
@@ -3919,6 +3921,8 @@ async function openDirectChat(person,requestedThreadId='',focusMessageId=''){
    document.removeEventListener('visibilitychange',flushChatDraft);
   };
   messagesBox?.addEventListener('click',event=>{
+   const origin=event.target.closest('[data-forwarded-kind]');
+   if(origin){event.preventDefault();if(origin.dataset.forwardedKind==='order')openOrderAtEntry(origin.dataset.forwardedOrder,origin.dataset.forwardedId);else openChat(origin.dataset.forwardedId);return;}
    const ack=event.target.closest('[data-direct-urgent-ack]');
    if(ack){event.preventDefault();void acknowledgeDirectUrgentMessage(ack.dataset.directUrgentAck);}
   });
@@ -4004,8 +4008,9 @@ async function runAdminTest(testId,trigger){
   if(trigger){trigger.disabled=false;trigger.textContent='Повторить';}
  }
 }
-function openChat(){
+function openChat(sourceMessageId=''){
   if(!signedInUser)return;
+  let sourceToFocus=typeof sourceMessageId==='string'?sourceMessageId:'';
   directChatUnsubscribe?.();directChatUnsubscribe=null;
   chatUnsubscribe?.();
   chatMessages=[];olderChatMessages=[];chatOldestCursor=null;hasOlderChatMessages=true;loadingOlderChatMessages=false;chatLegacyHistoryLoaded=false;chatLegacyHistoryLoading=false;chatLegacyHistoryCursor=null;chatPendingScrollRestore=null;chatReplyTo=null;chatFilterText='';chatFilterMode='all';
@@ -4027,6 +4032,23 @@ function openChat(){
     hasOlderChatMessages=snap.docs.length===50||!chatLegacyHistoryLoaded;
     renderChatMessages({preserveScroll:true,oldTop,oldHeight,wasAtBottom,scrollToNew:hasNewIncoming&&wasAtBottom});
     markChatMessagesRead(chatMessages);
+    if(sourceToFocus){
+      const id=sourceToFocus;sourceToFocus='';
+      void (async()=>{
+        const focusBox=$('chatMessages'),viewer=signedInUser?.uid;
+        try{
+          if(![...chatMessages,...olderChatMessages].some(m=>m.id===id)){
+            const snap=await getDoc(doc(db,'chatMessages',id));
+            if($('chatMessages')!==focusBox||signedInUser?.uid!==viewer)return;
+            if(!snap.exists()){toast('Исходное сообщение удалено или недоступно.');return;}
+            if(![...chatMessages,...olderChatMessages].some(m=>m.id===id))olderChatMessages.push(normalizeChatMessageDoc(snap));
+            renderChatMessages();
+          }
+          const target=[...focusBox.querySelectorAll('[data-group-message-id]')].find(node=>node.dataset.groupMessageId===id);
+          if(target){target.classList.add('direct-message-focus');target.scrollIntoView({block:'center'});setTimeout(()=>target.classList.remove('direct-message-focus'),6000);}
+        }catch(error){console.warn('Не удалось открыть исходное сообщение',error);toast('Не удалось открыть исходное сообщение.');}
+      })();
+    }
     // If fewer than 50 canonical messages exist, load legacy history immediately
     // so an otherwise non-scrollable empty/short chat still shows its old messages.
     if(snap.docs.length<50&&!chatLegacyHistoryLoaded)requestAnimationFrame(()=>loadOlderChatMessages());
@@ -4123,12 +4145,7 @@ function openChat(){
         ...(isUrgent?{isUrgent:true,urgentAckBy:[]}:{isUrgent:false}),
         ...(!isUrgent&&replyTarget?{replyToId:replyTarget.id,replyToAuthorId:replyTarget.authorId,replyToAuthorName:replyTarget.authorName||'Сотрудник',replyToText:(replyTarget.text||'📷 Фото').slice(0,300)}:{})
       });
-      if(!isUrgent&&replyTarget?.authorId&&replyTarget.authorId!==signedInUser.uid){
-        await queuePush(profileName,text||'📷 Фото',signedInUser.uid,'','chat','replies',replyTarget.authorId,{isReply:true});
-      }
-      for(const person of mentionedUsers){
-        await queuePush(isUrgent?'🚨 СРОЧНО · '+profileName:profileName,text||'📷 Фото',signedInUser.uid,'','chat','replies',person.id,{isMention:true});
-      }
+      // The server forwards targeted messages after the original has been saved.
       const urgentToggle=$('chatUrgent');if(urgentToggle)urgentToggle.checked=false;
       chatComposer.clear();chatComposer.setStatus('Сообщение отправлено.');
       cancelChatReply();

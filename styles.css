@@ -8647,3 +8647,14 @@ html body:not(.dark-theme) .inspection-defect.resolved{background:#d8e7d6;color:
  .inspection-toolbar>button{width:100%}
 }
 .order-delivery-summary{display:grid;gap:5px;margin:0 0 14px;padding:10px 12px;border:1px solid var(--line);border-radius:9px;font-size:12px;line-height:1.4;white-space:pre-wrap;overflow-wrap:anywhere}
+
+/* Context forwarded from shared conversations; keep it distinct from private messages. */
+#directChatMessages .chat-message.direct-chat-forwarded{background:#dce0e3!important;border:1px solid #a0a9b1!important;color:#29343d!important;box-shadow:none!important}
+body.dark-theme #directChatMessages .chat-message.direct-chat-forwarded{background:#30363d!important;border-color:#69747e!important;color:#e0e4e8!important}
+#directChatMessages .direct-forwarded-label{font-size:11px;font-weight:750;color:#54616c;margin-bottom:6px;overflow-wrap:anywhere}
+body.dark-theme #directChatMessages .direct-forwarded-label{color:#b1bac3}
+#directChatMessages .direct-forwarded-link{display:block;margin:7px 0 2px;padding:4px 0;background:none!important;border:0!important;color:inherit;font-size:11px;font-weight:650;text-decoration:underline;text-underline-offset:3px;cursor:pointer;text-align:left}
+.staff-rail-avatar.has-direct-unread .staff-avatar{outline:2px solid #ed5367;outline-offset:1px;box-shadow:0 0 10px 3px #ef526b99}
+.staff-rail-expand.has-direct-unread,.staff-presence-toggle.has-direct-unread{outline:2px solid #ed5367!important;box-shadow:0 0 12px 3px #ef526b88!important}
+.staff-conversation-row.has-unread{border-color:#e45b6b!important;box-shadow:inset 0 0 0 1px #e45b6b80,0 0 10px #e45b6b44!important}
+.staff-rail-unread-count,.staff-conversation-unread{box-shadow:0 0 9px 2px #ef526b88}

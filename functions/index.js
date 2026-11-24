@@ -9,6 +9,7 @@ const { getFirestore, FieldValue, Timestamp, FieldPath } = require('firebase-adm
 const { getMessaging } = require('firebase-admin/messaging');
 const { createHash } = require('crypto');
 const { directPushEventId } = require('./direct-push-id');
+const { forwardedRecipients } = require('./forwarded-context');
 const {createInspectionHandlers}=require('./inspection-items');
 const { normalizeBuybackArticle, resolveBuybackArticle, buybackArticleQuantities, buybackShippableArticles } = require('./buyback-articles');
 
@@ -62,6 +63,9 @@ function pluralRu(value, one, few, many) {
   return n > 10 && n < 20 ? many : last > 1 && last < 5 ? few : last === 1 ? one : many;
 }
 function notificationCopy(data, count, category) {
+  if (data.forwardedContext && data.directChatThreadId) {
+    return {title:data.forwardedContext.isReply?'Вам ответили':'Вас упомянули',body:String(data.body||'').slice(0,500)};
+  }
   if (data.directChatThreadId) {
     const rawSender = String(data.title || 'Сотрудник').trim();
     const sender = rawSender.replace(/^🚨\s*СРОЧНОЕ\s+ЛИЧНОЕ\s+СООБЩЕНИЕ\s*·\s*/iu, '') || 'Сотрудник';
@@ -166,6 +170,7 @@ async function createNotificationHistory(data, eventId) {
     const profile = user.data() || {};
     const isMentionRecipient=mentionRecipientIds.has(user.id);
     if (data.buybackItemId && !canAccessBuybackProfile(profile)) continue;
+    if (Array.isArray(data.excludedRecipientIds) && data.excludedRecipientIds.includes(user.id)) continue;
     if (authorId && user.id === authorId && !(data.forceAll === true && recipientUserId === user.id)) continue;
     const settings = profile.notificationSettings || {};
     if (!notificationCategoryEnabled(settings, category) && !data.isMention && !isMentionRecipient && !data.buybackItemId && data.forceAll !== true && !data.directChatThreadId) continue;
@@ -207,7 +212,7 @@ async function createNotificationHistory(data, eventId) {
   return count;
 }
 
-async function collectTokens(category='orders', recipientUserId='', authorId='', forceAll=false, buybackOnly=false, directChat=false, mentionRecipientIds=[]) {
+async function collectTokens(category='orders', recipientUserId='', authorId='', forceAll=false, buybackOnly=false, directChat=false, mentionRecipientIds=[], excludedRecipientIds=[]) {
   // Direct notifications should never enumerate every employee's devices.
   const users = recipientUserId
     ? await db.collection('users').doc(recipientUserId).get().then(user =>
@@ -218,6 +223,7 @@ async function collectTokens(category='orders', recipientUserId='', authorId='',
   const eligibleUsers = users.filter(user => {
     const profile = user.data() || {};
     if (buybackOnly && !canAccessBuybackProfile(profile)) return false;
+    if (excludedRecipientIds.includes(user.id)) return false;
     if (authorId && user.id === authorId && !(forceAll && recipientUserId === user.id)) return false;
     return forceAll || buybackOnly || directChat || mentionedUsers.has(user.id) || notificationCategoryEnabled(profile.notificationSettings || {}, category);
   });
@@ -523,6 +529,7 @@ exports.enqueueWarehousePush = onCall(async request => {
   const directChatThreadId = String(input.directChatThreadId || '');
   const directMessageId = String(input.directMessageId || '');
   const entryId = String(input.entryId || '');
+  let excludedRecipientIds=[];
   if (entryId && (!orderId || target !== 'site' || entryId.length > 128 || entryId.includes('/'))) throw new HttpsError('invalid-argument', 'Некорректная ссылка на запись заказа.');
   const isUrgent = input.isUrgent === true;
   if (input.mentionRecipientIds !== undefined && !Array.isArray(input.mentionRecipientIds)) {
@@ -612,6 +619,7 @@ exports.enqueueWarehousePush = onCall(async request => {
   if (entryId) {
     const entry = await db.collection('orders').doc(orderId).collection('entries').doc(entryId).get();
     if (!entry.exists || entry.data().authorId !== uid) throw new HttpsError('permission-denied', 'Запись заказа не найдена или принадлежит другому сотруднику.');
+    if (category==='comments' && Array.isArray(entry.data().mentionUserIds)) excludedRecipientIds=entry.data().mentionUserIds.filter(id=>typeof id==='string').slice(0,20);
   }
 
   const ref = directMessageId
@@ -627,6 +635,7 @@ exports.enqueueWarehousePush = onCall(async request => {
     category,
     recipientUserId,
     mentionRecipientIds,
+    excludedRecipientIds,
     orderNumber,
     isMention: input.isMention === true,
     isReply: input.isReply === true,
@@ -646,6 +655,56 @@ exports.enqueueWarehousePush = onCall(async request => {
   }
   return { ok: true, eventId: ref.id };
 });
+
+
+/** Mirror a saved public/order message into its addressed employee's pair thread.
+ * The source, recipient, and deterministic ID make event retries idempotent.
+ * Photos remain in the original, where the existing access rules apply.
+ */
+async function forwardAddressedMessage(snapshot,kind,orderId=''){
+ if(!snapshot)return;
+ const source=snapshot.data()||{},authorId=source.authorId;
+ if(typeof authorId!=='string'||!authorId||authorId.includes('/')||(kind==='order'&&source.kind!=='comment'))return;
+ const recipients=forwardedRecipients(source);
+ if(!recipients.length)return;
+ const [author,order]=await Promise.all([db.collection('users').doc(authorId).get(),orderId?db.collection('orders').doc(orderId).get():Promise.resolve(null)]);
+ if(!author.exists||author.data()?.active!==true||(orderId&&!order?.exists))return;
+ const name=String(source.authorName||author.data()?.displayName||'Сотрудник').slice(0,120);
+ const text=String(source.text||'').trim().slice(0,1000)||'Фото в исходном сообщении';
+ const createdAt=Timestamp.now();
+ const sourceTime=source.createdAt instanceof Timestamp?source.createdAt.toMillis():Date.parse(String(source.createdAt||''));
+ const orderNumber=String(order?.data()?.number||'').slice(0,80);
+ // Do not use untrusted source IDs in document paths beyond their existing snapshot path.
+ for(const recipient of recipients){
+  const uid=recipient.uid,participants=[authorId,uid].sort(),threadId=participants.join('__');
+  const threadRef=db.collection('directChats').doc(threadId);
+  const messageId='forwarded-'+createHash('sha256').update(JSON.stringify([snapshot.ref.path,uid])).digest('hex');
+  const messageRef=threadRef.collection('messages').doc(messageId);
+  const eventId=directPushEventId(threadId,messageId,authorId,uid);
+  const noticeRef=db.collection('users').doc(uid).collection('notifications').doc(eventId);
+  const queueRef=db.collection('pushQueue').doc(eventId);
+  const forwardedContext={kind,messageId:snapshot.id,orderId,orderNumber,isReply:recipient.isReply,isMention:recipient.isMention,isUrgent:source.isUrgent===true};
+  const label=(recipient.isReply?'Ответ':'Упоминание')+' · '+(kind==='order'?'Заказ № '+orderNumber:'Общий чат');
+  const body=(name+': '+text).slice(0,500);
+  await db.runTransaction(async tx=>{
+   const [profile,thread,existing]=await Promise.all([tx.get(db.collection('users').doc(uid)),tx.get(threadRef),tx.get(messageRef)]);
+   if(!profile.exists||profile.data()?.active!==true||existing.exists)return;
+   if(thread.exists&&JSON.stringify([...(thread.data()?.participants||[])].sort())!==JSON.stringify(participants))return;
+   const at=Number.isFinite(sourceTime)?Timestamp.fromMillis(sourceTime):createdAt;
+   tx.create(messageRef,{text,photos:[],authorId,authorName:name,createdAt:at,readBy:[authorId],isUrgent:false,urgentAckBy:[],forwardedContext});
+   const previousAt=thread.data()?.lastMessageAt;
+   const threadData={updatedAt:createdAt,lastMessage:(label+': '+text).slice(0,180),lastMessageAt:at,lastSenderId:authorId};
+   if(!thread.exists)tx.create(threadRef,{participants,createdAt,...threadData});
+   else if(!previousAt||!(previousAt instanceof Timestamp)||previousAt.toMillis()<=at.toMillis())tx.update(threadRef,threadData);
+   const title=label.slice(0,120);
+   const notice={title,message:body,body,authorId,orderId:'',target:'chat',category:'replies',isMention:recipient.isMention,isReply:recipient.isReply,isUrgent:false,directChatThreadId:threadId,directMessageId:messageId,forwardedContext,eventId,notificationTag:'event-'+eventId,createdAt,expiresAt:Date.now()+60000,read:false};
+   tx.create(noticeRef,notice);
+   tx.create(queueRef,{title,body,authorId,orderId:'',target:'chat',category:'replies',recipientUserId:uid,mentionRecipientIds:[],isMention:recipient.isMention,isReply:recipient.isReply,isUrgent:false,directChatThreadId:threadId,directMessageId:messageId,forwardedContext,createdAt:new Date().toISOString(),expiresAt:Date.now()+60000,sentAt:null});
+  });
+ }
+}
+exports.forwardGroupChatContext=onDocumentCreated({document:'chatMessages/{messageId}',retry:true},event=>forwardAddressedMessage(event.data,'chat'));
+exports.forwardOrderCommentContext=onDocumentCreated({document:'orders/{orderId}/entries/{entryId}',retry:true},event=>forwardAddressedMessage(event.data,'order',event.params.orderId));
 
 exports.sendWarehousePush = onDocumentCreated({ document: 'pushQueue/{eventId}', retry: true }, async event => {
   const snapshot = event.data;
@@ -681,7 +740,8 @@ exports.sendWarehousePush = onDocumentCreated({ document: 'pushQueue/{eventId}',
   }
   const notificationTag = notificationTagFor(data, eventId, category, target, recipientUserId);
   // Start notification history immediately, but do not make push delivery wait for it.
-  const historyPromise = createNotificationHistory(data, eventId).catch(error => {
+  // Forwarded cards and their unread notices are committed together with the queue item.
+  const historyPromise = (data.forwardedContext ? Promise.resolve() : createNotificationHistory(data, eventId)).catch(error => {
     logger.error('Notification history write failed', {
       eventId,
       error: String(error?.message || error)
@@ -696,7 +756,7 @@ exports.sendWarehousePush = onDocumentCreated({ document: 'pushQueue/{eventId}',
       : (orderId ? `${siteUrl}?order=${encodeURIComponent(orderId)}${data.entryId ? '&entry=' + encodeURIComponent(String(data.entryId)) : ''}` : siteUrl));
 
   try {
-    const tokenDocs = await collectTokens(category, recipientUserId, String(data.authorId || ''), data.forceAll === true, Boolean(data.buybackItemId), Boolean(directChatThreadId), mentionRecipientIds);
+    const tokenDocs = await collectTokens(category, recipientUserId, String(data.authorId || ''), data.forceAll === true, Boolean(data.buybackItemId), Boolean(directChatThreadId), mentionRecipientIds, Array.isArray(data.excludedRecipientIds)?data.excludedRecipientIds:[]);
 
     if (!tokenDocs.length) {
       await historyPromise;

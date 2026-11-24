@@ -598,7 +598,7 @@ service cloud.firestore {
             'kind', 'article', 'text', 'important', 'authorId', 'authorName', 'createdAt',
             'photos', 'decision', 'decisionText', 'decidedBy',
             'decidedByName', 'decidedAt', 'articleIndex',
-            'replyToEntryId', 'replyToAuthorId', 'replyToAuthorName', 'replyToText'
+            'replyToEntryId', 'replyToAuthorId', 'replyToAuthorName', 'replyToText', 'mentionUserIds'
           ])
           && request.resource.data.authorId == request.auth.uid
           && request.resource.data.authorName is string
@@ -606,6 +606,8 @@ service cloud.firestore {
             'comment', 'question', 'defect', 'decision', 'viewed', 'system', 'return'
           ]
           && request.resource.data.text is string
+          && (!('mentionUserIds' in request.resource.data) || (request.resource.data.kind == 'comment'
+            && request.resource.data.mentionUserIds is list && request.resource.data.mentionUserIds.size() <= 20))
           && (!request.resource.data.keys().hasAny(['important']) || request.resource.data.important is bool)
           && request.resource.data.photos is list
           && request.resource.data.photos.size() <= 5

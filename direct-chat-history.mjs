@@ -77,6 +77,8 @@ export function createDirectChatHistory({loadPage,onChange=()=>{},onError=()=>{}
   updateRecent(messages=[],pagination){
    if(disposed)return;
    const liveRevision=++revision;
+   const liveIds=new Set(messages.map(message=>message.id));
+   for(const [id,message] of records)if(message.hasPendingWrites===true&&!liveIds.has(id)){records.delete(id);liveRevisions.set(id,liveRevision);}
    for(const message of messages){if(message?.id){records.set(message.id,message);liveRevisions.set(message.id,liveRevision);}}
    // A cache snapshot may be incomplete. The caller passes pagination only
    // after a server snapshot; page reads must never reset an established cursor.

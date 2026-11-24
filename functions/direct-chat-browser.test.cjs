@@ -52,6 +52,12 @@ function onSnapshot(q,_options,callback){const listener={q,callback};listeners.a
 async function getDocsFromServer(q){window.qa.pageReads++;if(window.qa.delayNextPage){window.qa.delayNextPage=false;await new Promise(resolve=>{window.qa.releasePage=resolve;});window.qa.releasePage=null;}return snapshot(q);}
 async function runTransaction(_db,callback){const changes=[];const result=await callback({get:async ref=>snapDoc(ref,record(ref)),set:(ref,value)=>changes.push([ref,value]),update:()=>{}});if(window.qa.failSend&&changes.some(([ref])=>ref.split('/').length===4))throw Error('Тест: нет связи');for(const [ref,value]of changes){const p=ref.split('/');if(p.length===4){const list=threads.get(p[1])||[];list.push({...value,id:p[3]});threads.set(p[1],list);}}if(changes.length)emit();return result;}
 async function updateDoc(ref,patch){const value=record(ref);if(!value)throw Error('missing message');for(const[key,next]of Object.entries(patch))value[key]=next?.union?[...new Set([...(value[key]||[]),...next.union])]:next;emit();}
+const getDocFromServer=async ref=>snapDoc(ref,record(ref));
+function writeBatch(){const changes=[];return {set:(ref,value)=>changes.push([ref,value]),update:()=>{},commit:async()=>{
+ if(window.qa.failSend)throw Error('Тест: нет связи');
+ for(const [ref,value] of changes)if(record(ref))throw Error('already exists');
+ for(const [ref,value] of changes){const p=ref.split('/'),list=threads.get(p[1])||[];list.push({...value,id:p[3]});threads.set(p[1],list);}emit();
+ }};}
 const storageRef=(_storage,ref)=>ref,uploadBytes=async(ref,blob)=>photos.set(ref,blob);
 async function getDownloadURL(ref){if(!photos.has(ref))throw Object.assign(Error('not found'),{code:'storage/object-not-found'});return 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aK9sAAAAASUVORK5CYII=';}
 const readPhotos=async files=>files,queuePush=async()=>true;

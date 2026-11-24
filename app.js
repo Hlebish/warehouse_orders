@@ -10,7 +10,7 @@ import { orderPaymentLabels, orderPaymentLabel, isOrderPaymentType, deliveryAddr
 import { drafts, draftKey } from './draft-store.mjs?v=2026.11.16.04';
 import { createWarehouseMapPanel, warehouseMapUrl, mapArticleQuery } from './warehouse-map-panel.mjs?v=2026.11.12.06';
 import { composerHtml, bindChatComposer, chatTime, chatDay } from './chat-ui.mjs?v=2026.11.16.04';
-import { createDirectChatHistory } from './direct-chat-history.mjs?v=2026.11.16.04';
+import { createDirectChatHistory } from './direct-chat-history.mjs?v=2026.11.24.03';
 import { bindDirectChatDraft } from './direct-chat-draft.mjs?v=2026.11.16.04';
 import { buildOrderHistory, getOrderCreator, getLatestOrderEvent } from './order-history.mjs?v=2026.11.17.01';
 import { buildStaffConversations } from './staff-conversations.mjs?v=2026.11.16.05';
@@ -506,7 +506,8 @@ function chatUnreadIndicatorMode(){return signedInUser&&localStorage.getItem('wa
 function paintChatBadge(){const button=$('chatSidebarButton');if(!button)return;const unread=!!chatUnread;button.classList.toggle('has-unread-chat',unread&&chatUnreadIndicatorMode()==='dot');button.classList.toggle('has-unread-chat-bell',unread&&chatUnreadIndicatorMode()==='bell');}
 async function markChatMessagesRead(messages=[]){
   if(!signedInUser)return;
-  const incoming=messages.filter(m=>m.authorId!==signedInUser.uid&&m.isUrgent!==true);
+  const viewerId=signedInUser.uid;
+  const incoming=messages.filter(m=>m.authorId!==viewerId&&m.isUrgent!==true&&!(Array.isArray(m.readBy)&&m.readBy.includes(viewerId)));
   if(!incoming.length)return;
   try{
     const batch=writeBatch(db);
@@ -519,7 +520,7 @@ async function markChatMessagesRead(messages=[]){
     // are deployed. Receipt cleanup is a separate best-effort operation.
     await batch.commit();
     await Promise.all(incoming.map(m=>
-      deleteDoc(doc(db,'chatUnread',signedInUser.uid+'_'+m.id)).catch(err=>{
+      deleteDoc(doc(db,'chatUnread',viewerId+'_'+m.id)).catch(err=>{
         if(err?.code!=='permission-denied')console.warn('Не удалось удалить квитанцию непрочитанного сообщения',m.id,err);
       })
     ));
@@ -1000,7 +1001,7 @@ onMessage(messaging,payload=>{
     const category=String(n.category||'');
     const signature=`${target}|${category}|${orderId}|${message}`;
     for(const [key,time] of recentPushEvents){if(now-time>10000)recentPushEvents.delete(key)}
-    if((eventId&&recentPushEvents.has(`event:${eventId}`))||recentPushEvents.has(`msg:${signature}`))return;
+    if(eventId?recentPushEvents.has(`event:${eventId}`):recentPushEvents.has(`msg:${signature}`))return;
     if(eventId)recentPushEvents.set(`event:${eventId}`,now);
     recentPushEvents.set(`msg:${signature}`,now);
     // Play the site's custom MP3 for every foreground push, not only chat/mentions.
@@ -3660,7 +3661,7 @@ function renderChatMessages(options={}){
   const previousScrollTop=Number.isFinite(options.oldTop)?options.oldTop:box.scrollTop;
   const queryText=chatFilterText.toLocaleLowerCase('ru');
   const activeChatFilter=$('chatFilter')?.value||chatFilterMode||'all';
-  const orderCommentMessages=state.orders.flatMap(o=>(o.entries||[]).filter(e=>e.kind==='comment'&&String(e.text||'').trim()).map(e=>({id:'order-comment-'+o.id+'-'+e.id,source:'order-comment',orderId:o.id,orderNumber:o.number,client:o.client||'',authorName:e.author||'Сотрудник',text:e.text||'',createdAt:e.createdAt||o.createdAt,photos:Array.isArray(e.photos)?e.photos:[]}))).sort((x,y)=>{const time=v=>v?.toMillis?v.toMillis():new Date(v||0).getTime();return time(y.createdAt)-time(x.createdAt)}).slice(0,30);
+  const orderCommentMessages=(activeChatFilter==='all'||activeChatFilter==='orders'?state.orders:[]).flatMap(o=>(o.entries||[]).filter(e=>e.kind==='comment'&&String(e.text||'').trim()).map(e=>({id:'order-comment-'+o.id+'-'+e.id,source:'order-comment',orderId:o.id,orderNumber:o.number,client:o.client||'',authorName:e.author||'Сотрудник',text:e.text||'',createdAt:e.createdAt||o.createdAt,photos:Array.isArray(e.photos)?e.photos:[]}))).sort((x,y)=>{const time=v=>v?.toMillis?v.toMillis():new Date(v||0).getTime();return time(y.createdAt)-time(x.createdAt)}).slice(0,30);
   // Always combine the latest snapshot with order comments; do not reuse a stale timeline cache.
   const combinedMessages=[...olderChatMessages,...chatMessages,...orderCommentMessages].sort((x,y)=>{const time=v=>v?.toMillis?v.toMillis():new Date(v||0).getTime();return time(x.createdAt)-time(y.createdAt)||String(x.id).localeCompare(String(y.id))});
   // Keep ordinary staff chat messages at the end of the default All timeline so order comments cannot push them out of the visible bottom area.
@@ -3697,7 +3698,7 @@ function renderChatMessages(options={}){
 
       const roleMeta=({admin:{label:'Администратор',icon:'⚙',tone:'admin'},administrator:{label:'Администратор',icon:'⚙',tone:'admin'},warehouse:{label:'Кладовщик',icon:'▦',tone:'warehouse'},manager:{label:'Менеджер',icon:'↗',tone:'manager'},chief_accountant:{label:'Главный бухгалтер',icon:'₴',tone:'chief-accountant'},accountant:{label:'Бухгалтер',icon:'▤',tone:'accountant'},director:{label:'Директор',icon:'♛',tone:'director'}})[m.authorRole]||{label:'Сотрудник',icon:'•',tone:'unknown'};
       const roleBadge='<span class="chat-role-badge chat-role-'+roleMeta.tone+'" title="'+esc(roleMeta.label)+'"><span aria-hidden="true">'+roleMeta.icon+'</span>'+esc(roleMeta.label)+'</span>';
-      return chatDayDivider+'<article class="chat-message chat-author-role-'+roleMeta.tone+' '+(mine?'mine':'')+'" data-group-message-id="'+esc(m.id)+'"><div class="chat-bubble-head"><div class="chat-bubble-author"><b>'+esc(chatDisplayName(m.authorName))+'</b><span class="chat-bubble-role">'+esc(roleMeta.label)+'</span></div><time title="'+esc(fmtDateTime(m.createdAt))+'">'+esc(chatTime(m.createdAt))+'</time></div>'+replyHtml+'<div class="chat-message-text">'+renderChatText(m.text)+'</div>'+(m.editedAt?'<small class="chat-edited-label">изменено</small>':'')+photoHtml+(m.isUrgent?'<div class="chat-urgent-banner">🚨 СРОЧНОЕ ОБРАЩЕНИЕ</div>':'')+'<div class="chat-message-actions">'+likeHtml+menuHtml+receipt+urgentAckButton+'</div></article>';
+      return chatDayDivider+'<article class="chat-message chat-author-role-'+roleMeta.tone+' '+(mine?'mine':'')+'" data-group-message-id="'+esc(m.id)+'"><div class="chat-bubble-head"><div class="chat-bubble-author"><b>'+esc(chatDisplayName(m.authorName))+'</b><span class="chat-bubble-role">'+esc(roleMeta.label)+'</span></div><time title="'+esc(fmtDateTime(m.createdAt))+'">'+esc(chatTime(m.createdAt))+'</time></div>'+replyHtml+'<div class="chat-message-text">'+renderChatText(m.text)+'</div>'+(m.editedAt?'<small class="chat-edited-label">изменено</small>':'')+photoHtml+(m.isUrgent?'<div class="chat-urgent-banner">🚨 СРОЧНОЕ ОБРАЩЕНИЕ</div>':'')+(m.hasPendingWrites?'<div class="chat-message-actions"><small class="chat-edited-label" role="status">Отправляется…</small></div>':'<div class="chat-message-actions">'+likeHtml+menuHtml+receipt+urgentAckButton+'</div>')+'</article>';
     }).join('');
     decoratePhotoSharing(box);
     if(chatPendingScrollRestore){box.scrollTop=chatPendingScrollRestore.top+(box.scrollHeight-chatPendingScrollRestore.height);chatPendingScrollRestore=null;}
@@ -3749,7 +3750,7 @@ function renderDirectChatMessages(messages,options={}){
   const urgentPending=message.isUrgent===true&&!mine&&!(Array.isArray(message.urgentAckBy)&&message.urgentAckBy.includes(signedInUser?.uid));
   const photos=Array.isArray(message.photos)?message.photos:[];
   const photoHtml=photos.length?'<div class="chat-photo-grid">'+photos.map(path=>'<button type="button" class="chat-photo-open" data-direct-photo="'+esc(path)+'" aria-label="Открыть фотографию" disabled>Загрузка фото…</button>').join('')+'</div>':'';
-  return divider+'<article class="chat-message '+(mine?'mine':'')+(message.isUrgent?' direct-chat-urgent':'')+(forwarded?' direct-chat-forwarded':'')+'" data-direct-message-id="'+esc(message.id)+'">'+sourceHtml+(message.isUrgent?'<div class="chat-urgent-banner">СРОЧНОЕ ОБРАЩЕНИЕ</div>':'')+(message.text?'<div class="chat-message-text">'+renderChatText(message.text)+'</div>':'')+photoHtml+sourceLink+'<div class="direct-message-meta"><time title="'+esc(fmtDateTime(message.createdAt))+'">'+esc(chatTime(message.createdAt))+'</time>'+(mine?'<small class="direct-chat-read-status '+(peerRead?'is-read':'')+'" title="'+(peerRead?'Собеседник прочитал сообщение':'Сообщение отправлено')+'">'+(peerRead?'✓✓ Прочитано':'✓ Отправлено')+'</small>':'')+'</div>'+(urgentPending?'<button type="button" class="chat-urgent-ack" data-direct-urgent-ack="'+esc(message.id)+'">✓ Подтвердить получение</button>':(message.isUrgent&&!mine?'<small class="direct-urgent-acknowledged">✓ Получение подтверждено</small>':''))+'</article>';
+  return divider+'<article class="chat-message '+(mine?'mine':'')+(message.isUrgent?' direct-chat-urgent':'')+(forwarded?' direct-chat-forwarded':'')+'" data-direct-message-id="'+esc(message.id)+'">'+sourceHtml+(message.isUrgent?'<div class="chat-urgent-banner">СРОЧНОЕ ОБРАЩЕНИЕ</div>':'')+(message.text?'<div class="chat-message-text">'+renderChatText(message.text)+'</div>':'')+photoHtml+sourceLink+'<div class="direct-message-meta"><time title="'+esc(fmtDateTime(message.createdAt))+'">'+esc(chatTime(message.createdAt))+'</time>'+(mine?'<small class="direct-chat-read-status '+(peerRead?'is-read':'')+'" title="'+(peerRead?'Собеседник прочитал сообщение':'Сообщение отправлено')+'">'+(message.hasPendingWrites?'Отправляется…':peerRead?'✓✓ Прочитано':'✓ Отправлено')+'</small>':'')+'</div>'+(urgentPending?'<button type="button" class="chat-urgent-ack" data-direct-urgent-ack="'+esc(message.id)+'">✓ Подтвердить получение</button>':(message.isUrgent&&!mine?'<small class="direct-urgent-acknowledged">✓ Получение подтверждено</small>':''))+'</article>';
  }).join('');
  const photoButtons=box.querySelectorAll('[data-direct-photo]');
  if(typeof IntersectionObserver==='function'){
@@ -3766,18 +3767,21 @@ function renderDirectChatMessages(messages,options={}){
  box.querySelectorAll('img').forEach(image=>image.addEventListener('load',()=>{if(wasAtBottom&&!options.prepend&&!options.search)box.scrollTop=box.scrollHeight;},{once:true}));
 }
 async function commitDirectChatMessage(threadId,messageId,message){
- return runTransaction(db,async transaction=>{
-  const threadRef=doc(db,'directChats',threadId),messageRef=doc(db,'directChats',threadId,'messages',messageId);
-  const thread=await transaction.get(threadRef),existing=await transaction.get(messageRef);
-  if(!thread.exists()||!thread.data().participants?.includes(message.authorId))throw new Error('Переписка больше недоступна.');
-  if(existing.exists()){
-   const saved=existing.data();if(saved.authorId!==message.authorId||saved.text!==message.text||JSON.stringify(saved.photos||[])!==JSON.stringify(message.photos||[])||saved.isUrgent!==message.isUrgent)throw new Error('Сообщение уже было отправлено с другим содержимым.');
-   return {duplicate:true};
-  }
-  transaction.set(messageRef,message);
-  transaction.update(threadRef,{updatedAt:serverTimestamp(),lastMessage:(message.text||'📷 Фото: '+message.photos.length).slice(0,180),lastMessageAt:serverTimestamp(),lastSenderId:message.authorId});
-  return {duplicate:false};
- });
+ const threadRef=doc(db,'directChats',threadId),messageRef=doc(db,'directChats',threadId,'messages',messageId);
+ // One atomic write, no preliminary network reads. Firestore rules allow only
+ // creation by the author; an existing message cannot be overwritten on retry.
+ const batch=writeBatch(db);
+ batch.set(messageRef,message);
+ batch.update(threadRef,{updatedAt:serverTimestamp(),lastMessage:(message.text||'📷 Фото: '+message.photos.length).slice(0,180),lastMessageAt:serverTimestamp(),lastSenderId:message.authorId});
+ try{await batch.commit();return {duplicate:false};}
+ catch(error){
+  // If the server accepted a previous attempt, keep its immutable message and read receipts.
+  let existing;try{existing=await getDocFromServer(messageRef);}catch{throw error;}
+  if(!existing.exists())throw error;
+  const saved=existing.data();
+  if(saved.authorId!==message.authorId||saved.text!==message.text||JSON.stringify(saved.photos||[])!==JSON.stringify(message.photos||[])||saved.isUrgent!==message.isUrgent)throw new Error('Сообщение уже было отправлено с другим содержимым.');
+  return {duplicate:true};
+ }
 }
 async function acknowledgeDirectUrgentMessage(messageId,threadId='',noticeId=''){
  if(!signedInUser||!messageId)return;
@@ -3843,7 +3847,7 @@ async function openDirectChat(person,requestedThreadId='',focusMessageId=''){
   const searchInput=$('directChatSearch'),clearSearch=$('directChatSearchClear'),loadOlder=$('directChatLoadOlder'),historyStatus=$('directChatHistoryStatus');
   let searchTimer=null,renderedMessages=[],lastSearch='',lastSearching=false,firstHistory=true,focusStarted=false,focusLoading=false,focusPending=String(focusMessageId||''),focusNote='',highlightedMessageId='',highlightUntil=0;
   const highlightedMessage=()=>[...messagesBox.querySelectorAll('[data-direct-message-id]')].find(node=>node.dataset.directMessageId===highlightedMessageId);
-  const mapMessage=d=>({id:d.id,...d.data(),hasPendingWrites:d.metadata?.hasPendingWrites===true});
+  const mapMessage=d=>({id:d.id,...d.data({serverTimestamps:'estimate'}),hasPendingWrites:d.metadata?.hasPendingWrites===true});
   const historyController=createDirectChatHistory({
    loadPage:async cursor=>{
     const constraints=[orderBy('createdAt','desc')];if(cursor)constraints.push(startAfter(cursor));constraints.push(limit(100));
@@ -3943,17 +3947,21 @@ async function openDirectChat(person,requestedThreadId='',focusMessageId=''){
    const draft=pendingDraft;composer.setBusy(true);composer.setStatus(files.length?'Подготовка фото…':'Отправка сообщения…');
    const draftToken=draftSession.capture();
    try{
-    const compressed=await readPhotos(files),photos=[];
-    for(let index=0;index<compressed.length;index++){
+    const compressed=files.length?await readPhotos(files):[];
+    if(compressed.length)composer.setStatus('Загрузка фото…');
+    const retryUpload=draft.uploadAttempted===true;draft.uploadAttempted=true;
+    const photos=await Promise.all(compressed.map(async(file,index)=>{
      const path='directChats/'+threadId+'/'+sender.uid+'/'+draft.id+'/'+index+'.jpg',photoRef=storageRef(storage,path);
-     composer.setStatus('Загрузка фото '+(index+1)+' из '+files.length+'…');
-     try{await getDownloadURL(photoRef);}catch(error){if(error.code!=='storage/object-not-found')throw error;await uploadBytes(photoRef,compressed[index],{contentType:'image/jpeg'});}
-     photos.push(path);
-    }
+     // New drafts upload directly. A retried draft reuses immutable uploaded files.
+     if(retryUpload){try{await getDownloadURL(photoRef);return path;}catch(error){if(error.code!=='storage/object-not-found')throw error;}}
+     await uploadBytes(photoRef,file,{contentType:'image/jpeg'});
+     return path;
+    }));
+    
     if(signedInUser?.uid!==sender.uid)throw new Error('Учётная запись изменилась. Войдите заново.');
     composer.setStatus('Отправка сообщения…');
     await commitDirectChatMessage(threadId,draft.id,{text:textValue,photos,authorId:sender.uid,authorName:sender.name,createdAt:draft.createdAt,mentionUserIds:[person.uid],notificationRecipientIds:[person.uid],isUrgent:urgent,urgentAckBy:[],readBy:[sender.uid]});
-    await queuePush(urgent?'🚨 СРОЧНОЕ ЛИЧНОЕ СООБЩЕНИЕ · '+sender.name:sender.name,textValue.slice(0,300)||'📷 Фото: '+photos.length,sender.uid,'','chat','replies',person.uid,{isMention:true,directChatThreadId:threadId,directMessageId:draft.id,isUrgent:urgent});
+    // Push is queued by the server's message-create trigger; no callable round trip.
     if(await draftSession.clearAfterSend(draftToken))composer.setStatus('Сообщение отправлено.');pendingDraft=null;
     if(input.isConnected&&!isPhoneDevice())input.focus();
    }catch(error){console.error('Не удалось отправить личное сообщение',error);composer.setStatus((error.message||'Не удалось отправить сообщение.')+' Текст и фото оставлены. Повторите отправку.',true);}
@@ -4011,6 +4019,7 @@ async function runAdminTest(testId,trigger){
 function openChat(sourceMessageId=''){
   if(!signedInUser)return;
   let sourceToFocus=typeof sourceMessageId==='string'?sourceMessageId:'';
+  const pendingGroupMessages=new Map();
   directChatUnsubscribe?.();directChatUnsubscribe=null;
   chatUnsubscribe?.();
   chatMessages=[];olderChatMessages=[];chatOldestCursor=null;hasOlderChatMessages=true;loadingOlderChatMessages=false;chatLegacyHistoryLoaded=false;chatLegacyHistoryLoading=false;chatLegacyHistoryCursor=null;chatPendingScrollRestore=null;chatReplyTo=null;chatFilterText='';chatFilterMode='all';
@@ -4027,7 +4036,8 @@ function openChat(sourceMessageId=''){
     const wasAtBottom=!!box&&(box.scrollHeight-box.clientHeight-box.scrollTop<80);
     const previousIds=new Set([...chatMessages,...olderChatMessages].map(m=>m.id));
     const hasNewIncoming=next.some(m=>!previousIds.has(m.id)&&m.authorId!==signedInUser?.uid);
-    chatMessages=next;
+    for(const m of next)pendingGroupMessages.delete(m.id);
+    chatMessages=[...next,...pendingGroupMessages.values()];
     if(!chatOldestCursor&&snap.docs.length===50)chatOldestCursor=snap.docs.at(-1);
     hasOlderChatMessages=snap.docs.length===50||!chatLegacyHistoryLoaded;
     renderChatMessages({preserveScroll:true,oldTop,oldHeight,wasAtBottom,scrollToNew:hasNewIncoming&&wasAtBottom});
@@ -4075,7 +4085,8 @@ function openChat(sourceMessageId=''){
     $('chatForm')?.requestSubmit();
   });
   let chatSending=false;
-  $('chatForm').addEventListener('submit',async e=>{
+  const groupForm=$('chatForm');
+  groupForm.addEventListener('submit',async e=>{
     e.preventDefault();
     if(chatSending)return;
     const input=$('chatInput');
@@ -4084,6 +4095,9 @@ function openChat(sourceMessageId=''){
     const files=chatComposer.getFiles();
     if(!text&&!files.length||!signedInUser)return;
     if(files.some(file=>!file.type.startsWith('image/')||file.size>8*1024*1024)){toast('Фото должны быть изображениями до 8 МБ каждое.');return}
+    const sender={uid:signedInUser.uid,name:profileName,role:state.role};
+    const messageId=crypto.randomUUID();
+    const groupIsCurrent=()=>signedInUser?.uid===sender.uid&&$('chatForm')===groupForm;
     const replyTarget=chatReplyTo?{...chatReplyTo}:null;
       const mentionedTokens=[...text.matchAll(/(^|[\s])@([\p{L}\p{N}_-]{2,})/gu)].map(x=>x[2].toLocaleLowerCase('ru'));
       const mentionedUsers=[...new Map(knownChatPeople.filter(p=>p.id&&p.name&&p.active!==false).map(p=>[p.id,p])).values()]
@@ -4131,21 +4145,31 @@ function openChat(sourceMessageId=''){
       }));
       if(progressBar)progressBar.style.width='100%';
       if(progressText)progressText.textContent='Отправка сообщения…';
-      await setDoc(doc(db,'chatMessages',crypto.randomUUID()),{
+      if(signedInUser?.uid!==sender.uid)throw new Error('Учётная запись изменилась. Войдите заново.');
+      const message={
         text:text.slice(0,1000),
-        authorId:signedInUser.uid,
-        authorName:profileName,
-        authorRole:state.role,
+        authorId:sender.uid,
+        authorName:sender.name,
+        authorRole:sender.role,
         createdAt,
         photos,
         likes:[],
-        readBy:[signedInUser.uid],
+        readBy:[sender.uid],
         mentionUserIds:mentionedUsers.map(person=>person.id),
         notificationRecipientIds,
         ...(isUrgent?{isUrgent:true,urgentAckBy:[]}:{isUrgent:false}),
         ...(!isUrgent&&replyTarget?{replyToId:replyTarget.id,replyToAuthorId:replyTarget.authorId,replyToAuthorName:replyTarget.authorName||'Сотрудник',replyToText:(replyTarget.text||'📷 Фото').slice(0,300)}:{})
-      });
-      // The server forwards targeted messages after the original has been saved.
+      };
+      if(groupIsCurrent()){
+        const pending={...message,id:messageId,createdAt:new Date(),source:'chat-message',hasPendingWrites:true};
+        pendingGroupMessages.set(messageId,pending);chatMessages.push(pending);
+        renderChatMessages({preserveScroll:true,scrollToNew:true});
+      }
+      await setDoc(doc(db,'chatMessages',messageId),message);
+      // The server sends both broadcast and addressed notifications independently.
+      if(!groupIsCurrent())return;
+      const pending=pendingGroupMessages.get(messageId);
+      if(pending){pending.hasPendingWrites=false;renderChatMessages({preserveScroll:true,scrollToNew:true});}
       const urgentToggle=$('chatUrgent');if(urgentToggle)urgentToggle.checked=false;
       chatComposer.clear();chatComposer.setStatus('Сообщение отправлено.');
       cancelChatReply();
@@ -4153,6 +4177,7 @@ function openChat(sourceMessageId=''){
       const preview=$('chatPhotoPreview');if(preview)preview.innerHTML='';
       input.focus();
     }catch(err){
+      if(groupIsCurrent()&&pendingGroupMessages.delete(messageId)){chatMessages=chatMessages.filter(m=>m.id!==messageId);renderChatMessages();}
       chatComposer.setStatus('Не удалось отправить. Текст и фото оставлены — повторите отправку.',true);
       console.error('Не удалось отправить сообщение в чат',err);
       toast(err?.code==='permission-denied'?'Нет доступа к chatMessages. Сначала опубликуйте firestore.rules.':'Не удалось отправить сообщение.');

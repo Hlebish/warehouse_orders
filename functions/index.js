@@ -31,7 +31,7 @@ function orderVersionKey(order = {}) {
 }
 function notificationTagFor(data, eventId, category, target, recipientUserId) {
   const urgent = data.forceAll === true || data.isMention === true || data.isReply === true || data.buybackItemId || IMMEDIATE_NOTIFICATION_CATEGORIES.has(category);
-  if (urgent) return `event-${eventId}`;
+  if (urgent || data.groupMessageId) return `event-${eventId}`;
   const scope = recipientUserId ? `recipient:${recipientUserId}` : 'broadcast';
   const digest = createHash('sha1').update(`${target}:${category}:${scope}`).digest('hex').slice(0, 24);
   return `warehouse-${digest}`;
@@ -703,7 +703,45 @@ async function forwardAddressedMessage(snapshot,kind,orderId=''){
   });
  }
 }
-exports.forwardGroupChatContext=onDocumentCreated({document:'chatMessages/{messageId}',retry:true},event=>forwardAddressedMessage(event.data,'chat'));
+// Notifications follow the saved message, not the lifetime of the sender's browser.
+async function createChatPushOnce(id,payload){
+ const now=Date.now();
+ try{await db.collection('pushQueue').doc(id).create({...payload,createdAt:new Date(now).toISOString(),expiresAt:now+60000,sentAt:null});}
+ catch(error){if(![6,'already-exists','ALREADY_EXISTS'].includes(error.code))throw error;}
+}
+async function queueGroupChatPush(snapshot){
+ if(!snapshot)return;
+ const message=snapshot.data()||{},authorId=String(message.authorId||'');
+ if(!authorId)return;
+ const name=String(message.authorName||'Сотрудник').slice(0,100);
+ const text=String(message.text||'').trim()||'📷 Фото';
+ const id='group-'+createHash('sha256').update(snapshot.ref.path).digest('hex');
+ // Addressed recipients already get a personal forwarded card and its push.
+ // Other employees get the general-chat notification, subject to their settings.
+ const excludedRecipientIds=forwardedRecipients(message).map(recipient=>recipient.uid);
+ await createChatPushOnce(id,{title:'Общий чат · '+name,body:text.slice(0,500),authorId,orderId:'',target:'chat',category:'chat',recipientUserId:'',mentionRecipientIds:[],excludedRecipientIds,groupMessageId:snapshot.id,isMention:false,isReply:false,isUrgent:false});
+}
+exports.forwardGroupChatContext=onDocumentCreated({document:'chatMessages/{messageId}',retry:true},async event=>{
+ await Promise.all([queueGroupChatPush(event.data),forwardAddressedMessage(event.data,'chat')]);
+});
+exports.queueDirectChatPush=onDocumentCreated({document:'directChats/{threadId}/messages/{messageId}',retry:true},async event=>{
+ const message=event.data?.data()||{};
+ // Forwarded cards create their own notice and push atomically.
+ if(!message.authorId||message.forwardedContext)return;
+ const threadId=event.params.threadId,messageId=event.params.messageId;
+ const thread=await db.collection('directChats').doc(threadId).get();
+ const participants=thread.data()?.participants;
+ if(!thread.exists||!Array.isArray(participants)||participants.length!==2||!participants.includes(message.authorId))return;
+ const recipientUserId=participants.find(uid=>uid!==message.authorId);
+ if(!recipientUserId)return;
+ const urgent=message.isUrgent===true;
+ const name=String(message.authorName||'Сотрудник').slice(0,80);
+ const body=(String(message.text||'').trim()||'📷 Фото: '+(Array.isArray(message.photos)?message.photos.length:0)).slice(0,300);
+ // Same event ID as the legacy callable, so mixed client versions cannot double-send.
+ await createChatPushOnce(directPushEventId(threadId,messageId,message.authorId,recipientUserId),{
+  title:(urgent?'🚨 СРОЧНОЕ ЛИЧНОЕ СООБЩЕНИЕ · ':'')+name,body,authorId:message.authorId,orderId:'',target:'chat',category:'replies',recipientUserId,mentionRecipientIds:[],directChatThreadId:threadId,directMessageId:messageId,isMention:true,isReply:false,isUrgent:urgent
+ });
+});
 exports.forwardOrderCommentContext=onDocumentCreated({document:'orders/{orderId}/entries/{entryId}',retry:true},event=>forwardAddressedMessage(event.data,'order',event.params.orderId));
 
 exports.sendWarehousePush = onDocumentCreated({ document: 'pushQueue/{eventId}', retry: true }, async event => {

@@ -804,9 +804,12 @@ async function sendTestPushNotification(){
 }
 async function registerNativePushToken(token,installationId='') {
   if (!signedInUser || !token) return;
+  const uid=signedInUser.uid;
+  if(localStorage.getItem('warehouse_native_push_disabled_'+uid)==='1')return;
   try {
-    if(installationId)localStorage.setItem('ampPushInstallationId',String(installationId));
-    const tokenRef=doc(db,'users',signedInUser.uid,'pushTokens',encodeURIComponent(String(token)));
+    installationId=String(installationId||'')||localStorage.getItem('ampPushInstallationId')||crypto.randomUUID();
+    localStorage.setItem('ampPushInstallationId',installationId);
+    const tokenRef=doc(db,'users',uid,'pushTokens',encodeURIComponent(String(token)));
     await setDoc(tokenRef,{
       token:String(token),
       installationId:String(installationId||''),
@@ -815,6 +818,7 @@ async function registerNativePushToken(token,installationId='') {
       appId:'warehouse_orders_android',
       platform:'android'
     },{merge:true});
+    if(signedInUser?.uid===uid)void refreshPushRegistrationStatus();
   } catch(err) {
     console.warn('Не удалось зарегистрировать Android push-токен',err);
   }
@@ -822,6 +826,16 @@ async function registerNativePushToken(token,installationId='') {
 window.registerNativePushToken=registerNativePushToken;
 
 async function syncPushToken(requestPermission=false){
+  if(isAndroidWarehouse()||window.AndroidWarehouse){
+    if(!signedInUser)return;
+    if(requestPermission)localStorage.removeItem('warehouse_native_push_disabled_'+signedInUser.uid);
+    if(localStorage.getItem('warehouse_native_push_disabled_'+signedInUser.uid)==='1')return;
+    if(window.AndroidWarehouse?.requestNativePushToken){
+      window.AndroidWarehouse.requestNativePushToken();
+      if(requestPermission)toast('Регистрируем Android для уведомлений. Проверьте разрешение в настройках телефона.');
+    }else if(requestPermission)toast('Не найден Android-модуль уведомлений. Обновите приложение.');
+    return;
+  }
   // Electron uses native Windows notifications driven by the signed-in Firestore listener.
   // Remove stale FCM registrations created by older Electron builds: those tokens
   // make the service worker show a second, system-sound notification beside the
@@ -930,7 +944,7 @@ async function syncPushToken(requestPermission=false){
 
 let lastPushTokenRefreshAt=0;
 function refreshPushTokenOnResume(){
-  if(!signedInUser||!('Notification' in window)||Notification.permission!=='granted')return;
+  if(!signedInUser||(!isAndroidWarehouse()&&!window.AndroidWarehouse&&(!('Notification' in window)||Notification.permission!=='granted')))return;
   if(Date.now()-lastPushTokenRefreshAt<5*60*1000)return;
   lastPushTokenRefreshAt=Date.now();
   syncPushToken(false);
@@ -1462,7 +1476,7 @@ onAuthStateChanged(auth,user=>{
     // Server profile is now confirmed; refresh role-dependent UI without restarting listeners.
     render();
    }
-   inspectionItems.start();startPresence(user);syncPushToken(false);if(window.AndroidWarehouse?.requestNativePushToken){window.AndroidWarehouse.requestNativePushToken();}if(pendingNotificationOrderId)void openPendingNotificationOrder();if(pendingDirectChatThreadId)void openPendingDirectChat();if(pendingNotificationChat){pendingNotificationChat=false;history.replaceState({},'',location.pathname+location.hash);setTimeout(()=>openChat(),0);}
+   inspectionItems.start();startPresence(user);syncPushToken(false);if(pendingNotificationOrderId)void openPendingNotificationOrder();if(pendingDirectChatThreadId)void openPendingDirectChat();if(pendingNotificationChat){pendingNotificationChat=false;history.replaceState({},'',location.pathname+location.hash);setTimeout(()=>openChat(),0);}
  },err=>{console.error(err);if(!startedWithCache)showAuth('Не удалось проверить профиль сотрудника. Проверьте правила доступа Firestore.');else toast('Не удалось обновить профиль с сервера. Доступ к данным контролируется Firestore.')});
 });
  $('loginForm').addEventListener('submit',async e=>{e.preventDefault();$('authError').textContent='';try{await signInWithEmailAndPassword(auth,$('loginEmail').value.trim(),$('loginPassword').value)}catch(err){console.error('Ошибка входа Firebase:',err.code,err.message);$('authError').textContent=err.code==='auth/invalid-credential'?'Firebase отклонил почту или пароль (auth/invalid-credential).':err.code==='auth/too-many-requests'?'Слишком много попыток. Попробуйте позже. (auth/too-many-requests)':`Не удалось войти: ${err.code||'неизвестная ошибка'}. Проверьте почту, пароль и настройки Firebase.`}});
@@ -3116,7 +3130,7 @@ async function showDeletedOrder(id){
  }catch(err){console.error('Не удалось открыть архивный заказ',err);toast('Не удалось открыть заказ из истории.');}
 }
 function paintNotices(){const unread=state.notices.some(n=>!n.read&&state.notificationSettings[n.category||(n.target==='chat'?'chat':'orders')]!==false);$('notificationButton').classList.toggle('has-notice',unread);paintChatBadge()}
-async function disablePush(){try{if(!signedInUser)throw new Error('User is not signed in');const installationId=localStorage.getItem('ampPushInstallationId');const tokensRef=collection(db,'users',signedInUser.uid,'pushTokens');const snap=await getDocs(tokensRef);const batch=writeBatch(db);for(const tokenDoc of snap.docs){const data=tokenDoc.data()||{};if(installationId&&data.installationId===installationId)batch.delete(tokenDoc.ref)}await batch.commit();await deleteToken(messaging).catch(()=>{});await refreshPushRegistrationStatus();toast('Push-уведомления выключены на этом устройстве.')}catch(err){console.error('Не удалось выключить push',err);toast('Не удалось выключить уведомления. Попробуйте ещё раз.')}}
+async function disablePush(){try{if(!signedInUser)throw new Error('User is not signed in');const installationId=localStorage.getItem('ampPushInstallationId');const tokensRef=collection(db,'users',signedInUser.uid,'pushTokens');const snap=await getDocs(tokensRef);const batch=writeBatch(db);for(const tokenDoc of snap.docs){const data=tokenDoc.data()||{};if(installationId&&data.installationId===installationId)batch.delete(tokenDoc.ref)}await batch.commit();if(isAndroidWarehouse()||window.AndroidWarehouse)localStorage.setItem('warehouse_native_push_disabled_'+signedInUser.uid,'1');else await deleteToken(messaging).catch(()=>{});await refreshPushRegistrationStatus();toast('Push-уведомления выключены на этом устройстве.')}catch(err){console.error('Не удалось выключить push',err);toast('Не удалось выключить уведомления. Попробуйте ещё раз.')}}
 async function toggleNotificationSetting(category){
  if(!signedInUser||!NOTIFICATION_CATEGORY_KEYS.includes(category))return;
  const previous={...state.notificationSettings},next=state.notificationSettings[category]===false;
@@ -4744,6 +4758,7 @@ async function revokeShipmentManifest(dateKey){await saveShipmentConfirmation(da
 async function refreshPushRegistrationStatus(){
   const status=$('pushRegistrationStatus');
   if(!status||!signedInUser)return;
+  const nativeAndroid=isAndroidWarehouse()||!!window.AndroidWarehouse;
   const permission=typeof Notification==='undefined'?'unsupported':Notification.permission;
   if(window.warehouseDesktop?.isDesktopApp){
     status.textContent='Уведомления Windows обрабатываются приложением автоматически.';
@@ -4754,12 +4769,16 @@ async function refreshPushRegistrationStatus(){
     const installationId=localStorage.getItem('ampPushInstallationId')||'';
     const snapshot=await getDocs(collection(db,'users',signedInUser.uid,'pushTokens'));
     const current=snapshot.docs.map(docSnap=>({id:docSnap.id,...docSnap.data()}))
-      .filter(item=>installationId&&item.installationId===installationId&&['warehouse_orders','warehouse_orders_android'].includes(item.appId))
+      .filter(item=>installationId&&item.installationId===installationId&&(nativeAndroid?item.appId==='warehouse_orders_android':item.appId==='warehouse_orders'))
       .sort((a,b)=>String(b.updatedAt||'').localeCompare(String(a.updatedAt||'')))[0];
     if(current){
       const platform=current.platform==='android'?'Android':'браузере';
       status.textContent='Push-токен зарегистрирован · '+platform+' · обновлён '+fmtDateTime(current.updatedAt);
       status.dataset.state='ready';
+    }else if(nativeAndroid){
+      const disabled=localStorage.getItem('warehouse_native_push_disabled_'+signedInUser.uid)==='1';
+      status.textContent=disabled?'Уведомления отключены на этом устройстве.':'Нативный Android-токен не зарегистрирован. Нажмите «Включить уведомления» и проверьте разрешения приложения в Android.';
+      status.dataset.state=disabled?'blocked':'pending';
     }else if(permission==='denied'){
       status.textContent='Push отключён в настройках разрешений браузера. Разрешите уведомления для этого сайта.';
       status.dataset.state='blocked';
@@ -4808,7 +4827,7 @@ function showNotifications(){
   };
   const unread=state.notices.filter(n=>!n.read).length;
   const pushGranted=typeof Notification!=='undefined'&&Notification.permission==='granted';
-  const pushControls='<div class="push-device-controls"><div><b>Системные push-уведомления</b><small>'+((pushGranted)?'Разрешены в браузере':'Можно включить на этом устройстве')+'</small></div><div class="push-device-buttons"><button type="button" class="small-button good" data-action="enable-notifications">🔔 Включить уведомления</button><button type="button" class="small-button danger" data-action="disable-notifications">🔕 Отключить уведомления</button></div></div><div class="push-registration-status" id="pushRegistrationStatus" role="status">Проверяем регистрацию на этом устройстве…</div>'+'<button type="button" class="notification-setting '+(state.extraPhoneNotifications?'enabled':'disabled')+'" style="width:100%;margin:0 0 12px;text-align:left" data-action="toggle-extra-phone-notifications"><b>📱 Дополнительные уведомления на все устройства</b><small>'+(state.extraPhoneNotifications?'Включены — уведомления от других сотрудников приходят на все зарегистрированные устройства. Ваши действия не уведомляют вас.':'Выключены — push приходит только на последнее активное устройство. Включите, чтобы получать уведомления на компьютере и телефоне одновременно.')+'</small></button><p class="field-hint">Доставка на устройства независимая: открытый браузер на ПК не должен мешать уведомлениям на телефоне. На телефоне должны быть разрешены уведомления и зарегистрирован push-токен.</p>';
+  const pushControls='<div class="push-device-controls"><div><b>Системные push-уведомления</b><small>'+((isAndroidWarehouse()||window.AndroidWarehouse)?'Нативные уведомления Android':(pushGranted?'Разрешены в браузере':'Можно включить на этом устройстве'))+'</small></div><div class="push-device-buttons"><button type="button" class="small-button good" data-action="enable-notifications">🔔 Включить уведомления</button><button type="button" class="small-button danger" data-action="disable-notifications">🔕 Отключить уведомления</button></div></div><div class="push-registration-status" id="pushRegistrationStatus" role="status">Проверяем регистрацию на этом устройстве…</div>'+'<button type="button" class="notification-setting '+(state.extraPhoneNotifications?'enabled':'disabled')+'" style="width:100%;margin:0 0 12px;text-align:left" data-action="toggle-extra-phone-notifications"><b>📱 Дополнительные уведомления на все устройства</b><small>'+(state.extraPhoneNotifications?'Включены — уведомления от других сотрудников приходят на все зарегистрированные устройства. Ваши действия не уведомляют вас.':'Выключены — уведомления заказов приходят на последнее активное устройство. Сообщения чатов приходят на все зарегистрированные устройства независимо от этой настройки.')+'</small></button><p class="field-hint">Доставка на устройства независимая: открытый браузер на ПК не должен мешать уведомлениям на телефоне. На телефоне должны быть разрешены уведомления и зарегистрирован push-токен.</p>';
   const body='<details class="notification-preferences"><summary>Настройки уведомлений и устройств</summary>'+pushControls+'<h3 class="notification-settings-title">Персональные настройки · каждое действие отдельно</h3><div class="notification-settings-grid">'+NOTIFICATION_CATEGORY_KEYS.map(k=>'<button type="button" class="notification-setting '+(state.notificationSettings[k]?'enabled':'disabled')+'" data-action="toggle-notification:'+k+'"><b>'+esc(NOTIFICATION_CATEGORIES[k])+'</b><small>'+(state.notificationSettings[k]?'Включены':'Выключены')+'</small></button>').join('')+'</div></details><div class="notification-toolbar"><label class="search-box"><span>⌕</span><input id="notificationSearch" type="search" placeholder="Поиск уведомлений"></label><select id="notificationFilter"><option value="">Все категории</option><option value="unread">Непрочитанные</option><option value="direct">Личные сообщения</option>'+NOTIFICATION_CATEGORY_KEYS.map(k=>'<option value="'+k+'">'+esc(NOTIFICATION_CATEGORIES[k])+'</option>').join('')+'</select></div><div class="notification-summary"><span><b id="notificationUnreadCount">'+unread+'</b> непрочитанных</span><span><b id="notificationGroupCount">0</b> групп</span></div><div id="notificationList" class="notification-list"></div>';
   showModal('Уведомления',body,[button('Прочитать всё','mark-notifications-read','small-button good'),button('Закрыть','close')],'ЦЕНТР УВЕДОМЛЕНИЙ');
   $('notificationSearch')?.addEventListener('input',render);$('notificationFilter')?.addEventListener('change',render);render();

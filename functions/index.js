@@ -249,7 +249,7 @@ async function collectTokens(category='orders', recipientUserId='', authorId='',
         token,
         installationId: String(data.installationId || ''),
         appId: String(data.appId || ''),
-        platform: String(data.platform || (data.appId === 'warehouse_orders_android' ? 'android' : 'web')),
+        platform: data.appId === 'warehouse_orders_android' ? 'android' : 'web',
         updatedAt: String(data.updatedAt || ''),
         userId: user.id
       };
@@ -257,7 +257,8 @@ async function collectTokens(category='orders', recipientUserId='', authorId='',
       if (item.installationId) {
         const key = user.id + ':' + item.installationId;
         const previous = byInstallation.get(key);
-        if (!previous || item.updatedAt >= previous.updatedAt) byInstallation.set(key, item);
+        if (!previous || (item.platform==='android'&&previous.platform!=='android') ||
+          (item.platform===previous.platform&&item.updatedAt>=previous.updatedAt)) byInstallation.set(key, item);
       } else if (!byToken.has(token)) {
         byToken.set(token, item);
       }
@@ -274,8 +275,7 @@ async function collectTokens(category='orders', recipientUserId='', authorId='',
     }
   }
 
-  // With all-device notifications enabled, send to every registered installation.
-  // Otherwise use only the most recently active installation for each recipient.
+  // Chats reach every registered device; other categories keep the employee's preference.
   const tokensByUser = new Map();
   for (const item of result) {
     if (!tokensByUser.has(item.userId)) tokensByUser.set(item.userId, []);
@@ -284,7 +284,7 @@ async function collectTokens(category='orders', recipientUserId='', authorId='',
   const selected = [];
   for (const [userId, items] of tokensByUser) {
     const profile = users.find(user => user.id === userId)?.data() || {};
-    if (profile.extraPhoneNotifications === true) {
+    if (category==='chat' || directChat || profile.extraPhoneNotifications === true) {
       selected.push(...items);
     } else {
       items.sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
@@ -813,6 +813,7 @@ exports.sendWarehousePush = onDocumentCreated({ document: 'pushQueue/{eventId}',
 
     let accepted = 0;
     let failed = 0;
+    const platformDelivery={web:{selected:0,accepted:0,failed:0},android:{selected:0,accepted:0,failed:0}};
     const failureCodes = new Map();
 
     for (let i = 0; i < tokenDocs.length; i += 500) {
@@ -822,6 +823,7 @@ exports.sendWarehousePush = onDocumentCreated({ document: 'pushQueue/{eventId}',
        for (const isMentionRecipient of [false,true]) {
         const platformGroup = group.filter(item => item.platform === platform && mentionRecipients.has(item.userId)===isMentionRecipient);
         if (!platformGroup.length) continue;
+        platformDelivery[platform].selected+=platformGroup.length;
 
         const baseMessage = {
           tokens: platformGroup.map(item => item.token),
@@ -873,10 +875,12 @@ exports.sendWarehousePush = onDocumentCreated({ document: 'pushQueue/{eventId}',
       response.responses.forEach((result, index) => {
         if (result.success) {
           accepted++;
+          platformDelivery[platform].accepted++;
           return;
         }
 
         failed++;
+        platformDelivery[platform].failed++;
         const code = result.error?.code || 'unknown';
         failureCodes.set(code, (failureCodes.get(code) || 0) + 1);
 
@@ -898,9 +902,10 @@ exports.sendWarehousePush = onDocumentCreated({ document: 'pushQueue/{eventId}',
         deliveryStatus: failed ? 'partial' : 'sent',
         acceptedCount: accepted,
         failedCount: failed,
-        failureCodes: failures
+        failureCodes: failures,
+        platformDelivery
       });
-      logger.info('Push sent', { eventId, accepted, failed, failureCodes: failures });
+      logger.info('Push sent', { eventId, accepted, failed, failureCodes: failures, platformDelivery });
       return;
     }
 

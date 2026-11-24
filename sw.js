@@ -4,7 +4,7 @@ importScripts(
 );
 
 const SITE_URL = 'https://hlebish.github.io/warehouse_orders/';
-const CACHE = 'order-desk-fcm-v149-android-push';
+const CACHE = 'order-desk-fcm-v150-defect-indicator';
 // Version bump triggers install/activate; activate notifies open tabs to reload.
 const ASSETS = [
   './',

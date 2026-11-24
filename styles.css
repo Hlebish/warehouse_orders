@@ -8558,10 +8558,9 @@ html body :is(.app-shell,#modalBackdrop,.buyback-overlay) :is(button,[role="butt
 }
 .defect-counters:not(:has(>#inspectionDefectsCard:not([hidden]))){grid-template-columns:minmax(0,1fr);max-width:280px}
 #inspectionDefectsCard[hidden]{display:none!important}
-.defect-counter[data-stat-key="order-defects"]{border:2px solid #c65b65;font-weight:750}
-.defect-counter[data-stat-key="order-defects"] svg{color:#c65b65}
-body:not(.dark-theme) .defect-counter[data-stat-key="order-defects"]{border-color:#a83e4c}
-body:not(.dark-theme) .defect-counter[data-stat-key="order-defects"] svg{color:#a83e4c}
+.defect-counter[data-stat-key="order-defects"]{transition:border-color .18s ease,box-shadow .18s ease}
+.defect-counter[data-stat-key="order-defects"]:has(.defect-counter-value[data-active]){border-color:#c65b65;box-shadow:0 0 0 1px #c65b65,0 0 9px rgba(198,91,101,.22);font-weight:750}
+body:not(.dark-theme) .defect-counter[data-stat-key="order-defects"]:has(.defect-counter-value[data-active]){border-color:#a83e4c;box-shadow:0 0 0 1px #a83e4c,0 0 8px rgba(168,62,76,.14)}
 .defect-counter:hover{background:var(--dashboard-control-hover)}
 .defect-counter:focus-visible{outline:2px solid var(--dashboard-control-muted);outline-offset:2px}
 .defect-counter svg{width:16px;height:16px;color:var(--dashboard-control-muted)}

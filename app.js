@@ -513,7 +513,7 @@ async function markChatMessagesRead(messages=[]){
     const batch=writeBatch(db);
     incoming.forEach(m=>{
       if(!(Array.isArray(m.readBy)&&m.readBy.includes(signedInUser.uid))){
-        batch.update(doc(db,'chatMessages',m.id),{readBy:arrayUnion(signedInUser.uid)});
+        batch.update(doc(db,'chatMessages',m.id),{readBy:arrayUnion(viewerId)});
       }
     });
     // Keep the legacy read receipt working even before the new Firestore rules
@@ -3950,14 +3950,17 @@ async function openDirectChat(person,requestedThreadId='',focusMessageId=''){
     const compressed=files.length?await readPhotos(files):[];
     if(compressed.length)composer.setStatus('Загрузка фото…');
     const retryUpload=draft.uploadAttempted===true;draft.uploadAttempted=true;
-    const photos=await Promise.all(compressed.map(async(file,index)=>{
+    const uploadResults=await Promise.allSettled(compressed.map(async(file,index)=>{
      const path='directChats/'+threadId+'/'+sender.uid+'/'+draft.id+'/'+index+'.jpg',photoRef=storageRef(storage,path);
      // New drafts upload directly. A retried draft reuses immutable uploaded files.
      if(retryUpload){try{await getDownloadURL(photoRef);return path;}catch(error){if(error.code!=='storage/object-not-found')throw error;}}
      await uploadBytes(photoRef,file,{contentType:'image/jpeg'});
      return path;
     }));
-    
+    // Wait for all in-flight uploads before permitting a retry of this draft.
+    const failedUpload=uploadResults.find(result=>result.status==='rejected');
+    if(failedUpload)throw failedUpload.reason;
+    const photos=uploadResults.map(result=>result.value);
     if(signedInUser?.uid!==sender.uid)throw new Error('Учётная запись изменилась. Войдите заново.');
     composer.setStatus('Отправка сообщения…');
     await commitDirectChatMessage(threadId,draft.id,{text:textValue,photos,authorId:sender.uid,authorName:sender.name,createdAt:draft.createdAt,mentionUserIds:[person.uid],notificationRecipientIds:[person.uid],isUrgent:urgent,urgentAckBy:[],readBy:[sender.uid]});
@@ -4128,7 +4131,7 @@ function openChat(sourceMessageId=''){
       const totalBytes=compressedFiles.reduce((sum,file)=>sum+file.size,0);
       let uploadedBytes=0;
       await Promise.all(compressedFiles.map(async(file,index)=>{
-        const path=`chat/${signedInUser.uid}/${Date.now()}-${crypto.randomUUID()}-photo-${index+1}.jpg`;
+        const path=`chat/${sender.uid}/${Date.now()}-${crypto.randomUUID()}-photo-${index+1}.jpg`;
         const photoRef=storageRef(storage,path);
         await new Promise((resolve,reject)=>{
           const task=uploadBytesResumable(photoRef,file,{contentType:'image/jpeg'});

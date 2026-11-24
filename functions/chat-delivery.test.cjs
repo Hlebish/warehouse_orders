@@ -32,3 +32,19 @@ test('direct send uses one atomic commit and only reads on ambiguous failure',as
  assert.equal((await context.commitDirectChatMessage('a__b','m',saved)).duplicate,true);assert.equal(reads,1);
  await assert.rejects(context.commitDirectChatMessage('a__b','m',{...saved,text:'changed'}),/другим содержимым/);
 });
+
+test('private message enqueue targets only the other participant and ignores forwarded cards',async()=>{
+ const queue=new Map(),exports={};
+ const db={collection:kind=>({doc:id=>({
+  create:async data=>{if(queue.has(id))throw Object.assign(Error('exists'),{code:6});queue.set(id,data);},
+  get:async()=>({exists:kind==='directChats',data:()=>({participants:['a','b']})})
+ })})};
+ const context={db,createHash,forwardedRecipients,directPushEventId,exports,onDocumentCreated:(_config,handler)=>handler,forwardAddressedMessage:async()=>{}};
+ vm.createContext(context);
+ vm.runInContext(between(server,'async function createChatPushOnce(','exports.forwardOrderCommentContext='),context);
+ const event={params:{threadId:'a__b',messageId:'1'},data:{data:()=>({authorId:'a',authorName:'A',text:'private'})}};
+ await exports.queueDirectChatPush(event);await exports.queueDirectChatPush(event);
+ await exports.queueDirectChatPush({...event,params:{threadId:'a__b',messageId:'2'},data:{data:()=>({authorId:'a',forwardedContext:{kind:'chat'}})}});
+ assert.equal(queue.size,1);
+ assert.equal(queue.get(directPushEventId('a__b','1','a','b')).recipientUserId,'b');
+});

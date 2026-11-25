@@ -1,22 +1,57 @@
-/* Generator-only additions: inherit existing card, button and dark-theme styles. */
-#generatorScreen{display:grid;gap:14px}
-#generatorScreen .generator-status-line{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
-#generatorScreen .generator-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
-#generatorScreen .stat-card{display:block;min-width:0;min-height:100px;padding:12px}
-#generatorScreen .stat-card strong{font-variant-numeric:tabular-nums;font-size:clamp(17px,3vw,23px);white-space:normal;overflow-wrap:anywhere}
-#generatorScreen .stat-label{font-size:11px;line-height:1.4;white-space:normal}
-#generatorScreen .generator-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
-#generatorScreen .generator-actions button{min-height:40px;padding:8px 12px}
-#generatorScreen button:disabled{opacity:.45;cursor:not-allowed}
-#generatorScreen .generator-confirm{border:1px solid var(--line);border-radius:12px;padding:12px}
+/* Generator-only layout. Avoid the dashboard card's inherited font and layout rules. */
+#generatorScreen{
+ --gen-panel:#eef2ee;--gen-border:#c5d1c8;--gen-text:#263e36;--gen-muted:#53695c;
+ --gen-hero:#e1eee5;--gen-accent:#246849;--gen-start:#2c785a;--gen-start-text:#fff;
+ --gen-stop:#f0d8dc;--gen-stop-text:#872e3a;--gen-stop-line:#c58e98;
+ --gen-disabled:#e2e8e4;--gen-disabled-text:#67776d;
+ display:grid;gap:12px;min-width:0;color:var(--gen-text);
+}
+body.dark-theme #generatorScreen{
+ --gen-panel:#1c232b;--gen-border:#333c46;--gen-text:#e6edf3;--gen-muted:#a0aab5;
+ --gen-hero:#192922;--gen-accent:#75d6a1;--gen-start:#296c4b;--gen-start-text:#f3fff8;
+ --gen-stop:#41282b;--gen-stop-text:#f4b3b9;--gen-stop-line:#825058;
+ --gen-disabled:#20262d;--gen-disabled-text:#77818c;
+}
+#generatorScreen .generator-status-line{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+#generatorScreen .generator-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;align-items:stretch}
+#generatorScreen .generator-metric{display:flex;flex-direction:column;justify-content:center;align-items:flex-start;gap:5px;min-width:0;padding:14px 16px;border:1px solid var(--gen-border);border-radius:12px;background:var(--gen-panel);color:var(--gen-text)}
+#generatorScreen .generator-current{grid-column:1/-1;align-items:center;text-align:center;padding:17px 14px}
+#generatorScreen[data-running="true"] .generator-current{background:var(--gen-hero)}
+#generatorScreen .generator-label{font-size:12px;font-weight:600;line-height:1.35;color:var(--gen-muted)}
+#generatorScreen .generator-value{display:block;margin:0;color:var(--gen-text);font-size:26px;font-weight:750;line-height:1.12;letter-spacing:-.5px;font-variant-numeric:tabular-nums;white-space:normal;overflow-wrap:anywhere;max-width:100%}
+#generatorScreen .generator-current .generator-value{font-size:36px;letter-spacing:-1px}
+#generatorScreen[data-running="true"] .generator-current .generator-value{color:var(--gen-accent)}
+#generatorScreen .generator-time{font-size:13px;line-height:1.4;color:var(--gen-muted);font-variant-numeric:tabular-nums}
+#generatorScreen .generator-started{font-size:11px;line-height:1.4;color:var(--gen-muted)}
+#generatorScreen .generator-started:empty{display:none}
+#generatorScreen .generator-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:stretch}
+#generatorScreen .generator-controls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+#generatorScreen .generator-controls .generator-reset{grid-column:1/-1}
+#generatorScreen .generator-button{min-height:42px;padding:9px 12px;border:1px solid var(--gen-border);border-radius:9px;background:var(--gen-panel);color:var(--gen-text);font-family:inherit;line-height:1.3;font-size:12px;font-weight:600;white-space:normal;cursor:pointer}
+#generatorScreen .generator-start{background:var(--gen-start);border-color:var(--gen-start);color:var(--gen-start-text)}
+#generatorScreen .generator-stop{background:var(--gen-stop);border-color:var(--gen-stop-line);color:var(--gen-stop-text)}
+#generatorScreen .generator-button:enabled:hover{filter:brightness(1.1)}
+#generatorScreen .generator-button:focus-visible{outline:2px solid var(--gen-accent);outline-offset:2px}
+#generatorScreen .generator-button:disabled{background:var(--gen-disabled);color:var(--gen-disabled-text);border-color:var(--gen-border);opacity:1;cursor:not-allowed;box-shadow:none}
+#generatorScreen .generator-confirm{border:1px solid var(--gen-border);border-radius:12px;padding:12px}
 #generatorScreen .generator-confirm[hidden]{display:none!important}
 #generatorScreen .generator-confirm p{margin:0 0 10px;line-height:1.5}
-#generatorScreen .generator-feedback{min-height:1em;margin:0;font-size:12px;line-height:1.5}
+#generatorScreen .generator-feedback{margin:0;font-size:12px;line-height:1.5}
+#generatorScreen .generator-feedback:empty{display:none}
+#generatorScreen .field-hint{margin:0;font-size:11px;line-height:1.5;color:var(--gen-muted)}
 #generatorScreen .detail-section-title{margin:4px 0 0}
 #generatorScreen .timeline-item b{font-size:12px}
 #generatorScreen .timeline-text{white-space:pre-line;overflow-wrap:anywhere}
 @media(max-width:560px){
- #generatorScreen .generator-grid{grid-template-columns:1fr 1fr}
- #generatorScreen .generator-grid .stat-card:first-child{grid-column:1/-1;min-height:75px}
- #generatorScreen .generator-actions button{flex:1 1 140px}
+ #generatorScreen .generator-metric{padding:12px;gap:4px}
+ #generatorScreen .generator-current{padding:14px 10px}
+ #generatorScreen .generator-value{font-size:22px}
+ #generatorScreen .generator-current .generator-value{font-size:32px}
+ #generatorScreen .generator-label{font-size:11px}
+ #generatorScreen .generator-button{min-height:44px;padding:8px}
+}
+@media(max-width:360px){
+ #generatorScreen .generator-grid{gap:7px}
+ #generatorScreen .generator-metric{padding:10px}
+ #generatorScreen .generator-value{font-size:19px}
 }

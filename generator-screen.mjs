@@ -1,11 +1,12 @@
 // Shared generator screen, mounted inside the existing application modal.
 const INITIAL={revision:0,period:1,startedAtMs:null,periodMs:0,totalMs:0,lastResetAtMs:null};
-export const generatorDuration=ms=>{
- const duration=Math.max(0,ms);
- const minutes=Math.floor(duration/60000);
- const decimal=(duration/3600000).toLocaleString('ru-RU',{minimumFractionDigits:2,maximumFractionDigits:2,useGrouping:false});
- return decimal+' мч ('+Math.floor(minutes/60)+' ч '+minutes%60+' мин)';
+const decimalHours=new Intl.NumberFormat('ru-RU',{minimumFractionDigits:2,maximumFractionDigits:2,useGrouping:false});
+export const generatorEngineHours=ms=>decimalHours.format(Math.max(0,ms)/3600000)+' мч';
+export const generatorClockHours=ms=>{
+ const minutes=Math.floor(Math.max(0,ms)/60000);
+ return Math.floor(minutes/60)+' ч '+minutes%60+' мин';
 };
+export const generatorDuration=ms=>generatorEngineHours(ms)+' ('+generatorClockHours(ms)+')';
 const dateTime=ms=>ms==null?'—':new Intl.DateTimeFormat('ru-RU',{dateStyle:'short',timeStyle:'short',timeZone:'Europe/Kyiv'}).format(new Date(ms));
 export function createGeneratorScreen({db,doc,collection,query,orderBy,onSnapshot,call,canOperate}){
  let dispose=null,refresh=null;
@@ -17,14 +18,14 @@ export function createGeneratorScreen({db,doc,collection,query,orderBy,onSnapsho
   let events=[];
   root.innerHTML='<div class="generator-status-line"><span id="genStatus" class="status-pill status-neutral">Загрузка…</span><span id="genPeriodLabel" class="field-hint"></span></div>'+
    '<div class="generator-grid">'+
-   '<article class="stat-card"><div class="stat-label">Текущий запуск</div><strong id="genCurrent">—</strong><small id="genStarted"></small></article>'+
-   '<article class="stat-card"><div class="stat-label">Наработка за текущий период</div><strong id="genPeriod">—</strong></article>'+
-   '<article class="stat-card"><div class="stat-label">Наработка за всё время</div><strong id="genTotal">—</strong></article></div>'+
-   '<div class="generator-actions"><button type="button" id="genStart" class="primary-button" disabled>Старт генератора</button>'+
-   '<button type="button" id="genStop" class="small-button danger" disabled>Стоп генератора</button>'+
-   '<button type="button" id="genReset" class="secondary-button" disabled>Сбросить счётчик</button></div>'+
-   '<div id="genConfirm" class="generator-confirm" hidden><p>Начать новый период с 0 ч 0 мин? История запусков и итог прошлого периода сохранятся</p><div class="generator-actions"><button type="button" id="genResetYes" class="small-button danger">Подтвердить сброс</button><button type="button" id="genResetNo" class="secondary-button">Отмена</button></div></div>'+
-   '<p id="genFeedback" role="status" class="generator-feedback"></p><p class="field-hint">1 мч = 1 час работы двигателя. Моточасы отображаются с округлением до сотых; время сохраняется без округления. Приложение не управляет генератором.</p>'+
+   '<article class="generator-metric generator-current"><div class="generator-label">Текущий запуск</div><strong class="generator-value" id="genCurrent">—</strong><div class="generator-time" id="genCurrentTime">—</div><small class="generator-started" id="genStarted"></small></article>'+
+   '<article class="generator-metric"><div class="generator-label">За текущий период</div><strong class="generator-value" id="genPeriod">—</strong><div class="generator-time" id="genPeriodTime">—</div></article>'+
+   '<article class="generator-metric"><div class="generator-label">За всё время</div><strong class="generator-value" id="genTotal">—</strong><div class="generator-time" id="genTotalTime">—</div></article></div>'+
+   '<div class="generator-actions generator-controls"><button type="button" id="genStart" class="generator-button generator-start" disabled>Старт генератора</button>'+
+   '<button type="button" id="genStop" class="generator-button generator-stop" disabled>Стоп генератора</button>'+
+   '<button type="button" id="genReset" class="generator-button generator-reset" disabled>Сбросить счётчик</button></div>'+
+   '<div id="genConfirm" class="generator-confirm" hidden><p>Начать новый период с 0 ч 0 мин? История запусков и итог прошлого периода сохранятся</p><div class="generator-actions"><button type="button" id="genResetYes" class="generator-button generator-stop">Подтвердить сброс</button><button type="button" id="genResetNo" class="generator-button generator-reset">Отмена</button></div></div>'+
+   '<p id="genFeedback" role="status" class="generator-feedback"></p><p class="field-hint">1 мч = 1 час работы двигателя. Только учёт времени; без управления генератором.</p>'+
    '<h3 class="detail-section-title">Журнал запусков и сбросов</h3><div id="genHistory" class="timeline" aria-label="Журнал"></div>';
   const el=id=>root.querySelector('#'+id);
   let confirmationRevision=null;
@@ -37,9 +38,14 @@ export function createGeneratorScreen({db,doc,collection,query,orderBy,onSnapsho
    const elapsed=running?Math.max(0,Date.now()+clockOffset-state.startedAtMs):0;
    el('genStatus').textContent=!state?'Загрузка…':running?'Работает':'Остановлен';
    el('genStatus').className='status-pill '+(running?'status-assembled':'status-neutral');
-   el('genCurrent').textContent=state?generatorDuration(elapsed):'—';
-   el('genPeriod').textContent=state?generatorDuration(state.periodMs+elapsed):'—';
-   el('genTotal').textContent=state?generatorDuration(state.totalMs+elapsed):'—';
+   const metric=(id,ms)=>{
+    el(id).textContent=state?generatorEngineHours(ms):'—';
+    el(id+'Time').textContent=state?generatorClockHours(ms):'—';
+   };
+   metric('genCurrent',elapsed);
+   metric('genPeriod',(state?.periodMs??0)+elapsed);
+   metric('genTotal',(state?.totalMs??0)+elapsed);
+   root.dataset.running=String(running);
    el('genStarted').textContent=running?'Старт: '+dateTime(state.startedAtMs):'';
    el('genPeriodLabel').textContent=state?'Период № '+state.period+(state.lastResetAtMs?' · с '+dateTime(state.lastResetAtMs):''):'';
    el('genStart').disabled=!usable||running;

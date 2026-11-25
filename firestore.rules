@@ -46,6 +46,16 @@ service cloud.firestore {
     function chatReadBy(data) { return data.keys().hasAll(['readBy']) ? data.readBy : []; }
     function chatUrgentAckBy(data) { return data.keys().hasAll(['urgentAckBy']) && data.urgentAckBy is list ? data.urgentAckBy : []; }
 
+    // Shared generator accounting. Only the authenticated callable may mutate it.
+    match /generators/warehouse {
+      allow read: if activeUser();
+      allow write: if false;
+      match /journal/{eventId} {
+        allow read: if activeUser();
+        allow write: if false;
+      }
+    }
+
     match /users/{userId} {
       allow read: if signedIn() && (request.auth.uid == userId || canManageUsers());
       allow create: if canManageUsers()

@@ -141,3 +141,42 @@ test('browser sends full articles and maps each HTTP response to the correct ord
   assert.equal(result.get(aluminium), '📦 Без адреса');
   assert.equal(result.get(alias), '📦 Без адреса');
 });
+
+test('leading product description does not hide an exact article', () => {
+  const cells = { S1: { A: { '1': 'Крыло APBM2802', '2': 'Крыло ap-bm 28-02a алюминий', '3': 'Крыло APBM28020', '4': 'XAPBM2802' } } };
+  assert.deepEqual(addresses(cells, steel), ['S1-A-1']);
+  assert.deepEqual(addresses(cells, aluminium), ['S1-A-2']);
+  assert.equal(normalizeMapArticle('Крыло APBM2802'), steel);
+  assert.equal(lookupArticleInMap({}, { item: { article: 'Крыло APBM2802A' } }, steel).unaddressed, false);
+});
+
+test('year ranges remain description in cells, batch requests and client response mapping', async () => {
+  const cells = { S1: { A: { '1': 'APBM2802 2020–2024', '2': 'Крыло APBM2802A 2020-2024', '3': 'APBM28020 2020–2024' } } };
+  for (const range of ['2020–2024', '2020-2024', '2020 — 2024', '2020', '1999-2004']) {
+    assert.equal(normalizeMapArticle('AP BM 28 02 ' + range), steel);
+    assert.equal(normalizeMapArticle('APBM2802A ' + range), aluminium);
+    assert.equal(lineContainsExactArticle('APBM2802A ' + range, steel), false);
+  }
+  assert.deepEqual(addresses(cells, steel), ['S1-A-1']);
+  assert.deepEqual(addresses(cells, aluminium), ['S1-A-2']);
+  assert.equal(lineContainsExactArticle('APBM28022020', steel), false);
+  const lookup = createLookupHandler(cells, {});
+  const source = fs.readFileSync(path.join(__dirname, '../app.js'), 'utf8');
+  const start = source.indexOf('const WAREHOUSE_MAP_LOOKUP_URL=');
+  const end = source.indexOf('async function loadWarehouseMapAddresses(', start);
+  assert.ok(start >= 0 && end > start);
+  const user = { getIdToken: async () => 'fixture' };
+  const calls = [];
+  const context = { auth: { currentUser: user }, console, setTimeout, fetch: async (_, req) => {
+    const articles = JSON.parse(req.body).articles;
+    calls.push(articles);
+    return { ok: true, json: async () => lookup(articles) };
+  } };
+  vm.runInNewContext(source.slice(start, end), context);
+  const inputs = ['Крыло APBM2802 2020–2024', 'APBM2802A 2020-2024', steel, aluminium];
+  const response = await lookup(inputs);
+  assert.deepEqual(response.results.map(x => x.locations.map(y => y.address)), [['S1-A-1'], ['S1-A-2']]);
+  const result = await context.lookupWarehouseMapAddresses(inputs);
+  assert.deepEqual(calls, [inputs]);
+  assert.deepEqual(inputs.map(x => result.get(x)), ['📍 S1-A-1', '📍 S1-A-2', '📍 S1-A-1', '📍 S1-A-2']);
+});

@@ -228,51 +228,68 @@ async function collectTokens(category='orders', recipientUserId='', authorId='',
     return forceAll || buybackOnly || directChat || mentionedUsers.has(user.id) || notificationCategoryEnabled(profile.notificationSettings || {}, category);
   });
 
-  // Only read push-token subcollections for users who can receive this event.
-  const tokenGroups = await Promise.all(
-    eligibleUsers.map(user => user.ref.collection('pushTokens').get())
-  );
+  if (!eligibleUsers.length) return [];
 
-  const byInstallation = new Map();
-  const byToken = new Map();
-
-  for (let i = 0; i < tokenGroups.length; i++) {
-    const user = eligibleUsers[i];
-
-    for (const tokenDoc of tokenGroups[i].docs) {
-      const data = tokenDoc.data() || {};
-      const token = String(data.token || '');
-      if (!token || !['warehouse_orders','warehouse_orders_android'].includes(data.appId)) continue;
-
-      const item = {
-        ref: tokenDoc.ref,
-        token,
+  // A device can keep the same FCM token or installation ID after switching
+  // accounts. Resolve ownership BEFORE filtering eligible users, otherwise a
+  // stale registration under a colleague can deliver the author's own push.
+  // Include inactive accounts for ownership; never deliver to them.
+  const registrations = (await db.collectionGroup('pushTokens').get()).docs
+    .filter(doc => /^users\/[^/]+\/pushTokens\/[^/]+$/.test(doc.ref.path))
+    .map(doc => {
+      const data = doc.data() || {};
+      const userId = doc.ref.parent.parent.id;
+      return {
+        ref: doc.ref,
+        token: String(data.token || ''),
         installationId: String(data.installationId || ''),
         appId: String(data.appId || ''),
         platform: data.appId === 'warehouse_orders_android' ? 'android' : 'web',
         updatedAt: String(data.updatedAt || ''),
-        userId: user.id
+        registeredAt: Date.parse(String(data.updatedAt || '')) || 0,
+        userId
       };
+    })
+    .filter(item => item.token && ['warehouse_orders','warehouse_orders_android'].includes(item.appId));
 
-      if (item.installationId) {
-        const key = user.id + ':' + item.installationId;
-        const previous = byInstallation.get(key);
-        if (!previous || (item.platform==='android'&&previous.platform!=='android') ||
-          (item.platform===previous.platform&&item.updatedAt>=previous.updatedAt)) byInstallation.set(key, item);
-      } else if (!byToken.has(token)) {
-        byToken.set(token, item);
-      }
+  const tokenOwners = new Map(), installationOwners = new Map();
+  function recordOwner(owners, key, item) {
+    if (!key) return;
+    const previous = owners.get(key);
+    if (!previous || item.registeredAt > previous.at) {
+      owners.set(key, { uid: item.userId, at: item.registeredAt });
+    } else if (item.registeredAt === previous.at && previous.uid !== item.userId) {
+      // Ambiguous ownership: fail closed instead of notifying the wrong user.
+      owners.set(key, { uid: null, at: previous.at });
+    }
+  }
+  for (const item of registrations) {
+    recordOwner(tokenOwners, item.token, item);
+    recordOwner(installationOwners, item.installationId, item);
+  }
+
+  const eligibleIds = new Set(eligibleUsers.map(user => user.id));
+  const byInstallation = new Map(), byToken = new Map();
+  for (const item of registrations) {
+    if (!eligibleIds.has(item.userId) || tokenOwners.get(item.token)?.uid !== item.userId ||
+      (item.installationId && installationOwners.get(item.installationId)?.uid !== item.userId)) continue;
+    if (item.installationId) {
+      const key = item.userId + ':' + item.installationId;
+      const previous = byInstallation.get(key);
+      if (!previous || (item.platform==='android'&&previous.platform!=='android') ||
+        (item.platform===previous.platform&&item.registeredAt>=previous.registeredAt)) byInstallation.set(key,item);
+    } else {
+      const previous = byToken.get(item.token);
+      if (!previous || item.registeredAt >= previous.registeredAt) byToken.set(item.token,item);
     }
   }
 
-  const result = [...byInstallation.values()];
-  const usedTokens = new Set(result.map(item => item.token));
-
-  for (const item of byToken.values()) {
-    if (!usedTokens.has(item.token)) {
-      result.push(item);
-      usedTokens.add(item.token);
-    }
+  const result = [];
+  const usedTokens = new Set();
+  for (const item of [...byInstallation.values(), ...byToken.values()]) {
+    if (usedTokens.has(item.token)) continue;
+    usedTokens.add(item.token);
+    result.push(item);
   }
 
   // Chats reach every registered device; other categories keep the employee's preference.

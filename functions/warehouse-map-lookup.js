@@ -1,21 +1,21 @@
-function extractApArticle(text) {
-  // Separators inside the code are insignificant; a description begins after
-  // the complete numeric part and its attached (or single-letter) suffix.
-  const code = text.match(/^A[ \t-]*P[ \t-]*[A-Z][ \t-]*[A-Z][ \t-]*\d(?:[ \t-]*\d)*(?:[A-Z][A-Z0-9]*|-[A-Z][A-Z0-9]*|[ \t-]+[A-Z]\d*(?![A-Z0-9]))?/);
-  return code ? code[0].replace(/[^A-Z0-9]/g, '') : '';
+function extractApArticles(text) {
+  // Match complete AP codes anywhere in a line. A separated four-digit
+  // calendar year is description, not part of the preceding numeric code.
+  return Array.from(text.matchAll(/(?<![\p{L}\p{N}])A[ \t-]*P[ \t-]*[A-Z][ \t-]*[A-Z][ \t-]*\d+(?:[ \t-]+(?!(?:19|20)\d{2}(?![A-Z0-9]))\d+)*(?:[A-Z][A-Z0-9]*|-[A-Z][A-Z0-9]*|[ \t-]+[A-Z]\d*(?![A-Z0-9]))?/gu), code =>
+    code[0].replace(/[^A-Z0-9]/g, ''));
 }
 
 function normalizeMapArticle(value) {
   const text = String(value || '').trim().toUpperCase();
-  return extractApArticle(text) || text.replace(/[^A-Z0-9]/g, '');
+  return extractApArticles(text)[0] || text.replace(/[^A-Z0-9]/g, '');
 }
 
 function lineContainsExactArticle(line, article) {
   const normalizedArticle = normalizeMapArticle(article);
   if (!normalizedArticle) return false;
   const text = String(line || '').trim().toUpperCase();
-  const apCode = extractApArticle(text);
-  if (apCode || extractApArticle(normalizedArticle)) return apCode === normalizedArticle;
+  const apCodes = extractApArticles(text);
+  if (extractApArticles(normalizedArticle).length) return apCodes.includes(normalizedArticle);
   const tokens = text.match(/[A-Z0-9]+/g) || [];
   for (let start = 0; start < tokens.length; start++) {
     let combined = '';

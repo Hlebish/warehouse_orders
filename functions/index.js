@@ -1610,3 +1610,35 @@ exports.setStaffTemporaryPassword = onRequest(
     }
   }
 );
+
+/* Generator accounting: no physical device control. All writes share one
+ * transaction/ revision; direct client writes are forbidden by Firestore rules. */
+const generatorHours = require('./generator-hours');
+exports.manageGeneratorHours = onCall(async request => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Войдите в приложение.');
+  const uid = request.auth.uid;
+  const { action, expectedRevision } = request.data || {};
+  const actorRef = db.collection('users').doc(uid);
+  const stateRef = db.collection('generators').doc('warehouse');
+  if (action === 'clock') {
+    const profile = (await actorRef.get()).data();
+    if (profile?.active !== true) throw new HttpsError('permission-denied', 'Доступ отключён.');
+    return { serverNowMs: Date.now() };
+  }
+  if (!['start', 'stop', 'reset'].includes(action) || !Number.isSafeInteger(expectedRevision) || expectedRevision < 0) {
+    throw new HttpsError('invalid-argument', 'Некорректное действие.');
+  }
+  return db.runTransaction(async tx => {
+    const [actor, snapshot] = await Promise.all([tx.get(actorRef), tx.get(stateRef)]);
+    if (!generatorHours.canOperate(actor.data())) throw new HttpsError('permission-denied', 'Недостаточно прав для учёта генератора.');
+    let result;
+    try {
+      result = generatorHours.transition(snapshot.data(), action, expectedRevision, Date.now(), uid);
+    } catch (error) {
+      throw new HttpsError(error.code || 'internal', error.message);
+    }
+    tx.set(stateRef, result.state);
+    if (result.event) tx.create(stateRef.collection('journal').doc(String(result.event.revision)), result.event);
+    return { state: result.state, serverNowMs: Date.now() };
+  });
+});

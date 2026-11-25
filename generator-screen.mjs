@@ -1,8 +1,10 @@
 // Shared generator screen, mounted inside the existing application modal.
 const INITIAL={revision:0,period:1,startedAtMs:null,periodMs:0,totalMs:0,lastResetAtMs:null};
 export const generatorDuration=ms=>{
- const minutes=Math.floor(Math.max(0,ms)/60000);
- return Math.floor(minutes/60)+' ч '+minutes%60+' мин';
+ const duration=Math.max(0,ms);
+ const minutes=Math.floor(duration/60000);
+ const decimal=(duration/3600000).toLocaleString('ru-RU',{minimumFractionDigits:2,maximumFractionDigits:2,useGrouping:false});
+ return decimal+' мч ('+Math.floor(minutes/60)+' ч '+minutes%60+' мин)';
 };
 const dateTime=ms=>ms==null?'—':new Intl.DateTimeFormat('ru-RU',{dateStyle:'short',timeStyle:'short',timeZone:'Europe/Kyiv'}).format(new Date(ms));
 export function createGeneratorScreen({db,doc,collection,query,orderBy,onSnapshot,call,canOperate}){
@@ -22,7 +24,7 @@ export function createGeneratorScreen({db,doc,collection,query,orderBy,onSnapsho
    '<button type="button" id="genStop" class="small-button danger" disabled>Стоп генератора</button>'+
    '<button type="button" id="genReset" class="secondary-button" disabled>Сбросить счётчик</button></div>'+
    '<div id="genConfirm" class="generator-confirm" hidden><p>Начать новый период с 0 ч 0 мин? История запусков и итог прошлого периода сохранятся</p><div class="generator-actions"><button type="button" id="genResetYes" class="small-button danger">Подтвердить сброс</button><button type="button" id="genResetNo" class="secondary-button">Отмена</button></div></div>'+
-   '<p id="genFeedback" role="status" class="generator-feedback"></p><p class="field-hint">Только учёт времени. Приложение не управляет генератором.</p>'+
+   '<p id="genFeedback" role="status" class="generator-feedback"></p><p class="field-hint">1 мч = 1 час работы двигателя. Моточасы отображаются с округлением до сотых; время сохраняется без округления. Приложение не управляет генератором.</p>'+
    '<h3 class="detail-section-title">Журнал запусков и сбросов</h3><div id="genHistory" class="timeline" aria-label="Журнал"></div>';
   const el=id=>root.querySelector('#'+id);
   let confirmationRevision=null;

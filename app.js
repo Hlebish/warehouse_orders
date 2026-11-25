@@ -1,3 +1,4 @@
+import { createGeneratorScreen } from './generator-screen.mjs?v=2026.11.25.01';
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js';
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signInWithCredential, signOut, sendPasswordResetEmail, createUserWithEmailAndPassword, updatePassword, EmailAuthProvider, reauthenticateWithCredential, GoogleAuthProvider, signInWithPopup, linkWithCredential, setPersistence, browserLocalPersistence } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js';
 import { getFirestore, disableNetwork, enableNetwork, collection, doc, documentId, onSnapshot, setDoc, deleteDoc, getDocs, getDocsFromServer, getDoc, getDocFromServer, updateDoc, writeBatch, runTransaction, serverTimestamp, query, where, orderBy, limit, startAfter, arrayUnion, arrayRemove } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
@@ -73,6 +74,19 @@ pendingDirectChatThreadId=notificationParams.get('directChat')||'';
 pendingDirectChatPeerId=notificationParams.get('peer')||'';
 pendingDirectMessageId=notificationParams.get('directMessage')||'';
 const $=id=>document.getElementById(id), modal=$('modalBackdrop');
+const generatorScreen=createGeneratorScreen({
+ db,doc,collection,query,orderBy,onSnapshot,
+ call:httpsCallable(warehouseFunctions,'manageGeneratorHours',{timeout:15000}),
+ canOperate:()=>!!signedInUser&&(canManageUsers||state.role==='warehouse'||state.role==='director')
+});
+function openGenerator(){
+ if(!signedInUser||document.querySelector('.app-shell').hidden)return;
+ const replaceSidebar=sidebarHistoryEntry;
+ if(replaceSidebar)closeSidebar(true);
+ showModal('Генератор','<section id="generatorScreen" aria-label="Учёт моточасов"></section>',[button('Закрыть','close')],'УЧЁТ МОТОЧАСОВ',{replaceSidebar});
+ generatorScreen.open($('generatorScreen'));
+}
+$('generatorNavButton')?.addEventListener('click',openGenerator);
 let uiStateRestored=false,lastUiSave=0;
 const isAndroidWarehouse=()=>/WarehouseOrdersAndroid/.test(navigator.userAgent);
 const isPhoneDevice=()=>/Android|iPhone|iPod|Mobile/i.test(navigator.userAgent);
@@ -1029,7 +1043,7 @@ onMessage(messaging,payload=>{
     notify(message,orderId,target,target==='chat'?'chat':'orders');
   }
 });
-function stopCloud(){inspectionItems.stop();foregroundDataSync.reset();serverEntriesLoaded.clear();directPhotoCache.clear();directPhotoRequests.clear();flushOrdersCache();if(ordersRetryTimer!==null){clearTimeout(ordersRetryTimer);ordersRetryTimer=null}ordersRetryDelay=3000;ordersConnectionNoticeShown=false;ordersListenerBlocked=false;profileUnsubscribe?.();ordersUnsubscribe?.();chatUnsubscribe?.();chatBadgeUnsubscribe?.();chatUnreadReceiptUnsubscribe?.();notificationsUnsubscribe?.();profileUnsubscribe=ordersUnsubscribe=chatUnsubscribe=chatBadgeUnsubscribe=chatUnreadReceiptUnsubscribe=notificationsUnsubscribe=null;chatUnreadReceiptCount=0;chatLegacyUnread=false;chatUnread=false;for(const stop of entryUnsubscribes.values())stop();entryUnsubscribes.clear();for(const stop of defectEntryUnsubscribes.values())stop();defectEntryUnsubscribes.clear();serverCache.clear();state.orders=[];state.notices=[]}
+function stopCloud(){if(generatorScreen.isOpen())closeModal();inspectionItems.stop();foregroundDataSync.reset();serverEntriesLoaded.clear();directPhotoCache.clear();directPhotoRequests.clear();flushOrdersCache();if(ordersRetryTimer!==null){clearTimeout(ordersRetryTimer);ordersRetryTimer=null}ordersRetryDelay=3000;ordersConnectionNoticeShown=false;ordersListenerBlocked=false;profileUnsubscribe?.();ordersUnsubscribe?.();chatUnsubscribe?.();chatBadgeUnsubscribe?.();chatUnreadReceiptUnsubscribe?.();notificationsUnsubscribe?.();profileUnsubscribe=ordersUnsubscribe=chatUnsubscribe=chatBadgeUnsubscribe=chatUnreadReceiptUnsubscribe=notificationsUnsubscribe=null;chatUnreadReceiptCount=0;chatLegacyUnread=false;chatUnread=false;for(const stop of entryUnsubscribes.values())stop();entryUnsubscribes.clear();for(const stop of defectEntryUnsubscribes.values())stop();defectEntryUnsubscribes.clear();serverCache.clear();state.orders=[];state.notices=[]}
 let pendingOrderEntryFocus=(()=>{const params=new URLSearchParams(location.search);return params.get('order')&&params.get('entry')?{orderId:params.get('order'),entryId:params.get('entry')}:null;})();
 const serverEntriesLoaded=new Set();
 function openOrderAtEntry(orderId,entryId='',fromForm=false){
@@ -1682,7 +1696,7 @@ function renderOrdersUI(){const search=$('searchInput').value.toLocaleLowerCase(
   defectCounter.toggleAttribute('data-active',count>0);
  }
  $('listSummary').textContent=`${filteredOrderCount} ${plural(filteredOrderCount,'заказ','заказа','заказов')}`;const pagination=$('ordersPagination');if(pagination){const first=filteredOrderCount?(currentOrdersPage-1)*ordersPageSize+1:0;const last=Math.min(currentOrdersPage*ordersPageSize,filteredOrderCount);pagination.innerHTML=`<button type="button" class="secondary-button" data-orders-page="prev" ${currentOrdersPage<=1?'disabled':''}>← Назад</button><span>Страница ${currentOrdersPage} из ${pageCount} · ${first}–${last} из ${filteredOrderCount}</span><button type="button" class="secondary-button" data-orders-page="next" ${currentOrdersPage>=pageCount?'disabled':''}>Вперёд →</button>`;pagination.hidden=filteredOrderCount<=ordersPageSize;}$('userName').textContent=profileName||roles[state.role];$('userRole').textContent=canManageUsers?`Администратор · ${roles[state.role]}`:roles[state.role];foregroundDataSync.repaint();$('today').textContent=todayFormatter.format(new Date());document.querySelectorAll('.nav-item').forEach(b=>b.classList.toggle('active',b.dataset.filter===activeFilter));paintNotices()}
-function render(){renderOrdersUI();const testsNav=$('testsNavButton');if(testsNav)testsNav.hidden=!canManageUsers;const avatar=$('profileAvatar');if(avatar)avatar.innerHTML=profileAvatarUrl?'<img src="'+esc(profileAvatarUrl)+'" alt="">':'СК';}
+function render(){renderOrdersUI();generatorScreen.refreshPermissions();const testsNav=$('testsNavButton');if(testsNav)testsNav.hidden=!canManageUsers;const avatar=$('profileAvatar');if(avatar)avatar.innerHTML=profileAvatarUrl?'<img src="'+esc(profileAvatarUrl)+'" alt="">':'СК';}
 function plural(n,a,b,c){n=Math.abs(n)%100;const d=n%10;return n>10&&n<20?c:d>1&&d<5?b:d===1?a:c}
 function toast(msg,orderId='',options={}){const t=document.createElement('div');t.className='toast'+(orderId?' toast-clickable':'');t.textContent=msg;if(orderId)t.addEventListener('click',()=>{t.remove();openOrder(orderId)});$('toastStack').append(t);if(!options.persistent)setTimeout(()=>t.remove(),3500);return t}
 let activeEntryDraft=null;
@@ -1780,6 +1794,7 @@ async function commitOrderEdit(order,expected,patch,entry){
 let modalHistoryEntry=false;
 let orderReturnModalSnapshot=null;
 function showModal(title,body,buttons=[],eyebrow='КАРТОЧКА ЗАКАЗА',{replaceSidebar=false}={}){
+  generatorScreen.close();
   openStaffPanel(false);
   directChatOpenRequest++;
   directChatUnsubscribe?.();directChatUnsubscribe=null;
@@ -1808,6 +1823,7 @@ function showModal(title,body,buttons=[],eyebrow='КАРТОЧКА ЗАКАЗА'
   }
 }
 function closeModal(fromPop=false){
+  generatorScreen.close();
   directChatOpenRequest++;
   persistOpenEntryDraft();activeEntryDraft=null;
   chatUnsubscribe?.();

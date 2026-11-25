@@ -77,6 +77,11 @@ function runTests({test,assert,model,screen}){
   }
   return {device,setTime(v){now=v;for(const c of clients)c.send()},get writes(){return writes},get state(){return state},setFailed(v){failed=v}};
  }
+ test('decimal engine hours show hundredths and retain hours/minutes',()=>{
+  const h=harness(),pc=h.device();
+  for(const [ms,expected] of [[0,'0,00 мч (0 ч 0 мин)'],[900000,'0,25 мч (0 ч 15 мин)'],[1800000,'0,50 мч (0 ч 30 мин)'],[45000000,'12,50 мч (12 ч 30 мин)'],[36000,'0,01 мч (0 ч 0 мин)']])assert.equal(pc.generatorDuration(ms),expected);
+  pc.close();
+ });
  const flush=async()=>{for(let i=0;i<12;i++)await Promise.resolve()};
  test('actual screen restores active run, synchronizes two clients, handles stop and reset',async()=>{
   const h=harness(),pc=h.device(),android=h.device();await flush();
@@ -85,24 +90,26 @@ function runTests({test,assert,model,screen}){
   assert.equal(android.get('genStatus').textContent,'Работает');
   assert.equal(android.get('genReset').disabled,true);
   h.setTime(61000);pc.tick();android.tick();
-  assert.equal(pc.get('genCurrent').textContent,'0 ч 1 мин');
+  assert.equal(pc.get('genCurrent').textContent,'0,02 мч (0 ч 1 мин)');
   assert.equal(h.writes,1);
   android.close();const restarted=h.device();await flush();
-  assert.equal(restarted.get('genCurrent').textContent,'0 ч 1 мин');
+  assert.equal(restarted.get('genCurrent').textContent,'0,02 мч (0 ч 1 мин)');
   restarted.click('genStop');await flush();restarted.click('genStop');await flush();
-  assert.equal(h.writes,2);assert.equal(pc.get('genTotal').textContent,'0 ч 1 мин');
+  assert.equal(h.writes,2);assert.equal(pc.get('genTotal').textContent,'0,02 мч (0 ч 1 мин)');
   h.setTime(100000);pc.click('genStart');await flush();h.setTime(220000);pc.click('genStop');await flush();
-  assert.equal(restarted.get('genTotal').textContent,'0 ч 3 мин');
+  assert.equal(restarted.get('genTotal').textContent,'0,05 мч (0 ч 3 мин)');
   restarted.click('genReset');assert.equal(restarted.get('genConfirm').hidden,false);
   restarted.click('genResetNo');assert.equal(h.writes,4);
   restarted.click('genReset');restarted.click('genResetYes');await flush();
-  assert.equal(pc.get('genPeriod').textContent,'0 ч 0 мин');
-  assert.equal(pc.get('genTotal').textContent,'0 ч 3 мин');
+  assert.equal(pc.get('genPeriod').textContent,'0,00 мч (0 ч 0 мин)');
+  assert.equal(pc.get('genTotal').textContent,'0,05 мч (0 ч 3 мин)');
   assert.equal(pc.get('genHistory').children.length,3);
   assert.match(pc.get('genHistory').children[0].children[0].textContent,/Сброс/);
+  assert.match(pc.get('genHistory').children[0].children[1].textContent,/0,05 мч \(0 ч 3 мин\)/);
+  assert.match(pc.get('genHistory').children[1].children[0].textContent,/0,03 мч \(0 ч 2 мин\)/);
   h.setTime(300000);pc.click('genStart');await flush();h.setTime(360000);pc.click('genStop');await flush();
-  assert.equal(restarted.get('genPeriod').textContent,'0 ч 1 мин');
-  assert.equal(restarted.get('genTotal').textContent,'0 ч 4 мин');
+  assert.equal(restarted.get('genPeriod').textContent,'0,02 мч (0 ч 1 мин)');
+  assert.equal(restarted.get('genTotal').textContent,'0,07 мч (0 ч 4 мин)');
   assert.equal(restarted.get('genHistory').children.length,4);
   pc.close();restarted.close();assert.equal(pc.subscriptions.size,0);
  });

@@ -1,22 +1,34 @@
-/* Generator-only additions: inherit existing card, button and dark-theme styles. */
-#generatorScreen{display:grid;gap:14px}
+/* Generator-only layout, without dashboard card typography overrides. */
+#generatorScreen{display:grid;gap:12px;min-width:0}
 #generatorScreen .generator-status-line{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
-#generatorScreen .generator-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
-#generatorScreen .stat-card{display:block;min-width:0;min-height:100px;padding:12px}
-#generatorScreen .stat-card strong{font-variant-numeric:tabular-nums;font-size:clamp(17px,3vw,23px);white-space:normal;overflow-wrap:anywhere}
-#generatorScreen .stat-label{font-size:11px;line-height:1.4;white-space:normal}
+#generatorScreen .generator-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+#generatorScreen .generator-card{display:flex;flex-direction:column;min-width:0;min-height:122px;padding:14px;border:1px solid var(--line);border-radius:12px;background:var(--surface-raised,#fff);color:inherit}
+body.dark-theme #generatorScreen .generator-card{background:#191e26;border-color:#30363d;color:#e6edf3}
+#generatorScreen .generator-label{font-size:12px;font-weight:600;line-height:1.35;min-height:2.7em;overflow-wrap:break-word}
+#generatorScreen .generator-reading{display:grid;gap:4px;margin-top:8px;min-width:0}
+#generatorScreen .generator-reading strong{display:block;margin:0;font-size:24px;font-weight:700;line-height:1.15;letter-spacing:-.45px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+#generatorScreen .generator-reading small{display:block;color:var(--muted);font-size:12px;line-height:1.35;font-variant-numeric:tabular-nums}
+#generatorScreen #genStarted{display:block;margin-top:7px;color:var(--muted);font-size:10px;line-height:1.35}
+#generatorScreen #genStarted:empty{display:none}
 #generatorScreen .generator-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
-#generatorScreen .generator-actions button{min-height:40px;padding:8px 12px}
-#generatorScreen button:disabled{opacity:.45;cursor:not-allowed}
+#generatorScreen .generator-main-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}
+#generatorScreen .generator-actions button{min-width:0;min-height:42px;height:auto;padding:9px 8px;font-size:12px;font-weight:600;line-height:1.3;white-space:normal;border-radius:9px}
+#generatorScreen button:disabled{opacity:.42!important;cursor:not-allowed;box-shadow:none!important}
 #generatorScreen .generator-confirm{border:1px solid var(--line);border-radius:12px;padding:12px}
 #generatorScreen .generator-confirm[hidden]{display:none!important}
 #generatorScreen .generator-confirm p{margin:0 0 10px;line-height:1.5}
-#generatorScreen .generator-feedback{min-height:1em;margin:0;font-size:12px;line-height:1.5}
-#generatorScreen .detail-section-title{margin:4px 0 0}
+#generatorScreen .generator-feedback{margin:0;font-size:12px;line-height:1.5}
+#generatorScreen .generator-feedback:empty{display:none}
+#generatorScreen .generator-note{margin:0;color:var(--muted);font-size:11px;line-height:1.45}
+#generatorScreen .detail-section-title{margin:5px 0 0}
 #generatorScreen .timeline-item b{font-size:12px}
 #generatorScreen .timeline-text{white-space:pre-line;overflow-wrap:anywhere}
 @media(max-width:560px){
- #generatorScreen .generator-grid{grid-template-columns:1fr 1fr}
- #generatorScreen .generator-grid .stat-card:first-child{grid-column:1/-1;min-height:75px}
- #generatorScreen .generator-actions button{flex:1 1 140px}
+ #generatorScreen .generator-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+ #generatorScreen .generator-card{padding:12px;min-height:105px}
+ #generatorScreen .generator-card:first-child{grid-column:1/-1;min-height:0}
+ #generatorScreen .generator-card:first-child .generator-label{min-height:0}
+ #generatorScreen .generator-reading strong{font-size:22px}
+ #generatorScreen .generator-main-actions{grid-template-columns:repeat(2,minmax(0,1fr))}
+ #generatorScreen #genReset{grid-column:1/-1}
 }

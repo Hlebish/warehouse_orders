@@ -38,3 +38,106 @@ test('flags an article in the unaddressed list', () => {
   assert.deepEqual(result.locations, []);
   assert.equal(result.unaddressed, true);
 });
+
+const addresses = (cells, article) => lookupArticleInMap(cells, {}, article).locations.map(x => x.address);
+const steel = 'APBM2802';
+const aluminium = 'APBM2802A';
+const separateCells = { S1: { A: { '1': steel + ' стальное крыло', '2': aluminium + ' алюминиевое крыло' } } };
+
+test('steel and aluminium find only their own separate cells', () => {
+  assert.deepEqual(addresses(separateCells, steel), ['S1-A-1']);
+  assert.deepEqual(addresses(separateCells, aluminium), ['S1-A-2']);
+});
+
+test('both articles independently find a shared cell', () => {
+  const cells = { S1: { A: { '3': steel + ' сталь\n' + aluminium + ' алюминий' } } };
+  assert.deepEqual(addresses(cells, steel), ['S1-A-3']);
+  assert.deepEqual(addresses(cells, aluminium), ['S1-A-3']);
+});
+
+test('unaddressed aluminium does not mark steel as unaddressed', () => {
+  const cells = { S1: { A: { '1': steel } } };
+  const unaddressed = { item: { article: 'ap-bm 28 02-a алюминий' } };
+  assert.equal(lookupArticleInMap(cells, unaddressed, steel).unaddressed, false);
+  assert.equal(lookupArticleInMap(cells, unaddressed, aluminium).unaddressed, true);
+  assert.deepEqual(addresses(cells, aluminium), []);
+});
+
+test('separators, case and descriptions preserve exact AP code identity', () => {
+  for (const value of ['ap-bm 28-02a Fender', 'AP BM 2802-A — крыло', 'APBM2802 A алюминий', 'APBM2802A']) {
+    assert.equal(normalizeMapArticle(value), aluminium);
+    assert.equal(lineContainsExactArticle(value, aluminium), true);
+    assert.equal(lineContainsExactArticle(value, steel), false);
+  }
+  assert.equal(normalizeMapArticle('APBM 28 02 Steel wing'), steel);
+  for (const line of ['APBM28020', 'APBM2802AB', 'APBM 2802-A2', 'APBM2802A0']) {
+    assert.equal(lineContainsExactArticle(line, steel), false);
+    assert.equal(lineContainsExactArticle(line, aluminium), false);
+  }
+  assert.equal(lineContainsExactArticle('APBM2802 — Aluminium description', aluminium), false);
+  assert.equal(lineContainsExactArticle('APBM2802 — Aluminium description', steel), true);
+  assert.equal(lineContainsExactArticle('FP 4819 311 Крыло', 'FP4819311'), true);
+});
+
+const fs = require('node:fs');
+const path = require('node:path');
+const vm = require('node:vm');
+function createLookupHandler(cells, unaddressed) {
+  // Evaluate the actual HTTP handler with only authentication and database IO stubbed.
+  const source = fs.readFileSync(path.join(__dirname, 'index.js'), 'utf8');
+  const start = source.indexOf('exports.lookupWarehouseMapAddress = onRequest(');
+  const end = source.indexOf('// Admin-only temporary password reset', start);
+  assert.ok(start >= 0 && end > start);
+  const context = {
+    exports: {}, onRequest: (_, handler) => handler,
+    WAREHOUSE_MAP_ALLOWED_ORIGINS: new Set(), normalizeMapArticle, lookupArticleInMap,
+    logger: { info() {}, error() {} },
+    getAuth: () => ({ verifyIdToken: async () => ({ uid: 'fixture' }) }),
+    db: { collection: () => ({ doc: () => ({ get: async () => ({ exists: true, data: () => ({ active: true }) }) }) }) },
+    getWarehouseMapApp: () => ({}),
+    getDatabase: () => ({ ref: () => ({ child: key => ({ get: async () => ({ exists: () => true, val: () => key === 'cells' ? cells : unaddressed }) }) }) })
+  };
+  vm.runInNewContext(source.slice(start, end), context);
+  return async articles => {
+    const req = { method: 'POST', body: { articles }, get: key => key === 'authorization' ? 'Bearer fixture' : '' };
+    const res = { code: 0, body: null, set() {}, status(code) { this.code = code; return this; }, json(body) { this.body = body; return this; } };
+    await context.exports.lookupWarehouseMapAddress(req, res);
+    assert.equal(res.code, 200);
+    return JSON.parse(JSON.stringify(res.body));
+  };
+}
+
+test('real HTTP handler returns both articles and removes only equivalent duplicates', async () => {
+  const lookup = createLookupHandler(separateCells, {});
+  const result = await lookup([steel, aluminium, 'ap-bm 28 02-a Fender', 'AP BM 2802']);
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.results.map(x => [x.article, x.locations.map(y => y.address)]), [
+    [steel, ['S1-A-1']], [aluminium, ['S1-A-2']]
+  ]);
+});
+
+test('browser sends full articles and maps each HTTP response to the correct order line', async () => {
+  const source = fs.readFileSync(path.join(__dirname, '../app.js'), 'utf8');
+  const start = source.indexOf('const WAREHOUSE_MAP_LOOKUP_URL=');
+  const end = source.indexOf('async function loadWarehouseMapAddresses(', start);
+  assert.ok(start >= 0 && end > start);
+  const user = { getIdToken: async () => 'fixture' };
+  const calls = [];
+  const lookup = createLookupHandler({ S1: { A: { '1': steel } } }, { item: { article: aluminium } });
+  const context = {
+    auth: { currentUser: user }, console, setTimeout,
+    fetch: async (_, request) => {
+      const { articles } = JSON.parse(request.body);
+      calls.push(articles);
+      const data = await lookup(articles);
+      return { ok: true, json: async () => data };
+    }
+  };
+  vm.runInNewContext(source.slice(start, end), context);
+  const alias = 'ap-bm 28 02-a Fender';
+  const result = await context.lookupWarehouseMapAddresses([steel, aluminium, alias, steel]);
+  assert.deepEqual(calls, [[steel, aluminium, alias]]);
+  assert.equal(result.get(steel), '📍 S1-A-1');
+  assert.equal(result.get(aluminium), '📦 Без адреса');
+  assert.equal(result.get(alias), '📦 Без адреса');
+});

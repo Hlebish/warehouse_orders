@@ -17,19 +17,25 @@ export function createGeneratorScreen({db,doc,collection,query,orderBy,onSnapsho
   let events=[];
   root.innerHTML='<div class="generator-status-line"><span id="genStatus" class="status-pill status-neutral">Загрузка…</span><span id="genPeriodLabel" class="field-hint"></span></div>'+
    '<div class="generator-grid">'+
-   '<article class="stat-card"><div class="stat-label">Текущий запуск</div><strong id="genCurrent">—</strong><small id="genStarted"></small></article>'+
-   '<article class="stat-card"><div class="stat-label">Наработка за текущий период</div><strong id="genPeriod">—</strong></article>'+
-   '<article class="stat-card"><div class="stat-label">Наработка за всё время</div><strong id="genTotal">—</strong></article></div>'+
-   '<div class="generator-actions"><button type="button" id="genStart" class="primary-button" disabled>Старт генератора</button>'+
+   '<article class="generator-card"><div class="generator-label">Текущий запуск</div><div class="generator-reading"><strong id="genCurrent">—</strong><small id="genCurrentTime">—</small></div><small id="genStarted"></small></article>'+
+   '<article class="generator-card"><div class="generator-label">Наработка за текущий период</div><div class="generator-reading"><strong id="genPeriod">—</strong><small id="genPeriodTime">—</small></div></article>'+
+   '<article class="generator-card"><div class="generator-label">Наработка за всё время</div><div class="generator-reading"><strong id="genTotal">—</strong><small id="genTotalTime">—</small></div></article></div>'+
+   '<div class="generator-actions generator-main-actions"><button type="button" id="genStart" class="primary-button" disabled>Старт генератора</button>'+
    '<button type="button" id="genStop" class="small-button danger" disabled>Стоп генератора</button>'+
    '<button type="button" id="genReset" class="secondary-button" disabled>Сбросить счётчик</button></div>'+
    '<div id="genConfirm" class="generator-confirm" hidden><p>Начать новый период с 0 ч 0 мин? История запусков и итог прошлого периода сохранятся</p><div class="generator-actions"><button type="button" id="genResetYes" class="small-button danger">Подтвердить сброс</button><button type="button" id="genResetNo" class="secondary-button">Отмена</button></div></div>'+
-   '<p id="genFeedback" role="status" class="generator-feedback"></p><p class="field-hint">1 мч = 1 час работы двигателя. Моточасы отображаются с округлением до сотых; время сохраняется без округления. Приложение не управляет генератором.</p>'+
+   '<p id="genFeedback" role="status" class="generator-feedback"></p><p class="generator-note">1 мч = 1 час работы двигателя. Показания округлены до сотых. Только учёт времени.</p>'+
    '<h3 class="detail-section-title">Журнал запусков и сбросов</h3><div id="genHistory" class="timeline" aria-label="Журнал"></div>';
   const el=id=>root.querySelector('#'+id);
   let confirmationRevision=null;
   function hideConfirmation(){confirmationRevision=null;el('genConfirm').hidden=true;}
   const online=()=>navigator.onLine!==false;
+  function setReading(id,ms){
+   const reading=ms==null?null:generatorDuration(ms);
+   const split=reading?.indexOf(' (')??-1;
+   el(id).textContent=reading==null?'—':reading.slice(0,split);
+   el(id+'Time').textContent=reading==null?'—':reading.slice(split+2,-1);
+  }
   function render(){
    if(!alive)return;
    const running=state?.startedAtMs!=null;
@@ -37,9 +43,9 @@ export function createGeneratorScreen({db,doc,collection,query,orderBy,onSnapsho
    const elapsed=running?Math.max(0,Date.now()+clockOffset-state.startedAtMs):0;
    el('genStatus').textContent=!state?'Загрузка…':running?'Работает':'Остановлен';
    el('genStatus').className='status-pill '+(running?'status-assembled':'status-neutral');
-   el('genCurrent').textContent=state?generatorDuration(elapsed):'—';
-   el('genPeriod').textContent=state?generatorDuration(state.periodMs+elapsed):'—';
-   el('genTotal').textContent=state?generatorDuration(state.totalMs+elapsed):'—';
+   setReading('genCurrent',state?elapsed:null);
+   setReading('genPeriod',state?state.periodMs+elapsed:null);
+   setReading('genTotal',state?state.totalMs+elapsed:null);
    el('genStarted').textContent=running?'Старт: '+dateTime(state.startedAtMs):'';
    el('genPeriodLabel').textContent=state?'Период № '+state.period+(state.lastResetAtMs?' · с '+dateTime(state.lastResetAtMs):''):'';
    el('genStart').disabled=!usable||running;

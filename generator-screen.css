@@ -1,0 +1,22 @@
+/* Generator-only additions: inherit existing card, button and dark-theme styles. */
+#generatorScreen{display:grid;gap:14px}
+#generatorScreen .generator-status-line{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+#generatorScreen .generator-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+#generatorScreen .stat-card{display:block;min-width:0;min-height:100px;padding:12px}
+#generatorScreen .stat-card strong{font-variant-numeric:tabular-nums;font-size:clamp(17px,3vw,23px);white-space:normal;overflow-wrap:anywhere}
+#generatorScreen .stat-label{font-size:11px;line-height:1.4;white-space:normal}
+#generatorScreen .generator-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+#generatorScreen .generator-actions button{min-height:40px;padding:8px 12px}
+#generatorScreen button:disabled{opacity:.45;cursor:not-allowed}
+#generatorScreen .generator-confirm{border:1px solid var(--line);border-radius:12px;padding:12px}
+#generatorScreen .generator-confirm[hidden]{display:none!important}
+#generatorScreen .generator-confirm p{margin:0 0 10px;line-height:1.5}
+#generatorScreen .generator-feedback{min-height:1em;margin:0;font-size:12px;line-height:1.5}
+#generatorScreen .detail-section-title{margin:4px 0 0}
+#generatorScreen .timeline-item b{font-size:12px}
+#generatorScreen .timeline-text{white-space:pre-line;overflow-wrap:anywhere}
+@media(max-width:560px){
+ #generatorScreen .generator-grid{grid-template-columns:1fr 1fr}
+ #generatorScreen .generator-grid .stat-card:first-child{grid-column:1/-1;min-height:75px}
+ #generatorScreen .generator-actions button{flex:1 1 140px}
+}

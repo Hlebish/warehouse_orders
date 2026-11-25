@@ -4,13 +4,15 @@ importScripts(
 );
 
 const SITE_URL = 'https://hlebish.github.io/warehouse_orders/';
-const CACHE = 'order-desk-fcm-v150-defect-indicator';
+const CACHE = 'order-desk-fcm-v151-generator-hours';
 // Version bump triggers install/activate; activate notifies open tabs to reload.
 const ASSETS = [
   './',
   './index.html',
   './styles.css',
   './app.js',
+  './generator-screen.mjs',
+  './generator-screen.css',
   './elivered-message-sound.mp3',
   './firebase-config.js',
   './manifest.webmanifest',

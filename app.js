@@ -2452,7 +2452,7 @@ async function saveReturn(){
 const WAREHOUSE_MAP_LOOKUP_URL='https://europe-west1-sklad-18f38.cloudfunctions.net/lookupWarehouseMapAddress';
 function normalizeMapArticleForUi(value){
   const text=String(value||'').trim().toUpperCase();
-  const code=text.match(/^A[ \t-]*P[ \t-]*[A-Z][ \t-]*[A-Z][ \t-]*\d(?:[ \t-]*\d)*(?:[A-Z][A-Z0-9]*|-[A-Z][A-Z0-9]*|[ \t-]+[A-Z]\d*(?![A-Z0-9]))?/);
+  const code=text.matchAll(/(?<![\p{L}\p{N}])A[ \t-]*P[ \t-]*[A-Z][ \t-]*[A-Z][ \t-]*\d+(?:[ \t-]+(?!(?:19|20)\d{2}(?![A-Z0-9]))\d+)*(?:[A-Z][A-Z0-9]*|-[A-Z][A-Z0-9]*|[ \t-]+[A-Z]\d*(?![A-Z0-9]))?/gu).next().value;
   return (code?code[0]:text).replace(/[^A-Z0-9]/g,'');
 }
 async function lookupWarehouseMapAddresses(articles){

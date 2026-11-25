@@ -1,19 +1,26 @@
+function extractApArticle(text) {
+  // Separators inside the code are insignificant; a description begins after
+  // the complete numeric part and its attached (or single-letter) suffix.
+  const code = text.match(/^A[ \t-]*P[ \t-]*[A-Z][ \t-]*[A-Z][ \t-]*\d(?:[ \t-]*\d)*(?:[A-Z][A-Z0-9]*|-[A-Z][A-Z0-9]*|[ \t-]+[A-Z]\d*(?![A-Z0-9]))?/);
+  return code ? code[0].replace(/[^A-Z0-9]/g, '') : '';
+}
+
 function normalizeMapArticle(value) {
   const text = String(value || '').trim().toUpperCase();
-  // Order lines may contain the article code followed by a product description.
-  // Match the warehouse code prefix (AP + 2-letter brand + digits) only.
-  const code = text.match(/^(AP[A-Z]{2}\d+)/);
-  return code ? code[1] : text.replace(/[^A-Z0-9]/g, '');
+  return extractApArticle(text) || text.replace(/[^A-Z0-9]/g, '');
 }
 
 function lineContainsExactArticle(line, article) {
   const normalizedArticle = normalizeMapArticle(article);
   if (!normalizedArticle) return false;
-  const tokens = String(line || '').toUpperCase().match(/[A-Z0-9]+/g) || [];
+  const text = String(line || '').trim().toUpperCase();
+  const apCode = extractApArticle(text);
+  if (apCode || extractApArticle(normalizedArticle)) return apCode === normalizedArticle;
+  const tokens = text.match(/[A-Z0-9]+/g) || [];
   for (let start = 0; start < tokens.length; start++) {
     let combined = '';
     for (let end = start; end < Math.min(tokens.length, start + 5); end++) {
-      combined += normalizeMapArticle(tokens[end]);
+      combined += tokens[end];
       if (combined === normalizedArticle) return true;
       if (combined.length >= normalizedArticle.length) break;
     }

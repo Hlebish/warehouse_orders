@@ -68,3 +68,19 @@ export function patchOrderRows(body,html){
  for(const row of keyed.values())row.remove();
  body.__ordersHtml=html;
 }
+
+// Filter before sorting and compute each date key only once per visible order.
+const statusPriority={'Создан':0,'Собран':1,'На согласовании':2,'Под вопросом':3,'Дефект':4,'Ожидает оплаты':5,'Одобрен на отгрузку клиенту':6,'Ожидает самовывоза':7,'Самовывоз':7,'Перенесен':8,'Отгружен кладовщиком':9,'Клиент забрал самовывозом':10,'Отменён':11};
+export function sortOrderRows(orders,{activeFilter,search,dateFrom,dateTo,orderDisplayDate,localDateKey,orderSearchText,isDateInRange,asDate}){
+ return orders.filter(o=>(activeFilter==='Камянское'||o.status!=='Камянское')&&
+  (activeFilter==='all'||o.status===activeFilter)&&(!search||orderSearchText(o).includes(search))&&
+  (!(dateFrom||dateTo)||isDateInRange(o,dateFrom,dateTo))).map(order=>{
+   const transferred=order.status==='Перенесен';
+   const date=transferred?(order.createdAt||order.transferredAt||order.updatedAt):orderDisplayDate(order);
+   return {order,transferred,day:localDateKey(date),ms:asDate(transferred?(order.createdAt||order.transferredAt):date)?.getTime()||0,priority:statusPriority[order.status]??8};
+  }).sort((a,b)=>{
+   if(a.transferred!==b.transferred)return a.transferred?-1:1;
+   if(a.transferred)return a.day.localeCompare(b.day)||a.ms-b.ms;
+   return b.day.localeCompare(a.day)||a.priority-b.priority||b.ms-a.ms;
+  }).map(row=>row.order);
+}

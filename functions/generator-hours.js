@@ -29,4 +29,10 @@ function transition(previous,action,expectedRevision,now,uid){
  return {state:next,event};
 }
 
-module.exports={emptyState,canOperate,transition};
+const GENERATOR_IDS=Object.freeze(['red-small','yellow','red-large','warehouse']);
+function validateGeneratorAction(id,action){
+ if(!GENERATOR_IDS.includes(id))throw Object.assign(new Error('Выберите генератор. Обновите приложение, если выбор недоступен.'),{code:'invalid-argument'});
+ if(id==='warehouse'&&action!=='stop')throw Object.assign(new Error('Старый учёт доступен для просмотра и завершения текущего запуска.'),{code:'failed-precondition'});
+ return id;
+}
+module.exports={emptyState,canOperate,transition,validateGeneratorAction};

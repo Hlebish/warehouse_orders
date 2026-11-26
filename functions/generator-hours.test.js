@@ -48,7 +48,8 @@ function runTests({test,assert,model,screen}){
   assert.equal(canOperate({active:false,role:'warehouse',admin:true}),false);
  });
  function harness(){
-  let now=1000,state=null,events=[],writes=0,failed=false;
+  let now=1000,writes=0,failed=false;
+  const states=new Map(),journals=new Map();
   const clients=new Set();
   const notify=()=>{for(const c of clients)c.send();};
   function device(){
@@ -61,21 +62,22 @@ function runTests({test,assert,model,screen}){
    const factory=new Function('window','document','navigator','Date','setInterval','clearInterval',screen.replace(/export /g,'')+'\nreturn {createGeneratorScreen,generatorDuration};');
    const {createGeneratorScreen,generatorDuration}=factory(window,document,nav,Clock,fn=>{intervals.add(fn);return fn},fn=>intervals.delete(fn));
    const subscriptions=new Map();
-   const client={send(){for(const [key,cb] of subscriptions){if(key==='state')cb({exists:()=>state!==null,data:()=>state,metadata:{fromCache:!nav.onLine}});else cb({docs:events.slice().reverse().map(e=>({data:()=>e})),metadata:{fromCache:!nav.onLine}});}}};
+   const client={send(){for(const [key,cb] of subscriptions){if(key.endsWith('/state')){const state=states.get(key.split('/')[0]);cb({exists:()=>state!=null,data:()=>state,metadata:{fromCache:!nav.onLine}});}else{const events=journals.get(key.split('/')[0])||[];cb({docs:events.slice().reverse().map(e=>({data:()=>e})),metadata:{fromCache:!nav.onLine}});}}}};
    clients.add(client);
-   const ui=createGeneratorScreen({db:{},doc:()=>'state',collection:()=>'journal',query:x=>x,orderBy:()=>null,onSnapshot:(key,opts,cb)=>{subscriptions.set(key,cb);client.send();return ()=>subscriptions.delete(key)},canOperate:()=>true,call:async data=>{
+   const ui=createGeneratorScreen({db:{},doc:(_db,_collection,id)=>id+'/state',collection:ref=>ref.split('/')[0]+'/journal',query:x=>x,orderBy:()=>null,onSnapshot:(key,opts,cb)=>{subscriptions.set(key,cb);client.send();return ()=>subscriptions.delete(key)},canOperate:()=>true,call:async data=>{
     if(data.action==='clock')return {data:{serverNowMs:now}};
     if(failed||!nav.onLine)throw Object.assign(Error('network'),{code:'functions/unavailable'});
-    const next=transition(state,data.action,data.expectedRevision,now,'actor');
-    state=next.state;if(next.event)events.push(next.event);writes++;notify();
-    return {data:{state,serverNowMs:now}};
+    const id=model.validateGeneratorAction(data.generatorId,data.action);
+    const next=transition(states.get(id),data.action,data.expectedRevision,now,'actor');
+    states.set(id,next.state);if(next.event){if(!journals.has(id))journals.set(id,[]);journals.get(id).push(next.event);}writes++;notify();
+    return {data:{state:next.state,serverNowMs:now}};
    }});
    const get=id=>nodes.get(id);
    const click=id=>{if(!get(id).disabled)get(id).dispatch('click')};
    ui.open(root);
-   return {ui,root,get,click,generatorDuration,tick(){for(const cb of intervals)cb()},offline(){nav.onLine=false;window.dispatch('offline');client.send()},online(){nav.onLine=true;window.dispatch('online');client.send()},close(){ui.close();clients.delete(client)},subscriptions};
+   return {ui,root,get,click,select(id){get('genSelect').value=id;get('genSelect').dispatch('change')},generatorDuration,tick(){for(const cb of intervals)cb()},offline(){nav.onLine=false;window.dispatch('offline');client.send()},online(){nav.onLine=true;window.dispatch('online');client.send()},close(){ui.close();clients.delete(client)},subscriptions};
   }
-  return {device,setTime(v){now=v;for(const c of clients)c.send()},get writes(){return writes},get state(){return state},setFailed(v){failed=v}};
+  return {device,setTime(v){now=v;for(const c of clients)c.send()},get writes(){return writes},get state(){return states.get('red-small')},stateFor:id=>states.get(id),setFailed(v){failed=v}};
  }
  test('decimal engine hours show hundredths and retain hours/minutes',()=>{
   const h=harness(),pc=h.device();
@@ -114,6 +116,34 @@ function runTests({test,assert,model,screen}){
   assert.equal(restarted.get('genTotal').textContent,'0,07 мч');assert.equal(restarted.get('genTotalTime').textContent,'0 ч 4 мин');
   assert.equal(restarted.get('genHistory').children.length,4);
   pc.close();restarted.close();assert.equal(pc.subscriptions.size,0);
+ });
+ test('three generators have independent runs, totals, journals and resets',async()=>{
+  const h=harness(),pc=h.device(),android=h.device();await flush();
+  pc.click('genStart');await flush();
+  pc.select('yellow');await flush();
+  assert.equal(pc.get('genStatus').textContent,'Остановлен');
+  assert.equal(android.get('genStatus').textContent,'Работает');
+  h.setTime(31000);pc.click('genStart');await flush();
+  h.setTime(61000);android.click('genStop');await flush();
+  assert.equal(pc.get('genStatus').textContent,'Работает');
+  h.setTime(151000);pc.click('genStop');await flush();
+  assert.equal(h.stateFor('red-small').totalMs,60000);
+  assert.equal(h.stateFor('yellow').totalMs,120000);
+  pc.select('red-large');await flush();assert.equal(pc.get('genTotal').textContent,'0,00 мч');
+  pc.click('genStart');await flush();h.setTime(211000);pc.click('genStop');await flush();
+  assert.equal(h.stateFor('red-large').totalMs,60000);
+  pc.select('yellow');await flush();assert.equal(pc.get('genHistory').children.length,1);
+  pc.click('genReset');pc.click('genResetYes');await flush();
+  assert.equal(h.stateFor('yellow').periodMs,0);
+  assert.equal(h.stateFor('yellow').totalMs,120000);
+  assert.equal(h.stateFor('red-small').periodMs,60000);
+  assert.equal(h.stateFor('red-large').periodMs,60000);
+  pc.select('warehouse');await flush();assert.equal(pc.get('genStart').disabled,true);assert.equal(pc.get('genReset').disabled,true);
+  assert.throws(()=>model.validateGeneratorAction(undefined,'start'),e=>e.code==='invalid-argument');
+  assert.throws(()=>model.validateGeneratorAction('other','start'),e=>e.code==='invalid-argument');
+  assert.throws(()=>model.validateGeneratorAction('warehouse','start'),e=>e.code==='failed-precondition');
+  assert.equal(model.validateGeneratorAction('warehouse','stop'),'warehouse');
+  pc.close();android.close();
  });
  test('offline and rejected save are explicit and do not queue writes',async()=>{
   const h=harness(),pc=h.device();await flush();pc.offline();

@@ -1,4 +1,4 @@
-import { createGeneratorScreen } from './generator-screen.mjs?v=2026.11.25.03';
+import { createGeneratorScreen } from './generator-screen.mjs?v=2026.11.26.01';
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js';
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signInWithCredential, signOut, sendPasswordResetEmail, createUserWithEmailAndPassword, updatePassword, EmailAuthProvider, reauthenticateWithCredential, GoogleAuthProvider, signInWithPopup, linkWithCredential, setPersistence, browserLocalPersistence } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js';
 import { getFirestore, disableNetwork, enableNetwork, collection, doc, documentId, onSnapshot, setDoc, deleteDoc, getDocs, getDocsFromServer, getDoc, getDocFromServer, updateDoc, writeBatch, runTransaction, serverTimestamp, query, where, orderBy, limit, startAfter, arrayUnion, arrayRemove } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
@@ -76,7 +76,7 @@ pendingDirectMessageId=notificationParams.get('directMessage')||'';
 const $=id=>document.getElementById(id), modal=$('modalBackdrop');
 const generatorScreen=createGeneratorScreen({
  db,doc,collection,query,orderBy,onSnapshot,
- call:httpsCallable(warehouseFunctions,'manageGeneratorHours',{timeout:15000}),
+ call:httpsCallable(warehouseFunctions,'manageGeneratorHoursV2',{timeout:15000}),
  canOperate:()=>!!signedInUser&&(canManageUsers||state.role==='warehouse'||state.role==='director')
 });
 function openGenerator(){

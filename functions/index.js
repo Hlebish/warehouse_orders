@@ -1628,15 +1628,14 @@ exports.setStaffTemporaryPassword = onRequest(
   }
 );
 
-/* Generator accounting: no physical device control. All writes share one
- * transaction/ revision; direct client writes are forbidden by Firestore rules. */
+/* Generator accounting: no physical device control. Each generator has its own
+ * transaction/revision and journal; direct client writes are forbidden. */
 const generatorHours = require('./generator-hours');
 exports.manageGeneratorHours = onCall(async request => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Войдите в приложение.');
   const uid = request.auth.uid;
-  const { action, expectedRevision } = request.data || {};
+  const { action, expectedRevision, generatorId } = request.data || {};
   const actorRef = db.collection('users').doc(uid);
-  const stateRef = db.collection('generators').doc('warehouse');
   if (action === 'clock') {
     const profile = (await actorRef.get()).data();
     if (profile?.active !== true) throw new HttpsError('permission-denied', 'Доступ отключён.');
@@ -1645,6 +1644,10 @@ exports.manageGeneratorHours = onCall(async request => {
   if (!['start', 'stop', 'reset'].includes(action) || !Number.isSafeInteger(expectedRevision) || expectedRevision < 0) {
     throw new HttpsError('invalid-argument', 'Некорректное действие.');
   }
+  let id;
+  try { id = generatorHours.validateGeneratorAction(generatorId, action); }
+  catch (error) { throw new HttpsError(error.code || 'internal', error.message); }
+  const stateRef = db.collection('generators').doc(id);
   return db.runTransaction(async tx => {
     const [actor, snapshot] = await Promise.all([tx.get(actorRef), tx.get(stateRef)]);
     if (!generatorHours.canOperate(actor.data())) throw new HttpsError('permission-denied', 'Недостаточно прав для учёта генератора.');
@@ -1659,3 +1662,6 @@ exports.manageGeneratorHours = onCall(async request => {
     return { state: result.state, serverNowMs: Date.now() };
   });
 });
+
+// Separate callable prevents a new client from writing to an old single-generator backend.
+exports.manageGeneratorHoursV2 = exports.manageGeneratorHours;

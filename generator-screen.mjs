@@ -1,4 +1,5 @@
 // Shared generator screen, mounted inside the existing application modal.
+const GENERATORS=[['red-small','Красный маленький'],['yellow','Жёлтый'],['red-large','Красный большой'],['warehouse','Старый учёт (без привязки)']];
 const INITIAL={revision:0,period:1,startedAtMs:null,periodMs:0,totalMs:0,lastResetAtMs:null};
 const decimalHours=new Intl.NumberFormat('ru-RU',{minimumFractionDigits:2,maximumFractionDigits:2,useGrouping:false});
 export const generatorEngineHours=ms=>decimalHours.format(Math.max(0,ms)/3600000)+' мч';
@@ -9,14 +10,17 @@ export const generatorClockHours=ms=>{
 export const generatorDuration=ms=>generatorEngineHours(ms)+' ('+generatorClockHours(ms)+')';
 const dateTime=ms=>ms==null?'—':new Intl.DateTimeFormat('ru-RU',{dateStyle:'short',timeStyle:'short',timeZone:'Europe/Kyiv'}).format(new Date(ms));
 export function createGeneratorScreen({db,doc,collection,query,orderBy,onSnapshot,call,canOperate}){
- let dispose=null,refresh=null;
+ let dispose=null,refresh=null,selectedId='red-small';
  function close(){dispose?.();dispose=null;refresh=null;}
- function open(root){
+ function open(root,generatorId=selectedId){
   close();
   if(!root)return;
+  selectedId=generatorId;
+  const legacy=generatorId==='warehouse';
+  root.dataset.generatorId=generatorId;
   let alive=true,state=null,serverState=false,journalReady=false,busy=false,clockOffset=0,message='',clockPending=false;
   let events=[];
-  root.innerHTML='<div class="generator-status-line"><span id="genStatus" class="status-pill status-neutral">Загрузка…</span><span id="genPeriodLabel" class="field-hint"></span></div>'+
+  root.innerHTML='<label class="generator-label" for="genSelect">Выберите генератор</label><select class="generator-select" id="genSelect">'+GENERATORS.map(([id,name])=>'<option value="'+id+'">'+name+'</option>').join('')+'</select>'+(legacy?'<p class="field-hint">Старые записи сохранены без привязки к конкретному генератору. Здесь можно завершить ранее начатый запуск; новые запуски учитываются отдельно.</p>':'')+'<div class="generator-status-line"><span id="genStatus" class="status-pill status-neutral">Загрузка…</span><span id="genPeriodLabel" class="field-hint"></span></div>'+
    '<div class="generator-grid">'+
    '<article class="generator-metric generator-current"><div class="generator-label">Текущий запуск</div><strong class="generator-value" id="genCurrent">—</strong><div class="generator-time" id="genCurrentTime">—</div><small class="generator-started" id="genStarted"></small></article>'+
    '<article class="generator-metric"><div class="generator-label">За текущий период</div><strong class="generator-value" id="genPeriod">—</strong><div class="generator-time" id="genPeriodTime">—</div></article>'+
@@ -28,6 +32,12 @@ export function createGeneratorScreen({db,doc,collection,query,orderBy,onSnapsho
    '<p id="genFeedback" role="status" class="generator-feedback"></p><p class="field-hint">1 мч = 1 час работы двигателя. Только учёт времени; без управления генератором.</p>'+
    '<h3 class="detail-section-title">Журнал запусков и сбросов</h3><div id="genHistory" class="timeline" aria-label="Журнал"></div>';
   const el=id=>root.querySelector('#'+id);
+  el('genSelect').value=generatorId;
+  el('genSelect').addEventListener('change',()=>{
+   const next=el('genSelect').value;
+   if(busy||!GENERATORS.some(([id])=>id===next)){el('genSelect').value=generatorId;return;}
+   if(next!==generatorId)open(root,next);
+  });
   let confirmationRevision=null;
   function hideConfirmation(){confirmationRevision=null;el('genConfirm').hidden=true;}
   const online=()=>navigator.onLine!==false;
@@ -48,9 +58,10 @@ export function createGeneratorScreen({db,doc,collection,query,orderBy,onSnapsho
    root.dataset.running=String(running);
    el('genStarted').textContent=running?'Старт: '+dateTime(state.startedAtMs):'';
    el('genPeriodLabel').textContent=state?'Период № '+state.period+(state.lastResetAtMs?' · с '+dateTime(state.lastResetAtMs):''):'';
-   el('genStart').disabled=!usable||running;
+   el('genSelect').disabled=busy;
+   el('genStart').disabled=!usable||running||legacy;
    el('genStop').disabled=!usable||!running;
-   el('genReset').disabled=!usable||running;
+   el('genReset').disabled=!usable||running||legacy;
    if(confirmationRevision!==null&&(!usable||running||state.revision!==confirmationRevision))hideConfirmation();
    el('genFeedback').textContent=busy?'Сохраняем на сервере…':message||(!online()?'Нет связи. Изменения не отправляются; данные могут быть устаревшими.':!serverState?'Ожидаем подтверждение данных с сервера…':!canOperate()?'Доступен просмотр. Запись — кладовщику, директору и администратору.':!journalReady?'Загружаем журнал…':'');
   }
@@ -85,13 +96,14 @@ export function createGeneratorScreen({db,doc,collection,query,orderBy,onSnapsho
     message='Действие не отправлено. Проверьте подключение и права доступа.';render();return;
    }
    const running=state.startedAtMs!==null;
+   if(legacy&&action!=='stop')return;
    if((action==='start'&&running)||(action!=='start'&&!running&&action==='stop')||(action==='reset'&&running))return;
    const expectedRevision=state.revision;
    if(action==='reset'&&confirmationRevision!==expectedRevision)return;
    hideConfirmation();busy=true;message='';render();
    const begin=Date.now();
    try{
-    const {data}=await call({action,expectedRevision});
+    const {data}=await call({action,expectedRevision,generatorId});
     if(!alive)return;
     if(data.state&&data.state.revision>=state.revision)state=data.state;
     if(Number.isFinite(data.serverNowMs))clockOffset=data.serverNowMs-(begin+Date.now())/2;
@@ -116,7 +128,7 @@ export function createGeneratorScreen({db,doc,collection,query,orderBy,onSnapsho
   });
   el('genResetYes').addEventListener('click',()=>void act('reset'));
   el('genResetNo').addEventListener('click',hideConfirmation);
-  const ref=doc(db,'generators','warehouse');
+  const ref=doc(db,'generators',generatorId);
   const stateStop=onSnapshot(ref,{includeMetadataChanges:true},snapshot=>{
    if(!alive)return;
    const incoming=snapshot.exists()?snapshot.data():{...INITIAL};

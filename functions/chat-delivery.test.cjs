@@ -41,7 +41,7 @@ test('private message enqueue targets only the other participant and ignores for
  })})};
  const context={db,createHash,forwardedRecipients,directPushEventId,exports,onDocumentCreated:(_config,handler)=>handler,forwardAddressedMessage:async()=>{}};
  vm.createContext(context);
- vm.runInContext(between(server,'async function createChatPushOnce(','exports.forwardOrderCommentContext='),context);
+ vm.runInContext(between(server,'async function createChatPushOnce(','async function enqueuePersistedOrderEvent('),context);
  const event={params:{threadId:'a__b',messageId:'1'},data:{data:()=>({authorId:'a',authorName:'A',text:'private'})}};
  await exports.queueDirectChatPush(event);await exports.queueDirectChatPush(event);
  await exports.queueDirectChatPush({...event,params:{threadId:'a__b',messageId:'2'},data:{data:()=>({authorId:'a',forwardedContext:{kind:'chat'}})}});

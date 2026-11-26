@@ -129,7 +129,7 @@ async function claimEvent(ref) {
       const started = data.processingAt instanceof Timestamp
         ? data.processingAt.toMillis()
         : Date.parse(data.processingStartedAt || '');
-      if (Number.isFinite(started) && Date.now() - started < 120000) return false;
+      if (Number.isFinite(started) && Date.now() - started < 120000) throw new Error('Push event lease is active; retry after the current worker finishes.');
     }
 
     tx.update(ref, {
@@ -393,6 +393,8 @@ exports.import1COrder = onRequest(
           source: '1c',
           externalId: sourceId,
           sourceType,
+          updatedBy: '1c',
+          updatedByName: '1С',
           updatedAt: FieldValue.serverTimestamp()
         });
         return true;

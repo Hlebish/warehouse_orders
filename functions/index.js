@@ -136,7 +136,7 @@ async function claimEvent(ref) {
       processingAt: FieldValue.serverTimestamp(),
       processingStartedAt: new Date().toISOString()
     });
-    return true;
+    return data;
   });
 }
 
@@ -790,7 +790,10 @@ exports.sendWarehousePush = onDocumentCreated({ document: 'pushQueue/{eventId}',
   const claimed = await claimEvent(snapshot.ref);
   if (!claimed) return;
 
-  const data = snapshot.data() || {};
+  // Use the current queue document, not the original creation snapshot on retry.
+  const data = claimed;
+  const acceptedDeviceHashes=new Set(Array.isArray(data.acceptedDeviceHashes)?data.acceptedDeviceHashes:[]);
+  const deviceHash=item=>createHash('sha256').update(String(item.token)).digest('hex');
   const eventId = event.params.eventId;
   const siteUrl = 'https://hlebish.github.io/warehouse_orders/';
   const orderId = String(data.orderId || '');
@@ -808,7 +811,7 @@ exports.sendWarehousePush = onDocumentCreated({ document: 'pushQueue/{eventId}',
     throw error;
   }
   if (Number.isFinite(expiresAt) && expiresAt > 0 && Date.now() > expiresAt) {
-    await markDone(snapshot.ref, { deliveryStatus: 'expired', acceptedCount: 0, failedCount: 0 });
+    await markDone(snapshot.ref, { deliveryStatus: acceptedDeviceHashes.size?'partial_expired':'expired', acceptedCount: acceptedDeviceHashes.size, failedCount: Number(data.failedCount)||0 });
     logger.info('Push skipped: expired before delivery', { eventId });
     return;
   }
@@ -832,12 +835,13 @@ exports.sendWarehousePush = onDocumentCreated({ document: 'pushQueue/{eventId}',
       : (orderId ? `${siteUrl}?order=${encodeURIComponent(orderId)}${data.entryId ? '&entry=' + encodeURIComponent(String(data.entryId)) : ''}` : siteUrl));
 
   try {
-    const tokenDocs = await collectTokens(category, recipientUserId, String(data.authorId || ''), data.forceAll === true, Boolean(data.buybackItemId), Boolean(directChatThreadId), mentionRecipientIds, Array.isArray(data.excludedRecipientIds)?data.excludedRecipientIds:[]);
+    const eligibleTokenDocs = await collectTokens(category, recipientUserId, String(data.authorId || ''), data.forceAll === true, Boolean(data.buybackItemId), Boolean(directChatThreadId), mentionRecipientIds, Array.isArray(data.excludedRecipientIds)?data.excludedRecipientIds:[]);
+    const tokenDocs=eligibleTokenDocs.filter(item=>!acceptedDeviceHashes.has(deviceHash(item)));
 
     if (!tokenDocs.length) {
       await markDone(snapshot.ref, {
-        deliveryStatus: 'no_devices',
-        acceptedCount: 0,
+        deliveryStatus: acceptedDeviceHashes.size?'sent':'no_devices',
+        acceptedCount: acceptedDeviceHashes.size,
         failedCount: 0,
         diagnostic: 'На момент обработки не найдено ни одного активного устройства с push-токеном.'
       });
@@ -848,7 +852,7 @@ exports.sendWarehousePush = onDocumentCreated({ document: 'pushQueue/{eventId}',
     const burstCount = await registerNotificationBurst(notificationTag, eventId, category);
     const pushCopy = notificationCopy(data, burstCount, category);
 
-    let accepted = 0;
+    let accepted = acceptedDeviceHashes.size;
     let failed = 0;
     const platformDelivery={web:{selected:0,accepted:0,failed:0},android:{selected:0,accepted:0,failed:0}};
     const failureCodes = new Map();
@@ -907,11 +911,12 @@ exports.sendWarehousePush = onDocumentCreated({ document: 'pushQueue/{eventId}',
 
         const response = await messaging.sendEachForMulticast(message);
 
-        const removals = [];
+        const removals = [],acceptedThisGroup=[];
 
       response.responses.forEach((result, index) => {
         if (result.success) {
-          accepted++;
+          const hash=deviceHash(platformGroup[index]);
+          if(!acceptedDeviceHashes.has(hash)){acceptedDeviceHashes.add(hash);acceptedThisGroup.push(hash);accepted++;}
           platformDelivery[platform].accepted++;
           return;
         }
@@ -926,6 +931,8 @@ exports.sendWarehousePush = onDocumentCreated({ document: 'pushQueue/{eventId}',
         }
       });
 
+        // Persist successful FCM acceptances before retrying any other device.
+        if(acceptedThisGroup.length)await snapshot.ref.update({acceptedDeviceHashes:FieldValue.arrayUnion(...acceptedThisGroup),acceptedCount:accepted});
         await Promise.all(removals);
       }
       }
@@ -933,6 +940,11 @@ exports.sendWarehousePush = onDocumentCreated({ document: 'pushQueue/{eventId}',
 
     const failures = Object.fromEntries(failureCodes);
 
+    const retryableFailure=failed>0&&[...failureCodes.keys()].some(code=>!INVALID_TOKEN_CODES.has(code));
+    if(accepted>0&&retryableFailure){
+      await snapshot.ref.update({acceptedCount:accepted,failedCount:failed,failureCodes:failures,platformDelivery});
+      throw new Error('Some devices did not accept the push; retry remaining devices only.');
+    }
     if (accepted > 0) {
       await markDone(snapshot.ref, {
         deliveryStatus: failed ? 'partial' : 'sent',

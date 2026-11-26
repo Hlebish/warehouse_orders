@@ -1,4 +1,4 @@
-const { onDocumentCreated, onDocumentUpdated } = require('firebase-functions/v2/firestore');
+const { onDocumentCreated, onDocumentUpdated, onDocumentDeleted } = require('firebase-functions/v2/firestore');
 const { onSchedule } = require('firebase-functions/v2/scheduler');
 const { onRequest, onCall, HttpsError } = require('firebase-functions/v2/https');
 const { defineSecret } = require('firebase-functions/params');
@@ -10,6 +10,7 @@ const { getMessaging } = require('firebase-admin/messaging');
 const { createHash } = require('crypto');
 const { directPushEventId } = require('./direct-push-id');
 const { forwardedRecipients } = require('./forwarded-context');
+const { serverManagedPush, orderEvent, entryEvent } = require('./order-notification-events');
 const {createInspectionHandlers}=require('./inspection-items');
 const { normalizeBuybackArticle, resolveBuybackArticle, buybackArticleQuantities, buybackShippableArticles } = require('./buyback-articles');
 
@@ -162,9 +163,8 @@ async function createNotificationHistory(data, eventId) {
         user.exists && user.data()?.active === true ? [user] : [])
     : (await db.collection('users').where('active', '==', true).get()).docs;
 
-  let batch = db.batch();
+  const writes=[];
   let count = 0;
-  let batchWrites = 0;
 
   for (const user of users) {
     const profile = user.data() || {};
@@ -176,7 +176,7 @@ async function createNotificationHistory(data, eventId) {
     if (!notificationCategoryEnabled(settings, category) && !data.isMention && !isMentionRecipient && !data.buybackItemId && data.forceAll !== true && !data.directChatThreadId) continue;
 
     const notificationRef = user.ref.collection('notifications').doc(eventId);
-    batch.set(notificationRef, {
+    writes.push(notificationRef.create({
       title: (isMentionRecipient&&data.target!=='chat'?`Вас упомянули в заказе № ${String(data.orderNumber||'').trim()}`:String(data.title || 'Заказы · Склад')).slice(0, 120),
       message: String(data.body || 'Новое изменение.').slice(0, 500),
       body: String(data.body || 'Новое изменение.').slice(0, 500),
@@ -196,19 +196,10 @@ async function createNotificationHistory(data, eventId) {
       eventId,
       createdAt: FieldValue.serverTimestamp(),
       read: false
-    }, { merge: true });
+    }).catch(error=>{if(![6,'already-exists','ALREADY_EXISTS'].includes(error.code))throw error;}));
     count++;
-    batchWrites++;
-
-    // Firestore batches are limited to 500 writes.
-    if (batchWrites === 450) {
-      await batch.commit();
-      batch = db.batch();
-      batchWrites = 0;
-    }
   }
-
-  if (batchWrites) await batch.commit();
+  await Promise.all(writes);
   return count;
 }
 
@@ -639,6 +630,9 @@ exports.enqueueWarehousePush = onCall(async request => {
     if (category==='comments' && Array.isArray(entry.data().mentionUserIds)) excludedRecipientIds=entry.data().mentionUserIds.filter(id=>typeof id==='string').slice(0,20);
   }
 
+  // Older clients may still request a push for a persisted order event. The trigger
+  // owns these events; accepting the request without enqueueing prevents duplicates.
+  if (serverManagedPush(input)) return { ok: true, serverManaged: true };
   const ref = directMessageId
     ? db.collection('pushQueue').doc(directPushEventId(directChatThreadId,directMessageId,uid,recipientUserId))
     : db.collection('pushQueue').doc();
@@ -759,7 +753,33 @@ exports.queueDirectChatPush=onDocumentCreated({document:'directChats/{threadId}/
   title:(urgent?'🚨 СРОЧНОЕ ЛИЧНОЕ СООБЩЕНИЕ · ':'')+name,body,authorId:message.authorId,orderId:'',target:'chat',category:'replies',recipientUserId,mentionRecipientIds:[],directChatThreadId:threadId,directMessageId:messageId,isMention:true,isReply:false,isUrgent:urgent
  });
 });
-exports.forwardOrderCommentContext=onDocumentCreated({document:'orders/{orderId}/entries/{entryId}',retry:true},event=>forwardAddressedMessage(event.data,'order',event.params.orderId));
+async function enqueuePersistedOrderEvent(event, data, orderId, orderNumber, entryId=''){
+ if(!data)return;
+ const id='order-'+createHash('sha256').update(String(event.id)).digest('hex');
+ await createChatPushOnce(id,{...data,orderId,orderNumber:String(orderNumber||'').slice(0,80),entryId,target:'site',recipientUserId:'',mentionRecipientIds:[],isMention:false,isReply:false,isUrgent:false});
+}
+exports.queueOrderCreatedPush=onDocumentCreated({document:'orders/{orderId}',retry:true},async event=>{
+ const order=event.data?.data();if(!order)return;
+ await enqueuePersistedOrderEvent(event,orderEvent(null,order),event.params.orderId,order.number);
+});
+exports.queueOrderUpdatedPush=onDocumentUpdated({document:'orders/{orderId}',retry:true},async event=>{
+ const before=event.data?.before?.data(),after=event.data?.after?.data();if(!before||!after)return;
+ await enqueuePersistedOrderEvent(event,orderEvent(before,after),event.params.orderId,after.number);
+});
+exports.queueOrderDeletedPush=onDocumentDeleted({document:'orders/{orderId}',retry:true},async event=>{
+ const order=event.data?.data();if(!order)return;
+ const archive=await db.collection('deletedOrders').doc(event.params.orderId).get();
+ const actor=archive.data()?.deletedBy;
+ if(!archive.exists||!actor)return;
+ await enqueuePersistedOrderEvent(event,{authorId:String(actor),title:('Заказ № '+String(order.number||'')+' удалён').slice(0,120),body:'Заказ удалён администратором.',category:'editing',isDeleted:true},'',order.number);
+});
+exports.forwardOrderCommentContext=onDocumentCreated({document:'orders/{orderId}/entries/{entryId}',retry:true},async event=>{
+ const entry=event.data?.data();if(!entry)return;
+ const payload=entryEvent(entry,forwardedRecipients(entry).map(recipient=>recipient.uid));
+ const broadcast=async()=>{if(!payload)return;const order=await db.collection('orders').doc(event.params.orderId).get();if(!order.exists)return;
+ await enqueuePersistedOrderEvent(event,{...payload,title:(String(order.data().client||'Клиент не указан')+' · № '+String(order.data().number||'')).slice(0,120)},event.params.orderId,order.data().number,event.params.entryId);};
+ await Promise.all([broadcast(),forwardAddressedMessage(event.data,'order',event.params.orderId)]);
+});
 
 exports.sendWarehousePush = onDocumentCreated({ document: 'pushQueue/{eventId}', retry: true }, async event => {
   const snapshot = event.data;
@@ -778,6 +798,13 @@ exports.sendWarehousePush = onDocumentCreated({ document: 'pushQueue/{eventId}',
   const mentionRecipientIds=Array.isArray(data.mentionRecipientIds)?[...new Set(data.mentionRecipientIds.map(String))]:[];
   const mentionRecipients=new Set(mentionRecipientIds);
   const expiresAt = Number(data.expiresAt) || (Date.parse(String(data.createdAt || '')) + 60000);
+  // Persist the inbox even if the push TTL has passed. Retrying an existing
+  // history document must never reset its read state.
+  try { if (!data.forwardedContext) await createNotificationHistory(data,eventId); }
+  catch(error){
+    await snapshot.ref.update({deliveryStatus:'retrying',processingAt:FieldValue.delete(),processingStartedAt:FieldValue.delete()});
+    throw error;
+  }
   if (Number.isFinite(expiresAt) && expiresAt > 0 && Date.now() > expiresAt) {
     await markDone(snapshot.ref, { deliveryStatus: 'expired', acceptedCount: 0, failedCount: 0 });
     logger.info('Push skipped: expired before delivery', { eventId });
@@ -794,14 +821,6 @@ exports.sendWarehousePush = onDocumentCreated({ document: 'pushQueue/{eventId}',
     }
   }
   const notificationTag = notificationTagFor(data, eventId, category, target, recipientUserId);
-  // Start notification history immediately, but do not make push delivery wait for it.
-  // Forwarded cards and their unread notices are committed together with the queue item.
-  const historyPromise = (data.forwardedContext ? Promise.resolve() : createNotificationHistory(data, eventId)).catch(error => {
-    logger.error('Notification history write failed', {
-      eventId,
-      error: String(error?.message || error)
-    });
-  });
   const directChatThreadId = String(data.directChatThreadId || '');
   const senderId = String(data.authorId || '');
   const link = directChatThreadId && senderId
@@ -814,7 +833,6 @@ exports.sendWarehousePush = onDocumentCreated({ document: 'pushQueue/{eventId}',
     const tokenDocs = await collectTokens(category, recipientUserId, String(data.authorId || ''), data.forceAll === true, Boolean(data.buybackItemId), Boolean(directChatThreadId), mentionRecipientIds, Array.isArray(data.excludedRecipientIds)?data.excludedRecipientIds:[]);
 
     if (!tokenDocs.length) {
-      await historyPromise;
       await markDone(snapshot.ref, {
         deliveryStatus: 'no_devices',
         acceptedCount: 0,
@@ -914,7 +932,6 @@ exports.sendWarehousePush = onDocumentCreated({ document: 'pushQueue/{eventId}',
     const failures = Object.fromEntries(failureCodes);
 
     if (accepted > 0) {
-      await historyPromise;
       await markDone(snapshot.ref, {
         deliveryStatus: failed ? 'partial' : 'sent',
         acceptedCount: accepted,
@@ -931,7 +948,6 @@ exports.sendWarehousePush = onDocumentCreated({ document: 'pushQueue/{eventId}',
       [...failureCodes.keys()].every(code => INVALID_TOKEN_CODES.has(code));
 
     if (onlyInvalidTokens) {
-      await historyPromise;
       await markDone(snapshot.ref, {
         deliveryStatus: 'no_valid_devices',
         acceptedCount: 0,

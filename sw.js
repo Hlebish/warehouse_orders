@@ -4,21 +4,7 @@ importScripts(
 );
 
 const SITE_URL = 'https://hlebish.github.io/warehouse_orders/';
-const CACHE = 'order-desk-fcm-v154-multiple-generators';
-// Version bump triggers install/activate; activate notifies open tabs to reload.
-const ASSETS = [
-  './',
-  './index.html',
-  './styles.css',
-  './app.js',
-  './generator-screen.mjs',
-  './generator-screen.css',
-  './elivered-message-sound.mp3',
-  './firebase-config.js',
-  './manifest.webmanifest',
-  './%D0%9C%D0%B8%D0%BD%D0%B8%D0%BC%D0%B0%D0%BB%D0%B8%D1%81%D1%82%D0%B8%D1%87%D0%BD%D0%B0%D1%8F%20%D1%8D%D0%BC%D0%B1%D0%BB%D0%B5%D0%BC%D0%B0%20%D0%B0%D0%B2%D1%82%D0%BE%D0%B7%D0%B0%D0%BF%D1%87%D0%B0%D1%81%D1%82%D0%B5%D0%B9%20AMP.png'
-];
-
+const CACHE = 'order-desk-static-v155-reliability';
 // Handle notification clicks before FCM hooks.
 self.addEventListener('notificationclick', event => {
   event.notification.close();
@@ -131,16 +117,25 @@ self.addEventListener('install', event => {
 });
 
 self.addEventListener('activate', event => {
-  event.waitUntil(
-    caches.keys()
-      .then(keys => Promise.all(keys.map(key => caches.delete(key))))
-      .then(() => self.clients.claim())
-  );
+  event.waitUntil(caches.keys()
+    .then(keys => Promise.all(keys.filter(key => key !== CACHE &&
+      (key.startsWith('order-desk-fcm-') || key.startsWith('order-desk-static-'))).map(key => caches.delete(key))))
+    .then(() => self.clients.claim()));
 });
 
-// Never cache the application shell. Firebase/Firestore data is always fetched
-// by the page directly from the network. The service worker is kept only for FCM.
+// Only immutable, explicitly versioned same-origin scripts/styles are cached.
+// HTML, API calls, unversioned files and all Firestore traffic remain network-only.
 self.addEventListener('fetch', event => {
-  if (event.request.method !== 'GET' || new URL(event.request.url).origin !== location.origin) return;
-  event.respondWith(fetch(event.request, {cache: 'no-store'}));
+  const request=event.request,url=new URL(request.url);
+  if(request.method!=='GET'||url.origin!==location.origin)return;
+  const scope=new URL(self.registration.scope);
+  const versioned=url.pathname.startsWith(scope.pathname)&&url.searchParams.has('v')&&
+    ['script','style'].includes(request.destination)&&/\.(?:m?js|css)$/.test(url.pathname);
+  if(!versioned){event.respondWith(fetch(request,{cache:'no-store'}));return;}
+  event.respondWith((async()=>{
+    let cache;try{cache=await caches.open(CACHE);const hit=await cache.match(request);if(hit)return hit;}catch{}
+    const response=await fetch(request,{cache:'no-store'});
+    if(cache&&response.ok&&response.type==='basic')try{await cache.put(request,response.clone());}catch{}
+    return response;
+  })());
 });

@@ -37,3 +37,22 @@ test('order list preserves transfers and separate Kamyanske, filters before sort
  assert.deepEqual(sortOrderRows(orders,options).map(o=>o.id),['2','1','4']);
  assert.equal(sortOrderRows(orders,{...options,search:'4'}).length,1);
 });
+
+test('partial push failure retries only devices not accepted by FCM',async()=>{
+ const vm=require('node:vm'),{readFileSync}=require('node:fs'),{createHash}=require('node:crypto');
+ const source=readFileSync(require('node:path').join(__dirname,'index.js'),'utf8');
+ const begin=source.indexOf('exports.sendWarehousePush ='),end=source.indexOf('function buybackEventDocId',begin);
+ assert.ok(begin>=0&&end>begin);
+ const queue={authorId:'a',target:'site',category:'orders',createdAt:new Date().toISOString(),expiresAt:Date.now()+60000};
+ const accepted=[],attempts=[],exports={};let failAndroid=true;
+ const ref={async update(fields){for(const [k,v] of Object.entries(fields)){if(v?.union)queue[k]=[...new Set([...(queue[k]||[]),...v.union])];else queue[k]=v;}}};
+ const devices=[{token:'desktop-token',platform:'web',userId:'b'},{token:'phone-token',platform:'android',userId:'b'}];
+ const context={exports,onDocumentCreated:(_config,fn)=>fn,createHash,claimEvent:async()=>({...queue}),createNotificationHistory:async()=>{},markDone:async(_ref,fields)=>Object.assign(queue,fields),notificationTagFor:()=> 'tag',collectTokens:async()=>devices,registerNotificationBurst:async()=>1,notificationCopy:()=>({title:'order',body:'new'}),INVALID_TOKEN_CODES:new Set(),FieldValue:{arrayUnion:(...union)=>({union}),delete:()=>null},logger:{info(){},error(){},warn(){}},messaging:{async sendEachForMulticast(message){attempts.push(...message.tokens);return {responses:message.tokens.map(token=>{if(token==='phone-token'&&failAndroid)return {success:false,error:{code:'messaging/server-unavailable'}};accepted.push(token);return {success:true};})};}}};
+ vm.createContext(context);vm.runInContext(source.slice(begin,end),context);
+ const event={data:{ref,data:()=>({})},params:{eventId:'event'}};
+ await assert.rejects(exports.sendWarehousePush(event),/retry remaining devices/);
+ assert.equal(queue.deliveryStatus,'retrying');assert.equal(queue.acceptedCount,1);
+ failAndroid=false;await exports.sendWarehousePush(event);
+ assert.deepEqual(attempts,['desktop-token','phone-token','phone-token']);assert.deepEqual(accepted,['desktop-token','phone-token']);
+ assert.equal(queue.deliveryStatus,'sent');assert.equal(queue.acceptedCount,2);
+});

@@ -18,9 +18,9 @@ export function watchOrderWindow({db,collection,query,where,onSnapshot},next,err
   return delta>0||(delta===0&&b.sequence>a.sequence)?b:a;
  };
  const emit=()=>{
-  if(closed||parts.some(x=>!x))return;
+  if(closed||parts.every(x=>!x))return;
   const candidates=new Map();
-  for(const part of parts)for(const [id,record] of part.records)candidates.set(id,prefer(candidates.get(id),record));
+  for(const part of parts.filter(Boolean))for(const [id,record] of part.records)candidates.set(id,prefer(candidates.get(id),record));
   const merged=new Map([...candidates].map(([id,record])=>[id,record.doc]));
   const changes=[];
   for(const [id,doc] of merged){
@@ -29,7 +29,7 @@ export function watchOrderWindow({db,collection,query,where,onSnapshot},next,err
   }
   for(const [id,doc] of previous)if(!merged.has(id))changes.push({type:'removed',doc});
   previous=merged;
-  next({docs:[...merged.values()],metadata:{fromCache:parts.some(x=>x.snapshot.metadata.fromCache),hasPendingWrites:parts.some(x=>x.snapshot.metadata.hasPendingWrites)},docChanges:()=>changes});
+  next({docs:[...merged.values()],metadata:{fromCache:parts.some(x=>!x||x.snapshot.metadata.fromCache),hasPendingWrites:parts.some(x=>x?.snapshot.metadata.hasPendingWrites)},docChanges:()=>changes});
  };
  const stop=()=>{if(closed)return;closed=true;stops.forEach(fn=>fn());};
  for(const [i,q] of queries.entries()){

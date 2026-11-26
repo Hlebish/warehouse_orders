@@ -10,16 +10,22 @@ export function watchOrderWindow({db,collection,query,where,onSnapshot},next,err
  }
  const parts=new Array(queries.length).fill(null);
  let previous=new Map(),closed=false,stops=[],sequence=0;
+ const revision=doc=>{const data=doc.data();const value=data.updatedAt||data.createdAt;const ms=typeof value?.toMillis==='function'?value.toMillis():Date.parse(value);return Number.isFinite(ms)?ms:0;};
+ const prefer=(a,b)=>{
+  if(!a)return b;
+  if(a.doc.metadata?.hasPendingWrites!==b.doc.metadata?.hasPendingWrites)return b.doc.metadata?.hasPendingWrites?b:a;
+  const delta=revision(b.doc)-revision(a.doc);
+  return delta>0||(delta===0&&b.sequence>a.sequence)?b:a;
+ };
  const emit=()=>{
   if(closed||parts.some(x=>!x))return;
-  const merged=new Map();
-  for(const part of [...parts].sort((a,b)=>a.sequence-b.sequence)){
-   for(const doc of part.snapshot.docs)merged.set(doc.id,doc);
-  }
+  const candidates=new Map();
+  for(const part of parts)for(const [id,record] of part.records)candidates.set(id,prefer(candidates.get(id),record));
+  const merged=new Map([...candidates].map(([id,record])=>[id,record.doc]));
   const changes=[];
   for(const [id,doc] of merged){
    const old=previous.get(id);
-   if(!old||JSON.stringify(old.data())!==JSON.stringify(doc.data()))changes.push({type:old?'modified':'added',doc});
+   if(!old||(old!==doc&&JSON.stringify(old.data())!==JSON.stringify(doc.data())))changes.push({type:old?'modified':'added',doc});
   }
   for(const [id,doc] of previous)if(!merged.has(id))changes.push({type:'removed',doc});
   previous=merged;
@@ -28,7 +34,16 @@ export function watchOrderWindow({db,collection,query,where,onSnapshot},next,err
  const stop=()=>{if(closed)return;closed=true;stops.forEach(fn=>fn());};
  for(const [i,q] of queries.entries()){
   if(closed)break;
-  const unsubscribe=onSnapshot(q,{includeMetadataChanges:true},snapshot=>{if(closed)return;parts[i]={snapshot,sequence:++sequence};emit();},err=>{if(closed)return;stop();error(err);});
+  const unsubscribe=onSnapshot(q,{includeMetadataChanges:true},snapshot=>{
+   if(closed)return;
+   const old=parts[i],records=new Map();
+   for(const doc of snapshot.docs){
+    const record=old?.records.get(doc.id);
+    const unchanged=record&&JSON.stringify(record.doc.data())===JSON.stringify(doc.data());
+    records.set(doc.id,{doc,sequence:unchanged?record.sequence:++sequence});
+   }
+   parts[i]={snapshot,records};emit();
+  },err=>{if(closed)return;stop();error(err);});
   if(closed)unsubscribe();else stops.push(unsubscribe);
  }
  return stop;

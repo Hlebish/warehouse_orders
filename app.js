@@ -1,3 +1,4 @@
+import { createFormDraftStore, mapLimited, memoizeByObject, pushDiagnosticText } from './client-reliability.mjs?v=2026.11.27.01';
 import { watchOrderWindow, patchOrderRows, sortOrderRows, ARCHIVE_STATUSES } from './orders-window.mjs?v=2026.11.26.02';
 import { createGeneratorScreen } from './generator-screen.mjs?v=2026.11.26.01';
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js';
@@ -1004,7 +1005,7 @@ onMessage(messaging,payload=>{
     notify(message,orderId,target,target==='chat'?'chat':'orders');
   }
 });
-function stopCloud(){fullOrderHistoryRequested=false;fullOrderHistoryReady=false;settleFullOrderHistory(false);if(generatorScreen.isOpen())closeModal();inspectionItems.stop();foregroundDataSync.reset();serverEntriesLoaded.clear();directPhotoCache.clear();directPhotoRequests.clear();flushOrdersCache();if(ordersRetryTimer!==null){clearTimeout(ordersRetryTimer);ordersRetryTimer=null}ordersRetryDelay=3000;ordersConnectionNoticeShown=false;ordersListenerBlocked=false;profileUnsubscribe?.();ordersUnsubscribe?.();chatUnsubscribe?.();chatBadgeUnsubscribe?.();chatUnreadReceiptUnsubscribe?.();notificationsUnsubscribe?.();profileUnsubscribe=ordersUnsubscribe=chatUnsubscribe=chatBadgeUnsubscribe=chatUnreadReceiptUnsubscribe=notificationsUnsubscribe=null;chatUnreadReceiptCount=0;chatLegacyUnread=false;chatUnread=false;for(const stop of entryUnsubscribes.values())stop();entryUnsubscribes.clear();for(const stop of defectEntryUnsubscribes.values())stop();defectEntryUnsubscribes.clear();serverCache.clear();state.orders=[];state.notices=[]}
+function stopCloud(){persistOrderFormDraft();activeOrderFormDraft=null;fullOrderHistoryRequested=false;fullOrderHistoryReady=false;settleFullOrderHistory(false);if(generatorScreen.isOpen())closeModal();inspectionItems.stop();foregroundDataSync.reset();serverEntriesLoaded.clear();directPhotoCache.clear();directPhotoRequests.clear();flushOrdersCache();if(ordersRetryTimer!==null){clearTimeout(ordersRetryTimer);ordersRetryTimer=null}ordersRetryDelay=3000;ordersConnectionNoticeShown=false;ordersListenerBlocked=false;profileUnsubscribe?.();ordersUnsubscribe?.();chatUnsubscribe?.();chatBadgeUnsubscribe?.();chatUnreadReceiptUnsubscribe?.();notificationsUnsubscribe?.();profileUnsubscribe=ordersUnsubscribe=chatUnsubscribe=chatBadgeUnsubscribe=chatUnreadReceiptUnsubscribe=notificationsUnsubscribe=null;chatUnreadReceiptCount=0;chatLegacyUnread=false;chatUnread=false;for(const stop of entryUnsubscribes.values())stop();entryUnsubscribes.clear();for(const stop of defectEntryUnsubscribes.values())stop();defectEntryUnsubscribes.clear();serverCache.clear();state.orders=[];state.notices=[]}
 let pendingOrderEntryFocus=(()=>{const params=new URLSearchParams(location.search);return params.get('order')&&params.get('entry')?{orderId:params.get('order'),entryId:params.get('entry')}:null;})();
 const serverEntriesLoaded=new Set();
 function openOrderAtEntry(orderId,entryId='',fromForm=false){
@@ -1684,6 +1685,68 @@ function renderOrdersUI(){const search=$('searchInput').value.toLocaleLowerCase(
 function render(){renderOrdersUI();generatorScreen.refreshPermissions();const testsNav=$('testsNavButton');if(testsNav)testsNav.hidden=!canManageUsers;const avatar=$('profileAvatar');if(avatar)avatar.innerHTML=profileAvatarUrl?'<img src="'+esc(profileAvatarUrl)+'" alt="">':'СК';}
 function plural(n,a,b,c){n=Math.abs(n)%100;const d=n%10;return n>10&&n<20?c:d>1&&d<5?b:d===1?a:c}
 function toast(msg,orderId='',options={}){const t=document.createElement('div');t.className='toast'+(orderId?' toast-clickable':'');t.textContent=msg;if(orderId)t.addEventListener('click',()=>{t.remove();openOrder(orderId)});$('toastStack').append(t);if(!options.persistent)setTimeout(()=>t.remove(),3500);return t}
+let activeOrderFormDraft=null;
+const orderFormStore=createFormDraftStore({
+ getItem:key=>localStorage.getItem(key),setItem:(key,value)=>localStorage.setItem(key,value),removeItem:key=>localStorage.removeItem(key)
+});
+function readOrderFormDraft(session){
+ const fields={};
+ for(const id of session.ids){const el=$(id);if(el)fields[id]={value:el.value,clientId:el.dataset.clientId||''};}
+ const rows=$('orderArticlesRows');
+ const articles=rows?[...rows.querySelectorAll('.order-article-row')].map(row=>({article:row.querySelector('.order-article-input').value,quantity:row.querySelector('.order-article-qty').value})):null;
+ return {fields,articles,baseline:modal.dataset.orderBaseline||''};
+}
+function persistOrderFormDraft(){
+ const session=activeOrderFormDraft;
+ if(!session||session.uid!==signedInUser?.uid||!session.root.isConnected)return;
+ const value=readOrderFormDraft(session);
+ try{
+  if(JSON.stringify(value)===session.initial){orderFormStore.remove(session.uid,session.orderId,session.kind);session.note.textContent='Черновик пуст или не изменён.';}
+  else{orderFormStore.save(session.uid,session.orderId,session.kind,value);if(!session.conflict)session.note.textContent='Черновик сохранён на этом устройстве.';}
+ }catch{session.note.textContent='Не удалось сохранить черновик. Не закрывайте форму.';}
+}
+function clearOrderFormDraft(session=activeOrderFormDraft){
+ if(!session)return;
+ if(activeOrderFormDraft&&activeOrderFormDraft!==session&&activeOrderFormDraft.uid===session.uid&&activeOrderFormDraft.kind===session.kind&&activeOrderFormDraft.orderId===session.orderId)return;
+ try{orderFormStore.remove(session.uid,session.orderId,session.kind);}catch{toast('Не удалось удалить черновик с устройства.');}
+ if(activeOrderFormDraft===session)activeOrderFormDraft=null;
+}
+function activateOrderFormDraft(){
+ if(!signedInUser)return;
+ const root=$('newOrderForm')||$('editOrderInfoForm')||($('modalEyebrow')?.textContent==='СОСТАВ ЗАКАЗА'?$('orderArticlesRows'):null);
+ if(!root)return;
+ const kind=root.id==='newOrderForm'?'new':root.id==='editOrderInfoForm'?'info':'articles';
+ const ids=kind==='new'?['orderNumber','clientName','deliveryType','orderPaymentType','orderDeliveryAddress','orderMainComment','startStatus','orderClipboardText']:kind==='info'?['editOrderNumber','editClientName','editDeliveryType','orderPaymentType','orderDeliveryAddress','orderMainComment']:[];
+ const note=document.createElement('p');note.className='field-hint draft-status';note.setAttribute('role','status');note.textContent='Изменения сохраняются как черновик на устройстве.';
+ const discard=document.createElement('button');discard.type='button';discard.className='small-button';discard.textContent='Сбросить черновик';
+ const wrap=document.createElement('div');wrap.append(note,discard);$('modalBody').prepend(wrap);
+ const session={root,kind,ids,uid:signedInUser.uid,orderId:kind==='new'?'':String(selectedId||''),note,conflict:false};
+ activeOrderFormDraft=session;session.initial=JSON.stringify(readOrderFormDraft(session));
+ discard.addEventListener('click',()=>{
+  if(activeOrderFormDraft!==session||!confirm('Удалить несохранённые изменения этой формы?'))return;
+  clearOrderFormDraft(session);
+  if(kind==='new')openNewOrder();else if(kind==='info')editOrderInfo();else editArticles();
+ });
+ try{
+  const saved=orderFormStore.load(session.uid,session.orderId,kind);if(!saved)return;
+  for(const id of ids){const el=$(id),field=saved.fields?.[id];if(!el||!field)continue;
+   if(el.tagName==='SELECT'&&![...el.options].some(option=>option.value===field.value))continue;
+   el.value=String(field.value??'');if(field.clientId)el.dataset.clientId=String(field.clientId);else delete el.dataset.clientId;
+  }
+  if(Array.isArray(saved.articles)&&$('orderArticlesRows')){
+   $('orderArticlesRows').innerHTML=saved.articles.map(articleRowHtml).join('');
+   [...$('orderArticlesRows').querySelectorAll('.order-article-row')].forEach((row,index)=>{row.querySelector('.order-article-qty').value=String(saved.articles[index].quantity??'');});
+  }
+  if(kind!=='new'&&saved.baseline&&saved.baseline!==modal.dataset.orderBaseline){
+   session.conflict=true;modal.dataset.orderBaseline=saved.baseline;
+  }
+  note.textContent=session.conflict?'Черновик восстановлен, но заказ изменился. Скопируйте нужные изменения и сбросьте черновик перед повторным редактированием.':'Восстановлен черновик с этого устройства.';
+ }catch{note.textContent='Хранилище черновиков недоступно.';}
+}
+for(const event of ['input','change'])document.addEventListener(event,()=>{if(activeOrderFormDraft)queueMicrotask(persistOrderFormDraft);});
+document.addEventListener('click',()=>{if(activeOrderFormDraft)queueMicrotask(persistOrderFormDraft);});
+window.addEventListener('pagehide',persistOrderFormDraft);
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')persistOrderFormDraft();});
 let activeEntryDraft=null;
 const restoredDraftFiles=new WeakMap();
 function filesForInput(input){return input?.files?.length?[...input.files]:restoredDraftFiles.get(input)||[];}
@@ -1784,6 +1847,7 @@ function showModal(title,body,buttons=[],eyebrow='КАРТОЧКА ЗАКАЗА'
   directChatOpenRequest++;
   directChatUnsubscribe?.();directChatUnsubscribe=null;
   if(photoSharing.isOpen())photoSharing.close();
+  persistOrderFormDraft();activeOrderFormDraft=null;
   persistOpenEntryDraft();activeEntryDraft=null;
   const editingOrder=state.orders.find(order=>order.id===selectedId);
   if(editingOrder)modal.dataset.orderBaseline=JSON.stringify(orderEditSnapshot(editingOrder));else delete modal.dataset.orderBaseline;
@@ -1797,6 +1861,7 @@ function showModal(title,body,buttons=[],eyebrow='КАРТОЧКА ЗАКАЗА'
   decoratePhotoSharing($('modalBody'));
   $('modalFoot').innerHTML=buttons.join('');
   modal.hidden=false;
+  activateOrderFormDraft();
   document.body.classList.add('overlay-window-open');
   document.body.style.overflow='hidden';
   // Every modal gets one browser-history entry. Opening another modal while
@@ -1810,6 +1875,7 @@ function showModal(title,body,buttons=[],eyebrow='КАРТОЧКА ЗАКАЗА'
 function closeModal(fromPop=false){
   generatorScreen.close();
   directChatOpenRequest++;
+  persistOrderFormDraft();activeOrderFormDraft=null;
   persistOpenEntryDraft();activeEntryDraft=null;
   chatUnsubscribe?.();
   chatUnsubscribe=null;
@@ -1951,6 +2017,7 @@ function applyParsedOrderData(parsed){
   if(parsed.number)parts.push('№ '+parsed.number);
   if(parsed.client)parts.push(parsed.client);
   if(parsed.articles?.length)parts.push(parsed.articles.length+' поз.');
+  persistOrderFormDraft();
   toast(parts.length?'Данные из документа распознаны: '+parts.join(' · '):'Не удалось найти данные заказа в тексте.');
 }
 function orderDeliveryFields(order){
@@ -2554,6 +2621,7 @@ function openEditMenu(){showModal('Редактировать заказ','<div 
 function editOrderInfo(){const o=state.orders.find(x=>x.id===selectedId);if(!o)return;if(!canEditOrder(o)){toast('После отгрузки или получения заказа клиентом редактирование доступно только администратору и директору.');return;}showModal('Редактировать данные заказа',`<form id="editOrderInfoForm"><div class="field"><label for="editOrderNumber">Номер заказа *</label><input id="editOrderNumber" required autocomplete="off" value="${esc(o.number)}"></div><div class="field client-suggestion-wrap"><label for="editClientName">Имя клиента *</label><input id="editClientName" required autocomplete="off" value="${esc(o.client)}" data-client-id="${esc(o.clientId||'')}"><div id="editClientNameSuggestions" class="chat-mention-suggestions client-suggestions" hidden></div></div><div class="field"><label for="editDeliveryType">Вид доставки</label><select id="editDeliveryType"><option value="city"${(o.deliveryType||'city')==='city'?' selected':''}>Доставка по городу</option><option value="kamyanske"${o.deliveryType==='kamyanske'?' selected':''}>Доставка в Камянское</option><option value="pickup"${o.deliveryType==='pickup'?' selected':''}>Самовывоз</option><option value="post"${o.deliveryType==='post'?' selected':''}>Доставка почтой</option></select></div>${orderDeliveryFields(o)}<span class="field-hint">Изменения сохранятся в карточке заказа и будут видны всем сотрудникам.</span></form>`,[button('Назад','back-detail'),button('Сохранить изменения','save-order-info','primary-button')],'ДАННЫЕ ЗАКАЗА')}
 const orderEditsInFlight=new Set();
 async function saveOrderInfo(){
+ const formDraft=activeOrderFormDraft;persistOrderFormDraft();if(formDraft?.conflict){toast('Заказ изменился. Сбросьте устаревший черновик перед сохранением.');return;}
  const o=state.orders.find(order=>order.id===selectedId);if(!o||!signedInUser||orderEditsInFlight.has(o.id))return;
  if(!canEditOrder(o)){toast('После выдачи редактировать заказ может только администратор.');return;}
  const number=$('editOrderNumber').value.trim(),clientInput=$('editClientName'),client=clientInput.value.trim(),clientId=clientInput.dataset.clientId||(client===o.client?o.clientId||'':''),deliveryType=$('editDeliveryType').value;
@@ -2572,7 +2640,7 @@ async function saveOrderInfo(){
  ].filter(Boolean);
  const entry={id:crypto.randomUUID(),kind:'system',text:changes.length?`Данные заказа изменены: ${changes.join(', ')}`:'Данные заказа сохранены',authorId:signedInUser.uid,author:patch.updatedByName,createdAt:now,photos:[]};
  orderEditsInFlight.add(o.id);
- try{await commitOrderEdit(o,expected,patch,entry);feedback.success();render();toast('Данные заказа сохранены.');void queuePush(client,'Данные заказа изменены',signedInUser.uid,o.id,'site','editing');if(feedback.isCurrent()&&selectedId===o.id){openOrderAtEntry(o.id,'',true);}}
+ try{await commitOrderEdit(o,expected,patch,entry);feedback.success();clearOrderFormDraft(formDraft);render();toast('Данные заказа сохранены.');void queuePush(client,'Данные заказа изменены',signedInUser.uid,o.id,'site','editing');if(feedback.isCurrent()&&selectedId===o.id){openOrderAtEntry(o.id,'',true);}}
  catch(error){feedback.fail(error);toast(error.message||'Не удалось сохранить данные заказа.');}
  finally{orderEditsInFlight.delete(o.id);feedback.finish();}
 }
@@ -2685,6 +2753,7 @@ async function toggleAssemblyProgress(){
   }finally{collectionWritesInFlight.delete(o.id);}
 }
 async function saveArticles(){
+ const formDraft=activeOrderFormDraft;persistOrderFormDraft();if(formDraft?.conflict){toast('Заказ изменился. Сбросьте устаревший черновик перед сохранением.');return;}
  const o=state.orders.find(order=>order.id===selectedId);if(!o||!signedInUser||orderEditsInFlight.has(o.id))return;
  if(!canEditOrder(o)){toast('После выдачи редактировать заказ может только администратор.');return;}
  const raw=readArticles(),expected=modal.dataset.orderBaseline?JSON.parse(modal.dataset.orderBaseline):orderEditSnapshot(o);
@@ -2694,7 +2763,7 @@ async function saveArticles(){
  const now=isoNow(),patch={articles:next,updatedAt:now,updatedBy:signedInUser.uid,updatedByName:profileName||roles[state.role]};
  const entry={id:crypto.randomUUID(),kind:'system',text:'Состав заказа изменён: '+(next.map(line=>line.article+' × '+line.quantity).join(', ')||'артикулы удалены'),authorId:signedInUser.uid,author:patch.updatedByName,createdAt:now,photos:[]};
  orderEditsInFlight.add(o.id);
- try{await commitOrderEdit(o,expected,patch,entry);feedback.success();render();toast('Артикулы заказа сохранены.');void queuePush(o.client||'Клиент не указан','Артикулы заказа изменены',signedInUser.uid,o.id,'site','editing');if(feedback.isCurrent()&&selectedId===o.id){openOrderAtEntry(o.id,'',true);}}
+ try{await commitOrderEdit(o,expected,patch,entry);feedback.success();clearOrderFormDraft(formDraft);render();toast('Артикулы заказа сохранены.');void queuePush(o.client||'Клиент не указан','Артикулы заказа изменены',signedInUser.uid,o.id,'site','editing');if(feedback.isCurrent()&&selectedId===o.id){openOrderAtEntry(o.id,'',true);}}
  catch(error){feedback.fail(error);toast(error.message||'Не удалось сохранить артикулы.');}
  finally{orderEditsInFlight.delete(o.id);feedback.finish();}
 }
@@ -2797,6 +2866,7 @@ async function saveDefectEdit(){
  finally{feedback.finish();}
 }
 async function saveOrder(){
+ const formDraft=activeOrderFormDraft;persistOrderFormDraft();
  const submit=modal.querySelector('[data-action="create-order"]');
  if(submit?.disabled)return;
  const n=$('orderNumber').value.trim(),client=$('clientName').value.trim(),clientId=$('clientName')?.dataset.clientId||'',deliveryType=$('deliveryType')?.value||'';
@@ -2827,7 +2897,7 @@ async function saveOrder(){
   if(!state.orders.some(item=>item.id===o.id))state.orders.unshift(o);
   serverCache.set(o.id,{...o,articles:normalizeArticles(o.articles||[]),entries:[...o.entries]});
   pendingOrderData.delete(o.id);pendingOrderCreateDrafts.delete(fingerprint);saveOrdersCache();
-  closeModal();render();toast('Карточка заказа создана.');
+  clearOrderFormDraft(formDraft);closeModal();render();toast('Карточка заказа создана.');
   void queuePush(o.client||'Клиент не указан','Новый заказ',signedInUser.uid,o.id,'site','orders');
   if(o.entries.length)void queuePush(o.client||'Клиент не указан',String(o.entries.find(entry=>entry.kind==='comment')?.text||'Новый комментарий').slice(0,500),signedInUser.uid,o.id,'site','comments');
   notify(`Создан заказ № ${n}`,o.id);
@@ -2899,65 +2969,44 @@ document.addEventListener('paste',event=>{
     if(appendClipboardImages(event,'entryPhotos',5,8*1024*1024))event.preventDefault();
   }
 });
+const prepareOrderPhoto=memoizeByObject(async file=>{
+ if(!file.type.startsWith('image/'))throw new Error('Можно прикреплять только изображения.');
+ // Small JPEGs need no re-encoding, preserving detail and saving CPU time.
+ const url=URL.createObjectURL(file);
+ let image;
+ try{image=await new Promise((resolve,reject)=>{const img=new Image();img.onload=()=>resolve(img);img.onerror=()=>reject(new Error('Не удалось открыть фото'));img.src=url;});}
+ finally{URL.revokeObjectURL(url);}
+ if(file.type==='image/jpeg'&&file.size<=350*1024&&Math.max(image.width,image.height)<=1600)return file;
+ const scale=Math.min(1,1600/Math.max(image.width,image.height)),canvas=document.createElement('canvas');
+ canvas.width=Math.max(1,Math.round(image.width*scale));canvas.height=Math.max(1,Math.round(image.height*scale));
+ try{
+  const context=canvas.getContext('2d');if(!context)throw new Error('Не удалось подготовить фото.');
+  context.fillStyle='#fff';context.fillRect(0,0,canvas.width,canvas.height);context.drawImage(image,0,0,canvas.width,canvas.height);
+  const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/jpeg',.78));
+  if(!blob)throw new Error('Не удалось подготовить фото.');
+  return blob;
+ }finally{canvas.width=canvas.height=1;}
+});
 async function readPhotos(files){
-  if(files.length>5)throw new Error('К одной записи можно прикрепить не более пяти фото.');
-
-  const out=[];
-
-  for(const file of [...files]){
-    if(!file.type.startsWith('image/'))
-      throw new Error('Можно прикреплять только изображения.');
-
-    const image=await new Promise((resolve,reject)=>{
-      const url=URL.createObjectURL(file);
-      const img=new Image();
-
-      img.onload=()=>{
-        URL.revokeObjectURL(url);
-        resolve(img);
-      };
-
-      img.onerror=()=>{
-        URL.revokeObjectURL(url);
-        reject(new Error('Не удалось открыть фото'));
-      };
-
-      img.src=url;
-    });
-
-    const scale=Math.min(1,1600/Math.max(image.width,image.height));
-    const canvas=document.createElement('canvas');
-
-    canvas.width=Math.round(image.width*scale);
-    canvas.height=Math.round(image.height*scale);
-
-    canvas.getContext('2d').drawImage(
-      image,
-      0,
-      0,
-      canvas.width,
-      canvas.height
-    );
-
-    const blob=await new Promise(resolve=>{
-      canvas.toBlob(resolve,'image/jpeg',.78);
-    });
-
-    if(!blob)
-      throw new Error('Не удалось подготовить фото.');
-
-    out.push(blob);
-  }
-
-  return out;
+ if(files.length>5)throw new Error('К одной записи можно прикреплять не более пяти фото.');
+ return mapLimited([...files],1,prepareOrderPhoto);
 }
+const uploadedOrderPhotos=new WeakMap();
 async function uploadPhotos(orderId,entryId,blobs){
-  return Promise.all(blobs.map(async(blob,i)=>{
-    const path=`orders/${orderId}/${entryId}/photo-${i+1}-${crypto.randomUUID()}.jpg`;
-    const fileRef=storageRef(storage,path);
-    await uploadBytes(fileRef,blob,{contentType:'image/jpeg'});
-    return getDownloadURL(fileRef);
-  }));
+ const uid=signedInUser?.uid;if(!uid)throw new Error('Войдите в приложение.');
+ return mapLimited(blobs,2,async(blob,i)=>{
+  let cache=uploadedOrderPhotos.get(blob);if(!cache){cache=new Map();uploadedOrderPhotos.set(blob,cache);}
+  const key=JSON.stringify([uid,orderId,entryId,i]);
+  let item=cache.get(key);
+  if(!item){item={path:'orders/'+orderId+'/'+entryId+'/photo-'+(i+1)+'-'+crypto.randomUUID()+'.jpg',url:''};cache.set(key,item);}
+  if(item.url)return item.url;
+  if(signedInUser?.uid!==uid)throw new Error('Учётная запись изменилась.');
+  const fileRef=storageRef(storage,item.path);
+  if(item.uploaded){item.url=await getDownloadURL(fileRef);return item.url;}
+  if(item.attempted){try{item.url=await getDownloadURL(fileRef);return item.url;}catch(error){if(error.code!=='storage/object-not-found')throw error;}}
+  item.attempted=true;await uploadBytes(fileRef,blob,{contentType:'image/jpeg'});item.uploaded=true;
+  item.url=await getDownloadURL(fileRef);return item.url;
+ });
 }
 let entrySending=false;
 const pendingEntryMentionIds=new Map();
@@ -3248,6 +3297,7 @@ function chooseOrderClientSuggestion(inputId,listId,clientId){
   if(!client)return;
   input.value=String(client.name||'').trim();
   input.dataset.clientId=client.id;
+  persistOrderFormDraft();
   if(list){list.hidden=true;list.innerHTML='';}
   input.focus();
 }

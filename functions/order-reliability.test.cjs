@@ -95,3 +95,62 @@ test('push diagnostic only exposes own explicit test and never returns tokens',a
  await assert.rejects(call({auth:{uid:'b'},data:{eventId:'test'}}),error=>error.code==='permission-denied');
  item={...item,forceAll:false};await assert.rejects(call({auth:{uid:'a'},data:{eventId:'test'}}),error=>error.code==='permission-denied');
 });
+
+const {isRoutine,nextDue,appendOrderPush,sealOrderPush,deliveryFor,dispatchOrderPush}=require('./order-push-batches');
+const routine=(category='status',body='Статус: Собран',extra={})=>({target:'site',category,body,authorId:'a',orderId:'o',orderNumber:'42',title:'Клиент · № 42',...extra});
+function batchDb(){
+ const records=new Map(),clone=x=>x===undefined?undefined:JSON.parse(JSON.stringify(x));
+ const snapshot=ref=>({exists:records.has(ref.path),data:()=>clone(records.get(ref.path))});
+ const ref=(collection,id)=>({id,path:collection+'/'+id,async create(data){if(records.has(this.path))throw Object.assign(Error('exists'),{code:6});records.set(this.path,clone(data));}});
+ const db={collection:name=>({doc:id=>ref(name,id),where:()=>({get:async()=>({docs:[{id:'a',data:()=>({})},{id:'b',data:()=>({})},{id:'c',data:()=>({notificationSettings:{comments:false}})}]})})}),async runTransaction(fn){
+  const operations=[];
+  const result=await fn({get:async r=>snapshot(r),create:(r,data)=>operations.push(()=>{if(records.has(r.path))throw Error('duplicate');records.set(r.path,clone(data));}),set:(r,data)=>operations.push(()=>records.set(r.path,clone(data))),update:(r,data)=>operations.push(()=>records.set(r.path,{...records.get(r.path),...clone(data)}))});
+  operations.forEach(op=>op());return result;
+ }};
+ return {db,records};
+}
+test('routine orders batch across categories; urgent and addressed messages bypass debounce',()=>{
+ for(const category of ['orders','assembly','status','editing','comments'])assert.equal(isRoutine(routine(category)),true);
+ for(const category of ['defects','questions','decisions','replies'])assert.equal(isRoutine(routine(category)),false);
+ for(const extra of [{isUrgent:true},{isMention:true},{forceAll:true},{recipientUserId:'b'},{mentionRecipientIds:['b']},{target:'chat'},{isDeleted:true}])assert.equal(isRoutine(routine('comments','x',extra)),false);
+ assert.equal(nextDue(1000,1000),6000);assert.equal(nextDue(1000,9000),11000);
+});
+test('durable window extends after new events, deduplicates retries and seals at ten seconds',async()=>{
+ const {db,records}=batchDb();let now=1000;
+ const add=(eventId,category,extra={})=>appendOrderPush({db,eventId,data:routine(category,'actual '+category,extra),eventAt:now,now:()=>now});
+ const id=await add('first','orders');now=4000;assert.equal(await add('second','editing'),id);
+ now=8000;assert.equal(await add('third','comments'),id);
+ const key='orderPushBatches/'+id;
+ assert.equal(records.get(key).dueAt,11000);
+ assert.equal(await add('first','orders'),id);assert.equal(records.get(key).events.length,3);
+ const other=await add('other','status',{authorId:'another'});assert.notEqual(other,id);
+ const different=await add('different','status',{orderId:'different'});assert.notEqual(different,id);
+ const ref=db.collection('orderPushBatches').doc(id);
+ const waits=[];
+ const sealed=await sealOrderPush({db,ref,now:()=>now,sleep:async ms=>{waits.push(ms);now+=ms;}});
+ assert.deepEqual(waits,[3000]);assert.equal(sealed.events.length,3);assert.equal(sealed.sealedAt,11000);
+ assert.notEqual(await add('late','status'),id);
+});
+test('one recipient gets one readable summary, with per-category settings and no self notifications',async()=>{
+ const {db,records}=batchDb();let now=1000;
+ const id=await appendOrderPush({db,eventId:'new',data:routine('orders','Новый заказ'),eventAt:now,now:()=>now});
+ now+=1000;await appendOrderPush({db,eventId:'comment',data:routine('comments','Позвонить перед приездом',{excludedRecipientIds:[]}),eventAt:now,now:()=>now});
+ now+=1000;await appendOrderPush({db,eventId:'status',data:routine(),eventAt:now,now:()=>now});
+ const ref=db.collection('orderPushBatches').doc(id),enabled=(settings,category)=>settings[category]!==false;
+ const options={db,ref,enabled,now:()=>now,sleep:async ms=>{now+=ms;},markDone:async()=>{}};
+ await dispatchOrderPush(options);await dispatchOrderPush(options);
+ const deliveries=[...records.entries()].filter(([key])=>key.startsWith('pushQueue/')).map(([,value])=>value);
+ assert.equal(deliveries.length,2);assert.equal(deliveries.some(x=>x.recipientUserId==='a'),false);
+ const b=deliveries.find(x=>x.recipientUserId==='b'),c=deliveries.find(x=>x.recipientUserId==='c');
+ assert.equal(b.batchCount,3);assert.equal(b.title,'Клиент · № 42');assert.match(b.body,/^3 действия: Позвонить перед приездом/);assert.match(b.body,/Статус: Собран/);assert.equal(b.batchEvents.length,3);
+ assert.equal(c.batchCount,2);assert.doesNotMatch(c.body,/Позвонить/);
+ const batch=records.get(ref.path);batch.events[1].excludedRecipientIds=['b'];
+ assert.doesNotMatch(deliveryFor(batch,'b',{},enabled).body,/Позвонить/);
+});
+test('notification copy contains actual comments, article differences and changed delivery fields',()=>{
+ assert.equal(entryEvent({kind:'comment',authorId:'a',text:'Клиент заберёт в 15:00'}).body,'Клиент заберёт в 15:00');
+ assert.equal(entryEvent({kind:'comment',authorId:'a',text:'Важно',important:true}).isUrgent,true);
+ const base={status:'Создан',createdBy:'a',updatedBy:'a',number:'42',client:'Клиент',articles:[{article:'AAA',quantity:1}]};
+ assert.match(orderEvent(base,{...base,articles:[{article:'AAA',quantity:2},{article:'BBB',quantity:1}]}).body,/AAA: 1 → 2.*BBB/);
+ assert.match(orderEvent(base,{...base,mainComment:'Позвонить клиенту'}).body,/Комментарий: Позвонить клиенту/);
+});

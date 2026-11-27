@@ -1036,6 +1036,11 @@ public class MainActivity extends AppCompatActivity {
 
     private class AndroidBridge {
         @JavascriptInterface
+        public String getAppVersion() {
+            return String.valueOf(installedAppVersionCode());
+        }
+
+        @JavascriptInterface
         public void printDriverSheet(String html) {
             if (html == null || html.isEmpty()) return;
             runOnUiThread(() -> MainActivity.this.printDriverSheet(html));

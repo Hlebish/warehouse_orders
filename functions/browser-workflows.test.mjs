@@ -20,7 +20,7 @@ function harness(order,overrides={}){
    toast:message=>events.push(['toast',message]),queuePush:async(...args)=>events.push(['push',...args]),
    writeAudit:async(...args)=>events.push(['audit',...args]),$:()=>null,
    entryToCloud:entry=>({...entry}),canTransitionOrderStatus,statusAfterDefectDecision,orderEditSnapshot,assertOrderUnchanged,
-   filesForInput:input=>[...(input?.files||[])],activeEntryDraft:null,persistOpenEntryDraft(){},clearSubmittedDraft:async()=>{},startModalSave:()=>({success(){},fail(){},finish(){},isCurrent:()=>false}),
+   filesForInput:input=>[...(input?.files||[])],activeOrderFormDraft:null,persistOrderFormDraft(){},clearOrderFormDraft(){},activeEntryDraft:null,persistOpenEntryDraft(){},clearSubmittedDraft:async()=>{},startModalSave:()=>({success(){},fail(){},finish(){},isCurrent:()=>false}),
    ...overrides
  };
  context.runTransaction=async(_db,callback)=>{

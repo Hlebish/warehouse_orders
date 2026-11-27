@@ -50,7 +50,7 @@ test('permanent permission errors stop retries until a new session',async()=>{
 
 function ordersHarness(){
  const source=readFileSync(new URL('../app.js',import.meta.url),'utf8');let listener,renders=0;const notices=[];
- const context={ordersRetryTimer:null,ordersUnsubscribe:null,ordersRetryDelay:3000,ordersConnectionNoticeShown:false,initialCloudLoad:true,storedOrderDeliveryDetails,
+ const context={fullOrderHistoryRequested:false,fullOrderHistoryReady:false,settleFullOrderHistory(){},signedInUser:{uid:'test-user'},asDate:value=>value?new Date(value):null,watchOrderWindow(_deps,next){listener=next;return ()=>{};},query(){},where(){},ordersRetryTimer:null,ordersUnsubscribe:null,ordersRetryDelay:3000,ordersConnectionNoticeShown:false,initialCloudLoad:true,storedOrderDeliveryDetails,
   inspectionItems:{start(){}},foregroundDataSync:{start(){},snapshot(){},fail(){}},db:{},collection:()=>({}),onSnapshot(_ref,opts,fn){assert.equal(opts.includeMetadataChanges,true);listener=fn;return ()=>{};},
   state:{orders:[{id:'cached',number:'1',status:'Создан',entries:[]}]},pendingWrites:new Set(),pendingOrderData:new Map(),serverCache:new Map(),entryUnsubscribes:new Map(),selectedId:null,
   saveOrdersCache(){},watchPendingDefectOrders(){},scheduleRender(){renders++;},restoreUiState(){},pendingNotificationOrderId:'',toast:text=>notices.push(text),notify(){}};

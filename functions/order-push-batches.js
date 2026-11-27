@@ -16,13 +16,13 @@ async function appendOrderPush({db,eventId,data,eventAt,now=Date.now}){
  const item=cleanEvent(eventId,data,eventAt);
  const receipt=db.collection('orderPushEventReceipts').doc(digest(eventId));
  const pointer=db.collection('orderPushWindows').doc(digest(JSON.stringify([item.authorId,item.orderId])));
- const fresh=db.collection('pushQueue').doc('order-batch-'+digest(eventId));
+ const fresh=db.collection('orderPushBatches').doc('order-batch-'+digest(eventId));
  return db.runTransaction(async tx=>{
   const existing=await tx.get(receipt);
   if(existing.exists)return existing.data().batchId;
   const window=await tx.get(pointer);
   const id=window.data()?.batchId;
-  const current=id?db.collection('pushQueue').doc(id):null;
+  const current=id?db.collection('orderPushBatches').doc(id):null;
   const snap=current?await tx.get(current):null;
   const batch=snap?.data(),at=now();
   const append=canAppend(batch,at);

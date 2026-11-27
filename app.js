@@ -1005,7 +1005,7 @@ onMessage(messaging,payload=>{
     notify(message,orderId,target,target==='chat'?'chat':'orders');
   }
 });
-function stopCloud(){persistOrderFormDraft();activeOrderFormDraft=null;fullOrderHistoryRequested=false;fullOrderHistoryReady=false;settleFullOrderHistory(false);if(generatorScreen.isOpen())closeModal();inspectionItems.stop();foregroundDataSync.reset();serverEntriesLoaded.clear();directPhotoCache.clear();directPhotoRequests.clear();flushOrdersCache();if(ordersRetryTimer!==null){clearTimeout(ordersRetryTimer);ordersRetryTimer=null}ordersRetryDelay=3000;ordersConnectionNoticeShown=false;ordersListenerBlocked=false;profileUnsubscribe?.();ordersUnsubscribe?.();chatUnsubscribe?.();chatBadgeUnsubscribe?.();chatUnreadReceiptUnsubscribe?.();notificationsUnsubscribe?.();profileUnsubscribe=ordersUnsubscribe=chatUnsubscribe=chatBadgeUnsubscribe=chatUnreadReceiptUnsubscribe=notificationsUnsubscribe=null;chatUnreadReceiptCount=0;chatLegacyUnread=false;chatUnread=false;for(const stop of entryUnsubscribes.values())stop();entryUnsubscribes.clear();for(const stop of defectEntryUnsubscribes.values())stop();defectEntryUnsubscribes.clear();serverCache.clear();state.orders=[];state.notices=[]}
+function stopCloud(){clearArchiveLookup();persistOrderFormDraft();activeOrderFormDraft=null;fullOrderHistoryRequested=false;fullOrderHistoryReady=false;settleFullOrderHistory(false);if(generatorScreen.isOpen())closeModal();inspectionItems.stop();foregroundDataSync.reset();serverEntriesLoaded.clear();directPhotoCache.clear();directPhotoRequests.clear();flushOrdersCache();if(ordersRetryTimer!==null){clearTimeout(ordersRetryTimer);ordersRetryTimer=null}ordersRetryDelay=3000;ordersConnectionNoticeShown=false;ordersListenerBlocked=false;profileUnsubscribe?.();ordersUnsubscribe?.();chatUnsubscribe?.();chatBadgeUnsubscribe?.();chatUnreadReceiptUnsubscribe?.();notificationsUnsubscribe?.();profileUnsubscribe=ordersUnsubscribe=chatUnsubscribe=chatBadgeUnsubscribe=chatUnreadReceiptUnsubscribe=notificationsUnsubscribe=null;chatUnreadReceiptCount=0;chatLegacyUnread=false;chatUnread=false;for(const stop of entryUnsubscribes.values())stop();entryUnsubscribes.clear();for(const stop of defectEntryUnsubscribes.values())stop();defectEntryUnsubscribes.clear();serverCache.clear();state.orders=[];state.notices=[]}
 let pendingOrderEntryFocus=(()=>{const params=new URLSearchParams(location.search);return params.get('order')&&params.get('entry')?{orderId:params.get('order'),entryId:params.get('entry')}:null;})();
 const serverEntriesLoaded=new Set();
 function openOrderAtEntry(orderId,entryId='',fromForm=false){
@@ -1091,7 +1091,7 @@ function ensureFullOrderHistory(){
   const timer=setTimeout(()=>done(false),30000);fullOrderHistoryWaiters.add(done);scheduleRender();
  });
  if(!fullOrderHistoryRequested||!ordersUnsubscribe){
-  fullOrderHistoryRequested=true;ordersListenerBlocked=false;watchOrders();scheduleRender();
+  fullOrderHistoryRequested=true;clearArchiveLookup();ordersListenerBlocked=false;watchOrders();scheduleRender();
  }
  return promise;
 }
@@ -1668,7 +1668,39 @@ function scheduleRender(){
     render();
   });
 }
-function renderOrdersUI(){const search=$('searchInput').value.toLocaleLowerCase('ru');const dateFrom=$('dateFromFilter')?.value||'';const dateTo=$('dateToFilter')?.value||'';if(signedInUser&&!fullOrderHistoryRequested&&(search||dateFrom||dateTo||ARCHIVE_STATUSES.includes(activeFilter)))queueMicrotask(requestFullOrderHistory);const historyButton=$('loadFullOrderHistory');if(historyButton){historyButton.hidden=fullOrderHistoryReady;historyButton.disabled=fullOrderHistoryWaiters.size>0;historyButton.textContent=historyButton.disabled?'Загрузка истории…':'Загрузить всю историю';}const orders=sortOrderRows(state.orders,{activeFilter,search,dateFrom,dateTo,orderDisplayDate,localDateKey,orderSearchText,isDateInRange,asDate});const hasDateFilter=!!(dateFrom||dateTo);$('clearDateButton').hidden=!hasDateFilter;const filteredOrderCount=orders.length;const pageCount=Math.max(1,Math.ceil(filteredOrderCount/ordersPageSize));currentOrdersPage=Math.max(1,Math.min(currentOrdersPage,pageCount));const pageOrders=orders.slice((currentOrdersPage-1)*ordersPageSize,currentOrdersPage*ordersPageSize);const rows=[];let previousDate='',previousSection='';for(const o of pageOrders){const transferred=o.status==='Перенесен';const displayDate=transferred?(o.createdAt||o.transferredAt||o.updatedAt||o.createdAt):orderDisplayDate(o);const day=localDateKey(displayDate);const section=transferred?'transferred':'current';if(section!==previousSection){rows.push(`<tr class="date-separator ${transferred?'transferred-date-separator':'current-date-separator'}"><td colspan="7"><span>${transferred?'Перенесённые заказы · дата создания':'Текущие заказы · по дням'}</span></td></tr>`);previousSection=section;previousDate=''}if(day!==previousDate){rows.push(`<tr class="date-separator"><td colspan="7"><span>${esc(fmtDate(displayDate))}</span></td></tr>`);previousDate=day}rows.push(`<tr data-order="${esc(o.id)}" tabindex="0" role="button" aria-label="Открыть заказ № ${esc(o.number)}" class="order-card-row ${transferred?'transferred-order-row':''}"><td><a class="order-number" href="#" data-open="${esc(o.id)}">№ ${esc(o.number)}</a><span class="client-sub">создал ${esc(o.author||'Кладовщик')}</span></td><td><a class="client-name client-open" href="#" data-open="${esc(o.id)}">${esc(o.client)}</a><span class="client-sub">${fmtDateTime(displayDate)}</span></td><td><button type="button" class="row-open-status" data-open="${esc(o.id)}" title="Открыть заказ">${statusPill(o.status)}</button>${assemblyIndicator(o)}</td><td><button type="button" class="delivery-type-pill" data-open="${esc(o.id)}" title="Открыть карточку заказа"><span class="delivery-type-icon" aria-hidden="true">${o.deliveryType==='pickup'?'♧':o.deliveryType==='post'?'✉':o.deliveryType==='kamyanske'?'⌖':'↗'}</span><span>${o.deliveryType==='pickup'?'Самовывоз':o.deliveryType==='post'?'Доставка почтой':o.deliveryType==='kamyanske'?'Доставка в Камянское':'Доставка по городу'}</span></button></td><td><button type="button" class="row-open-comments" data-open="${esc(o.id)}" title="Открыть заказ"><span class="comment-icon">💬</span><span class="entry-count">${entriesCount(o)}</span></button></td><td class="time-cell">${fmtDate(displayDate)}</td><td><button class="row-menu" title="Открыть карточку" data-open="${esc(o.id)}">···</button></td></tr>`)}patchOrderRows($('ordersBody'),rows.join(''));const empty=orders.length===0;$('emptyState').classList.toggle('visible',empty);$('ordersBody').style.display=empty?'none':'';const statusCounts=Object.create(null);for(const order of state.orders)statusCounts[order.status]=(statusCounts[order.status]||0)+1;$('statTotal').textContent=statusCounts['Собран']||0;$('statCreated').textContent=statusCounts['Создан']||0;$('statQuestions').textContent=statusCounts['Под вопросом']||0;$('statApproval').textContent=statusCounts['На согласовании']||0;$('statReady').textContent=statusCounts['Одобрен на отгрузку клиенту']||0;$('statPayment').textContent=statusCounts['Ожидает оплаты']||0;$('statPickup').textContent=statusCounts['Ожидает самовывоза']||0;$('statTransferred').textContent=statusCounts['Перенесен']||0;
+let archiveLookupTimer=null,archiveLookupKey='',archiveLookupRows=[],archiveLookupPending=false;
+function clearArchiveLookup(){
+ if(archiveLookupTimer!==null)clearTimeout(archiveLookupTimer);
+ archiveLookupTimer=null;archiveLookupKey='';archiveLookupRows=[];archiveLookupPending=false;
+}
+function scheduleArchiveSearch(raw){
+ const text=String(raw||'').trim(),uid=signedInUser?.uid;
+ if(!uid||!text||fullOrderHistoryRequested){clearArchiveLookup();return;}
+ const key=JSON.stringify([uid,text]);
+ if(archiveLookupKey===key)return;
+ clearArchiveLookup();archiveLookupKey=key;archiveLookupPending=true;
+ archiveLookupTimer=setTimeout(async()=>{
+  archiveLookupTimer=null;
+  const current=()=>signedInUser?.uid===uid&&archiveLookupKey===key&&!fullOrderHistoryRequested;
+  if(!current())return;
+  // Exact order numbers can use Firestore's existing single-field index.
+  // General substring/article searches still use the complete history so results are not lost.
+  if(!/^(?:[\\p{L}]+[- /]?)?\\d[\\p{L}\\d /-]*$/u.test(text)){archiveLookupPending=false;requestFullOrderHistory();return;}
+  try{
+   const variants=[...new Set([text,text.toLocaleUpperCase('ru')])];
+   const snapshots=await Promise.all(variants.map(value=>getDocsFromServer(query(collection(db,'orders'),where('number','==',value)))));
+   if(!current())return;
+   const matches=new Map();
+   for(const snap of snapshots)for(const docSnap of snap.docs){
+    const data=docSnap.data();matches.set(docSnap.id,{...data,id:docSnap.id,author:data.createdByName||'Сотрудник',articles:Array.isArray(data.articles)?data.articles:[],entries:[]});
+   }
+   archiveLookupRows=[...matches.values()];archiveLookupPending=false;
+   if(!matches.size){requestFullOrderHistory();return;}
+   scheduleRender();
+  }catch(error){if(current()){archiveLookupPending=false;requestFullOrderHistory();}}
+ },500);
+}
+function renderOrdersUI(){const search=$('searchInput').value.toLocaleLowerCase('ru');const dateFrom=$('dateFromFilter')?.value||'';const dateTo=$('dateToFilter')?.value||'';if(signedInUser&&!fullOrderHistoryRequested&&(dateFrom||dateTo||ARCHIVE_STATUSES.includes(activeFilter)))queueMicrotask(requestFullOrderHistory);else if(!fullOrderHistoryRequested)scheduleArchiveSearch($('searchInput').value);const historyButton=$('loadFullOrderHistory');if(historyButton){historyButton.hidden=fullOrderHistoryReady;historyButton.disabled=fullOrderHistoryWaiters.size>0;historyButton.textContent=historyButton.disabled?'Загрузка истории…':'Загрузить всю историю';}const orderSource=search&&!fullOrderHistoryReady&&archiveLookupRows.length?[...new Map([...archiveLookupRows,...state.orders].map(o=>[o.id,o])).values()]:state.orders;const orders=sortOrderRows(orderSource,{activeFilter,search,dateFrom,dateTo,orderDisplayDate,localDateKey,orderSearchText,isDateInRange,asDate});const hasDateFilter=!!(dateFrom||dateTo);$('clearDateButton').hidden=!hasDateFilter;const filteredOrderCount=orders.length;const pageCount=Math.max(1,Math.ceil(filteredOrderCount/ordersPageSize));currentOrdersPage=Math.max(1,Math.min(currentOrdersPage,pageCount));const pageOrders=orders.slice((currentOrdersPage-1)*ordersPageSize,currentOrdersPage*ordersPageSize);const rows=[];let previousDate='',previousSection='';for(const o of pageOrders){const transferred=o.status==='Перенесен';const displayDate=transferred?(o.createdAt||o.transferredAt||o.updatedAt||o.createdAt):orderDisplayDate(o);const day=localDateKey(displayDate);const section=transferred?'transferred':'current';if(section!==previousSection){rows.push(`<tr class="date-separator ${transferred?'transferred-date-separator':'current-date-separator'}"><td colspan="7"><span>${transferred?'Перенесённые заказы · дата создания':'Текущие заказы · по дням'}</span></td></tr>`);previousSection=section;previousDate=''}if(day!==previousDate){rows.push(`<tr class="date-separator"><td colspan="7"><span>${esc(fmtDate(displayDate))}</span></td></tr>`);previousDate=day}rows.push(`<tr data-order="${esc(o.id)}" tabindex="0" role="button" aria-label="Открыть заказ № ${esc(o.number)}" class="order-card-row ${transferred?'transferred-order-row':''}"><td><a class="order-number" href="#" data-open="${esc(o.id)}">№ ${esc(o.number)}</a><span class="client-sub">создал ${esc(o.author||'Кладовщик')}</span></td><td><a class="client-name client-open" href="#" data-open="${esc(o.id)}">${esc(o.client)}</a><span class="client-sub">${fmtDateTime(displayDate)}</span></td><td><button type="button" class="row-open-status" data-open="${esc(o.id)}" title="Открыть заказ">${statusPill(o.status)}</button>${assemblyIndicator(o)}</td><td><button type="button" class="delivery-type-pill" data-open="${esc(o.id)}" title="Открыть карточку заказа"><span class="delivery-type-icon" aria-hidden="true">${o.deliveryType==='pickup'?'♧':o.deliveryType==='post'?'✉':o.deliveryType==='kamyanske'?'⌖':'↗'}</span><span>${o.deliveryType==='pickup'?'Самовывоз':o.deliveryType==='post'?'Доставка почтой':o.deliveryType==='kamyanske'?'Доставка в Камянское':'Доставка по городу'}</span></button></td><td><button type="button" class="row-open-comments" data-open="${esc(o.id)}" title="Открыть заказ"><span class="comment-icon">💬</span><span class="entry-count">${entriesCount(o)}</span></button></td><td class="time-cell">${fmtDate(displayDate)}</td><td><button class="row-menu" title="Открыть карточку" data-open="${esc(o.id)}">···</button></td></tr>`)}patchOrderRows($('ordersBody'),rows.join(''));const empty=orders.length===0;$('emptyState').classList.toggle('visible',empty);$('ordersBody').style.display=empty?'none':'';const statusCounts=Object.create(null);for(const order of state.orders)statusCounts[order.status]=(statusCounts[order.status]||0)+1;$('statTotal').textContent=statusCounts['Собран']||0;$('statCreated').textContent=statusCounts['Создан']||0;$('statQuestions').textContent=statusCounts['Под вопросом']||0;$('statApproval').textContent=statusCounts['На согласовании']||0;$('statReady').textContent=statusCounts['Одобрен на отгрузку клиенту']||0;$('statPayment').textContent=statusCounts['Ожидает оплаты']||0;$('statPickup').textContent=statusCounts['Ожидает самовывоза']||0;$('statTransferred').textContent=statusCounts['Перенесен']||0;
  const kamenskoyeCounter=$('statKamenskoye');
  if(kamenskoyeCounter){
   const count=statusCounts['Камянское']||0;
@@ -1681,7 +1713,7 @@ function renderOrdersUI(){const search=$('searchInput').value.toLocaleLowerCase(
   if(defectCounter.textContent!==String(count))defectCounter.textContent=String(count);
   defectCounter.toggleAttribute('data-active',count>0);
  }
- $('listSummary').textContent=`${filteredOrderCount} ${plural(filteredOrderCount,'заказ','заказа','заказов')}${fullOrderHistoryReady?'':fullOrderHistoryWaiters.size?' · история загружается':' · активные и за 30 дней'}`;const pagination=$('ordersPagination');if(pagination){const first=filteredOrderCount?(currentOrdersPage-1)*ordersPageSize+1:0;const last=Math.min(currentOrdersPage*ordersPageSize,filteredOrderCount);pagination.innerHTML=`<button type="button" class="secondary-button" data-orders-page="prev" ${currentOrdersPage<=1?'disabled':''}>← Назад</button><span>Страница ${currentOrdersPage} из ${pageCount} · ${first}–${last} из ${filteredOrderCount}</span><button type="button" class="secondary-button" data-orders-page="next" ${currentOrdersPage>=pageCount?'disabled':''}>Вперёд →</button>`;pagination.hidden=filteredOrderCount<=ordersPageSize;}$('userName').textContent=profileName||roles[state.role];$('userRole').textContent=canManageUsers?`Администратор · ${roles[state.role]}`:roles[state.role];foregroundDataSync.repaint();const versionLabel=document.querySelector('.site-version');if(versionLabel&&signedInUser)void checkBackendVersion(versionLabel,document.querySelector('meta[name="app-version"]')?.content||'');$('today').textContent=todayFormatter.format(new Date());document.querySelectorAll('.nav-item').forEach(b=>b.classList.toggle('active',b.dataset.filter===activeFilter));paintNotices()}
+ $('listSummary').textContent=`${filteredOrderCount} ${plural(filteredOrderCount,'заказ','заказа','заказов')}${fullOrderHistoryReady?'':fullOrderHistoryWaiters.size?' · история загружается':archiveLookupPending?' · поиск в архиве…':search&&archiveLookupRows.length?' · текущие + точные номера из архива':' · активные и за 30 дней'}`;const pagination=$('ordersPagination');if(pagination){const first=filteredOrderCount?(currentOrdersPage-1)*ordersPageSize+1:0;const last=Math.min(currentOrdersPage*ordersPageSize,filteredOrderCount);pagination.innerHTML=`<button type="button" class="secondary-button" data-orders-page="prev" ${currentOrdersPage<=1?'disabled':''}>← Назад</button><span>Страница ${currentOrdersPage} из ${pageCount} · ${first}–${last} из ${filteredOrderCount}</span><button type="button" class="secondary-button" data-orders-page="next" ${currentOrdersPage>=pageCount?'disabled':''}>Вперёд →</button>`;pagination.hidden=filteredOrderCount<=ordersPageSize;}$('userName').textContent=profileName||roles[state.role];$('userRole').textContent=canManageUsers?`Администратор · ${roles[state.role]}`:roles[state.role];foregroundDataSync.repaint();const versionLabel=document.querySelector('.site-version');if(versionLabel&&signedInUser)void checkBackendVersion(versionLabel,document.querySelector('meta[name="app-version"]')?.content||'');$('today').textContent=todayFormatter.format(new Date());document.querySelectorAll('.nav-item').forEach(b=>b.classList.toggle('active',b.dataset.filter===activeFilter));paintNotices()}
 function render(){renderOrdersUI();generatorScreen.refreshPermissions();const testsNav=$('testsNavButton');if(testsNav)testsNav.hidden=!canManageUsers;const avatar=$('profileAvatar');if(avatar)avatar.innerHTML=profileAvatarUrl?'<img src="'+esc(profileAvatarUrl)+'" alt="">':'СК';}
 function plural(n,a,b,c){n=Math.abs(n)%100;const d=n%10;return n>10&&n<20?c:d>1&&d<5?b:d===1?a:c}
 function toast(msg,orderId='',options={}){const t=document.createElement('div');t.className='toast'+(orderId?' toast-clickable':'');t.textContent=msg;if(orderId)t.addEventListener('click',()=>{t.remove();openOrder(orderId)});$('toastStack').append(t);if(!options.persistent)setTimeout(()=>t.remove(),3500);return t}
@@ -2971,12 +3003,11 @@ document.addEventListener('paste',event=>{
 });
 const prepareOrderPhoto=memoizeByObject(async file=>{
  if(!file.type.startsWith('image/'))throw new Error('Можно прикреплять только изображения.');
- // Small JPEGs need no re-encoding, preserving detail and saving CPU time.
+ // Reuse compressed results while retaining canvas re-encoding to strip source metadata.
  const url=URL.createObjectURL(file);
  let image;
  try{image=await new Promise((resolve,reject)=>{const img=new Image();img.onload=()=>resolve(img);img.onerror=()=>reject(new Error('Не удалось открыть фото'));img.src=url;});}
  finally{URL.revokeObjectURL(url);}
- if(file.type==='image/jpeg'&&file.size<=350*1024&&Math.max(image.width,image.height)<=1600)return file;
  const scale=Math.min(1,1600/Math.max(image.width,image.height)),canvas=document.createElement('canvas');
  canvas.width=Math.max(1,Math.round(image.width*scale));canvas.height=Math.max(1,Math.round(image.height*scale));
  try{
@@ -5241,14 +5272,17 @@ async function checkBackendVersion(label,siteVersion){
   const {data}=await getWarehousePushDiagnostic({});
   if(signedInUser?.uid!==uid||!label.isConnected)return;
   label.title='Сайт '+siteVersion+' · сервер '+String(data.version||'неизвестно')+' · протокол '+String(data.protocol||'неизвестно');
+  label.dataset.serverVersion=String(data.version||'неизвестно');
+  const versionLine=$('serverVersionLabel');if(versionLine)versionLine.textContent='Сервер '+label.dataset.serverVersion;
   if(Number(data.protocol)<2)toast('Серверная часть требует обновления. Сообщите администратору.');
- }catch(error){label.title='Не удалось подтвердить версию серверных функций.';}
+ }catch(error){label.title='Не удалось подтвердить версию серверных функций.';const versionLine=$('serverVersionLabel');if(versionLine)versionLine.textContent='Сервер: версия не подтверждена';}
 }
 function updateVersionLabel(){
  const label=document.querySelector('.site-version');
  if(!label)return;
  const siteVersion=document.querySelector('meta[name="app-version"]')?.content||'неизвестно';
- label.textContent='Версия сайта '+siteVersion;
+ const androidVersion=typeof window.AndroidWarehouse?.getAppVersion==='function'?window.AndroidWarehouse.getAppVersion():'';
+ label.textContent=(androidVersion?'Android '+androidVersion+' · ':'')+'Версия сайта '+siteVersion;
  if(signedInUser)void checkBackendVersion(label,siteVersion);
  if(typeof window.warehouseDesktop?.getAppVersion==='function'){
   window.warehouseDesktop.getAppVersion().then(version=>{

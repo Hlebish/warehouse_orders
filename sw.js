@@ -4,7 +4,7 @@ importScripts(
 );
 
 const SITE_URL = 'https://hlebish.github.io/warehouse_orders/';
-const CACHE = 'order-desk-static-v156-reliability';
+const CACHE = 'order-desk-static-v157-integrity';
 // Handle notification clicks before FCM hooks.
 self.addEventListener('notificationclick', event => {
   event.notification.close();
@@ -102,7 +102,8 @@ function showPushNotification(data={}){
 }
 
 messaging.onBackgroundMessage(payload=>{
-  showPushNotification(payload?.data||payload?.notification||{});
+  // FCM awaits this promise to keep the push event alive until display completes.
+  return showPushNotification(payload?.data||payload?.notification||{});
 });
 
 self.addEventListener('message',event=>{

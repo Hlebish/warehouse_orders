@@ -76,19 +76,27 @@ function createInspectionHandlers({db,FieldValue,HttpsError}){
    const live=new Map();for(const line of order.articles||[]){const key=resolveBuybackArticle(line.article,known);live.set(key,(live.get(key)||0)+Math.max(1,Math.floor(Number(line.quantity)||1)));}
    const consumed={...(marker.data()?.consumed||{})};
    const matches=inspectionMatches({...eventOrder,client:order.client,clientId:order.clientId,status:order.status},items,cutoff,before,consumed,live);
-   const chunk=matches.slice(0,20),count=Number(marker.data()?.count)||0;let hasPendingDefect=false;
+   const chunk=matches.slice(0,20),count=Number(marker.data()?.count)||0;let hasPendingDefect=false,linkedDefects=false;
    for(const item of chunk){
     consumed[item.articleKey]=(consumed[item.articleKey]||0)+1;
     tx.update(db.collection('inspectionItems').doc(item.id),{status:'ordered',orderId:orderRef.id,orderNumber:String(order.number||''),orderedAt:FieldValue.serverTimestamp(),updatedAt:FieldValue.serverTimestamp()});
     const articleIndex=(order.articles||[]).findIndex(line=>resolveBuybackArticle(line.article,known)===item.articleKey);
     for(const defect of item.defects||[]){
+     linkedDefects=true;
      const entryId=`inspection_${item.id}_${defect.id}`,entry={kind:'defect',article:order.articles[articleIndex].article,articleIndex,text:defect.text,photos:defect.photos||[],important:false,authorId:defect.authorId,authorName:defect.authorName,createdAt:defect.createdAt};
      if(defect.decision)Object.assign(entry,{decision:defect.decision,decidedAt:defect.decidedAt,decidedBy:defect.decidedBy,decidedByName:defect.decidedByName});
      else hasPendingDefect=true;
      tx.set(orderRef.collection('entries').doc(entryId),entry);
     }
    }
-   if(hasPendingDefect&&!['Отгружен кладовщиком','Клиент забрал самовывозом','Отменён','Возврат'].includes(order.status))tx.update(orderRef,{status:'Дефект',updatedAt:new Date().toISOString(),updatedBy:'system',updatedByName:'Проверка товара'});
+   if(linkedDefects){
+    // Article editors prefetch defect references before their transaction. Bump
+    // the parent version for resolved defects too, so a concurrent new link
+    // invalidates that editor's baseline instead of retaining an obsolete index.
+    const patch={updatedAt:new Date(Math.max(Date.now(),millis(order.updatedAt)+1)).toISOString(),updatedBy:'system',updatedByName:'Проверка товара'};
+    if(hasPendingDefect&&!['Отгружен кладовщиком','Клиент забрал самовывозом','Отменён','Возврат'].includes(order.status))patch.status='Дефект';
+    tx.update(orderRef,patch);
+   }
    tx.set(markerRef,{complete:matches.length<=20,count:count+chunk.length,consumed,processedAt:FieldValue.serverTimestamp()});
    return matches.length>20;
   });}

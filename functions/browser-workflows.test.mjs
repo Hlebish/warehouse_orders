@@ -5,6 +5,7 @@ import vm from 'node:vm';
 import {orderEditSnapshot,assertOrderUnchanged} from '../editing-state.mjs';
 import { canTransitionOrderStatus, statusAfterDefectDecision } from '../order-workflow.mjs';
 import { deliveryAddressLimit, isOrderPaymentType, mainCommentLimit, orderPaymentLabel, storedOrderDeliveryDetails } from '../order-delivery.mjs';
+import {mapLimited} from '../client-reliability.mjs';
 const source=readFileSync(new URL('../app.js',import.meta.url),'utf8');
 const between=(start,end)=>{const a=source.indexOf(start),b=source.indexOf(end,a);assert.ok(a>=0&&b>a,'Missing source boundary: '+start);return source.slice(a,b);};
 const clone=value=>JSON.parse(JSON.stringify(value));
@@ -19,7 +20,7 @@ function harness(order,overrides={}){
    render(){},saveOrdersCache(){},openOrder(){},notify:(...args)=>events.push(['notify',...args]),
    toast:message=>events.push(['toast',message]),queuePush:async(...args)=>events.push(['push',...args]),
    writeAudit:async(...args)=>events.push(['audit',...args]),$:()=>null,
-   entryToCloud:entry=>({...entry}),canTransitionOrderStatus,statusAfterDefectDecision,orderEditSnapshot,assertOrderUnchanged,
+   entryToCloud:entry=>({...entry}),canTransitionOrderStatus,statusAfterDefectDecision,orderEditSnapshot,assertOrderUnchanged,mapLimited,
    filesForInput:input=>[...(input?.files||[])],activeOrderFormDraft:null,persistOrderFormDraft(){},clearOrderFormDraft(){},activeEntryDraft:null,persistOpenEntryDraft(){},clearSubmittedDraft:async()=>{},startModalSave:()=>({success(){},fail(){},finish(){},isCurrent:()=>false}),
    ...overrides
  };

@@ -11,6 +11,8 @@ function between(start,end){const a=source.indexOf(start),b=source.indexOf(end,a
 const application=[
  between('function presenceLastSeenLabel(', 'function renderStaffPanel('),
  between('function showModal(', 'function button('),
+ between('function clearStaffTemporaryPassword(', 'async function resetStaffPassword('),
+ between('function photoProgressText(', 'let entrySending='),
  between('let directChatTarget=', 'const ADMIN_TEST_CASES=')
 ].join('\n');
 const fixture=`
@@ -20,13 +22,17 @@ import {createDirectChatHistory} from '/direct-chat-history.mjs?v=2026.11.16.04'
 import {createDirectChatReceipts} from '/direct-chat-receipts.mjs?v=2026.11.16.02';
 import {createDirectChatNoticeSync} from '/direct-chat-notices.mjs?v=2026.11.16.02';
 import {drafts,draftKey} from '/draft-store.mjs?v=2026.11.16.04';
+import {createPhotoTransfer} from '/photo-transfer.mjs?v=2026.11.27.01';
 const $=id=>document.getElementById(id),modal=$('modalBackdrop');
 const signedInUser={uid:'me'},profileName='Кладовщик';
 const db={},storage={},state={orders:[],notices:[],role:'warehouse'};
-let selectedId=null,activeEntryDraft=null,directChatUnsubscribe=null,chatUnsubscribe=null;
+let selectedId=null,activeEntryDraft=null,activeOrderFormDraft=null,directChatUnsubscribe=null,chatUnsubscribe=null;
 let modalHistoryEntry=false,orderReturnModalSnapshot=null;
 const entryUnsubscribes=new Map(),statOrderConfig={},staffPresence=new Map();
 const photoSharing={isOpen:()=>false,close(){}},persistOpenEntryDraft=()=>{},decoratePhotoSharing=()=>{};
+const generatorScreen={close(){}},persistOrderFormDraft=()=>{},activateOrderFormDraft=()=>{},decorateDefectPhotoActions=()=>{};
+const photoTransfer=createPhotoTransfer({prepare:async file=>file,preparationConcurrency:1,uploadConcurrency:2});
+const warmPhotoFiles=files=>{void photoTransfer.warm(files);};
 const orderEditSnapshot=x=>x,openStatOrders=()=>{},showNotifications=()=>{},openStaffPanel=()=>{};
 const isAndroidWarehouse=()=>false,isPhoneDevice=()=>innerWidth<700;
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -90,7 +96,7 @@ async function run(){
  const url='http://127.0.0.1:'+server.address().port;
  let browser;
  try{
-  browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_PATH||'/usr/bin/chromium',args:['--no-sandbox']});
+  browser=await chromium.launch({headless:true,...(process.env.CHROMIUM_PATH?{executablePath:process.env.CHROMIUM_PATH}:process.platform==='win32'?{channel:'chrome'}:{executablePath:'/usr/bin/chromium'}),args:['--no-sandbox']});
   const page=await browser.newPage({viewport:{width:1280,height:900}}),errors=[];
   page.on('pageerror',error=>errors.push(error.message));
   await page.route('**/*',route=>route.request().url().startsWith(url)?route.continue():route.abort());

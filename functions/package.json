@@ -10,7 +10,7 @@
     "firebase-functions": "^7.4.0"
   },
   "scripts": {
-    "test": "node --test warehouse-map-lookup.test.js domain-modules.test.mjs browser-workflows.test.mjs buyback-articles.test.js buyback-sync.test.js desktop-recovery.test.cjs desktop-viber.test.cjs editing-state.test.mjs warehouse-map-panel.test.mjs chat-ui.test.mjs chat-presence.test.mjs direct-chat-receipts.test.mjs direct-chat-notices.test.mjs direct-chat-history.test.mjs direct-chat-draft.test.mjs notification-message-links.test.mjs order-history.test.mjs order-history-listener.test.mjs order-event-recording.test.mjs staff-conversations.test.mjs client-matching.test.mjs buyback-state.test.mjs buyback-lifecycle.test.js collage.test.mjs photo-sharing.test.mjs foreground-sync.test.mjs inspection-model.test.js forwarded-context.test.js chat-delivery.test.cjs android-push-routing.test.cjs generator-hours.test.js order-reliability.test.cjs order-integrity.test.mjs service-worker-notifications.test.cjs staff-password.test.cjs order-import.test.cjs staff-password-client.test.cjs photo-transfer.test.mjs photo-upload-workflows.test.cjs order-push-batching.test.cjs",
+    "test": "node --test warehouse-map-lookup.test.js domain-modules.test.mjs browser-workflows.test.mjs buyback-articles.test.js buyback-sync.test.js desktop-recovery.test.cjs desktop-viber.test.cjs editing-state.test.mjs warehouse-map-panel.test.mjs chat-ui.test.mjs chat-presence.test.mjs direct-chat-receipts.test.mjs direct-chat-notices.test.mjs direct-chat-history.test.mjs direct-chat-draft.test.mjs notification-message-links.test.mjs order-history.test.mjs order-history-listener.test.mjs order-event-recording.test.mjs staff-conversations.test.mjs client-matching.test.mjs buyback-state.test.mjs buyback-lifecycle.test.js collage.test.mjs photo-sharing.test.mjs foreground-sync.test.mjs inspection-model.test.js forwarded-context.test.js chat-delivery.test.cjs android-push-routing.test.cjs generator-hours.test.js generator-corrections.test.js generator-screen.test.js order-reliability.test.cjs order-integrity.test.mjs service-worker-notifications.test.cjs staff-password.test.cjs order-import.test.cjs staff-password-client.test.cjs photo-transfer.test.mjs photo-upload-workflows.test.cjs order-push-batching.test.cjs",
     "test:order-history-browser": "node order-history-browser.test.cjs",
     "test:staff-conversations": "node staff-conversations.test.mjs",
     "test:staff-drawer-browser": "node staff-drawer-browser.test.cjs",
@@ -23,7 +23,7 @@
     "test:inspection-emulator": "firebase emulators:exec --config ../firebase.inspection-test.json --project demo-warehouse-inspections --only firestore,storage \"node inspection-emulator.test.cjs\"",
     "test:inspection-browser": "node inspection-browser.test.cjs",
     "test:order-delivery-rules": "firebase emulators:exec --config ../firebase.inspection-test.json --project demo-warehouse-order-delivery --only firestore \"node --test order-delivery-rules.test.cjs\"",
-    "test:generator": "node --test generator-hours.test.js",
+    "test:generator": "node --test generator-hours.test.js generator-corrections.test.js generator-screen.test.js",
     "test:order-article-rules": "firebase emulators:exec --config ../firebase.inspection-test.json --project demo-warehouse-order-articles --only firestore \"node --test order-article-rules.test.cjs\""
   },
   "devDependencies": {

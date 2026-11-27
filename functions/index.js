@@ -292,7 +292,7 @@ async function collectTokens(category='orders', recipientUserId='', authorId='',
   const selected = [];
   for (const [userId, items] of tokensByUser) {
     const profile = users.find(user => user.id === userId)?.data() || {};
-    if (category==='chat' || directChat || profile.extraPhoneNotifications === true) {
+    if (forceAll || category==='chat' || directChat || profile.extraPhoneNotifications === true) {
       selected.push(...items);
     } else {
       items.sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
@@ -857,6 +857,7 @@ exports.sendWarehousePush = onDocumentCreated({ document: 'pushQueue/{eventId}',
         deliveryStatus: acceptedDeviceHashes.size?'sent':'no_devices',
         acceptedCount: acceptedDeviceHashes.size,
         failedCount: 0,
+        ...(data.platformDelivery?{platformDelivery:data.platformDelivery}:{}),
         diagnostic: 'На момент обработки не найдено ни одного активного устройства с push-токеном.'
       });
       logger.info('Push skipped: no registered devices', { eventId });
@@ -869,6 +870,7 @@ exports.sendWarehousePush = onDocumentCreated({ document: 'pushQueue/{eventId}',
     let accepted = acceptedDeviceHashes.size;
     let failed = 0;
     const platformDelivery={web:{selected:0,accepted:0,failed:0},android:{selected:0,accepted:0,failed:0}};
+    for(const item of eligibleTokenDocs){const platform=platformDelivery[item.platform];if(platform){platform.selected++;if(acceptedDeviceHashes.has(deviceHash(item)))platform.accepted++;}}
     const failureCodes = new Map();
 
     for (let i = 0; i < tokenDocs.length; i += 500) {
@@ -878,7 +880,7 @@ exports.sendWarehousePush = onDocumentCreated({ document: 'pushQueue/{eventId}',
        for (const isMentionRecipient of [false,true]) {
         const platformGroup = group.filter(item => item.platform === platform && mentionRecipients.has(item.userId)===isMentionRecipient);
         if (!platformGroup.length) continue;
-        platformDelivery[platform].selected+=platformGroup.length;
+
 
         const baseMessage = {
           tokens: platformGroup.map(item => item.token),

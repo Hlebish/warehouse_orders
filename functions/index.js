@@ -674,6 +674,20 @@ exports.enqueueWarehousePush = onCall(async request => {
  * The source, recipient, and deterministic ID make event retries idempotent.
  * Photos remain in the original, where the existing access rules apply.
  */
+// Read-only diagnostics: never expose tokens, message content, or other users' events.
+exports.getWarehousePushDiagnostic=onCall(async request=>{
+ const uid=request.auth?.uid;if(!uid)throw new HttpsError('unauthenticated','Требуется авторизация.');
+ const profile=await db.collection('users').doc(uid).get();
+ if(!profile.exists||profile.data()?.active!==true)throw new HttpsError('permission-denied','Активный профиль не найден.');
+ const eventId=String(request.data?.eventId||'');
+ if(!eventId)return {protocol:2,version:'2026.11.27.01',persistedOrderEvents:true};
+ if(eventId.length>128||eventId.includes('/'))throw new HttpsError('invalid-argument','Некорректный идентификатор события.');
+ const snap=await db.collection('pushQueue').doc(eventId).get(),data=snap.data()||{};
+ if(!snap.exists||data.authorId!==uid||data.recipientUserId!==uid||data.forceAll!==true)throw new HttpsError('permission-denied','Диагностика доступна только для собственного тестового уведомления.');
+ const counts=value=>({selected:Number(value?.selected)||0,accepted:Number(value?.accepted)||0,failed:Number(value?.failed)||0});
+ return {protocol:2,status:String(data.deliveryStatus||(data.processingAt?'processing':'pending')),done:!!data.sentAt,acceptedCount:Number(data.acceptedCount)||0,failedCount:Number(data.failedCount)||0,platformDelivery:data.platformDelivery?{web:counts(data.platformDelivery.web),android:counts(data.platformDelivery.android)}:null};
+});
+
 async function forwardAddressedMessage(snapshot,kind,orderId=''){
  if(!snapshot)return;
  const source=snapshot.data()||{},authorId=source.authorId;

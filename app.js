@@ -13,7 +13,7 @@ import { orderEditSnapshot, assertOrderUnchanged } from './editing-state.mjs?v=2
 import { prepareArticleEdit, remapDefectIndex, availableReturnItems, appendOrderReturn, cancelOrderReturn } from './order-integrity.mjs?v=2026.11.27.01';
 import { orderPaymentLabels, orderPaymentLabel, isOrderPaymentType, deliveryAddressLimit, mainCommentLimit, storedOrderDeliveryDetails, driverOrdersForDate, driverSheetHtml } from './order-delivery.mjs?v=2026.11.20.03';
 import { drafts, draftKey } from './draft-store.mjs?v=2026.11.16.04';
-import { createWarehouseMapPanel, warehouseMapUrl, mapArticleQuery, validMapCells } from './warehouse-map-panel.mjs?v=2026.11.27.06';
+import { createWarehouseMapPanel, warehouseMapUrl, warehouseMapPageUrl, mapArticleQuery, validMapCells } from './warehouse-map-panel.mjs?v=2026.11.27.07';
 import { composerHtml, bindChatComposer, chatTime, chatDay } from './chat-ui.mjs?v=2026.11.16.04';
 import { createDirectChatHistory } from './direct-chat-history.mjs?v=2026.11.24.03';
 import { bindDirectChatDraft } from './direct-chat-draft.mjs?v=2026.11.16.04';
@@ -129,7 +129,8 @@ const photoSharing=createPhotoSharing({prepare:source=>Array.isArray(source)?cre
 function showArticleOnMap(article,addresses=[]){
  if(!mapArticleQuery(article)){toast('В позиции не указан артикул.');return;}
  if(isPhoneDevice()||window.Capacitor?.isNativePlatform?.()){
-  warehouseMapPanel.open(article,state.orders.find(order=>order.id===selectedId)?.number||'',addresses);return;
+  // Open WebGL at top level: embedded Android WebViews can render an empty iframe.
+  location.assign(warehouseMapPageUrl(article,addresses,selectedId,location.origin));return;
  }
  window.open(warehouseMapUrl(article,addresses),'_blank','noopener,noreferrer');
 }

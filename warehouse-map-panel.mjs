@@ -13,6 +13,12 @@ export function validMapCells(addresses = []) {
 export function warehouseMapUrl(article, addresses = []) {
   return 'https://hlebish.github.io/warehouse_orders_3d/?article=' + encodeURIComponent(mapArticleQuery(article)) + validMapCells(addresses).map(cell=>'&cell='+encodeURIComponent(cell)).join('');
 }
+export function warehouseMapPageUrl(article, addresses, orderId, sourceOrigin) {
+  const url=warehouseMapUrl(article,addresses);
+  const sites=Object.freeze({'https://hlebish.github.io':'github','https://sklad-18f38.web.app':'firebase','https://sklad-18f38.firebaseapp.com':'firebaseapp'});
+  const site=Object.prototype.hasOwnProperty.call(sites,sourceOrigin)?sites[sourceOrigin]:'github';
+  return url+'&returnSite='+site+'&returnOrder='+encodeURIComponent(String(orderId||'').slice(0,200));
+}
 export function createWarehouseMapPanel() {
   let panel = null, previousFocus = null, previousOverflow = '', pendingBack = false;
   function remove() {

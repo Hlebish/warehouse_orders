@@ -1035,7 +1035,7 @@ function watchOrderEntries(id){
   serverCache.set(id,{...serverCache.get(id),entries:entries.map(x=>({...x}))});
   saveOrdersCache();
   const entriesChanged=before!==JSON.stringify(entries);
-  if(!initialCloudLoad&&!firstEntries&&entriesChanged){const last=entries.at(-1);if(last?.kind!=='system'&&last?.authorId!==signedInUser?.uid)toast(`${item.client||'Клиент не указан'} · ${last?last.kind==='decision'?'Добавлено решение':last.kind==='defect'?'Добавлен дефект':last.kind==='question'?'Добавлен вопрос':'Новый комментарий':'Заказ обновлён'}`);}
+  // Order-entry notifications come from the durable notification queue; do not show an additional generic popup here.
   const wasFirstEntries=firstEntries;firstEntries=false;
   if(entriesChanged||wasFirstEntries)scheduleRender();
   if((entriesChanged||wasFirstEntries||historyBecameLoaded)&&selectedId===id&&!modal.hidden&&modal.dataset.orderDetail===id)openOrder(id);
@@ -1139,7 +1139,7 @@ function watchOrders(){
        (existingOrder.status!==data.status||!equal(storedOrderDeliveryDetails(existingOrder),deliveryDetails)))openedOrderDetailsChanged=true;
      const order={id:d.id,number:pending?.number??data.number,client:pending?.client??(data.client||''),clientId:pending?.clientId??(data.clientId||''),deliveryType:['city','pickup','post','kamyanske'].includes(data.deliveryType)?data.deliveryType:'city',...deliveryDetails,status:pending?.status??data.status,returnCancelled:data.returnCancelled===true||(Array.isArray(data.returns)&&data.returns.some(r=>r?.status==='cancelled')),articles:pending?.articles??(Array.isArray(data.articles)?data.articles:[]),createdAt:data.createdAt,updatedAt:data.updatedAt,transferredAt:data.transferredAt,resumedAt:data.resumedAt,assembledAt:data.assembledAt,shippedAt:data.shippedAt,assemblyInProgress:data.assemblyInProgress===true,assemblyStartedAt:data.assemblyStartedAt,assemblyStartedBy:data.assemblyStartedBy,assemblyStartedByName:data.assemblyStartedByName,returns:Array.isArray(data.returns)?data.returns:[],author:data.createdByName||'Сотрудник',createdByName:data.createdByName||'',createdBy:data.createdBy,updatedBy:data.updatedBy,updatedByName:data.updatedByName,entries:prior?.entries||[],returns:Array.isArray(data.returns)?data.returns:[]};
      let at=orderIndexById.get(d.id);if(at===undefined){at=state.orders.length;state.orders.push(order);orderIndexById.set(d.id,at);}else state.orders[at]={...order,entries:state.orders[at].entries||[]};serverCache.set(d.id,{...order,articles:(order.articles||[]).map(x=>({...x})),entries:(prior?.entries||[]).map(x=>({...x}))});
-     if(!initialCloudLoad&&!snap.metadata.fromCache&&!firstServer&&change.type==='added'&&order.createdBy!==signedInUser?.uid&&(asDate(order.createdAt)?.getTime()||0)>Date.now()-120000){const message=`Поступил заказ № ${order.number}`;toast(message);notify(message,d.id)}
+     // The server sends a single summary for the new order and its related actions.
      if(pending && data.number===pending.number && data.client===pending.client && data.status===pending.status){pendingOrderData.delete(d.id);}
    }
    if(!snap.metadata.fromCache&&!snap.metadata.hasPendingWrites){initialCloudLoad=false;if(fullOrderHistoryRequested&&!fullOrderHistoryReady){fullOrderHistoryReady=true;settleFullOrderHistory(true);}}saveOrdersCache();watchPendingDefectOrders();scheduleRender();restoreUiState();
@@ -4911,6 +4911,11 @@ function directChatNoticeButton(notice,className='small-button'){
  if(!notice?.directChatThreadId||!notice?.authorId)return '';
  return '<button type="button" class="'+esc(className)+'" data-open-direct-chat-thread="'+esc(notice.directChatThreadId)+'" data-open-direct-chat-peer="'+esc(notice.authorId)+'" data-open-direct-chat-message="'+esc(notice.directMessageId||'')+'">'+(notice.directMessageId?'К сообщению':'Открыть личный чат')+'</button>';
 }
+function orderBatchDetails(notice){
+ const actions=Array.isArray(notice?.batchEvents)?notice.batchEvents:[];
+ if(actions.length<2)return '';
+ return '<details class="notification-history"><summary>Все действия ('+actions.length+')</summary>'+actions.map(item=>'<div><p>'+esc(item.body||'Изменение')+'</p>'+(item.entryId&&notice.orderId?'<button type="button" class="small-button" data-open="'+esc(notice.orderId)+'" data-entry-id="'+esc(item.entryId)+'">К записи</button>':'')+'</div>').join('')+'</details>';
+}
 function showNotifications(){
   const render=()=>{
     const q=String($('notificationSearch')?.value||'').toLocaleLowerCase('ru');
@@ -4924,9 +4929,9 @@ function showNotifications(){
       const entries=group.entries,n=group.latest,ids=entries.map(item=>item.id),unreadCount=group.unreadCount;
       const tone=group.section==='direct'?'violet':notificationTone(n);
       const badge='<span class="notification-kind">'+esc(n.directChatThreadId?'Личное сообщение':NOTIFICATION_CATEGORIES[group.category]||'Уведомление')+'</span>';
-      const history=entries.length>1?'<details class="notification-history"><summary>Показать все события ('+entries.length+')</summary>'+entries.map(item=>'<div><b>'+esc(item.title||'Уведомление')+'</b>'+(item.entryId&&item.orderId?'<button type="button" class="small-button" data-open="'+esc(item.orderId)+'" data-entry-id="'+esc(item.entryId)+'">К записи</button>':'')+directChatNoticeButton(item)+'<p>'+esc(item.message||item.body||'Новое событие')+'</p><small>'+fmtDateTime(item.createdAt||item.at)+'</small></div>').join('')+'</details>':'';
+      const history=entries.length>1?'<details class="notification-history"><summary>Показать все события ('+entries.length+')</summary>'+entries.map(item=>'<div><b>'+esc(item.title||'Уведомление')+'</b>'+(item.entryId&&item.orderId?'<button type="button" class="small-button" data-open="'+esc(item.orderId)+'" data-entry-id="'+esc(item.entryId)+'">К записи</button>':'')+directChatNoticeButton(item)+'<p>'+esc(item.message||item.body||'Новое событие')+'</p>'+orderBatchDetails(item)+'<small>'+fmtDateTime(item.createdAt||item.at)+'</small></div>').join('')+'</details>':'';
       const openButton=n.directChatThreadId&&n.authorId?directChatNoticeButton(n,'small-button primary-soft'):n.orderId?'<button type="button" class="small-button primary-soft" data-open="'+esc(n.orderId)+'" data-entry-id="'+esc(n.entryId||'')+'">'+(n.entryId?'К записи в заказе':'Открыть заказ')+'</button>':n.target==='chat'?'<button type="button" class="small-button primary-soft" data-open-chat="1">Открыть чат</button>':'';
-      return '<article class="notification-entry notification-'+tone+' '+(unreadCount?'unread':'')+'" data-notice-id="'+esc(n.id)+'" data-notice-ids="'+esc(ids.join(','))+'"><span class="notification-dot"></span><div>'+badge+'<b>'+esc(n.title||'Уведомление')+'</b><p>'+esc(n.message||n.body||'Новое событие')+'</p><small>'+fmtDateTime(n.createdAt||n.at)+'</small>'+(entries.length>1?'<span class="notification-group-count">'+entries.length+' событий · '+(unreadCount?unreadCount+' новых':'прочитано')+'</span>':'')+history+'</div><div class="notification-group-actions">'+openButton+(unreadCount?'<button type="button" class="small-button" data-read-notices>Прочитано</button>':'')+'</div></article>';
+      return '<article class="notification-entry notification-'+tone+' '+(unreadCount?'unread':'')+'" data-notice-id="'+esc(n.id)+'" data-notice-ids="'+esc(ids.join(','))+'"><span class="notification-dot"></span><div>'+badge+'<b>'+esc(n.title||'Уведомление')+'</b><p>'+esc(n.message||n.body||'Новое событие')+'</p>'+orderBatchDetails(n)+'<small>'+fmtDateTime(n.createdAt||n.at)+'</small>'+(entries.length>1?'<span class="notification-group-count">'+entries.length+' событий · '+(unreadCount?unreadCount+' новых':'прочитано')+'</span>':'')+history+'</div><div class="notification-group-actions">'+openButton+(unreadCount?'<button type="button" class="small-button" data-read-notices>Прочитано</button>':'')+'</div></article>';
       }).join('')+'</section>';
     }).join('');
     const listEl=$('notificationList');if(listEl)listEl.innerHTML=rows||'<div class="danger-note">Уведомлений по фильтрам нет.</div>';

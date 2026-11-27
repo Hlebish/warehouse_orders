@@ -196,7 +196,7 @@ async function createNotificationHistory(data, eventId) {
       notificationTag: notificationTagFor(data, eventId, category, data.target === 'chat' ? 'chat' : 'site', recipientUserId),
       expiresAt: Number(data.expiresAt) || null,
       eventId,
-      ...(data.orderBatchDelivery===true?{batchCount:Number(data.batchCount)||1,batchCategories:Array.isArray(data.batchCategories)?data.batchCategories:[]}:{}),
+      ...(data.orderBatchDelivery===true?{batchCount:Number(data.batchCount)||1,batchCategories:Array.isArray(data.batchCategories)?data.batchCategories:[],batchEvents:Array.isArray(data.batchEvents)?data.batchEvents:[]}:{}),
       createdAt: FieldValue.serverTimestamp(),
       read: false
     }).catch(error=>{if(![6,'already-exists','ALREADY_EXISTS'].includes(error.code))throw error;}));

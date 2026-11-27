@@ -9,3 +9,5 @@ test('map links retain every part of a spaced article and remove its product des
  }
  assert.equal(mapArticleQuery('  '),'');
 });
+
+test('3D links include exact valid storage cells and preserve article fallback',()=>{const url=new URL(warehouseMapUrl('FP 4819 311 Крыло',['S1-A-2','S3-K-7','S1-K-2','S3-K-7','invalid']));assert.equal(url.pathname,'/warehouse_orders_3d/');assert.equal(url.searchParams.get('article'),'FP 4819 311');assert.deepEqual(url.searchParams.getAll('cell'),['S1-A-2','S3-K-7']);assert.deepEqual(validMapCells(['S5-H-10','s2-a-1']),['S5-H-10','S2-A-1']);assert.deepEqual(new URL(warehouseMapUrl('APBM2802')).searchParams.getAll('cell'),[]);});

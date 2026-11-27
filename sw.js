@@ -4,7 +4,7 @@ importScripts(
 );
 
 const SITE_URL = 'https://hlebish.github.io/warehouse_orders/';
-const CACHE = 'order-desk-static-v159-generator-startup';
+const CACHE = 'order-desk-static-v160-map3d';
 // Handle notification clicks before FCM hooks.
 self.addEventListener('notificationclick', event => {
   event.notification.close();

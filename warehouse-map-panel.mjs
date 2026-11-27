@@ -7,8 +7,11 @@ export function mapArticleQuery(value) {
   }
   return code.join(' ');
 }
-export function warehouseMapUrl(article) {
-  return 'https://hlebish.github.io/warehouse-map/?article=' + encodeURIComponent(mapArticleQuery(article));
+export function validMapCells(addresses = []) {
+  return [...new Set((Array.isArray(addresses)?addresses:[]).map(v=>String(v||'').trim().toUpperCase()).filter(v=>/^S[1-5]-[A-HJK]-(?:[1-9]|10)$/.test(v)&&!/^S1-[FGHJK]-/.test(v)))];
+}
+export function warehouseMapUrl(article, addresses = []) {
+  return 'https://hlebish.github.io/warehouse_orders_3d/?article=' + encodeURIComponent(mapArticleQuery(article)) + validMapCells(addresses).map(cell=>'&cell='+encodeURIComponent(cell)).join('');
 }
 export function createWarehouseMapPanel() {
   let panel = null, previousFocus = null, previousOverflow = '', pendingBack = false;
@@ -31,23 +34,23 @@ export function createWarehouseMapPanel() {
     isOpen: () => panel !== null,
     close,
     handlePopState() { if (pendingBack) { pendingBack = false; return true; } return remove(); },
-    open(article, orderNumber = '') {
+    open(article, orderNumber = '', addresses = []) {
       if (!mapArticleQuery(article)) return;
-      if (panel) { panel.querySelector('iframe').src = warehouseMapUrl(article); return; }
+      if (panel) { panel.querySelector('iframe').src = warehouseMapUrl(article, addresses); return; }
       previousFocus = document.activeElement;
       previousOverflow = document.body.style.overflow;
       panel = document.createElement('section');
       panel.className = 'warehouse-map-panel';
       panel.setAttribute('role', 'dialog'); panel.setAttribute('aria-modal', 'true');
-      panel.setAttribute('aria-label', 'Карта склада');
+      panel.setAttribute('aria-label', 'Карта склада 3D');
       const header = document.createElement('header');
       const back = document.createElement('button'); back.type = 'button';
       back.textContent = '← К заказу' + (orderNumber ? ' № ' + orderNumber : '');
       back.addEventListener('click', close);
-      const title = document.createElement('span'); title.textContent = 'Карта склада';
+      const title = document.createElement('span'); title.textContent = 'Карта склада 3D';
       header.append(back, title);
       const frame = document.createElement('iframe');
-      frame.title = 'Карта склада: ' + mapArticleQuery(article); frame.src = warehouseMapUrl(article);
+      frame.title = 'Карта склада 3D: ' + mapArticleQuery(article); frame.src = warehouseMapUrl(article, addresses);
       frame.addEventListener('load', () => {
         try {
           frame.contentWindow.addEventListener('popstate', () => { if (panel?.contains(frame)) close(); });

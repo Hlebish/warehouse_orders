@@ -32,7 +32,7 @@ function orderVersionKey(order = {}) {
   return timestampKey(order.updatedAt) || `${timestampKey(order.createdAt)}|${String(order.status || '')}`;
 }
 function notificationTagFor(data, eventId, category, target, recipientUserId) {
-  const urgent = data.forceAll === true || data.isMention === true || data.isReply === true || data.buybackItemId || IMMEDIATE_NOTIFICATION_CATEGORIES.has(category);
+  const urgent = data.forceAll === true || data.isMention === true || data.isReply === true || data.isUrgent === true || data.buybackItemId || IMMEDIATE_NOTIFICATION_CATEGORIES.has(category);
   if (urgent || data.groupMessageId || data.orderBatchDelivery===true) return `event-${eventId}`;
   const scope = recipientUserId ? `recipient:${recipientUserId}` : 'broadcast';
   const digest = createHash('sha1').update(`${target}:${category}:${scope}`).digest('hex').slice(0, 24);
@@ -775,7 +775,7 @@ exports.queueDirectChatPush=onDocumentCreated({document:'directChats/{threadId}/
 async function enqueuePersistedOrderEvent(event, data, orderId, orderNumber, entryId=''){
  if(!data)return;
  const id='order-'+createHash('sha256').update(String(event.id)).digest('hex');
- const payload={...data,orderId,orderNumber:String(orderNumber||'').slice(0,80),entryId,target:'site',recipientUserId:'',mentionRecipientIds:[],isMention:false,isReply:false,isUrgent:false};
+ const payload={...data,orderId,orderNumber:String(orderNumber||'').slice(0,80),entryId,target:'site',recipientUserId:'',mentionRecipientIds:[],isMention:false,isReply:false,isUrgent:data.isUrgent===true};
  if(isRoutine(payload)){await appendOrderPush({db,eventId:id,data:payload,eventAt:Date.parse(event.time||'')||Date.now()});return;}
  await createChatPushOnce(id,payload);
 }

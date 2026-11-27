@@ -59,13 +59,15 @@ function deliveryFor(batch,userId,settings,enabled){
  if(!events.length)return null;
  const last=events[events.length-1],single=events.length===1;
  const forms=n=>n%100>=11&&n%100<=14?'действий':n%10===1?'действие':n%10>=2&&n%10<=4?'действия':'действий';
- const prefix=events.length+' '+forms(events.length)+' по заказу № '+last.orderNumber+'. ';
- const details=events.map(e=>e.body);
- // Preserve chronology and show the newest details if the text is long.
- const max=500-prefix.length;
- let body=details.join(' · ');
- if(body.length>max){body='… '+details.slice(-3).join(' · ');if(body.length>max)body=body.slice(0,max-1)+'…';}
- return {title:last.title,body:single?last.body:(prefix+body).slice(0,500),authorId:last.authorId,orderId:last.orderId,orderNumber:last.orderNumber,entryId:single?last.entryId:'',target:'site',category:last.category,recipientUserId:userId,orderBatchDelivery:true,batchCount:events.length,batchCategories:[...new Set(events.map(e=>e.category))],mentionRecipientIds:[],excludedRecipientIds:[],isMention:false,isReply:false,isUrgent:false,createdAt:new Date(batch.lastAt).toISOString(),expiresAt:Number(batch.lastAt)+60000,sentAt:null};
+ const prefix=events.length+' '+forms(events.length)+': ';
+ // Put actual comment text first for a collapsed mobile notification, not a
+ // generic "comment added" label. The remaining actions follow in full view.
+ const comments=events.filter(e=>e.category==='comments');
+ const other=events.filter(e=>e.category!=='comments');
+ const details=[...comments.slice().reverse().map(e=>e.body),...other.map(e=>e.body)];
+ let body=details.join('\n');
+ if(body.length>500-prefix.length)body=body.slice(0,499-prefix.length)+'…';
+ return {title:last.title,body:single?last.body:(prefix+body).slice(0,500),authorId:last.authorId,orderId:last.orderId,orderNumber:last.orderNumber,entryId:single?last.entryId:'',target:'site',category:last.category,recipientUserId:userId,orderBatchDelivery:true,batchCount:events.length,batchCategories:[...new Set(events.map(e=>e.category))],batchEvents:events.map(e=>({category:e.category,body:e.body,entryId:e.entryId})),mentionRecipientIds:[],excludedRecipientIds:[],isMention:false,isReply:false,isUrgent:false,createdAt:new Date(batch.lastAt).toISOString(),expiresAt:Number(batch.lastAt)+60000,sentAt:null};
 }
 async function dispatchOrderPush({db,ref,enabled,markDone,now=Date.now,sleep}){
  const batch=await sealOrderPush({db,ref,now,sleep});

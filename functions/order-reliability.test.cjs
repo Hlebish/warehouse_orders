@@ -55,4 +55,43 @@ test('partial push failure retries only devices not accepted by FCM',async()=>{
  failAndroid=false;await exports.sendWarehousePush(event);
  assert.deepEqual(attempts,['desktop-token','phone-token','phone-token']);assert.deepEqual(accepted,['desktop-token','phone-token']);
  assert.equal(queue.deliveryStatus,'sent');assert.equal(queue.acceptedCount,2);
+ assert.equal(queue.platformDelivery.web.accepted,1);assert.equal(queue.platformDelivery.android.accepted,1);
+});
+
+test('text drafts are isolated by employee and form, survive reopening and expire',async()=>{
+ const {createFormDraftStore}=await import('../client-reliability.mjs');
+ let now=10;const map=new Map(),storage={getItem:key=>map.get(key)||null,setItem:(key,value)=>map.set(key,value),removeItem:key=>map.delete(key)};
+ const draft={fields:{clientName:{value:'Client'}},articles:[{article:'AP',quantity:'2'}]};
+ const store=createFormDraftStore(storage,{now:()=>now,maxAge:100});
+ store.save('a','','new',draft);
+ assert.deepEqual(createFormDraftStore(storage,{now:()=>now,maxAge:100}).load('a','','new'),draft);
+ assert.equal(store.load('b','','new'),null);assert.equal(store.load('a','other','info'),null);
+ store.remove('a','','new');assert.equal(store.load('a','','new'),null);
+ store.save('a','order','info',draft);now=111;assert.equal(store.load('a','order','info'),null);
+});
+test('photo preparation memoizes successful results and retries failures',async()=>{
+ const {memoizeByObject,mapLimited}=await import('../client-reliability.mjs');
+ let calls=0;const image={},fn=memoizeByObject(async()=>{calls++;if(calls===1)throw Error('decode');return 'compressed';});
+ await assert.rejects(fn(image),/decode/);assert.equal(await fn(image),'compressed');assert.equal(await fn(image),'compressed');assert.equal(calls,2);
+ let active=0,peak=0;const output=await mapLimited([1,2,3,4],2,async n=>{active++;peak=Math.max(active,peak);await Promise.resolve();active--;return n*2;});
+ assert.deepEqual(output,[2,4,6,8]);assert.equal(peak,2);
+});
+test('diagnostic distinguishes Firebase acceptance from actual receipt',async()=>{
+ const {pushDiagnosticText}=await import('../client-reliability.mjs');
+ assert.match(pushDiagnosticText({status:'sent',acceptedCount:2}),/Firebase принял отправку/);
+ assert.match(pushDiagnosticText({status:'retrying',acceptedCount:1,failedCount:1,platformDelivery:{android:{accepted:0,selected:1}}}),/Android: 0\/1/);
+});
+test('push diagnostic only exposes own explicit test and never returns tokens',async()=>{
+ const vm=require('node:vm'),{readFileSync}=require('node:fs');
+ const source=readFileSync(require('node:path').join(__dirname,'index.js'),'utf8');
+ const begin=source.indexOf('exports.getWarehousePushDiagnostic='),end=source.indexOf('async function forwardAddressedMessage(',begin);
+ assert.ok(begin>=0&&end>begin);
+ const exports={};let item={authorId:'a',recipientUserId:'a',forceAll:true,deliveryStatus:'sent',sentAt:1,acceptedCount:2,acceptedDeviceHashes:['private-hash'],body:'private body',platformDelivery:{android:{selected:1,accepted:1,failed:0}}};
+ const context={exports,onCall:fn=>fn,HttpsError:class extends Error{constructor(code,message){super(message);this.code=code;}},db:{collection:name=>({doc:id=>({get:async()=>({exists:true,data:()=>name==='users'?{active:true}:item})})})}};
+ vm.createContext(context);vm.runInContext(source.slice(begin,end),context);
+ const call=exports.getWarehousePushDiagnostic;
+ assert.equal((await call({auth:{uid:'a'},data:{}})).protocol,2);
+ const result=await call({auth:{uid:'a'},data:{eventId:'test'}});assert.equal(result.acceptedCount,2);assert.equal(result.acceptedDeviceHashes,undefined);assert.equal(result.body,undefined);
+ await assert.rejects(call({auth:{uid:'b'},data:{eventId:'test'}}),error=>error.code==='permission-denied');
+ item={...item,forceAll:false};await assert.rejects(call({auth:{uid:'a'},data:{eventId:'test'}}),error=>error.code==='permission-denied');
 });

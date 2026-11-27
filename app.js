@@ -107,8 +107,8 @@ const foregroundDataSync=createForegroundSync({
   resumeOrdersListener();
   // A fresh transport clears Firestore's backoff after Android suspends its
   // connection. Existing listeners, cached data and queued writes stay intact.
-  await disableNetwork(db);
-  await enableNetwork(db);
+  if(!signedInUser||navigator.onLine===false)return;
+  try{await disableNetwork(db);}finally{await enableNetwork(db);}
  },
  onStateChange:renderDataSyncStatus
 });
@@ -1113,7 +1113,7 @@ function watchOrders(){
    foregroundDataSync.snapshot(snap.metadata);
    // Firestore provides only the documents that changed after the initial snapshot.
    // Keep a local index so each change can be applied without rescanning every order.
-   const firstServer=!snap.metadata.fromCache&&firstServerSnapshot;
+   const firstServer=!snap.metadata.fromCache&&!snap.metadata.hasPendingWrites&&firstServerSnapshot;
    // The in-memory SDK cache can be empty on a cold launch. Keep the persisted
    // Android snapshot until the server confirms the complete collection.
    if(firstServer){const localIds=new Set(snap.docs.map(d=>d.id));state.orders=state.orders.filter(o=>localIds.has(o.id)||pendingWrites.has(o.id)||(!fullOrderHistoryRequested&&(o.id===selectedId||o.id===pendingNotificationOrderId)));firstServerSnapshot=false;}
@@ -1142,7 +1142,7 @@ function watchOrders(){
      if(!initialCloudLoad&&!snap.metadata.fromCache&&!firstServer&&change.type==='added'&&order.createdBy!==signedInUser?.uid&&(asDate(order.createdAt)?.getTime()||0)>Date.now()-120000){const message=`Поступил заказ № ${order.number}`;toast(message);notify(message,d.id)}
      if(pending && data.number===pending.number && data.client===pending.client && data.status===pending.status){pendingOrderData.delete(d.id);}
    }
-   if(!snap.metadata.fromCache){initialCloudLoad=false;if(fullOrderHistoryRequested&&!fullOrderHistoryReady){fullOrderHistoryReady=true;settleFullOrderHistory(true);}}saveOrdersCache();watchPendingDefectOrders();scheduleRender();restoreUiState();
+   if(!snap.metadata.fromCache&&!snap.metadata.hasPendingWrites){initialCloudLoad=false;if(fullOrderHistoryRequested&&!fullOrderHistoryReady){fullOrderHistoryReady=true;settleFullOrderHistory(true);}}saveOrdersCache();watchPendingDefectOrders();scheduleRender();restoreUiState();
    // Keep the open order card in sync when its status or delivery details change.
    if(openedOrderDetailsChanged&&selectedId&&!modal.hidden&&modal.dataset.orderDetail===selectedId)openOrder(selectedId);
    if(pendingNotificationOrderId)void openPendingNotificationOrder();
@@ -1681,7 +1681,7 @@ function renderOrdersUI(){const search=$('searchInput').value.toLocaleLowerCase(
   if(defectCounter.textContent!==String(count))defectCounter.textContent=String(count);
   defectCounter.toggleAttribute('data-active',count>0);
  }
- $('listSummary').textContent=`${filteredOrderCount} ${plural(filteredOrderCount,'заказ','заказа','заказов')}${fullOrderHistoryReady?'':fullOrderHistoryWaiters.size?' · история загружается':' · активные и за 30 дней'}`;const pagination=$('ordersPagination');if(pagination){const first=filteredOrderCount?(currentOrdersPage-1)*ordersPageSize+1:0;const last=Math.min(currentOrdersPage*ordersPageSize,filteredOrderCount);pagination.innerHTML=`<button type="button" class="secondary-button" data-orders-page="prev" ${currentOrdersPage<=1?'disabled':''}>← Назад</button><span>Страница ${currentOrdersPage} из ${pageCount} · ${first}–${last} из ${filteredOrderCount}</span><button type="button" class="secondary-button" data-orders-page="next" ${currentOrdersPage>=pageCount?'disabled':''}>Вперёд →</button>`;pagination.hidden=filteredOrderCount<=ordersPageSize;}$('userName').textContent=profileName||roles[state.role];$('userRole').textContent=canManageUsers?`Администратор · ${roles[state.role]}`:roles[state.role];foregroundDataSync.repaint();$('today').textContent=todayFormatter.format(new Date());document.querySelectorAll('.nav-item').forEach(b=>b.classList.toggle('active',b.dataset.filter===activeFilter));paintNotices()}
+ $('listSummary').textContent=`${filteredOrderCount} ${plural(filteredOrderCount,'заказ','заказа','заказов')}${fullOrderHistoryReady?'':fullOrderHistoryWaiters.size?' · история загружается':' · активные и за 30 дней'}`;const pagination=$('ordersPagination');if(pagination){const first=filteredOrderCount?(currentOrdersPage-1)*ordersPageSize+1:0;const last=Math.min(currentOrdersPage*ordersPageSize,filteredOrderCount);pagination.innerHTML=`<button type="button" class="secondary-button" data-orders-page="prev" ${currentOrdersPage<=1?'disabled':''}>← Назад</button><span>Страница ${currentOrdersPage} из ${pageCount} · ${first}–${last} из ${filteredOrderCount}</span><button type="button" class="secondary-button" data-orders-page="next" ${currentOrdersPage>=pageCount?'disabled':''}>Вперёд →</button>`;pagination.hidden=filteredOrderCount<=ordersPageSize;}$('userName').textContent=profileName||roles[state.role];$('userRole').textContent=canManageUsers?`Администратор · ${roles[state.role]}`:roles[state.role];foregroundDataSync.repaint();const versionLabel=document.querySelector('.site-version');if(versionLabel&&signedInUser)void checkBackendVersion(versionLabel,document.querySelector('meta[name="app-version"]')?.content||'');$('today').textContent=todayFormatter.format(new Date());document.querySelectorAll('.nav-item').forEach(b=>b.classList.toggle('active',b.dataset.filter===activeFilter));paintNotices()}
 function render(){renderOrdersUI();generatorScreen.refreshPermissions();const testsNav=$('testsNavButton');if(testsNav)testsNav.hidden=!canManageUsers;const avatar=$('profileAvatar');if(avatar)avatar.innerHTML=profileAvatarUrl?'<img src="'+esc(profileAvatarUrl)+'" alt="">':'СК';}
 function plural(n,a,b,c){n=Math.abs(n)%100;const d=n%10;return n>10&&n<20?c:d>1&&d<5?b:d===1?a:c}
 function toast(msg,orderId='',options={}){const t=document.createElement('div');t.className='toast'+(orderId?' toast-clickable':'');t.textContent=msg;if(orderId)t.addEventListener('click',()=>{t.remove();openOrder(orderId)});$('toastStack').append(t);if(!options.persistent)setTimeout(()=>t.remove(),3500);return t}
@@ -2599,7 +2599,7 @@ function orderDeliverySummary(order){
  const {paymentType,deliveryAddress,mainComment}=storedOrderDeliveryDetails(order);
  return `<section class="order-delivery-summary" aria-label="Доставка и оплата"><div><b>Оплата:</b> ${esc(orderPaymentLabel(paymentType))}</div>${deliveryAddress?`<div><b>Адрес доставки:</b> ${esc(deliveryAddress)}</div>`:''}${mainComment?`<div><b>Основной комментарий:</b> ${esc(mainComment)}</div>`:''}</section>`;
 }
-function openOrder(id,{fromForm=false}={}){const o=state.orders.find(x=>x.id===id);if(!o){if(id&&signedInUser&&pendingNotificationLoadId!==id){pendingNotificationOrderId=id;void openPendingNotificationOrder();}return;}if(selectedId&&selectedId!==id){entryUnsubscribes.get(selectedId)?.();entryUnsubscribes.delete(selectedId);}watchOrderEntries(id);if(!fromForm&&!modal.hidden&&!orderReturnModalSnapshot&&!/^Заказ №/.test($('modalTitle').textContent)){orderReturnModalSnapshot={title:$('modalTitle').textContent,eyebrow:$('modalEyebrow').textContent,body:$('modalBody').innerHTML,foot:$('modalFoot').innerHTML,noticeSearch:$('notificationSearch')?.value||'',noticeFilter:$('notificationFilter')?.value||'',directChatPeer:$('modalTitle').textContent==='Личный чат'?directChatTarget:null,directChatThreadId:directChatActiveThreadId};}selectedId=id;const isManager=isManagerRole()||canManageUsers,isWarehouse=state.role==='warehouse'||canManageUsers,isDirector=state.role==='director',hasOpenDefect=hasPendingDefect(o),shipmentLocked=isShipmentLocked(o);const locked=shipmentLocked;const lockedButton=(label,action,cls='small-button',reason='Недоступно для вашей роли')=>'<button type="button" class="'+cls+' role-action-locked" disabled aria-disabled="true" title="'+esc(reason)+'"><span class="role-action-ban" aria-hidden="true">🚫</span>'+label+'</button>';const actionButton=(label,action,cls,allowed,reason)=>allowed?button(label,action,cls):lockedButton(label,action,cls,reason);let actions='';actions+='<div class="detail-action-group detail-action-roles">'+actionButton('📋 Менеджер','open-manager-actions','small-button action-category manager-category',isManager&&!locked,'Доступно менеджерам и администраторам')+actionButton('📦 Кладовщик','open-warehouse-actions','small-button action-category warehouse-category',isWarehouse&&!locked,'Доступно кладовщику и администраторам')+'</div>';actions+='<div class="detail-action-group detail-action-edit">'+actionButton('✎ Редактировать','open-edit-menu','small-button neutral-edit-button',!locked,'Редактирование недоступно после отгрузки')+'</div>';const utilityActions=actionButton('＋ Добавить комментарий','add-comment','small-button primary-soft',true,'')+actionButton('↩ Возврат','open-return','small-button primary-soft',isWarehouse&&(!o.returnCancelled||canManageUsers)&&!locked,'Возврат доступен кладовщику и администраторам')+actionButton(o.assemblyInProgress?'✓ Завершить сборку':'▶ Начать сборку','toggle-assembly','small-button '+(o.assemblyInProgress?'good':'primary-soft'),isWarehouse&&!shipmentLocked,'Сборка доступна кладовщику и администраторам');actions+='<div class="detail-action-group detail-action-utility">'+utilityActions+'</div>';actions+='<div class="detail-action-group detail-action-bottom">'+actionButton('⚠ Добавить дефект','add-defect','small-button danger',isWarehouse&&!locked,'Создавать дефекты может кладовщик или администратор/директор')+(!hasOpenDefect?actionButton('🗑 Удалить карточку','delete-order','small-button danger',canManageUsers&&!locked,'Удалять заказы может только администратор или директор'):'')+'</div>';if(shipmentLocked)actions='<div class="danger-note">🔒 🔒 После отгрузки или статуса «Клиент забрал самовывозом» менеджер, бухгалтер и главный бухгалтер больше не могут редактировать, отменять или удалять заказ.</div>'+actions;else if(hasOpenDefect)actions='<div class="defect-order-lock-note">⚠ По заказу есть нерассмотренный дефект. Сборку и редактирование можно продолжать; смена статуса будет доступна после решения.</div>'+actions;let articlesHtml='<div class="detail-section-title">Артикулы заказа · '+(o.articles||[]).length+'</div>';
+function openOrder(id,{fromForm=false}={}){const priorScroll=!modal.hidden&&modal.dataset.orderDetail===id?$('modalBody').scrollTop:null;const o=state.orders.find(x=>x.id===id);if(!o){if(id&&signedInUser&&pendingNotificationLoadId!==id){pendingNotificationOrderId=id;void openPendingNotificationOrder();}return;}if(selectedId&&selectedId!==id){entryUnsubscribes.get(selectedId)?.();entryUnsubscribes.delete(selectedId);}watchOrderEntries(id);if(!fromForm&&!modal.hidden&&!orderReturnModalSnapshot&&!/^Заказ №/.test($('modalTitle').textContent)){orderReturnModalSnapshot={title:$('modalTitle').textContent,eyebrow:$('modalEyebrow').textContent,body:$('modalBody').innerHTML,foot:$('modalFoot').innerHTML,noticeSearch:$('notificationSearch')?.value||'',noticeFilter:$('notificationFilter')?.value||'',directChatPeer:$('modalTitle').textContent==='Личный чат'?directChatTarget:null,directChatThreadId:directChatActiveThreadId};}selectedId=id;const isManager=isManagerRole()||canManageUsers,isWarehouse=state.role==='warehouse'||canManageUsers,isDirector=state.role==='director',hasOpenDefect=hasPendingDefect(o),shipmentLocked=isShipmentLocked(o);const locked=shipmentLocked;const lockedButton=(label,action,cls='small-button',reason='Недоступно для вашей роли')=>'<button type="button" class="'+cls+' role-action-locked" disabled aria-disabled="true" title="'+esc(reason)+'"><span class="role-action-ban" aria-hidden="true">🚫</span>'+label+'</button>';const actionButton=(label,action,cls,allowed,reason)=>allowed?button(label,action,cls):lockedButton(label,action,cls,reason);let actions='';actions+='<div class="detail-action-group detail-action-roles">'+actionButton('📋 Менеджер','open-manager-actions','small-button action-category manager-category',isManager&&!locked,'Доступно менеджерам и администраторам')+actionButton('📦 Кладовщик','open-warehouse-actions','small-button action-category warehouse-category',isWarehouse&&!locked,'Доступно кладовщику и администраторам')+'</div>';actions+='<div class="detail-action-group detail-action-edit">'+actionButton('✎ Редактировать','open-edit-menu','small-button neutral-edit-button',!locked,'Редактирование недоступно после отгрузки')+'</div>';const utilityActions=actionButton('＋ Добавить комментарий','add-comment','small-button primary-soft',true,'')+actionButton('↩ Возврат','open-return','small-button primary-soft',isWarehouse&&(!o.returnCancelled||canManageUsers)&&!locked,'Возврат доступен кладовщику и администраторам')+actionButton(o.assemblyInProgress?'✓ Завершить сборку':'▶ Начать сборку','toggle-assembly','small-button '+(o.assemblyInProgress?'good':'primary-soft'),isWarehouse&&!shipmentLocked,'Сборка доступна кладовщику и администраторам');actions+='<div class="detail-action-group detail-action-utility">'+utilityActions+'</div>';actions+='<div class="detail-action-group detail-action-bottom">'+actionButton('⚠ Добавить дефект','add-defect','small-button danger',isWarehouse&&!locked,'Создавать дефекты может кладовщик или администратор/директор')+(!hasOpenDefect?actionButton('🗑 Удалить карточку','delete-order','small-button danger',canManageUsers&&!locked,'Удалять заказы может только администратор или директор'):'')+'</div>';if(shipmentLocked)actions='<div class="danger-note">🔒 🔒 После отгрузки или статуса «Клиент забрал самовывозом» менеджер, бухгалтер и главный бухгалтер больше не могут редактировать, отменять или удалять заказ.</div>'+actions;else if(hasOpenDefect)actions='<div class="defect-order-lock-note">⚠ По заказу есть нерассмотренный дефект. Сборку и редактирование можно продолжать; смена статуса будет доступна после решения.</div>'+actions;let articlesHtml='<div class="detail-section-title">Артикулы заказа · '+(o.articles||[]).length+'</div>';
 if(hasOpenDefect){articlesHtml+='<div class="defect-click-hint"><span class="defect-click-hint-icon">⚠</span><span><b>ТРЕБУЕТСЯ РЕШЕНИЕ ПО ДЕФЕКТУ</b><small>Нажмите на красную позицию ниже, чтобы открыть фото и вынести решение.</small></span><span class="defect-click-arrow">↓</span></div>';}
 if((o.articles||[]).length){
   articlesHtml+='<div class="order-articles-list">'+o.articles.map((x,i)=>{
@@ -2614,7 +2614,7 @@ if((o.articles||[]).length){
 }else{
   articlesHtml+='<div class="danger-note">Артикулы не указаны.</div>';
 }
-const historyLoaded=serverEntriesLoaded.has(id),history=buildOrderHistory(o,{historyLoaded,staffDirectory}),latestEvent=getLatestOrderEvent(history),createdEvent=history.find(event=>event.kind==='created');const entries=history.map(event=>renderOrderHistoryItem(event,o,{isDirector,isManager,isWarehouse,shipmentLocked})).join('');const reviewed=(o.entries||[]).some(e=>e.kind==='viewed');let badge=reviewed?'<span class="status-pill status-neutral">Просмотрен менеджером</span>':'';showModal(`Заказ № ${o.number}`,`<div class="order-detail-head"><div><button type="button" class="detail-number detail-client-link" data-open-client-card="${esc(o.client)}" data-open-client-id="${esc(o.clientId||'')}" title="Открыть карточку клиента">${esc(o.client)}</button><div class="detail-client">Заказ № ${esc(o.number)}</div><div class="detail-meta"><div class="detail-meta-line order-created-by"><b>Создал:</b> ${esc(getOrderCreator(o,{staffDirectory}))} · ${fmtDateTime(createdEvent?.createdAt)}</div><div class="detail-meta-line">Доставка: ${o.deliveryType==='pickup'?'Самовывоз':o.deliveryType==='post'?'Доставка почтой':o.deliveryType==='kamyanske'?'Доставка в Камянское':'Доставка по городу'}</div></div></div><div>${statusPill(o.status)}${assemblyIndicator(o)}<div style="margin-top:6px">${badge}</div></div></div>${orderDeliverySummary(o)}<div class="order-latest-event"><span>Последнее событие</span>${latestEvent?`<b>${esc(latestEvent.title)}</b><small>${esc(latestEvent.author)} · <time datetime="${esc(latestEvent.createdAt.toISOString())}">${esc(fmtDateTime(latestEvent.createdAt))}</time></small>${latestEvent.text&&latestEvent.text!==latestEvent.title?`<p>${esc(latestEvent.text.slice(0,180))}${latestEvent.text.length>180?'…':''}</p>`:''}`:'<b>Дата события не указана</b>'}${!historyLoaded?'<small class="order-history-loading" role="status">Загружаем полную историю…</small>':''}</div><div class="detail-actions">${actions}</div>${articlesHtml}<section class="order-history" aria-label="История заказа"><div class="order-history-heading"><h3 class="detail-section-title">История заказа</h3><span>${history.length} ${plural(history.length,'событие','события','событий')}</span></div>${!historyLoaded?'<p class="order-history-loading" role="status">Загружаем события и комментарии…</p>':''}<div class="timeline">${entries}</div></section>`,[button('Закрыть','close')],'КАРТОЧКА ЗАКАЗА');modal.dataset.orderDetail=id;loadWarehouseMapAddresses(o.articles);focusPendingOrderEntry()}
+const historyLoaded=serverEntriesLoaded.has(id),history=buildOrderHistory(o,{historyLoaded,staffDirectory}),latestEvent=getLatestOrderEvent(history),createdEvent=history.find(event=>event.kind==='created');const entries=history.map(event=>renderOrderHistoryItem(event,o,{isDirector,isManager,isWarehouse,shipmentLocked})).join('');const reviewed=(o.entries||[]).some(e=>e.kind==='viewed');let badge=reviewed?'<span class="status-pill status-neutral">Просмотрен менеджером</span>':'';showModal(`Заказ № ${o.number}`,`<div class="order-detail-head"><div><button type="button" class="detail-number detail-client-link" data-open-client-card="${esc(o.client)}" data-open-client-id="${esc(o.clientId||'')}" title="Открыть карточку клиента">${esc(o.client)}</button><div class="detail-client">Заказ № ${esc(o.number)}</div><div class="detail-meta"><div class="detail-meta-line order-created-by"><b>Создал:</b> ${esc(getOrderCreator(o,{staffDirectory}))} · ${fmtDateTime(createdEvent?.createdAt)}</div><div class="detail-meta-line">Доставка: ${o.deliveryType==='pickup'?'Самовывоз':o.deliveryType==='post'?'Доставка почтой':o.deliveryType==='kamyanske'?'Доставка в Камянское':'Доставка по городу'}</div></div></div><div>${statusPill(o.status)}${assemblyIndicator(o)}<div style="margin-top:6px">${badge}</div></div></div>${orderDeliverySummary(o)}<div class="order-latest-event"><span>Последнее событие</span>${latestEvent?`<b>${esc(latestEvent.title)}</b><small>${esc(latestEvent.author)} · <time datetime="${esc(latestEvent.createdAt.toISOString())}">${esc(fmtDateTime(latestEvent.createdAt))}</time></small>${latestEvent.text&&latestEvent.text!==latestEvent.title?`<p>${esc(latestEvent.text.slice(0,180))}${latestEvent.text.length>180?'…':''}</p>`:''}`:'<b>Дата события не указана</b>'}${!historyLoaded?'<small class="order-history-loading" role="status">Загружаем полную историю…</small>':''}</div><div class="detail-actions">${actions}</div>${articlesHtml}<section class="order-history" aria-label="История заказа"><div class="order-history-heading"><h3 class="detail-section-title">История заказа</h3><span>${history.length} ${plural(history.length,'событие','события','событий')}</span></div>${!historyLoaded?'<p class="order-history-loading" role="status">Загружаем события и комментарии…</p>':''}<div class="timeline">${entries}</div></section>`,[button('Закрыть','close')],'КАРТОЧКА ЗАКАЗА');modal.dataset.orderDetail=id;if(priorScroll!==null)$('modalBody').scrollTop=priorScroll;loadWarehouseMapAddresses(o.articles);focusPendingOrderEntry()}
 
 function openOrderActionCategory(category){const o=state.orders.find(x=>x.id===selectedId);if(o&&hasPendingDefect(o)){toast('Пока дефект не рассмотрен, смена статуса недоступна. Сборку и редактирование можно продолжать.');return;}const isManager=isManagerRole()||canManageUsers;const warehouseActions=[...(state.role==='warehouse'||canManageUsers?[...(o&&canTransitionOrderStatus({role:state.role,isAdmin:canManageUsers,currentStatus:o.status,nextStatus:'Собран'})?[button('Собран','set-assembled','small-button warehouse-status-assembled')]:[]),button('Отгружен кладовщиком','set-status:Отгружен кладовщиком','small-button shipped')]:[]),button('Камянское','set-status:Камянское','small-button warehouse-status-kamenskoye'),button('Под вопросом','set-status:Под вопросом','small-button warehouse-status-question'),button('Ожидает самовывоза','set-status:Ожидает самовывоза','small-button warehouse-status-pickup-waiting'),button('Клиент забрал самовывозом','set-status:Клиент забрал самовывозом','small-button warehouse-status-pickup-done')];const managerActions=[button('Создан','set-status:Создан','small-button manager-status-created'),button('На согласовании','set-status:На согласовании','small-button manager-status-approval'),button('Одобрен на отгрузку клиенту','set-status:Одобрен на отгрузку клиенту','small-button manager-status-ready'),button('Перенесен','set-status:Перенесен','small-button manager-status-transferred'),button('Отменён','set-status:Отменён','small-button manager-status-cancel'),button('Ожидает оплаты','set-status:Ожидает оплаты','small-button manager-status-payment')];const title=category==='warehouse'?'Действия кладовщика':'Действия менеджера';const list=category==='warehouse'?warehouseActions:managerActions;showModal(title,`<div class="order-action-menu"><div class="order-action-menu-hint">${category==='warehouse'?'Статусы сборки и выдачи заказа.':'Статусы согласования и работы менеджера.'}</div><div class="order-action-menu-list">${list.join('')}</div></div>`,[button('Назад к заказу','back-detail')],category==='warehouse'?'КЛАДОВЩИК':'МЕНЕДЖЕР')}
 function openEditMenu(){showModal('Редактировать заказ','<div class="field-hint">Выберите, что хотите изменить.</div>',[button('Редактировать данные','edit-order-info','small-button neutral-edit-button'),button('Редактировать артикулы','edit-articles','small-button neutral-edit-button'),button('Назад к заказу','back-detail','small-button')],'РЕДАКТИРОВАНИЕ ЗАКАЗА')}
@@ -4058,6 +4058,27 @@ function openAdminTests(){
  showModal('Тесты','<div class="admin-tests"><div class="admin-tests-intro"><b>Проверка системы</b><span>Все тестовые уведомления отправляются только на ваши устройства. Проверки заказов и статусов выполняются без создания или изменения рабочих записей.</span></div><div class="admin-test-list">'+cards+'</div></div>',[button('Закрыть','close')],'АДМИНИСТРАТОР');
  modal.querySelector('.modal')?.classList.add('admin-tests-modal');
 }
+const getWarehousePushDiagnostic=httpsCallable(warehouseFunctions,'getWarehousePushDiagnostic',{timeout:10000});
+async function inspectOwnTestPush(testId,result){
+ const userId=signedInUser?.uid;if(!userId)throw new Error('Войдите в приложение.');
+ const direct=testId!=='general-chat',urgent=testId==='urgent-chat';
+ const title=urgent?'Тест срочного сообщения':direct?'Тест личного сообщения':'Тест общего чата';
+ const response=await enqueueWarehousePush({title,body:'Проверка доставки только на ваши устройства.',target:'chat',category:direct?'replies':'chat',recipientUserId:userId,forceAll:true,isMention:direct,isUrgent:urgent});
+ const eventId=response.data?.eventId;if(!eventId)throw new Error('Сервер не вернул идентификатор теста.');
+ for(let i=0;i<12;i++){
+  if(signedInUser?.uid!==userId||!result?.isConnected)return null;
+  try{
+   const {data}=await getWarehousePushDiagnostic({eventId});
+   if(signedInUser?.uid!==userId||!result.isConnected)return null;
+   result.textContent=pushDiagnosticText(data)+' · '+eventId;
+   result.dataset.state=data.done?(data.acceptedCount>0&&!data.failedCount?'success':'error'):'pending';
+   if(data.done)return data;
+  }catch(error){if(result?.isConnected)result.textContent='Тест принят в очередь, но диагностика недоступна. ID: '+eventId;return null;}
+  await new Promise(resolve=>setTimeout(resolve,1500));
+ }
+ if(result?.isConnected)result.textContent+=' · Отправка ещё обрабатывается.';
+ return null;
+}
 async function runAdminTest(testId,trigger){
  if(!signedInUser||!canManageUsers){toast('Тесты доступны только администратору.');return;}
  const test=ADMIN_TEST_CASES.find(item=>item.id===testId);if(!test)return;
@@ -4065,12 +4086,10 @@ async function runAdminTest(testId,trigger){
  if(trigger){trigger.disabled=true;trigger.textContent='Проверяю…';}
  if(result){result.textContent='Выполняется…';result.dataset.state='pending';}
  try{
-  if(testId==='general-chat'){
-   await queuePush('Тест общего чата','Проверка доставки общего чата. Это сообщение отправлено только на ваши устройства.',signedInUser.uid,'','chat','chat',signedInUser.uid,{forceAll:true});
-  }else if(testId==='direct-chat'){
-   await queuePush('Тест личного сообщения','Проверка адресной доставки личного сообщения — получатель только вы.',signedInUser.uid,'','chat','replies',signedInUser.uid,{isMention:true,forceAll:true});
-  }else if(testId==='urgent-chat'){
-   await queuePush('🚨 Тест срочного сообщения','Проверка срочного уведомления. Оно направлено только на ваши устройства.',signedInUser.uid,'','chat','replies',signedInUser.uid,{isMention:true,forceAll:true});
+  if(test.kind==='push'){
+   const data=await inspectOwnTestPush(testId,result);
+   if(data&&result?.isConnected)toast(data.acceptedCount>0?'Firebase принял push на '+data.acceptedCount+' устройств. Проверьте фактическое получение.':'Устройства не приняли push. Смотрите результат теста.');
+   return;
   }else if(testId==='create-order'){
    const sample={number:'TEST-'+Date.now(),client:'Тестовая проверка',deliveryType:'city',status:'Создан',articles:[],createdBy:signedInUser.uid};
    if(!sample.number||!sample.client||!['city','pickup','post','kamyanske'].includes(sample.deliveryType)||!['Создан','Собран','Под вопросом','Камянское'].includes(sample.status)||!Array.isArray(sample.articles))throw new Error('Проверка структуры заказа не пройдена.');
@@ -4813,6 +4832,7 @@ async function revokeShipmentManifest(dateKey){await saveShipmentConfirmation(da
 async function refreshPushRegistrationStatus(){
   const status=$('pushRegistrationStatus');
   if(!status||!signedInUser)return;
+  const uid=signedInUser.uid;
   const nativeAndroid=isAndroidWarehouse()||!!window.AndroidWarehouse;
   const permission=typeof Notification==='undefined'?'unsupported':Notification.permission;
   if(window.warehouseDesktop?.isDesktopApp){
@@ -4822,13 +4842,15 @@ async function refreshPushRegistrationStatus(){
   }
   try{
     const installationId=localStorage.getItem('ampPushInstallationId')||'';
-    const snapshot=await getDocs(collection(db,'users',signedInUser.uid,'pushTokens'));
+    const snapshot=await getDocs(collection(db,'users',uid,'pushTokens'));
+    if(!status.isConnected||signedInUser?.uid!==uid)return;
     const current=snapshot.docs.map(docSnap=>({id:docSnap.id,...docSnap.data()}))
       .filter(item=>installationId&&item.installationId===installationId&&(nativeAndroid?item.appId==='warehouse_orders_android':item.appId==='warehouse_orders'))
       .sort((a,b)=>String(b.updatedAt||'').localeCompare(String(a.updatedAt||'')))[0];
     if(current){
       const platform=current.platform==='android'?'Android':'браузере';
-      status.textContent='Push-токен зарегистрирован · '+platform+' · обновлён '+fmtDateTime(current.updatedAt);
+      const registrations=snapshot.docs.length;
+      status.textContent='Push-токен зарегистрирован · '+platform+' · обновлён '+fmtDateTime(current.updatedAt)+' · всего регистраций аккаунта: '+registrations+(navigator.onLine===false?' · нет сети':'');
       status.dataset.state='ready';
     }else if(nativeAndroid){
       const disabled=localStorage.getItem('warehouse_native_push_disabled_'+signedInUser.uid)==='1';
@@ -5172,7 +5194,8 @@ function showSiteUpdateNotice(){
  siteUpdateNotice.append(button);
 }
 function reloadToLatestSite(){
- saveUiState();
+ if($('modalBody')?.querySelector('[data-save-status].save-pending')||$('modalFoot')?.querySelector('[data-save-status].save-pending')){toast('Дождитесь завершения сохранения перед обновлением.');return;}
+ persistOrderFormDraft();persistOpenEntryDraft();saveUiState();
  const url=new URL('./index.html',location.href);
  url.searchParams.set('_app_refresh',String(Date.now()));
  location.replace(url.href);
@@ -5204,17 +5227,29 @@ window.addEventListener('load',()=>{
 },{once:true});
 // Restore the connection in the existing page while keeping its UI and drafts.
 window.addEventListener('warehouse-app-resumed',event=>{
- if(isAndroidClient())foregroundDataSync.resume({backgroundMs:event.detail?.backgroundMs});
+ if(isAndroidClient()){foregroundDataSync.resume({backgroundMs:event.detail?.backgroundMs});resumeOrdersListener();refreshPushTokenOnResume();}
  const shell=document.querySelector('.app-shell');
  const gate=$('authGate');
  if((signedInUser&&shell&&!shell.hidden)||(gate&&!gate.hidden))finishInitialLoading();
  void window.checkWarehouseSiteUpdate?.();
 });
+let lastBackendVersionCheck=0;
+async function checkBackendVersion(label,siteVersion){
+ const uid=signedInUser?.uid;if(!uid||Date.now()-lastBackendVersionCheck<120000)return;
+ lastBackendVersionCheck=Date.now();
+ try{
+  const {data}=await getWarehousePushDiagnostic({});
+  if(signedInUser?.uid!==uid||!label.isConnected)return;
+  label.title='Сайт '+siteVersion+' · сервер '+String(data.version||'неизвестно')+' · протокол '+String(data.protocol||'неизвестно');
+  if(Number(data.protocol)<2)toast('Серверная часть требует обновления. Сообщите администратору.');
+ }catch(error){label.title='Не удалось подтвердить версию серверных функций.';}
+}
 function updateVersionLabel(){
  const label=document.querySelector('.site-version');
  if(!label)return;
  const siteVersion=document.querySelector('meta[name="app-version"]')?.content||'неизвестно';
  label.textContent='Версия сайта '+siteVersion;
+ if(signedInUser)void checkBackendVersion(label,siteVersion);
  if(typeof window.warehouseDesktop?.getAppVersion==='function'){
   window.warehouseDesktop.getAppVersion().then(version=>{
    if(version)label.textContent='Windows-приложение '+version+' · сайт '+siteVersion;

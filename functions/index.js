@@ -7,7 +7,7 @@ const { logger } = require('firebase-functions');
 const { initializeApp } = require('firebase-admin/app');
 const { getFirestore, FieldValue, Timestamp, FieldPath } = require('firebase-admin/firestore');
 const { getMessaging } = require('firebase-admin/messaging');
-const { createHash } = require('crypto');
+const { createHash, randomBytes } = require('crypto');
 const { directPushEventId } = require('./direct-push-id');
 const { forwardedRecipients } = require('./forwarded-context');
 const { serverManagedPush, orderEvent, entryEvent } = require('./order-notification-events');
@@ -20,6 +20,9 @@ const db = getFirestore();
 const messaging = getMessaging();
 const ORDER_NOTIFICATION_CATEGORIES = new Set(['assembly', 'defects', 'status', 'editing', 'comments', 'questions', 'decisions']);
 const IMMEDIATE_NOTIFICATION_CATEGORIES = new Set(['defects', 'questions', 'decisions', 'replies']);
+// Keep in sync with validOrderArticles in firestore.rules. Imported orders must
+// remain editable and collectable by ordinary warehouse staff.
+const ORDER_ARTICLE_LIMIT = 500;
 function canAccessBuybackProfile(profile = {}) {
   return profile.active === true && (profile.admin === true || ['accountant', 'chief_accountant', 'director'].includes(profile.role));
 }
@@ -348,8 +351,8 @@ exports.import1COrder = onRequest(
       if (sourceType.length > 100) {
         return res.status(400).json({ ok: false, error: 'sourceType must be at most 100 characters' });
       }
-      if (!Array.isArray(rawArticles) || rawArticles.length === 0 || rawArticles.length > 500) {
-        return res.status(400).json({ ok: false, error: 'articles must contain between 1 and 500 items' });
+      if (!Array.isArray(rawArticles) || rawArticles.length === 0 || rawArticles.length > ORDER_ARTICLE_LIMIT) {
+        return res.status(400).json({ ok: false, error: `articles must contain between 1 and ${ORDER_ARTICLE_LIMIT} items` });
       }
 
       const articles = [];
@@ -683,7 +686,7 @@ exports.getWarehousePushDiagnostic=onCall(async request=>{
  const profile=await db.collection('users').doc(uid).get();
  if(!profile.exists||profile.data()?.active!==true)throw new HttpsError('permission-denied','Активный профиль не найден.');
  const eventId=String(request.data?.eventId||'');
- if(!eventId)return {protocol:2,version:'2026.11.27.02',persistedOrderEvents:true,orderPushBatching:true};
+ if(!eventId)return {protocol:2,version:'2026.11.27.03',persistedOrderEvents:true,orderPushBatching:true};
  if(eventId.length>128||eventId.includes('/'))throw new HttpsError('invalid-argument','Некорректный идентификатор события.');
  const snap=await db.collection('pushQueue').doc(eventId).get(),data=snap.data()||{};
  if(!snap.exists||data.authorId!==uid||data.recipientUserId!==uid||data.forceAll!==true)throw new HttpsError('permission-denied','Диагностика доступна только для собственного тестового уведомления.');
@@ -1663,6 +1666,13 @@ exports.setStaffTemporaryPassword = onRequest(
         return res.status(403).json({ ok: false, error: 'Administrator permission required' });
       }
 
+      if (req.body?.action === 'capabilities') {
+        return res.status(200).json({ ok: true, passwordMode: 'random-v1' });
+      }
+      if (req.body?.passwordMode !== 'random-v1') {
+        return res.status(409).json({ ok: false, error: 'Refresh the app before resetting a password' });
+      }
+
       const uid = String(req.body?.uid || '').trim();
       if (!uid || uid.length > 128) return res.status(400).json({ ok: false, error: 'Valid employee uid required' });
       if (uid === decoded.uid) return res.status(400).json({ ok: false, error: 'You cannot reset your own password here' });
@@ -1671,11 +1681,16 @@ exports.setStaffTemporaryPassword = onRequest(
       if (!targetSnap.exists) return res.status(404).json({ ok: false, error: 'Employee profile not found' });
       if (targetSnap.data()?.active !== true) return res.status(400).json({ ok: false, error: 'Employee account is disabled' });
 
-      await getAuth().updateUser(uid, { password: '111111' });
+      // Generate a distinct 120-bit secret for each reset. The prefix satisfies
+      // common upper/lowercase, digit and symbol password policies. Return it
+      // only in this authorized, non-cacheable response; never persist or log it.
+      const temporaryPassword = 'Aa1!' + randomBytes(15).toString('base64url');
+      await getAuth().updateUser(uid, { password: temporaryPassword });
       logger.info('Temporary staff password set by administrator', { actorUid: decoded.uid, targetUid: uid });
-      return res.status(200).json({ ok: true });
+      return res.status(200).json({ ok: true, temporaryPassword });
     } catch (error) {
-      logger.error('Temporary staff password reset failed', { error: String(error?.message || error) });
+      // SDK messages may contain request data; keep reset secrets out of logs.
+      logger.error('Temporary staff password reset failed', { code: String(error?.code || 'unknown') });
       const code = String(error?.code || '');
       if (code === 'auth/id-token-revoked' || code === 'auth/invalid-id-token' || code === 'auth/argument-error') {
         return res.status(401).json({ ok: false, error: 'Session expired; sign in again' });

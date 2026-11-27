@@ -1,14 +1,30 @@
-name: Performance branch syntax checks
+name: Application checks
 
 on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '*.js'
+      - '*.mjs'
+      - '*.css'
+      - 'index.html'
+      - 'functions/**'
+      - 'desktop/**'
+      - 'android/**'
+      - '.github/workflows/performance-checks.yml'
   push:
     branches:
       - main
       - performance-audit-2026-11
     paths:
-      - 'app.js'
-      - 'foreground-sync.mjs'
-      - 'functions/foreground-sync.test.mjs'
+      - '*.js'
+      - '*.mjs'
+      - '*.css'
+      - 'index.html'
+      - 'functions/**'
+      - 'desktop/**'
+      - 'android/**'
       - '.github/workflows/performance-checks.yml'
   workflow_dispatch:
 
@@ -16,7 +32,7 @@ permissions:
   contents: read
 
 jobs:
-  syntax:
+  test:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -25,7 +41,11 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Check app.js syntax
-        run: node --check app.js
-      - name: Verify background data refresh and cached orders
-        run: node --test functions/foreground-sync.test.mjs
+      - name: Check application syntax
+        run: |
+          node --input-type=module --check < app.js
+          node --check sw.js
+          node --check functions/index.js
+      - name: Run application regression tests
+        working-directory: functions
+        run: npm test

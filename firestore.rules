@@ -35,6 +35,11 @@ service cloud.firestore {
         && (!('deliveryAddress' in data) || data.deliveryAddress is string && data.deliveryAddress.size() <= 500)
         && (!('mainComment' in data) || data.mainComment is string && data.mainComment.size() <= 2000);
     }
+    // Matches the 1C import limit so existing large imports can be collected
+    // and edited through the same client operations as manually created orders.
+    function validOrderArticles(articles) {
+      return articles is list && articles.size() <= 500;
+    }
     // Бухгалтеры и главный бухгалтер входят в ту же группу полномочий, что и менеджеры.
     function hasManagerPermissions() { return isManager(); }
     function canManageUsers() { return activeUser() && (userDoc().data.admin == true || role() == 'director'); }
@@ -485,8 +490,7 @@ service cloud.firestore {
         && (!request.resource.data.keys().hasAny(['clientId']) || request.resource.data.clientId is string && request.resource.data.clientId.size() <= 256)
         && request.resource.data.deliveryType in ['city', 'pickup', 'post', 'kamyanske']
         && validOrderDeliveryDetails(request.resource.data)
-        && request.resource.data.articles is list
-        && request.resource.data.articles.size() <= 100
+        && validOrderArticles(request.resource.data.articles)
         && request.resource.data.createdBy == request.auth.uid
         && validOrderStatus(request.resource.data.status);
 
@@ -530,8 +534,7 @@ service cloud.firestore {
           && request.resource.data.status == resource.data.status
           && request.resource.data.diff(resource.data).affectedKeys()
             .hasOnly(['articles', 'updatedAt', 'updatedBy', 'updatedByName'])
-          && request.resource.data.articles is list
-          && request.resource.data.articles.size() <= 100
+          && validOrderArticles(request.resource.data.articles)
           && request.resource.data.updatedAt is string
           && request.resource.data.updatedBy == request.auth.uid
           && request.resource.data.updatedByName is string)
@@ -551,7 +554,7 @@ service cloud.firestore {
           && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['number']) || request.resource.data.number is string && request.resource.data.number.size() > 0)
           && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['client']) || request.resource.data.client is string)
           && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['clientId']) || request.resource.data.clientId is string && request.resource.data.clientId.size() <= 256)
-          && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['articles']) || request.resource.data.articles is list && request.resource.data.articles.size() <= 100)
+          && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['articles']) || validOrderArticles(request.resource.data.articles))
           && validOrderStatus(request.resource.data.status)
           && (request.resource.data.status == resource.data.status
             || managerOrderStatus(request.resource.data.status)))
@@ -573,7 +576,7 @@ service cloud.firestore {
           && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['number']) || request.resource.data.number is string && request.resource.data.number.size() > 0)
           && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['client']) || request.resource.data.client is string)
           && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['clientId']) || request.resource.data.clientId is string && request.resource.data.clientId.size() <= 256)
-          && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['articles']) || request.resource.data.articles is list && request.resource.data.articles.size() <= 100)
+          && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['articles']) || validOrderArticles(request.resource.data.articles))
           && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['deliveryType']) || request.resource.data.deliveryType in ['city', 'pickup', 'post', 'kamyanske'])
           && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['transferredAt']) || request.resource.data.transferredAt is string)
           && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['resumedAt']) || request.resource.data.resumedAt is string)
@@ -637,6 +640,23 @@ service cloud.firestore {
             .hasOnly(['decision', 'decisionText', 'decidedBy', 'decidedByName', 'decidedAt'])
           && request.resource.data.decision in ['Подтверждён', 'Отменён', 'Удалена из заказа']
           && request.resource.data.decisionText is string
+
+          // Editing/reordering order lines must preserve each defect's original
+          // SKU. Only its index may move, atomically with the parent article edit.
+          // -1 keeps a removed line's defect in history without affecting another line.
+          || (activeUser()
+            && resource.data.kind == 'defect'
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['articleIndex'])
+            && request.resource.data.articleIndex is int
+            && request.resource.data.articleIndex >= -1
+            && getAfter(/databases/$(database)/documents/orders/$(orderId)).data.updatedBy == request.auth.uid
+            && getAfter(/databases/$(database)/documents/orders/$(orderId)).data.diff(
+              get(/databases/$(database)/documents/orders/$(orderId)).data).affectedKeys().hasAny(['articles'])
+            && !(get(/databases/$(database)/documents/orders/$(orderId)).data.status in ['Отгружен кладовщиком', 'Клиент забрал самовывозом'])
+            && !(getAfter(/databases/$(database)/documents/orders/$(orderId)).data.status in ['Отгружен кладовщиком', 'Клиент забрал самовывозом'])
+            && (request.resource.data.articleIndex == -1
+              || (request.resource.data.articleIndex < getAfter(/databases/$(database)/documents/orders/$(orderId)).data.articles.size()
+                && getAfter(/databases/$(database)/documents/orders/$(orderId)).data.articles[request.resource.data.articleIndex].article == resource.data.article)))
 
           || ((isWarehouse() || canManageUsers())
             && resource.data.kind == 'defect'

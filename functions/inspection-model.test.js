@@ -37,3 +37,31 @@ test('cancelled requests and orders do not consume checks',()=>{
  assert.equal(inspectionMatches(order({status:'Отменён'}),[item('a')]).length,0);
  assert.equal(inspectionMatches(order(),[item('a','APMA2506',{status:'ordered'})]).length,0);
 });
+
+test('linking resolved inspection defects changes the parent version without changing its status',async()=>{
+ const {createInspectionHandlers}=require('./inspection-items');
+ const {orderEditSnapshot,assertOrderUnchanged}=await import('../editing-state.mjs');
+ const initial=order({number:'101',updatedAt:'2099-01-01T00:00:00.000Z'}),baseline=orderEditSnapshot(initial);
+ const checked=item('checked','APMA2506',{defects:[{id:'defect',text:'Царапина',photos:[],authorId:'warehouse',authorName:'Кладовщик',createdAt:'2026-11-18T10:00:00Z',decision:'Подтверждён',decidedAt:'2026-11-18T10:01:00Z',decidedBy:'manager',decidedByName:'Менеджер'}]});
+ const data=new Map([['orders/o',initial],['inspectionItems/checked',checked]]),writes=[];
+ const ref=path=>({path,collection:name=>({doc:id=>ref(path+'/'+name+'/'+id)})});
+ const snapshot=target=>({ref:target,exists:data.has(target.path),data:()=>data.get(target.path)});
+ const db={collection:name=>({doc:id=>ref(name+'/'+id),where:()=>({active:true})}),runTransaction:async callback=>{
+  const operations=[];
+  const result=await callback({get:async target=>target.active?{docs:[...data].filter(([path,item])=>path.startsWith('inspectionItems/')&&['pending','checked'].includes(item.status)).map(([path])=>({id:path.split('/').at(-1),data:()=>data.get(path)}))}:snapshot(target),
+   update:(target,patch)=>operations.push({target,patch,merge:true}),set:(target,patch)=>operations.push({target,patch})});
+  for(const operation of operations){writes.push(operation);data.set(operation.target.path,operation.merge?{...data.get(operation.target.path),...operation.patch}:operation.patch);}
+  return result;
+ }};
+ const handlers=createInspectionHandlers({db,FieldValue:{serverTimestamp:()=> 'server-time'},HttpsError:Error});
+ await handlers.syncOrder({...snapshot(ref('orders/o')),createTime:{toMillis:()=>Date.parse('2026-11-19')}},'resolved-defect');
+ const current=data.get('orders/o');
+ assert.equal(current.status,initial.status);
+ assert.equal(current.updatedBy,'system');
+ assert.equal(current.updatedAt,'2099-01-01T00:00:00.001Z');
+ assert.throws(()=>assertOrderUnchanged(baseline,current),{code:'order-conflict'});
+ assert.equal(data.get('orders/o/entries/inspection_checked_defect').articleIndex,0);
+ assert.equal(data.get('orders/o/entries/inspection_checked_defect').decision,'Подтверждён');
+ const count=writes.length;await handlers.syncOrder({...snapshot(ref('orders/o')),createTime:{toMillis:()=>Date.parse('2026-11-19')}},'resolved-defect');
+ assert.equal(writes.length,count,'A retried inspection event must not bump the version twice');
+});

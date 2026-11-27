@@ -35,4 +35,4 @@ function validateGeneratorAction(id,action){
  if(id==='warehouse'&&action!=='stop')throw Object.assign(new Error('Старый учёт доступен для просмотра и завершения текущего запуска.'),{code:'failed-precondition'});
  return id;
 }
-module.exports={emptyState,canOperate,transition,validateGeneratorAction};
+module.exports={emptyState,canOperate,transition,validateGeneratorAction,GENERATOR_IDS};

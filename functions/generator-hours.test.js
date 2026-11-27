@@ -62,7 +62,7 @@ function runTests({test,assert,model,screen}){
    const factory=new Function('window','document','navigator','Date','setInterval','clearInterval',screen.replace(/export /g,'')+'\nreturn {createGeneratorScreen,generatorDuration};');
    const {createGeneratorScreen,generatorDuration}=factory(window,document,nav,Clock,fn=>{intervals.add(fn);return fn},fn=>intervals.delete(fn));
    const subscriptions=new Map();
-   const client={send(){for(const [key,cb] of subscriptions){if(key.endsWith('/state')){const state=states.get(key.split('/')[0]);cb({exists:()=>state!=null,data:()=>state,metadata:{fromCache:!nav.onLine}});}else{const events=journals.get(key.split('/')[0])||[];cb({docs:events.slice().reverse().map(e=>({data:()=>e})),metadata:{fromCache:!nav.onLine}});}}}};
+   const client={send(){for(const [key,cb] of subscriptions){if(key.endsWith('/state')){const id=key.split('/')[0],state=states.get(id);cb({id,ref:{id},exists:()=>state!=null,data:()=>state,metadata:{fromCache:!nav.onLine}});}else{const events=journals.get(key.split('/')[0])||[];cb({docs:events.slice().reverse().map(e=>({data:()=>e})),metadata:{fromCache:!nav.onLine}});}}}};
    clients.add(client);
    const ui=createGeneratorScreen({db:{},doc:(_db,_collection,id)=>id+'/state',collection:ref=>ref.split('/')[0]+'/journal',query:x=>x,orderBy:()=>null,onSnapshot:(key,opts,cb)=>{subscriptions.set(key,cb);client.send();return ()=>subscriptions.delete(key)},canOperate:()=>true,call:async data=>{
     if(data.action==='clock')return {data:{serverNowMs:now}};
@@ -70,7 +70,7 @@ function runTests({test,assert,model,screen}){
     const id=model.validateGeneratorAction(data.generatorId,data.action);
     const next=transition(states.get(id),data.action,data.expectedRevision,now,'actor');
     states.set(id,next.state);if(next.event){if(!journals.has(id))journals.set(id,[]);journals.get(id).push(next.event);}writes++;notify();
-    return {data:{state:next.state,serverNowMs:now}};
+    return {data:{generatorId:id,state:next.state,serverNowMs:now}};
    }});
    const get=id=>nodes.get(id);
    const click=id=>{if(!get(id).disabled)get(id).dispatch('click')};

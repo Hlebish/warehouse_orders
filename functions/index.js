@@ -1704,10 +1704,13 @@ exports.setStaffTemporaryPassword = onRequest(
 /* Generator accounting: no physical device control. Each generator has its own
  * transaction/revision and journal; direct client writes are forbidden. */
 const generatorHours = require('./generator-hours');
+const {createGeneratorCorrectionsHandler}=require('./generator-corrections');
+const correctGeneratorHours=createGeneratorCorrectionsHandler({db,HttpsError});
 exports.manageGeneratorHours = onCall(async request => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Войдите в приложение.');
   const uid = request.auth.uid;
   const { action, expectedRevision, generatorId } = request.data || {};
+  if (['adjust','previewTransfer','transfer'].includes(action)) return correctGeneratorHours(request);
   const actorRef = db.collection('users').doc(uid);
   if (action === 'clock') {
     const profile = (await actorRef.get()).data();
@@ -1732,7 +1735,7 @@ exports.manageGeneratorHours = onCall(async request => {
     }
     tx.set(stateRef, result.state);
     if (result.event) tx.create(stateRef.collection('journal').doc(String(result.event.revision)), result.event);
-    return { state: result.state, serverNowMs: Date.now() };
+    return { generatorId: id, state: result.state, serverNowMs: Date.now() };
   });
 });
 

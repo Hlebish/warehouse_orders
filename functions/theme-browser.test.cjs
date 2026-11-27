@@ -5,6 +5,7 @@ const {chromium}=require('playwright');
 const root=path.resolve(__dirname,'..');
 const index=fs.readFileSync(path.join(root,'index.html'),'utf8').replace(/<script\b[\s\S]*?<\/script>/g,'');
 const app=fs.readFileSync(path.join(root,'app.js'),'utf8');
+const orderWindowModule=fs.readFileSync(path.join(root,'orders-window.mjs'),'utf8').replace(/^export /gm,'');
 const renderOrders=app.slice(app.indexOf('function renderOrdersUI('),app.indexOf('\nfunction render(){'));
 const unresolvedOrderDefects=app.match(/^function unresolvedOrderDefects.*$/m)[0];
 const buyback=fs.readFileSync(path.join(root,'buyback.js'),'utf8');
@@ -124,6 +125,10 @@ async function run(){
     let currentOrdersPage=1;
     const plural=(_n,_one,_few,many)=>many,paintNotices=()=>{};
     const foregroundDataSync={repaint(){}},todayFormatter=new Intl.DateTimeFormat('ru');
+    const signedInUser=null,fullOrderHistoryRequested=true,fullOrderHistoryReady=true;
+    const fullOrderHistoryWaiters=new Set(),archiveLookupRows=[],archiveLookupPending=false;
+    const orderDisplayDate=o=>o.createdAt,localDateKey=()=>'',orderSearchText=()=>'',isDateInRange=()=>true,asDate=value=>new Date(value);
+    ${orderWindowModule}
     ${unresolvedOrderDefects}
     ${renderOrders}
     window.setKamenskoyeOrders=count=>{
@@ -142,6 +147,9 @@ async function run(){
    assert.equal(await page.locator('.kamenskoye-stat-section').isHidden(),true);
    for(const id of ['inspectionPendingCard','inspectionCheckedCard','inspectionDefectsCard'])assert.equal(await page.locator('#'+id).isHidden(),true);
   }
+  const inactiveDefectStyle=await page.locator('[data-stat-key="order-defects"]').evaluate(node=>{
+   const style=getComputedStyle(node);return {border:style.borderTopColor,shadow:style.boxShadow};
+  });
   await page.evaluate(()=>window.setOrderDefects([{kind:'defect'},{kind:'defect',decision:'Подтверждён'},{kind:'defect'},{kind:'comment'}]));
   assert.equal(await page.locator('#statOrderDefects').textContent(),'1');
   assert.equal(await page.locator('#statOrderDefects').getAttribute('data-active'),'');
@@ -154,7 +162,11 @@ async function run(){
     const box=node.getBoundingClientRect();return {left:box.left,right:box.right,top:box.top,height:box.height};
    }));
    assert.equal(boxes.length,1);
-   assert.equal(await page.locator('[data-stat-key="order-defects"]').evaluate(node=>getComputedStyle(node).borderTopWidth),'2px');
+   const activeDefectStyle=await page.locator('[data-stat-key="order-defects"]').evaluate(node=>{
+    const style=getComputedStyle(node);return {border:style.borderTopColor,shadow:style.boxShadow};
+   });
+   assert.notEqual(activeDefectStyle.border,inactiveDefectStyle.border,'pending defects must change the counter outline');
+   assert.notEqual(activeDefectStyle.shadow,'none','pending defects must retain their visible highlight');
    assert.ok(boxes.every(box=>box.left>=0&&box.right<=width+1&&box.height<=50),'defect counters must fit on one compact row at '+width+'px: '+JSON.stringify(boxes));
   }
   await page.evaluate(()=>window.setKamenskoyeOrders(0));

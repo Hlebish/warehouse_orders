@@ -1,7 +1,7 @@
 import { createFormDraftStore, mapLimited, pushDiagnosticText } from './client-reliability.mjs?v=2026.11.27.01';
 import { createPhotoTransfer } from './photo-transfer.mjs?v=2026.11.27.01';
 import { watchOrderWindow, patchOrderRows, sortOrderRows, ARCHIVE_STATUSES } from './orders-window.mjs?v=2026.11.26.02';
-import { createGeneratorScreen } from './generator-screen.mjs?v=2026.11.27.04';
+import { createGeneratorScreen } from './generator-screen.mjs?v=2026.11.27.05';
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js';
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signInWithCredential, signOut, sendPasswordResetEmail, createUserWithEmailAndPassword, updatePassword, EmailAuthProvider, reauthenticateWithCredential, GoogleAuthProvider, signInWithPopup, linkWithCredential, setPersistence, browserLocalPersistence } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js';
 import { getFirestore, disableNetwork, enableNetwork, collection, doc, documentId, onSnapshot, setDoc, deleteDoc, getDocs, getDocsFromServer, getDoc, getDocFromServer, updateDoc, writeBatch, runTransaction, serverTimestamp, query, where, orderBy, limit, startAfter, arrayUnion, arrayRemove } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';

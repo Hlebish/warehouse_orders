@@ -13,7 +13,7 @@ const deferred=()=>{let resolve,reject;const promise=new Promise((yes,no)=>{reso
 // Exercise the real screen with browser-like event delivery and a controllable
 // Firestore transport. A cancelled listener may still deliver an already queued
 // callback; keeping its reference makes those races deterministic.
-function harness({states={},journals={},autoSnapshots=true,permission=true,now=NOW}={}){
+function harness({states={},journals={},autoSnapshots=true,permission=true,now=NOW,intl=Intl}={}){
  const savedStates=new Map(Object.entries(states).map(([id,state])=>[id,clone(state)]));
  const savedJournals=new Map(Object.entries(journals).map(([id,events])=>[id,clone(events)]));
  const subscriptions=[],intervals=new Set(),calls=[],nodes=new Map(),behaviors=new Map();
@@ -59,8 +59,8 @@ function harness({states={},journals={},autoSnapshots=true,permission=true,now=N
  }});
  const Clock=class extends Date{constructor(...args){super(...(args.length?args:[currentTime]));}static now(){return currentTime;}};
  const crypto={randomUUID:()=>`00000000-0000-4000-8000-${String(++sequence).padStart(12,'0')}`};
- const create=new Function('window','document','navigator','Date','setInterval','clearInterval','crypto',screen.replace(/\bexport /g,'')+'\nreturn createGeneratorScreen;')(
-  window,document,navigator,Clock,callback=>{intervals.add(callback);return callback;},callback=>intervals.delete(callback),crypto);
+ const create=new Function('window','document','navigator','Date','setInterval','clearInterval','crypto','Intl',screen.replace(/\bexport /g,'')+'\nreturn createGeneratorScreen;')(
+  window,document,navigator,Clock,callback=>{intervals.add(callback);return callback;},callback=>intervals.delete(callback),crypto,intl);
  const ref=(parts,kind='state')=>({path:parts.join('/'),id:parts[parts.length-1],generatorId:parts[1],kind});
  const doc=(_db,...parts)=>ref(parts);
  const collection=(parent,...parts)=>ref([...parent.path.split('/'),...parts],'journal');
@@ -362,4 +362,55 @@ test('the default transfer range preserves every millisecond of the selected rec
  assert.equal(request.fromMs,startedAtMs);assert.equal(request.toMs,stoppedAtMs);
  const {parseGeneratorInputTime,generatorInputTime}=new Function(screen.replace(/\bexport /g,'')+'\nreturn {parseGeneratorInputTime,generatorInputTime};')();
  for(const instant of [startedAtMs,stoppedAtMs,Date.parse('2026-07-01T07:15:30.001Z')])assert.equal(parseGeneratorInputTime(generatorInputTime(instant)),instant);
+});
+
+function legacyKyivIntl(){
+ const zones=[];
+ function DateTimeFormat(locale,options){
+  zones.push(options?.timeZone);
+  if(options?.timeZone==='Europe/Kyiv')throw new RangeError('Invalid time zone specified: Europe/Kyiv');
+  return new Intl.DateTimeFormat(locale,options);
+ }
+ return {intl:{NumberFormat:Intl.NumberFormat,DateTimeFormat},zones};
+}
+
+test('evaluating the optional generator module does not initialize date formatters before the app starts',()=>{
+ let constructions=0;
+ const intl={NumberFormat:Intl.NumberFormat,DateTimeFormat:function(){constructions++;throw new RangeError('Timezone data unavailable during startup');}};
+ const exports=new Function('Intl',screen.replace(/\bexport /g,'')+'\nreturn {createGeneratorScreen,generatorInputTime,parseGeneratorInputTime};')(intl);
+ assert.equal(typeof exports.createGeneratorScreen,'function');
+ assert.equal(constructions,0,'importing the generator module must not require timezone support');
+});
+
+test('legacy Intl with only Europe/Kiev preserves winter, summer and DST conversions',()=>{
+ const {intl,zones}=legacyKyivIntl();
+ const {generatorInputTime,parseGeneratorInputTime}=new Function('Intl',screen.replace(/\bexport /g,'')+'\nreturn {generatorInputTime,parseGeneratorInputTime};')(intl);
+ const examples=[
+  ['2026-11-27T10:15:30.123','2026-11-27T08:15:30.123Z'],
+  ['2026-07-01T10:15:30.456','2026-07-01T07:15:30.456Z'],
+  ['2026-03-29T02:59:59','2026-03-29T00:59:59Z'],
+  ['2026-03-29T04:00:00','2026-03-29T01:00:00Z']
+ ];
+ for(const [local,utc] of examples){
+  assert.equal(generatorInputTime(Date.parse(utc)),local);
+  assert.equal(parseGeneratorInputTime(local),Date.parse(utc));
+ }
+ assert.throws(()=>parseGeneratorInputTime('2026-03-29T03:30'),/нет.*летнее/);
+ assert.throws(()=>parseGeneratorInputTime('2026-10-25T03:30'),/дважды/);
+ assert.ok(zones.includes('Europe/Kiev'),'use the supported IANA alias rather than a fixed UTC offset');
+});
+
+test('journal and prefilled transfer form mount when the runtime rejects Europe/Kyiv',async t=>{
+ const {intl,zones}=legacyKyivIntl();
+ const startedAtMs=Date.parse('2026-11-27T08:00:00.123Z'),stoppedAtMs=Date.parse('2026-11-27T10:00:00.987Z');
+ const run={type:'run',revision:2,period:1,startedAtMs,stoppedAtMs,durationMs:stoppedAtMs-startedAtMs};
+ const h=harness({states:{'red-small':stoppedState()},journals:{'red-small':[run]},intl});t.after(()=>h.close());await flush();
+ assert.equal(h.get('genStatus').textContent,'Остановлен');
+ const display=new Intl.DateTimeFormat('ru-RU',{dateStyle:'short',timeStyle:'short',timeZone:'Europe/Kiev'});
+ const text=h.get('genHistory').children[0].children[1].textContent;
+ assert.ok(text.includes(display.format(new Date(startedAtMs))));assert.ok(text.includes(display.format(new Date(stoppedAtMs))));
+ h.click('genTransfer');assert.equal(h.get('genTransferForm').hidden,false);
+ assert.equal(h.get('genTransferFrom').value,'2026-11-27T10:00:00.123');assert.equal(h.get('genTransferTo').value,'2026-11-27T12:00:00.987');
+ h.input('genTransferTarget','yellow','change');h.respondNext('previewTransfer',request=>({data:transferPreview(request)}));h.click('genTransferPreview');await flush();
+ assert.equal(h.get('genTransferConfirm').hidden,false);assert.ok(zones.includes('Europe/Kiev'));
 });

@@ -9,10 +9,24 @@ export const generatorClockHours=ms=>{
  return Math.floor(minutes/60)+' ч '+minutes%60+' мин';
 };
 export const generatorDuration=ms=>generatorEngineHours(ms)+' ('+generatorClockHours(ms)+')';
-const dateTime=ms=>ms==null?'—':new Intl.DateTimeFormat('ru-RU',{dateStyle:'short',timeStyle:'short',timeZone:'Europe/Kyiv'}).format(new Date(ms));
-const kyivParts=new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Kyiv',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'});
+// Some installed browser runtimes only know the historical Kyiv timezone alias.
+// Resolve it when the generator screen needs dates, never while the app imports.
+let kyivTimeZone=null,kyivParts=null,kyivDisplay=null;
+function kyivFormatter(locale,options){
+ let failure;
+ for(const timeZone of kyivTimeZone?[kyivTimeZone]:['Europe/Kyiv','Europe/Kiev']){
+  try{
+   const formatter=new Intl.DateTimeFormat(locale,{...options,timeZone});
+   kyivTimeZone=timeZone;
+   return formatter;
+  }catch(error){failure=error;}
+ }
+ throw failure;
+}
+const dateTime=ms=>ms==null?'—':(kyivDisplay??=kyivFormatter('ru-RU',{dateStyle:'short',timeStyle:'short'})).format(new Date(ms));
+const dateParts=ms=>(kyivParts??=kyivFormatter('en-CA',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'})).formatToParts(new Date(ms));
 export function generatorInputTime(ms){
- const p=Object.fromEntries(kyivParts.formatToParts(new Date(ms)).map(part=>[part.type,part.value]));
+ const p=Object.fromEntries(dateParts(ms).map(part=>[part.type,part.value]));
  const milliseconds=new Date(ms).getUTCMilliseconds();
  return p.year+'-'+p.month+'-'+p.day+'T'+p.hour+':'+p.minute+':'+p.second+(milliseconds?'.'+String(milliseconds).padStart(3,'0'):'');
 }
@@ -27,7 +41,7 @@ export function parseGeneratorInputTime(value){
  const normalized=match[1]+'-'+match[2]+'-'+match[3]+'T'+match[4]+':'+match[5]+':'+String(second).padStart(2,'0')+(milliseconds?'.'+String(milliseconds).padStart(3,'0'):'');
  const offsets=new Set([-129600000,0,129600000].map(delta=>{
   const sample=Math.floor((nominal+delta)/1000)*1000;
-  const p=Object.fromEntries(kyivParts.formatToParts(new Date(sample)).map(part=>[part.type,Number(part.value)]));
+  const p=Object.fromEntries(dateParts(sample).map(part=>[part.type,Number(part.value)]));
   return Date.UTC(p.year,p.month-1,p.day,p.hour,p.minute,p.second)-sample;
  }));
  const candidates=[...offsets].map(offset=>nominal-offset).filter(ms=>generatorInputTime(ms)===normalized);

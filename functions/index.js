@@ -11,6 +11,7 @@ const { createHash } = require('crypto');
 const { directPushEventId } = require('./direct-push-id');
 const { forwardedRecipients } = require('./forwarded-context');
 const { serverManagedPush, orderEvent, entryEvent } = require('./order-notification-events');
+const {isRoutine,appendOrderPush,dispatchOrderPush}=require('./order-push-batches');
 const {createInspectionHandlers}=require('./inspection-items');
 const { normalizeBuybackArticle, resolveBuybackArticle, buybackArticleQuantities, buybackShippableArticles } = require('./buyback-articles');
 
@@ -32,7 +33,7 @@ function orderVersionKey(order = {}) {
 }
 function notificationTagFor(data, eventId, category, target, recipientUserId) {
   const urgent = data.forceAll === true || data.isMention === true || data.isReply === true || data.buybackItemId || IMMEDIATE_NOTIFICATION_CATEGORIES.has(category);
-  if (urgent || data.groupMessageId) return `event-${eventId}`;
+  if (urgent || data.groupMessageId || data.orderBatchDelivery===true) return `event-${eventId}`;
   const scope = recipientUserId ? `recipient:${recipientUserId}` : 'broadcast';
   const digest = createHash('sha1').update(`${target}:${category}:${scope}`).digest('hex').slice(0, 24);
   return `warehouse-${digest}`;
@@ -64,6 +65,7 @@ function pluralRu(value, one, few, many) {
   return n > 10 && n < 20 ? many : last > 1 && last < 5 ? few : last === 1 ? one : many;
 }
 function notificationCopy(data, count, category) {
+  if(data.orderBatchDelivery===true)return {title:String(data.title||'Заказы · Склад'),body:String(data.body||'Новое изменение')};
   if (data.forwardedContext && data.directChatThreadId) {
     return {title:(data.forwardedContext.isUrgent?'🚨 Срочно · ':'')+(data.forwardedContext.isReply?'Вам ответили':'Вас упомянули'),body:String(data.body||'').slice(0,500)};
   }
@@ -194,6 +196,7 @@ async function createNotificationHistory(data, eventId) {
       notificationTag: notificationTagFor(data, eventId, category, data.target === 'chat' ? 'chat' : 'site', recipientUserId),
       expiresAt: Number(data.expiresAt) || null,
       eventId,
+      ...(data.orderBatchDelivery===true?{batchCount:Number(data.batchCount)||1,batchCategories:Array.isArray(data.batchCategories)?data.batchCategories:[]}:{}),
       createdAt: FieldValue.serverTimestamp(),
       read: false
     }).catch(error=>{if(![6,'already-exists','ALREADY_EXISTS'].includes(error.code))throw error;}));
@@ -680,7 +683,7 @@ exports.getWarehousePushDiagnostic=onCall(async request=>{
  const profile=await db.collection('users').doc(uid).get();
  if(!profile.exists||profile.data()?.active!==true)throw new HttpsError('permission-denied','Активный профиль не найден.');
  const eventId=String(request.data?.eventId||'');
- if(!eventId)return {protocol:2,version:'2026.11.27.01',persistedOrderEvents:true};
+ if(!eventId)return {protocol:2,version:'2026.11.27.02',persistedOrderEvents:true,orderPushBatching:true};
  if(eventId.length>128||eventId.includes('/'))throw new HttpsError('invalid-argument','Некорректный идентификатор события.');
  const snap=await db.collection('pushQueue').doc(eventId).get(),data=snap.data()||{};
  if(!snap.exists||data.authorId!==uid||data.recipientUserId!==uid||data.forceAll!==true)throw new HttpsError('permission-denied','Диагностика доступна только для собственного тестового уведомления.');
@@ -772,7 +775,9 @@ exports.queueDirectChatPush=onDocumentCreated({document:'directChats/{threadId}/
 async function enqueuePersistedOrderEvent(event, data, orderId, orderNumber, entryId=''){
  if(!data)return;
  const id='order-'+createHash('sha256').update(String(event.id)).digest('hex');
- await createChatPushOnce(id,{...data,orderId,orderNumber:String(orderNumber||'').slice(0,80),entryId,target:'site',recipientUserId:'',mentionRecipientIds:[],isMention:false,isReply:false,isUrgent:false});
+ const payload={...data,orderId,orderNumber:String(orderNumber||'').slice(0,80),entryId,target:'site',recipientUserId:'',mentionRecipientIds:[],isMention:false,isReply:false,isUrgent:false};
+ if(isRoutine(payload)){await appendOrderPush({db,eventId:id,data:payload,eventAt:Date.parse(event.time||'')||Date.now()});return;}
+ await createChatPushOnce(id,payload);
 }
 exports.queueOrderCreatedPush=onDocumentCreated({document:'orders/{orderId}',retry:true},async event=>{
  const order=event.data?.data();if(!order)return;
@@ -795,6 +800,13 @@ exports.forwardOrderCommentContext=onDocumentCreated({document:'orders/{orderId}
  const broadcast=async()=>{if(!payload)return;const order=await db.collection('orders').doc(event.params.orderId).get();if(!order.exists)return;
  await enqueuePersistedOrderEvent(event,{...payload,title:(String(order.data().client||'Клиент не указан')+' · № '+String(order.data().number||'')).slice(0,120)},event.params.orderId,order.data().number,event.params.entryId);};
  await Promise.all([broadcast(),forwardAddressedMessage(event.data,'order',event.params.orderId)]);
+});
+
+// Dedicated batch worker waits for the persisted quiet window, then seals it
+// transactionally. A retry creates the same recipient queue documents.
+exports.flushOrderPushBatch=onDocumentCreated({document:'orderPushBatches/{batchId}',retry:true,timeoutSeconds:60},async event=>{
+ if(!event.data)return;
+ await dispatchOrderPush({db,ref:event.data.ref,enabled:notificationCategoryEnabled,markDone});
 });
 
 exports.sendWarehousePush = onDocumentCreated({ document: 'pushQueue/{eventId}', retry: true }, async event => {

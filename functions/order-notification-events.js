@@ -21,9 +21,26 @@ function orderEvent(before,after){
   return {authorId,title,body:'Статус: '+String(after.status||''),category:after.status==='Собран'?'assembly':'status'};
  }
  if(Boolean(before.assemblyInProgress)!==Boolean(after.assemblyInProgress))return {authorId,title,body:after.assemblyInProgress?'Начата сборка заказа.':'Сборка заказа завершена.',category:'assembly'};
- if(articleContent(before.articles)!==articleContent(after.articles))return {authorId,title,body:'Артикулы заказа изменены',category:'editing'};
+ if(articleContent(before.articles)!==articleContent(after.articles)){
+  const totals=items=>{const map=new Map();for(const item of Array.isArray(items)?items:[]){const key=String(item?.article||'').trim();if(key)map.set(key,(map.get(key)||0)+(Number(item.quantity)||1));}return map;};
+  const old=totals(before.articles),next=totals(after.articles),changes=[];
+  for(const [article,qty] of next){if(!old.has(article))changes.push('+'+article+' × '+qty);else if(old.get(article)!==qty)changes.push(article+': '+old.get(article)+' → '+qty);}
+  for(const article of old.keys())if(!next.has(article))changes.push('−'+article);
+  return {authorId,title,body:(changes.length?'Артикулы: '+changes.join(', '):'Изменён порядок артикулов').slice(0,500),category:'editing'};
+ }
  const fields=['number','client','clientId','deliveryType','deliveryAddress','paymentType','paymentStatus','mainComment','ttn','trackingNumber'];
- if(fields.some(key=>JSON.stringify(before[key]??'')!==JSON.stringify(after[key]??'')))return {authorId,title,body:'Данные заказа изменены',category:'editing'};
+ const changed=fields.filter(key=>JSON.stringify(before[key]??'')!==JSON.stringify(after[key]??''));
+ if(changed.length){
+  const labels={number:'Номер',client:'Клиент',clientId:'Клиент из справочника',deliveryType:'Доставка',deliveryAddress:'Адрес',paymentType:'Оплата',paymentStatus:'Статус оплаты',mainComment:'Комментарий',ttn:'ТТН',trackingNumber:'Номер отслеживания'};
+  const delivery={city:'По городу',pickup:'Самовывоз',post:'Почтой',kamyanske:'Камянское'};
+  const payments={cash:'Наличными',bank_transfer:'На рахунок',unknown:'Неизвестно'};
+  const details=changed.filter(key=>key!=='clientId'||!changed.includes('client')).map(key=>{
+   if(key==='clientId')return 'Изменён клиент из справочника';
+   const value=key==='deliveryType'?delivery[after[key]]||after[key]:key==='paymentType'?payments[after[key]]||after[key]:after[key];
+   return labels[key]+': '+(String(value??'').trim()||'убрано');
+  });
+  return {authorId,title,body:details.join(' · ').slice(0,500),category:'editing'};
+ }
  return null;
 }
 function entryEvent(entry,excluded=[]){
@@ -31,6 +48,13 @@ function entryEvent(entry,excluded=[]){
  const categories={comment:'comments',question:'questions',decision:'decisions',defect:'defects'};
  const category=categories[entry.kind];
  if(!category||entry.kind==='comment'&&entry.replyToEntryId)return null;
- return {authorId:String(entry.authorId),category,body:String(entry.text|| (entry.kind==='defect'?'Добавлен дефект':'Новая запись')).slice(0,500),excludedRecipientIds:[...new Set(excluded)]};
+ const text=String(entry.text||'').trim();
+ const article=String(entry.article||'').trim();
+ const photos=Array.isArray(entry.photos)?entry.photos.length:0;
+ const photoText=photos?' · Фото: '+photos:'';
+ const label=entry.kind==='comment'?'':entry.kind==='defect'?'Дефект':entry.kind==='question'?'Вопрос':'Решение';
+ const prefix=[label,article].filter(Boolean).join(' · ');
+ const body=(prefix&&text?prefix+': '+text:prefix||text||'Прикреплённые фотографии')+photoText;
+ return {authorId:String(entry.authorId),category,body:body.slice(0,500),isUrgent:entry.important===true||entry.isUrgent===true,excludedRecipientIds:[...new Set(excluded)]};
 }
 module.exports={serverManagedPush,orderEvent,entryEvent};
